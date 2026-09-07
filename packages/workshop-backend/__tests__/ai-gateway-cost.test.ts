@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { AiChatAuthorInfo, AiChatMetadata } from "@gadgets/workshop-shared/api";
@@ -17,9 +17,11 @@ describe("AI Gateway cost persistence", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("retries and records a cross-account log cost on the matching chat and gadget", async () => {
-    const fetchMock = vi.fn(async () => fetchMock.mock.calls.length === 1
-      ? new Response(null, { status: 404 })
-      : Response.json({ success: true, result: { cost: 1.25 } }));
+    const fetchMock = vi.fn(async () =>
+      fetchMock.mock.calls.length === 1
+        ? new Response(null, { status: 404 })
+        : Response.json({ success: true, result: { cost: 1.25 } }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const stub = env.TEST_OVERSEER.getByName("ai-gateway-cost");
@@ -56,9 +58,12 @@ describe("AI Gateway cost persistence", () => {
         apiToken: "read-run-token",
       });
 
-      await vi.waitFor(() => {
-        expect(overseer.impl.storage.chatMeta.get(7)?.totalCost).toBe(1.25);
-      }, { timeout: 3000 });
+      await vi.waitFor(
+        () => {
+          expect(overseer.impl.storage.chatMeta.get(7)?.totalCost).toBe(1.25);
+        },
+        { timeout: 3000 },
+      );
       expect(overseer.impl.storage.totalCost.get()).toBe(1.25);
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);

@@ -14,7 +14,7 @@ import {
   type PublicApi,
 } from "@gadgets/workshop-shared/api";
 import server from "../src/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 type CodedError = Error & { code?: unknown };
 
@@ -53,9 +53,13 @@ function expectRpcCode(error: CodedError, code: OpenGadgetErrorCode): void {
 async function connect(): Promise<RpcStub<PublicApi>> {
   // A service-binding fetch context ends with the upgrade response, before the socket callbacks.
   // Invoke the handler directly so the WebSocket session shares the test's execution context.
-  const response = await server.fetch(new Request("https://workshop.invalid/api", {
-    headers: { Upgrade: "websocket" },
-  }), env, createExecutionContext());
+  const response = await server.fetch(
+    new Request("https://workshop.invalid/api", {
+      headers: { Upgrade: "websocket" },
+    }),
+    env,
+    createExecutionContext(),
+  );
 
   expect(response.status).toBe(101);
   const socket = response.webSocket;
@@ -66,7 +70,9 @@ async function connect(): Promise<RpcStub<PublicApi>> {
 }
 
 async function createAccount(
-    publicApi: RpcStub<PublicApi>, prefix: string): Promise<{ username: string; token: string }> {
+  publicApi: RpcStub<PublicApi>,
+  prefix: string,
+): Promise<{ username: string; token: string }> {
   const name = username(prefix);
   const token = await publicApi.createAccount(name, name, PASSWORD_HASH);
   if (token === null) throw new Error(`Failed to create ${name}.`);
@@ -74,8 +80,9 @@ async function createAccount(
 }
 
 async function openRejection(
-    authenticated: RpcStub<AuthenticatedApi>,
-    id: string): Promise<CodedError> {
+  authenticated: RpcStub<AuthenticatedApi>,
+  id: string,
+): Promise<CodedError> {
   using workspace = authenticated.openGadget(id);
   return await rejection(workspace.getMetadata());
 }
@@ -130,13 +137,13 @@ describe.skip("openGadget errors across native RPC and Cap'n Web", () => {
     const metadata = await workspace.getMetadata();
 
     const nativeError = await rejection(
-      exports.OverseerDurableObject
-        .get(exports.OverseerDurableObject.idFromString(metadata.id))
-        .open(
-          exports.UserDurableObject.idFromName(intruderAccount.username).toString(),
-          intruderAccount.username,
-          () => {},
-        ),
+      exports.OverseerDurableObject.get(
+        exports.OverseerDurableObject.idFromString(metadata.id),
+      ).open(
+        exports.UserDurableObject.idFromName(intruderAccount.username).toString(),
+        intruderAccount.username,
+        () => {},
+      ),
     );
     expectRpcCode(nativeError, OPEN_GADGET_ERROR_CODES.workspaceAccessDenied);
 
@@ -163,7 +170,8 @@ describe("user-DO reset flags", () => {
     // the abort would simply restart the object and succeed. This poisoned-stub rejection is
     // the exact shape AuthenticatedApiImpl sees when one of its calls loses the reset race.
     const userStub = exports.UserDurableObject.get(
-      exports.UserDurableObject.idFromName(account.username));
+      exports.UserDurableObject.idFromName(account.username),
+    );
     expect(await userStub.listModels()).toBeInstanceOf(Array);
 
     await abortAllDurableObjects();
@@ -211,11 +219,14 @@ describe("workspace session across a user-DO-only reset", () => {
     expect(await workspace.newChat("before the reset", null)).toEqual(expect.any(Number));
 
     const userStub = exports.UserDurableObject.get(
-      exports.UserDurableObject.idFromName(account.username));
+      exports.UserDurableObject.idFromName(account.username),
+    );
     // The abort kills the very call delivering it, so the rejection is the success signal.
-    await rejection(runInDurableObject(userStub, (_instance, state) => {
-      state.abort(USER_DO_ABORT_REASON);
-    }));
+    await rejection(
+      runInDurableObject(userStub, (_instance, state) => {
+        state.abort(USER_DO_ABORT_REASON);
+      }),
+    );
 
     // Every operation below crosses into the user DO through the SAME retained workspace
     // capability. Each minting a fresh stub is what restarts the object and recovers.

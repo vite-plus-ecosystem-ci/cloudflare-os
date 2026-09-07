@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   connectMutationError,
   errorPageHtml,
@@ -10,8 +10,9 @@ import {
 
 describe("connect pages", () => {
   it("escapes every character that could break out of markup", () => {
-    expect(escapeHtml(`<img src="x" onerror='alert(1)'>&`))
-      .toBe("&lt;img src=&quot;x&quot; onerror=&#39;alert(1)&#39;&gt;&amp;");
+    expect(escapeHtml(`<img src="x" onerror='alert(1)'>&`)).toBe(
+      "&lt;img src=&quot;x&quot; onerror=&#39;alert(1)&#39;&gt;&amp;",
+    );
   });
 
   it("escapes vendor-supplied error text into the page", () => {
@@ -49,26 +50,32 @@ describe("connectMutationError", () => {
     new Request(`${origin}/connect/capability`, { method: "POST", headers });
 
   it("accepts a same-origin mutation carrying the required content type", () => {
-    expect(connectMutationError(
-      mutation({ Origin: origin, "Content-Type": "application/json" }), json,
-    )).toBeUndefined();
+    expect(
+      connectMutationError(mutation({ Origin: origin, "Content-Type": "application/json" }), json),
+    ).toBeUndefined();
   });
 
   it("refuses a mutation whose Origin is absent or foreign", () => {
     // Browsers send Origin on every POST, so an absent one is a non-browser caller that has no
     // business on a browser capability URL.
-    expect(connectMutationError(mutation({ "Content-Type": "application/json" }), json))
-      .toBe("cross-origin");
-    expect(connectMutationError(
-      mutation({ Origin: "https://attacker.example", "Content-Type": "application/json" }), json,
-    )).toBe("cross-origin");
+    expect(connectMutationError(mutation({ "Content-Type": "application/json" }), json)).toBe(
+      "cross-origin",
+    );
+    expect(
+      connectMutationError(
+        mutation({ Origin: "https://attacker.example", "Content-Type": "application/json" }),
+        json,
+      ),
+    ).toBe("cross-origin");
   });
 
   it("refuses a mutation whose content type is absent or wrong", () => {
-    expect(connectMutationError(mutation({ Origin: origin }), json))
-      .toBe("unsupported-content-type");
-    expect(connectMutationError(mutation({ Origin: origin, "Content-Type": "text/plain" }), json))
-      .toBe("unsupported-content-type");
+    expect(connectMutationError(mutation({ Origin: origin }), json)).toBe(
+      "unsupported-content-type",
+    );
+    expect(
+      connectMutationError(mutation({ Origin: origin, "Content-Type": "text/plain" }), json),
+    ).toBe("unsupported-content-type");
   });
 
   it("compares against the configured origin, not the request URL", () => {
@@ -78,25 +85,30 @@ describe("connectMutationError", () => {
       headers: { Origin: origin, "Content-Type": "application/json" },
     });
     expect(connectMutationError(rewritten, json)).toBeUndefined();
-    expect(connectMutationError(rewritten, { ...json, origin: "https://other.example" }))
-      .toBe("cross-origin");
+    expect(connectMutationError(rewritten, { ...json, origin: "https://other.example" })).toBe(
+      "cross-origin",
+    );
   });
 
   it("accepts a full base URL as the expected origin", () => {
-    expect(connectMutationError(
-      mutation({ Origin: origin, "Content-Type": "application/json" }),
-      { origin: `${origin}/gatekeeper/acme`, contentType: "application/json" },
-    )).toBeUndefined();
+    expect(
+      connectMutationError(mutation({ Origin: origin, "Content-Type": "application/json" }), {
+        origin: `${origin}/gatekeeper/acme`,
+        contentType: "application/json",
+      }),
+    ).toBeUndefined();
   });
 
   it("matches the content type case-insensitively and past its parameters", () => {
-    expect(connectMutationError(
-      mutation({ Origin: origin, "Content-Type": "APPLICATION/JSON" }), json,
-    )).toBeUndefined();
-    expect(connectMutationError(
-      mutation({ Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }),
-      { origin, contentType: "multipart/form-data" },
-    )).toBeUndefined();
+    expect(
+      connectMutationError(mutation({ Origin: origin, "Content-Type": "APPLICATION/JSON" }), json),
+    ).toBeUndefined();
+    expect(
+      connectMutationError(
+        mutation({ Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }),
+        { origin, contentType: "multipart/form-data" },
+      ),
+    ).toBeUndefined();
   });
 
   it("compares the media type exactly, so no neighbour or parameter can smuggle it", () => {
@@ -106,8 +118,9 @@ describe("connectMutationError", () => {
       "text/plain; x=application/json",
       "application/json-patch+json",
     ]) {
-      expect(connectMutationError(mutation({ Origin: origin, "Content-Type": contentType }), json))
-        .toBe("unsupported-content-type");
+      expect(
+        connectMutationError(mutation({ Origin: origin, "Content-Type": contentType }), json),
+      ).toBe("unsupported-content-type");
     }
   });
 });

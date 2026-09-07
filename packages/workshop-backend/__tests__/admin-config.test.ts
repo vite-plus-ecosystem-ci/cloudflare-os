@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { DEFAULT_ADMIN_CONFIG, defaultOutputFormatId, parseAdminConfig, reorderFormats, resolveFormatOutput, sanitizeOutputOverrides, serializeAdminConfig } from "../src/admin-config.js";
+import { describe, expect, it } from "vite-plus/test";
+import {
+  DEFAULT_ADMIN_CONFIG,
+  defaultOutputFormatId,
+  parseAdminConfig,
+  reorderFormats,
+  resolveFormatOutput,
+  sanitizeOutputOverrides,
+  serializeAdminConfig,
+} from "../src/admin-config.js";
 
 describe("parseAdminConfig", () => {
   it("backfills fields missing from a config persisted before they existed", () => {
@@ -17,14 +25,16 @@ describe("parseAdminConfig", () => {
   });
 
   it("drops malformed format entries rather than the whole list", () => {
-    let config = parseAdminConfig(JSON.stringify({
-      formats: [
-        { blueprintId: "good", enabled: true, agentHint: "  prefer me  " },
-        { enabled: true },                       // no blueprintId
-        "nonsense",
-        { blueprintId: "defaults-enabled" },     // enabled omitted
-      ],
-    }));
+    let config = parseAdminConfig(
+      JSON.stringify({
+        formats: [
+          { blueprintId: "good", enabled: true, agentHint: "  prefer me  " },
+          { enabled: true }, // no blueprintId
+          "nonsense",
+          { blueprintId: "defaults-enabled" }, // enabled omitted
+        ],
+      }),
+    );
 
     expect(config.formats).toEqual([
       { blueprintId: "good", enabled: true, agentHint: "prefer me" },
@@ -36,13 +46,15 @@ describe("parseAdminConfig", () => {
   // list as a set and refuses every reordering if it isn't one. A duplicate would make the menu
   // permanently unorderable, so it can't be allowed to survive a read.
   it("keeps only the first entry for a repeated blueprint", () => {
-    let config = parseAdminConfig(JSON.stringify({
-      formats: [
-        { blueprintId: "dup", enabled: true, agentHint: "first" },
-        { blueprintId: "other", enabled: true },
-        { blueprintId: "dup", enabled: false, agentHint: "second" },
-      ],
-    }));
+    let config = parseAdminConfig(
+      JSON.stringify({
+        formats: [
+          { blueprintId: "dup", enabled: true, agentHint: "first" },
+          { blueprintId: "other", enabled: true },
+          { blueprintId: "dup", enabled: false, agentHint: "second" },
+        ],
+      }),
+    );
 
     expect(config.formats).toEqual([
       { blueprintId: "dup", enabled: true, agentHint: "first" },
@@ -59,8 +71,11 @@ describe("reorderFormats", () => {
   ];
 
   it("rearranges into the order given", () => {
-    expect(reorderFormats(promoted, ["c", "a", "b"]).map(f => f.blueprintId))
-        .toEqual(["c", "a", "b"]);
+    expect(reorderFormats(promoted, ["c", "a", "b"]).map((f) => f.blueprintId)).toEqual([
+      "c",
+      "a",
+      "b",
+    ]);
   });
 
   // A repeated id passes both a length and a membership test, so without an explicit uniqueness
@@ -77,11 +92,19 @@ describe("reorderFormats", () => {
 });
 
 describe("format presentation", () => {
-  let declared = { id: "presentation", noun: "Slides", plural: "Slides", icon: "presentation" } as const;
+  let declared = {
+    id: "presentation",
+    noun: "Slides",
+    plural: "Slides",
+    icon: "presentation",
+  } as const;
 
   it("applies overrides over the blueprint's own declaration", () => {
-    expect(resolveFormatOutput(declared, { noun: "Briefing", plural: "Briefings" }))
-        .toEqual({ ...declared, noun: "Briefing", plural: "Briefings" });
+    expect(resolveFormatOutput(declared, { noun: "Briefing", plural: "Briefings" })).toEqual({
+      ...declared,
+      noun: "Briefing",
+      plural: "Briefings",
+    });
   });
 
   it("has no format to offer when neither side supplies a complete one", () => {
@@ -90,8 +113,9 @@ describe("format presentation", () => {
   });
 
   it("keeps only well-formed override fields", () => {
-    expect(sanitizeOutputOverrides({ noun: "  Deck  ", icon: "notAnIcon", plural: "" }))
-        .toEqual({ noun: "Deck" });
+    expect(sanitizeOutputOverrides({ noun: "  Deck  ", icon: "notAnIcon", plural: "" })).toEqual({
+      noun: "Deck",
+    });
     expect(sanitizeOutputOverrides({ icon: "notAnIcon" })).toBeUndefined();
     expect(sanitizeOutputOverrides({ noun: "x".repeat(41) })).toBeUndefined();
   });

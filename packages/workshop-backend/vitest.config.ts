@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
-import type { Plugin } from 'vite'
-import { defineConfig } from 'vitest/config'
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers'
-import capnwebValidate from 'capnweb-validate/vite'
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import type { Plugin } from "vite-plus";
+import { defineConfig } from "vite-plus";
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import capnwebValidate from "capnweb-validate/vite";
 
 // Wrangler ships `*.txt` imports as Text modules (its default module rules; see
 // src/text-modules.d.ts), but this config drives the pool from inline miniflare settings, and
@@ -13,19 +13,19 @@ import capnwebValidate from 'capnweb-validate/vite'
 // symlinked .txt (the binding .txts are symlinks to their .d.ts) would dodge the load hook
 // below and fall through to the TypeScript pipeline.
 const textModules: Plugin = {
-  name: 'text-modules',
-  enforce: 'pre',
+  name: "text-modules",
+  enforce: "pre",
   resolveId(source, importer) {
-    if (source.endsWith('.txt') && importer !== undefined) {
-      return path.resolve(path.dirname(importer), source)
+    if (source.endsWith(".txt") && importer !== undefined) {
+      return path.resolve(path.dirname(importer), source);
     }
   },
   load(id) {
-    if (id.endsWith('.txt')) {
-      return `export default ${JSON.stringify(readFileSync(id, 'utf-8'))};`
+    if (id.endsWith(".txt")) {
+      return `export default ${JSON.stringify(readFileSync(id, "utf-8"))};`;
     }
   },
-}
+};
 
 /**
  * Tests run inside workerd (via vitest-pool-workers) so they exercise the same runtime APIs as
@@ -38,19 +38,19 @@ export default defineConfig({
     textModules,
     capnwebValidate(),
     cloudflareTest({
-      main: './src/server.ts',
+      main: "./src/server.ts",
       miniflare: {
-        compatibilityDate: '2026-09-04',
-        compatibilityFlags: ['experimental', 'nodejs_compat'],
+        compatibilityDate: "2026-09-04",
+        compatibilityFlags: ["experimental", "nodejs_compat"],
         durableObjects: {
-          TEST_OVERSEER: { className: 'OverseerDurableObject', useSQLite: true },
+          TEST_OVERSEER: { className: "OverseerDurableObject", useSQLite: true },
         },
       },
     }),
   ],
   test: {
-    include: ['__tests__/*.test.ts'],
+    include: ["__tests__/*.test.ts"],
     // Asserts the pool actually started, rather than trusting a green run to mean workerd.
-    setupFiles: ['@gadgets/scripts/assert-workerd'],
+    setupFiles: ["@gadgets/scripts/assert-workerd"],
   },
-})
+});

@@ -37,7 +37,7 @@ on:
   schedule:
     # Nightly, off the hour. GitHub has no equivalent of GitLab's `environment.auto_stop_in`, so
     # this is what stops abandoned previews from leaking a KV pair and an R2 bucket each.
-    - cron: "37 4 * * *"
+  - cron: "37 4 * * *"
   workflow_dispatch:
 
 # Escalated per job. The preview jobs need no write scope at all beyond the sticky comment.
@@ -50,12 +50,7 @@ jobs:
   deploy:
     name: Deploy preview
     if: >-
-      github.event_name == 'pull_request' &&
-      github.event.action != 'closed' &&
-      github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id &&
-      github.event.pull_request.user.type != 'Bot' &&
-      github.head_ref != 'main' &&
-      github.repository_owner == 'cloudflare'
+      ${{ github.repository_owner != 'vite-plus-ecosystem-ci' && (github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && github.event.pull_request.user.type != 'Bot' && github.head_ref != 'main' && github.repository_owner == 'cloudflare') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     concurrency:
@@ -69,57 +64,57 @@ jobs:
     steps:
       # First, before any step can reference a secret. Catches a future edit that flips the
       # trigger to `pull_request_target`, and a branch pushed by a since-demoted account or a bot.
-      - name: Verify the pull request is from a maintainer
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-        run: |
-          permission=$(gh api "repos/$GH_REPO/collaborators/$PR_AUTHOR/permission" \
-            --jq '.permission')
-          if [[ ! "$permission" =~ ^(admin|maintain|write)$ ]]; then
-            echo "$PR_AUTHOR has '$permission' on $GH_REPO; previews require write access."
-            exit 1
-          fi
+    - name: Verify the pull request is from a maintainer
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+      run: |
+        permission=$(gh api "repos/$GH_REPO/collaborators/$PR_AUTHOR/permission" \
+          --jq '.permission')
+        if [[ ! "$permission" =~ ^(admin|maintain|write)$ ]]; then
+          echo "$PR_AUTHOR has '$permission' on $GH_REPO; previews require write access."
+          exit 1
+        fi
 
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+    - name: Check out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      with:
+        persist-credentials: false
 
       # Vite+ downloads its own pnpm for `vp install` and exposes no shim, so this is what puts
       # `pnpm` on PATH — for the steps below, and for the bare `pnpm` preview.ts spawns.
-      - name: Enable Corepack
-        run: corepack enable
+    - name: Enable Corepack
+      run: corepack enable
 
       # Vite+ resolves its own version from the `vite-plus` catalog entry, and installs the pnpm
       # named in `packageManager` (integrity hash checked as Corepack does), so setup-node is not
       # needed.
-      - name: Set up Vite+, Node.js and dependencies
-        uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: true
-          run-install: true
+    - name: Set up Vite+, Node.js and dependencies
+      uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754   # v1.18.0
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: true
+        run-install: true
 
-      - name: Deploy preview
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          PREVIEW_WORKERS_DEV_HOST: ${{ vars.PREVIEW_WORKERS_DEV_HOST }}
+    - name: Deploy preview
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        PREVIEW_WORKERS_DEV_HOST: ${{ vars.PREVIEW_WORKERS_DEV_HOST }}
           # Secrets, not vars: these three are uploaded to the backend's Previews settings with
           # `wrangler preview secret bulk`, and never written into a config file — Wrangler prints
           # the values it finds in one, and this log is public.
-          PREVIEW_ADMINS: ${{ secrets.PREVIEW_ADMINS }}
-          CF_ACCESS_AUD: ${{ secrets.CF_ACCESS_AUD }}
-          CF_ACCESS_ISS: ${{ secrets.CF_ACCESS_ISS }}
+        PREVIEW_ADMINS: ${{ secrets.PREVIEW_ADMINS }}
+        CF_ACCESS_AUD: ${{ secrets.CF_ACCESS_AUD }}
+        CF_ACCESS_ISS: ${{ secrets.CF_ACCESS_ISS }}
           # AI Gateway, so a preview's chats use server-managed keys rather than asking each user
           # for their own. Optional as a group: with CF_AI_GATEWAY unset the preview is BYOK, but
           # once it is set the account id is required.
-          CF_AI_GATEWAY: ${{ secrets.CF_AI_GATEWAY }}
+        CF_AI_GATEWAY: ${{ secrets.CF_AI_GATEWAY }}
           # This is delibaretely set to CF_OS_AI_GATEWAY_ACCOUNT_ID (gets uploaded as CF_AI_GATEWAY_ACCOUNT_ID)
-          CF_AI_GATEWAY_ACCOUNT_ID: ${{ secrets.CF_OS_AI_GATEWAY_ACCOUNT_ID }}
-          CF_AI_GATEWAY_PROVIDERS: ${{ secrets.CF_AI_GATEWAY_PROVIDERS }}
+        CF_AI_GATEWAY_ACCOUNT_ID: ${{ secrets.CF_OS_AI_GATEWAY_ACCOUNT_ID }}
+        CF_AI_GATEWAY_PROVIDERS: ${{ secrets.CF_AI_GATEWAY_PROVIDERS }}
           # The gateway above lives in the account these previews deploy to, so the backend's
           # WORKERS_AI binding reaches it: inference and cost-log reads are pre-authenticated
           # in-account, which is why no CF_AI_GATEWAY_API_TOKEN is passed at all.
@@ -128,7 +123,7 @@ jobs:
           # `CF_AI_GATEWAY_API_TOKEN: ${{ secrets.CF_AI_GATEWAY_API_TOKEN }}` line is added back:
           # a gateway in a *different* account (which sets this secret to `false`), and the google
           # provider, whose SDK cannot take the binding's fetch. Both fail the deploy.
-          CF_AI_GATEWAY_USE_BINDING: ${{ secrets.CF_AI_GATEWAY_USE_BINDING || 'true' }}
+        CF_AI_GATEWAY_USE_BINDING: ${{ secrets.CF_AI_GATEWAY_USE_BINDING || 'true' }}
           # The GitHub gatekeeper's OAuth app, uploaded to *that worker's* Previews settings the
           # same way, and for the same reason, as the backend's three above. Optional: with both
           # unset the preview still deploys and only the GitHub connector is dead in it.
@@ -138,58 +133,53 @@ jobs:
           # with the callback URL `https://<PREVIEW_WORKERS_DEV_HOST>/gatekeeper/github/oauth` and
           # wildcard matching left on — every preview is a different subdomain of that host, so
           # nothing narrower validates, and anything on that subdomain can receive its codes.
-          PREVIEW_GITHUB_CLIENT_ID: ${{ secrets.PREVIEW_GITHUB_CLIENT_ID }}
-          PREVIEW_GITHUB_CLIENT_SECRET: ${{ secrets.PREVIEW_GITHUB_CLIENT_SECRET }}
+        PREVIEW_GITHUB_CLIENT_ID: ${{ secrets.PREVIEW_GITHUB_CLIENT_ID }}
+        PREVIEW_GITHUB_CLIENT_SECRET: ${{ secrets.PREVIEW_GITHUB_CLIENT_SECRET }}
           # Together these are the preview name, which is the first label of its hostname: a preview
           # reads as `pr123-my-branch-router.<subdomain>.workers.dev`. The number is what keeps two
           # branches that slugify alike from sharing one instance, and is how the nightly sweep
           # matches a live preview back to its pull request. The cleanup job below passes both too.
-          PREVIEW_NAME: ${{ github.head_ref }}
-          PREVIEW_PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: node scripts/preview/preview.ts deploy
+        PREVIEW_NAME: ${{ github.head_ref }}
+        PREVIEW_PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: node scripts/preview/preview.ts deploy
 
       # In this same job, deliberately: handing the comment to a privileged second workflow is
       # the pattern workers-sdk deleted, because the privileged half read the PR number out of an
       # artifact the unprivileged half had named.
-      - name: Comment the preview URL
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          MARKER: "<!-- preview-deployment -->"
-        run: |
-          {
-            printf '%s\n\n' "$MARKER"
-            cat output/preview-comment.md
-          } > output/preview-comment-body.md
-          jq -n --rawfile body output/preview-comment-body.md '{body: $body}' \
-            > output/preview-comment.json
+    - name: Comment the preview URL
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        MARKER: "<!-- preview-deployment -->"
+      run: |
+        {
+          printf '%s\n\n' "$MARKER"
+          cat output/preview-comment.md
+        } > output/preview-comment-body.md
+        jq -n --rawfile body output/preview-comment-body.md '{body: $body}' \
+          > output/preview-comment.json
 
-          # No `| head -1`: the shell runs with `pipefail`, and gh would take a SIGPIPE.
-          matches=$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/comments" --paginate --jq '
-            first(.[]
-              | select(.user.login == "github-actions[bot]")
-              | select(.body | startswith(env.MARKER))
-              | .id)')
-          id=${matches%%$'\n'*}
+        # No `| head -1`: the shell runs with `pipefail`, and gh would take a SIGPIPE.
+        matches=$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/comments" --paginate --jq '
+          first(.[]
+            | select(.user.login == "github-actions[bot]")
+            | select(.body | startswith(env.MARKER))
+            | .id)')
+        id=${matches%%$'\n'*}
 
-          if [[ -n "$id" ]]; then
-            gh api --silent --method PATCH "repos/$GH_REPO/issues/comments/$id" \
-              --input output/preview-comment.json
-          else
-            gh api --silent --method POST "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
-              --input output/preview-comment.json
-          fi
+        if [[ -n "$id" ]]; then
+          gh api --silent --method PATCH "repos/$GH_REPO/issues/comments/$id" \
+            --input output/preview-comment.json
+        else
+          gh api --silent --method POST "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
+            --input output/preview-comment.json
+        fi
 
   cleanup:
     name: Delete preview
     if: >-
-      github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id &&
-      github.event.pull_request.user.type != 'Bot' &&
-      github.head_ref != 'main' &&
-      github.repository_owner == 'cloudflare'
+      ${{ github.repository_owner != 'vite-plus-ecosystem-ci' && (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.repo.id == github.event.pull_request.base.repo.id && github.event.pull_request.user.type != 'Bot' && github.head_ref != 'main' && github.repository_owner == 'cloudflare') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -198,58 +188,57 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Verify the pull request is from a maintainer
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-        run: |
-          permission=$(gh api "repos/$GH_REPO/collaborators/$PR_AUTHOR/permission" \
-            --jq '.permission')
-          if [[ ! "$permission" =~ ^(admin|maintain|write)$ ]]; then
-            echo "$PR_AUTHOR has '$permission' on $GH_REPO; previews require write access."
-            exit 1
-          fi
+    - name: Verify the pull request is from a maintainer
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+      run: |
+        permission=$(gh api "repos/$GH_REPO/collaborators/$PR_AUTHOR/permission" \
+          --jq '.permission')
+        if [[ ! "$permission" =~ ^(admin|maintain|write)$ ]]; then
+          echo "$PR_AUTHOR has '$permission' on $GH_REPO; previews require write access."
+          exit 1
+        fi
 
       # The PR's own head commit, not the default branch: the teardown has to read the package list
       # and wrangler configs that *created* these previews
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/head
-          persist-credentials: false
+    - name: Check out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/head
+        persist-credentials: false
 
       # Vite+ downloads its own pnpm for `vp install` and exposes no shim, so this is what puts
       # `pnpm` on PATH — for the steps below, and for the bare `pnpm` preview.ts spawns.
-      - name: Enable Corepack
-        run: corepack enable
+    - name: Enable Corepack
+      run: corepack enable
 
       # Vite+ resolves its own version from the `vite-plus` catalog entry, and installs the pnpm
       # named in `packageManager` (integrity hash checked as Corepack does), so setup-node is not
       # needed.
-      - name: Set up Vite+, Node.js and dependencies
-        uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: true
-          run-install: true
+    - name: Set up Vite+, Node.js and dependencies
+      uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754   # v1.18.0
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: true
+        run-install: true
 
-      - name: Delete preview
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          PREVIEW_WORKERS_DEV_HOST: ${{ vars.PREVIEW_WORKERS_DEV_HOST }}
+    - name: Delete preview
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        PREVIEW_WORKERS_DEV_HOST: ${{ vars.PREVIEW_WORKERS_DEV_HOST }}
           # The same pair the deploy job passed, which is what names the preview. GitHub sets both on
           # the closed event too. No admin or Access secret is needed to tear one down.
-          PREVIEW_NAME: ${{ github.head_ref }}
-          PREVIEW_PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: node scripts/preview/preview.ts delete
+        PREVIEW_NAME: ${{ github.head_ref }}
+        PREVIEW_PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: node scripts/preview/preview.ts delete
 
   sweep:
     name: Sweep abandoned previews
     if: >-
-      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
-      github.repository_owner == 'cloudflare'
+      ${{ github.repository_owner != 'vite-plus-ecosystem-ci' && ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository_owner == 'cloudflare') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     concurrency:
@@ -259,31 +248,31 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+    - name: Check out repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      with:
+        persist-credentials: false
 
       # Vite+ downloads its own pnpm for `vp install` and exposes no shim, so this is what puts
       # `pnpm` on PATH — for the steps below, and for the bare `pnpm` preview.ts spawns.
-      - name: Enable Corepack
-        run: corepack enable
+    - name: Enable Corepack
+      run: corepack enable
 
       # Vite+ resolves its own version from the `vite-plus` catalog entry, and installs the pnpm
       # named in `packageManager` (integrity hash checked as Corepack does), so setup-node is not
       # needed.
-      - name: Set up Vite+, Node.js and dependencies
-        uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: true
-          run-install: true
+    - name: Set up Vite+, Node.js and dependencies
+      uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754   # v1.18.0
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: true
+        run-install: true
 
-      - name: Sweep previews whose PR is closed, or older than 7 days
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          PREVIEW_WORKERS_DEV_HOST: ${{ vars.PREVIEW_WORKERS_DEV_HOST }}
+    - name: Sweep previews whose PR is closed, or older than 7 days
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        PREVIEW_WORKERS_DEV_HOST: ${{ vars.PREVIEW_WORKERS_DEV_HOST }}
           # Reads one pull request per number parsed out of a live preview's name.
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/preview/preview.ts sweep
+        GITHUB_TOKEN: ${{ github.token }}
+      run: node scripts/preview/preview.ts sweep

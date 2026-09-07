@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   CredentialCoordinator,
   CredentialsExpiredError,
@@ -21,8 +21,11 @@ function coordinator(
   upgrade?: CredentialCoordinatorOptions<Creds>["upgrade"],
   legacyKeys: readonly string[] = ["accessToken"],
 ) {
-  return new CredentialCoordinator<Creds>(
-    kv, { expiresAt: creds => creds.expiresAt, upgrade, legacyKeys });
+  return new CredentialCoordinator<Creds>(kv, {
+    expiresAt: (creds) => creds.expiresAt,
+    upgrade,
+    legacyKeys,
+  });
 }
 
 const live: Creds = { token: "live", expiresAt: Date.now() + 60 * 60 * 1000 };
@@ -30,8 +33,9 @@ const stale: Creds = { token: "stale", expiresAt: Date.now() + 1000 };
 
 describe("CredentialCoordinator", () => {
   it("reports expiry when nothing is stored", async () => {
-    await expect(coordinator(makeKv()).fresh(async () => live))
-      .rejects.toThrow(CredentialsExpiredError);
+    await expect(coordinator(makeKv()).fresh(async () => live)).rejects.toThrow(
+      CredentialsExpiredError,
+    );
   });
 
   it("returns stored credentials until they near expiry, then refreshes once", async () => {
@@ -66,16 +70,18 @@ describe("CredentialCoordinator", () => {
   });
 
   it("refuses to rotate an account holding no grant", async () => {
-    await expect(coordinator(makeKv()).rotate(async () => live))
-      .rejects.toThrow(CredentialsExpiredError);
+    await expect(coordinator(makeKv()).rotate(async () => live)).rejects.toThrow(
+      CredentialsExpiredError,
+    );
   });
 
   it("refuses a refresh window that would read a dead token as live", async () => {
     // Fails open, unlike a bad `maxPending`: a negative skew moves the freshness boundary past
     // expiry, and a non-finite one makes the comparison itself meaningless.
     for (const refreshSkewMs of [-1, Number.NaN, Infinity, -Infinity]) {
-      expect(() => new CredentialCoordinator<Creds>(makeKv(), { refreshSkewMs }))
-        .toThrow(/refreshSkewMs must be a non-negative finite number/);
+      expect(() => new CredentialCoordinator<Creds>(makeKv(), { refreshSkewMs })).toThrow(
+        /refreshSkewMs must be a non-negative finite number/,
+      );
     }
     expect(() => new CredentialCoordinator<Creds>(makeKv(), { refreshSkewMs: 0 })).not.toThrow();
   });
@@ -84,8 +90,9 @@ describe("CredentialCoordinator", () => {
     for (const expiresAt of [Infinity, -Infinity, Number.NaN]) {
       const instance = new CredentialCoordinator<Creds>(makeKv(), { expiresAt: () => expiresAt });
       instance.connect(live);
-      await expect(instance.fresh(async () => live))
-        .rejects.toThrow(`expiresAt must be finite or undefined, got ${expiresAt}.`);
+      await expect(instance.fresh(async () => live)).rejects.toThrow(
+        `expiresAt must be finite or undefined, got ${expiresAt}.`,
+      );
     }
 
     for (const expiresAt of [undefined, live.expiresAt]) {
@@ -97,7 +104,7 @@ describe("CredentialCoordinator", () => {
 
   it("honours a refresh window wider than the default", async () => {
     const instance = new CredentialCoordinator<Creds>(makeKv(), {
-      expiresAt: creds => creds.expiresAt,
+      expiresAt: (creds) => creds.expiresAt,
       refreshSkewMs: 5 * 60_000,
     });
     instance.connect({ token: "soon", expiresAt: Date.now() + 3 * 60_000 });
@@ -119,7 +126,7 @@ describe("CredentialCoordinator", () => {
     const both = Promise.all([instance.fresh(refresh), instance.fresh(refresh)]);
     resolve({ token: "refreshed", expiresAt: live.expiresAt });
 
-    expect((await both).map(creds => creds.token)).toEqual(["refreshed", "refreshed"]);
+    expect((await both).map((creds) => creds.token)).toEqual(["refreshed", "refreshed"]);
     expect(refresh).toHaveBeenCalledOnce();
   });
 
@@ -134,7 +141,7 @@ describe("CredentialCoordinator", () => {
     const refresh = vi.fn(async () => ({ token: `rotated${++minted}`, expiresAt: live.expiresAt }));
 
     const both = await Promise.all([first.rotate(refresh), second.rotate(refresh)]);
-    expect(both.map(creds => creds.token)).toEqual(["rotated1", "rotated1"]);
+    expect(both.map((creds) => creds.token)).toEqual(["rotated1", "rotated1"]);
     expect(refresh).toHaveBeenCalledOnce();
   });
 
@@ -189,13 +196,18 @@ describe("CredentialCoordinator", () => {
     const instance = coordinator(makeKv());
     instance.connect(stale);
 
-    await expect(instance.fresh(async () => { throw new Error("502 from origin"); }))
-      .rejects.toThrow("502 from origin");
+    await expect(
+      instance.fresh(async () => {
+        throw new Error("502 from origin");
+      }),
+    ).rejects.toThrow("502 from origin");
     expect(instance.stored()).toEqual(stale);
 
-    await expect(instance.fresh(async () => {
-      throw new CredentialsExpiredError("invalid_grant");
-    })).rejects.toThrow(CredentialsExpiredError);
+    await expect(
+      instance.fresh(async () => {
+        throw new CredentialsExpiredError("invalid_grant");
+      }),
+    ).rejects.toThrow(CredentialsExpiredError);
     expect(instance.stored()).toEqual(stale);
   });
 
@@ -448,15 +460,15 @@ describe("CredentialCoordinator", () => {
     let reapable = false;
     const failing: CredentialsKv = {
       ...kv,
-      delete: key => {
+      delete: (key) => {
         if (!reapable && key === "accessToken") throw new Error("storage unavailable");
         kv.delete(key);
       },
     };
     const instance = new CredentialCoordinator<Creds>(failing, {
-      expiresAt: creds => creds.expiresAt,
+      expiresAt: (creds) => creds.expiresAt,
       legacyKeys: ["accessToken"],
-      upgrade: storage => {
+      upgrade: (storage) => {
         const token = storage.get<string>("accessToken");
         return token === undefined ? undefined : { token, expiresAt: live.expiresAt };
       },
@@ -476,19 +488,23 @@ describe("CredentialCoordinator", () => {
   it("refuses to declare a legacy key the coordinator owns", () => {
     // Sweeping the whole `credentials:` namespace would take the identity with it, and an
     // unfenceable "" would then let an in-flight refresh commit over a revoke.
-    expect(() => coordinator(makeKv(), undefined, ["accessToken", "credentials:identity"]))
-      .toThrow('Legacy key "credentials:identity" is one the coordinator owns.');
+    expect(() => coordinator(makeKv(), undefined, ["accessToken", "credentials:identity"])).toThrow(
+      'Legacy key "credentials:identity" is one the coordinator owns.',
+    );
   });
 });
 
 describe("CredentialSource", () => {
   function source(overrides: Partial<CredentialSourceOptions<Creds>> = {}) {
-    const getCredentials =
-      vi.fn(async () => ({ creds: live, identity: "id-a", generation: "gen-a" }));
+    const getCredentials = vi.fn(async () => ({
+      creds: live,
+      identity: "id-a",
+      generation: "gen-a",
+    }));
     const noteCredentialsExpired = vi.fn(async (_identity: string) => {});
     const instance = new CredentialSource<Creds>({
       account: () => ({ getCredentials, noteCredentialsExpired }),
-      isAuthError: error => error instanceof Error && error.message === "401",
+      isAuthError: (error) => error instanceof Error && error.message === "401",
       expiredMessage: "Reconnect the account.",
       ...overrides,
     });
@@ -509,7 +525,7 @@ describe("CredentialSource", () => {
 
   it("hands the operation the credentials it fetched", async () => {
     const { instance } = source();
-    expect(await instance.run(async creds => creds.token)).toBe("live");
+    expect(await instance.run(async (creds) => creds.token)).toBe("live");
   });
 
   it("surfaces the authority only while the principal is known", async () => {
@@ -520,7 +536,7 @@ describe("CredentialSource", () => {
         getCredentials: async () => ({ creds: live, identity, generation }),
         noteCredentialsExpired: async () => {},
       }),
-      isAuthError: error => error instanceof Error && error.message === "401",
+      isAuthError: (error) => error instanceof Error && error.message === "401",
       expiredMessage: "Reconnect the account.",
     });
     // Nothing fetched yet: a cache keyed on this must bypass, not hit a props-keyed partition.
@@ -530,8 +546,11 @@ describe("CredentialSource", () => {
     expect(instance.authority()).toBe("gen-a");
 
     // A reported expiry means a reconnect will rotate the generation; forget the old one.
-    await expect(instance.run(async () => { throw new Error("401"); }))
-      .rejects.toThrow("Reconnect the account.");
+    await expect(
+      instance.run(async () => {
+        throw new Error("401");
+      }),
+    ).rejects.toThrow("Reconnect the account.");
     expect(instance.authority()).toBeUndefined();
 
     // The account keeps the dead grant until reconnect: refetching the same identity must not
@@ -549,8 +568,11 @@ describe("CredentialSource", () => {
   it("reports expiry against the identity the failed call used", async () => {
     const { instance, getCredentials, noteCredentialsExpired } = source();
 
-    await expect(instance.run(async () => { throw new Error("401"); }))
-      .rejects.toThrow("Reconnect the account.");
+    await expect(
+      instance.run(async () => {
+        throw new Error("401");
+      }),
+    ).rejects.toThrow("Reconnect the account.");
     expect(noteCredentialsExpired).toHaveBeenCalledWith("id-a");
 
     await instance.get();
@@ -566,17 +588,19 @@ describe("CredentialSource", () => {
         getCredentials: async () => ({ creds: live, identity, generation }),
         noteCredentialsExpired,
       }),
-      isAuthError: error => error instanceof Error && error.message === "401",
+      isAuthError: (error) => error instanceof Error && error.message === "401",
       expiredMessage: "Reconnect the account.",
     });
 
-    await expect(instance.run(async () => {
-      // A reconnect lands and another caller refetches while this call is in flight.
-      identity = "id-b";
-      generation = "gen-b";
-      await instance.get();
-      throw new Error("401");
-    })).rejects.toThrow("credentials changed during the operation");
+    await expect(
+      instance.run(async () => {
+        // A reconnect lands and another caller refetches while this call is in flight.
+        identity = "id-b";
+        generation = "gen-b";
+        await instance.get();
+        throw new Error("401");
+      }),
+    ).rejects.toThrow("credentials changed during the operation");
 
     // Reporting would expire the grant the user just reconnected, and clearing the authority
     // would drop its live partition; both belong to the grant that actually died.
@@ -590,12 +614,17 @@ describe("CredentialSource", () => {
       const { instance } = source({
         account: () => ({
           getCredentials: async () => ({ creds: live, identity: "id-a", generation: "gen-a" }),
-          noteCredentialsExpired: async () => { throw new Error("account unreachable"); },
+          noteCredentialsExpired: async () => {
+            throw new Error("account unreachable");
+          },
         }),
       });
 
-      await expect(instance.run(async () => { throw new Error("401"); }))
-        .rejects.toThrow("Reconnect the account.");
+      await expect(
+        instance.run(async () => {
+          throw new Error("401");
+        }),
+      ).rejects.toThrow("Reconnect the account.");
       expect(logged).toHaveBeenCalledOnce();
     } finally {
       logged.mockRestore();
@@ -605,18 +634,25 @@ describe("CredentialSource", () => {
   it("passes other failures through untouched", async () => {
     const { instance, noteCredentialsExpired } = source();
 
-    await expect(instance.run(async () => { throw new Error("500"); })).rejects.toThrow("500");
+    await expect(
+      instance.run(async () => {
+        throw new Error("500");
+      }),
+    ).rejects.toThrow("500");
     expect(noteCredentialsExpired).not.toHaveBeenCalled();
   });
 
   it("never hands a caller the fetch in flight when credentials were reported dead", async () => {
     const fetches: Array<(fetched: CredentialsWithIdentity<Creds>) => void> = [];
-    const getCredentials = vi.fn(() => new Promise<CredentialsWithIdentity<Creds>>(resolve => {
-      fetches.push(resolve);
-    }));
+    const getCredentials = vi.fn(
+      () =>
+        new Promise<CredentialsWithIdentity<Creds>>((resolve) => {
+          fetches.push(resolve);
+        }),
+    );
     const instance = new CredentialSource<Creds>({
       account: () => ({ getCredentials, noteCredentialsExpired: async () => {} }),
-      isAuthError: error => error instanceof Error && error.message === "401",
+      isAuthError: (error) => error instanceof Error && error.message === "401",
       expiredMessage: "Reconnect the account.",
     });
 
@@ -657,12 +693,15 @@ describe("CredentialSource", () => {
 
   it("never resurrects a generation cleared while another fetch was in flight", async () => {
     const fetches: Array<(fetched: CredentialsWithIdentity<Creds>) => void> = [];
-    const getCredentials = vi.fn(() => new Promise<CredentialsWithIdentity<Creds>>(resolve => {
-      fetches.push(resolve);
-    }));
+    const getCredentials = vi.fn(
+      () =>
+        new Promise<CredentialsWithIdentity<Creds>>((resolve) => {
+          fetches.push(resolve);
+        }),
+    );
     const instance = new CredentialSource<Creds>({
       account: () => ({ getCredentials, noteCredentialsExpired: async () => {} }),
-      isAuthError: error => error instanceof Error && error.message === "401",
+      isAuthError: (error) => error instanceof Error && error.message === "401",
       expiredMessage: "Reconnect the account.",
     });
 
@@ -705,7 +744,7 @@ describe("CredentialSource", () => {
         },
         noteCredentialsExpired: async () => {},
       }),
-      isAuthError: error => error instanceof Error && error.message === "401",
+      isAuthError: (error) => error instanceof Error && error.message === "401",
       expiredMessage: "Reconnect the account.",
     });
 
@@ -718,8 +757,9 @@ describe("CredentialSource", () => {
     expect(instance.authority()).toBe("gen-a");
 
     // A failed refresh is a confirmed expiry. RPC strips the class, so the name is the contract.
-    failure = Object.assign(new Error("Reconnect the account."),
-      { name: "CredentialsExpiredError" });
+    failure = Object.assign(new Error("Reconnect the account."), {
+      name: "CredentialsExpiredError",
+    });
     await expect(instance.get()).rejects.toThrow("Reconnect the account.");
     expect(instance.authority()).toBeUndefined();
   });
@@ -733,13 +773,16 @@ describe("CredentialSource", () => {
     });
     const instance = new CredentialSource<Creds>({
       account: () => ({ getCredentials, noteCredentialsExpired: async () => {} }),
-      isAuthError: error => error instanceof Error && error.message === "401",
+      isAuthError: (error) => error instanceof Error && error.message === "401",
       expiredMessage: "Reconnect the account.",
     });
 
     // Grant A is adopted, another fetch opens, then A's expiry forgets that fetch mid-flight.
     const gate = Promise.withResolvers<void>();
-    const call = instance.run(async () => { await gate.promise; throw new Error("401"); });
+    const call = instance.run(async () => {
+      await gate.promise;
+      throw new Error("401");
+    });
     fetches[0]?.resolve({ creds: live, identity: "id-a", generation: "gen-a" });
     expect(await instance.get()).toEqual(live);
     const straggler = instance.get();
@@ -754,25 +797,32 @@ describe("CredentialSource", () => {
 
     // The forgotten fetch's stale coalesced refresh finally fails; it must not clear the revival.
     fetches[1]?.reject(
-      Object.assign(new Error("Reconnect the account."), { name: "CredentialsExpiredError" }));
+      Object.assign(new Error("Reconnect the account."), { name: "CredentialsExpiredError" }),
+    );
     await expect(straggler).rejects.toThrow("Reconnect the account.");
     expect(instance.authority()).toBe("gen-a");
   });
 
   it("never adopts a straggler fetch that outlived later expiry reports", async () => {
     const fetches: Array<(fetched: CredentialsWithIdentity<Creds>) => void> = [];
-    const getCredentials = vi.fn(() => new Promise<CredentialsWithIdentity<Creds>>(resolve => {
-      fetches.push(resolve);
-    }));
+    const getCredentials = vi.fn(
+      () =>
+        new Promise<CredentialsWithIdentity<Creds>>((resolve) => {
+          fetches.push(resolve);
+        }),
+    );
     const instance = new CredentialSource<Creds>({
       account: () => ({ getCredentials, noteCredentialsExpired: async () => {} }),
-      isAuthError: error => error instanceof Error && error.message === "401",
+      isAuthError: (error) => error instanceof Error && error.message === "401",
       expiredMessage: "Reconnect the account.",
     });
 
     // Grant A is adopted, another fetch opens, then A's expiry forgets that fetch mid-flight.
     const gate = Promise.withResolvers<void>();
-    const callA = instance.run(async () => { await gate.promise; throw new Error("401"); });
+    const callA = instance.run(async () => {
+      await gate.promise;
+      throw new Error("401");
+    });
     fetches[0]?.({ creds: live, identity: "id-a", generation: "gen-a" });
     expect(await instance.get()).toEqual(live);
     const straggler = instance.get();
@@ -781,7 +831,9 @@ describe("CredentialSource", () => {
     await expect(callA).rejects.toThrow("Reconnect the account.");
 
     // Grant B is adopted and dies too, rotating the dead marker away from A.
-    const callB = instance.run(async () => { throw new Error("401"); });
+    const callB = instance.run(async () => {
+      throw new Error("401");
+    });
     fetches[2]?.({ creds: live, identity: "id-b", generation: "gen-b" });
     await expect(callB).rejects.toThrow("Reconnect the account.");
     expect(instance.authority()).toBeUndefined();
@@ -793,7 +845,9 @@ describe("CredentialSource", () => {
     expect(instance.authority()).toBeUndefined();
 
     // A failure under the still-current dead grant routes to expiry, not "retry".
-    const callC = instance.run(async () => { throw new Error("401"); });
+    const callC = instance.run(async () => {
+      throw new Error("401");
+    });
     fetches[3]?.({ creds: live, identity: "id-b", generation: "gen-b" });
     await expect(callC).rejects.toThrow("Reconnect the account.");
     expect(instance.authority()).toBeUndefined();
@@ -801,22 +855,30 @@ describe("CredentialSource", () => {
 
   it("reports a failure under fenced-out credentials as expiry when nothing live succeeded them", async () => {
     const fetches: Array<(fetched: CredentialsWithIdentity<Creds>) => void> = [];
-    const getCredentials = vi.fn(() => new Promise<CredentialsWithIdentity<Creds>>(resolve => {
-      fetches.push(resolve);
-    }));
+    const getCredentials = vi.fn(
+      () =>
+        new Promise<CredentialsWithIdentity<Creds>>((resolve) => {
+          fetches.push(resolve);
+        }),
+    );
     const noteCredentialsExpired = vi.fn(async (_identity: string) => {});
     const instance = new CredentialSource<Creds>({
       account: () => ({ getCredentials, noteCredentialsExpired }),
-      isAuthError: error => error instanceof Error && error.message === "401",
+      isAuthError: (error) => error instanceof Error && error.message === "401",
       expiredMessage: "Reconnect the account.",
     });
 
     // Grant A is adopted, a concurrent operation's fetch opens, then A's expiry fences it out.
     const gate = Promise.withResolvers<void>();
-    const callA = instance.run(async () => { await gate.promise; throw new Error("401"); });
+    const callA = instance.run(async () => {
+      await gate.promise;
+      throw new Error("401");
+    });
     fetches[0]?.({ creds: live, identity: "id-a", generation: "gen-a" });
     expect(await instance.get()).toEqual(live);
-    const callB = instance.run(async () => { throw new Error("401"); });
+    const callB = instance.run(async () => {
+      throw new Error("401");
+    });
     expect(getCredentials).toHaveBeenCalledTimes(2);
     gate.resolve();
     await expect(callA).rejects.toThrow("Reconnect the account.");
@@ -838,12 +900,15 @@ describe("CredentialSource", () => {
 
   it("keeps a dead grant refused however many stale failures report after it", async () => {
     const fetches: Array<(fetched: CredentialsWithIdentity<Creds>) => void> = [];
-    const getCredentials = vi.fn(() => new Promise<CredentialsWithIdentity<Creds>>(resolve => {
-      fetches.push(resolve);
-    }));
+    const getCredentials = vi.fn(
+      () =>
+        new Promise<CredentialsWithIdentity<Creds>>((resolve) => {
+          fetches.push(resolve);
+        }),
+    );
     const instance = new CredentialSource<Creds>({
       account: () => ({ getCredentials, noteCredentialsExpired: async () => {} }),
-      isAuthError: error => error instanceof Error && error.message === "401",
+      isAuthError: (error) => error instanceof Error && error.message === "401",
       expiredMessage: "Reconnect the account.",
     });
 
@@ -853,17 +918,21 @@ describe("CredentialSource", () => {
     const stale: Promise<unknown>[] = [];
     for (const [index, gate] of gates.entries()) {
       const reading = Promise.withResolvers<void>();
-      stale.push(instance.run(async () => {
-        reading.resolve();
-        await gate.promise;
-        throw new Error("401");
-      }));
+      stale.push(
+        instance.run(async () => {
+          reading.resolve();
+          await gate.promise;
+          throw new Error("401");
+        }),
+      );
       fetches[index]?.({ creds: live, identity: `id-stale-${index}`, generation: "gen-a" });
       await reading.promise;
     }
 
     // Grant B is adopted and dies, then every stale operation reports its own identity dead.
-    const callB = instance.run(async () => { throw new Error("401"); });
+    const callB = instance.run(async () => {
+      throw new Error("401");
+    });
     fetches[9]?.({ creds: live, identity: "id-b", generation: "gen-b" });
     await expect(callB).rejects.toThrow("Reconnect the account.");
     for (const gate of gates) gate.resolve();

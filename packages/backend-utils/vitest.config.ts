@@ -1,5 +1,5 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   plugins: [
@@ -15,18 +15,20 @@ export default defineConfig({
         // Invocations are only traced (span.isTraced === true) when a tail consumer is attached;
         // the no-op "span-sink" below exists solely so tracing.test.ts can observe span lifetime.
         tails: ["span-sink"],
-        workers: [{
-          name: "span-sink",
-          modules: true,
-          compatibilityDate: "2026-09-04",
-          compatibilityFlags: ["streaming_tail_worker"],
-          // The no-op tail() silences workerd's legacy tail delivery, which it attempts alongside
-          // the streaming path.
-          script: `export default { tail: () => {}, tailStream: () => () => {} }`,
-        }, {
-          name: "reporter",
-          modules: true,
-          script: `
+        workers: [
+          {
+            name: "span-sink",
+            modules: true,
+            compatibilityDate: "2026-09-04",
+            compatibilityFlags: ["streaming_tail_worker"],
+            // The no-op tail() silences workerd's legacy tail delivery, which it attempts alongside
+            // the streaming path.
+            script: `export default { tail: () => {}, tailStream: () => () => {} }`,
+          },
+          {
+            name: "reporter",
+            modules: true,
+            script: `
             import { WorkerEntrypoint } from "cloudflare:workers";
             let lastEvent;
             export class ErrorReporter extends WorkerEntrypoint {
@@ -44,7 +46,8 @@ export default defineConfig({
               async getLast() { return lastEvent; }
             }
           `,
-        }],
+          },
+        ],
       },
     }),
   ],

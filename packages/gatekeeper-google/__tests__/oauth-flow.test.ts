@@ -1,11 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  beginStoredOAuthFlow, claimStoredOAuthFlow, mergeGrantedResources, prepareOAuthFlow,
-  shouldDeleteCredentialsOnAlarm, type OAuthFlowMode,
+  beginStoredOAuthFlow,
+  claimStoredOAuthFlow,
+  mergeGrantedResources,
+  prepareOAuthFlow,
+  shouldDeleteCredentialsOnAlarm,
+  type OAuthFlowMode,
 } from "../src/oauth-flow";
-import {
-  BIGQUERY_RESOURCE, GOOGLE_DOC_RESOURCE, IDENTITY_SCOPES,
-} from "../src/resources";
+import { BIGQUERY_RESOURCE, GOOGLE_DOC_RESOURCE, IDENTITY_SCOPES } from "../src/resources";
 import { FakeKv } from "./fake-kv";
 
 const TEN_MINUTES = 10 * 60 * 1000;
@@ -32,8 +34,10 @@ describe("stored OAuth flow", () => {
       requestedResources: [GOOGLE_DOC_RESOURCE.urlPattern],
       oauthRedirectUri: OAUTH_REDIRECT_URI,
     });
-    expect(beginStoredOAuthFlow(kv, "init-bigquery", "oauth-bigquery", OAUTH_REDIRECT_URI, 5_000)?.scopes)
-      .toContain("https://www.googleapis.com/auth/bigquery");
+    expect(
+      beginStoredOAuthFlow(kv, "init-bigquery", "oauth-bigquery", OAUTH_REDIRECT_URI, 5_000)
+        ?.scopes,
+    ).toContain("https://www.googleapis.com/auth/bigquery");
     expect(claimStoredOAuthFlow(kv, "oauth-bigquery", 6_000)).toEqual({
       mode: "reconnect",
       requestedResources: [BIGQUERY_RESOURCE.urlPattern],
@@ -76,7 +80,9 @@ describe("stored OAuth flow", () => {
     expect(beginStoredOAuthFlow(kv, "init", "other", OAUTH_REDIRECT_URI, 2)).toBeNull();
     expect(claimStoredOAuthFlow(kv, "wrong", 2)).toBeNull();
     expect(claimStoredOAuthFlow(kv, "oauth", 2)).toEqual({
-      mode: "connect", requestedResources: [], oauthRedirectUri: OAUTH_REDIRECT_URI,
+      mode: "connect",
+      requestedResources: [],
+      oauthRedirectUri: OAUTH_REDIRECT_URI,
     });
     expect(claimStoredOAuthFlow(kv, "oauth", 2)).toBeNull();
   });
@@ -87,11 +93,15 @@ describe("stored OAuth flow", () => {
     expect(beginStoredOAuthFlow(kv, "init", "oauth", OAUTH_REDIRECT_URI, TEN_MINUTES)).toBeNull();
 
     prepareOAuthFlow(kv, "init", [], "connect", 0);
-    expect(beginStoredOAuthFlow(kv, "init", "oauth", OAUTH_REDIRECT_URI, TEN_MINUTES - 1)).not.toBeNull();
+    expect(
+      beginStoredOAuthFlow(kv, "init", "oauth", OAUTH_REDIRECT_URI, TEN_MINUTES - 1),
+    ).not.toBeNull();
     expect(claimStoredOAuthFlow(kv, "oauth", 2 * TEN_MINUTES - 1)).toBeNull();
 
     prepareOAuthFlow(kv, "init", [], "connect", 0);
-    expect(beginStoredOAuthFlow(kv, "init", "oauth", OAUTH_REDIRECT_URI, TEN_MINUTES - 1)).not.toBeNull();
+    expect(
+      beginStoredOAuthFlow(kv, "init", "oauth", OAUTH_REDIRECT_URI, TEN_MINUTES - 1),
+    ).not.toBeNull();
     expect(claimStoredOAuthFlow(kv, "oauth", 2 * TEN_MINUTES - 2)).not.toBeNull();
   });
 
@@ -104,28 +114,44 @@ describe("stored OAuth flow", () => {
   });
 
   it.each<OAuthFlowMode>(["connect", "auth", "reconnect"])(
-    "preserves %s mode independently of an empty resource list", mode => {
+    "preserves %s mode independently of an empty resource list",
+    (mode) => {
       let kv = new FakeKv();
       prepareOAuthFlow(kv, "init", [], mode, 0);
 
       expect(beginStoredOAuthFlow(kv, "init", "oauth", OAUTH_REDIRECT_URI, 1)).toEqual({
-        oauthNonce: "oauth", scopes: IDENTITY_SCOPES,
+        oauthNonce: "oauth",
+        scopes: IDENTITY_SCOPES,
       });
       expect(claimStoredOAuthFlow(kv, "oauth", 2)).toEqual({
-        mode, requestedResources: [], oauthRedirectUri: OAUTH_REDIRECT_URI,
+        mode,
+        requestedResources: [],
+        oauthRedirectUri: OAUTH_REDIRECT_URI,
       });
     },
   );
 
   it("clears obsolete pending-flow keys when preparing a new flow", () => {
     let kv = new FakeKv();
-    for (let key of ["nonce", "requestedScopes", "requestedResources", "reconnecting", "ephemeral"]) {
+    for (let key of [
+      "nonce",
+      "requestedScopes",
+      "requestedResources",
+      "reconnecting",
+      "ephemeral",
+    ]) {
       kv.put(key, "legacy");
     }
 
     prepareOAuthFlow(kv, "init", [], "auth", 0);
 
-    for (let key of ["nonce", "requestedScopes", "requestedResources", "reconnecting", "ephemeral"]) {
+    for (let key of [
+      "nonce",
+      "requestedScopes",
+      "requestedResources",
+      "reconnecting",
+      "ephemeral",
+    ]) {
       expect(kv.entries.has(key)).toBe(false);
     }
   });
