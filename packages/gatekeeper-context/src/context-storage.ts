@@ -10,10 +10,7 @@ export function truncateContextDescription(description: string): string {
   return description.slice(0, MAX_DOCUMENT_DESCRIPTION_CHARS);
 }
 
-export function decodeStoredContextBody(
-  contentType: string,
-  body: string | Uint8Array,
-): string {
+export function decodeStoredContextBody(contentType: string, body: string | Uint8Array): string {
   if (typeof body === "string") return body;
   return isTextContentType(contentType)
     ? textDecoder.decode(body)

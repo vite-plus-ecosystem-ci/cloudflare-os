@@ -48,8 +48,9 @@ const ACCESS_DENIED_STATUSES = new Set([400, 401, 403, 404]);
  * "allowed" would admit an unauthorized reader.
  */
 export function deniesAccess(error: unknown): error is CloudflareObservabilityApiError {
-  return error instanceof CloudflareObservabilityApiError &&
-    ACCESS_DENIED_STATUSES.has(error.status);
+  return (
+    error instanceof CloudflareObservabilityApiError && ACCESS_DENIED_STATUSES.has(error.status)
+  );
 }
 
 export type ObservabilityFilter = CloudflareObservabilityFilter;
@@ -64,12 +65,15 @@ const MAX_CALLER_FILTER_DEPTH = 3;
 const MAX_CALLER_FILTER_NODES = 100;
 
 function validateFilterExpression(expression: ObservabilityFilter): void {
-  const pending: Array<{ filter: ObservabilityFilter; depth: number }> = [{ filter: expression, depth: 1 }];
+  const pending: Array<{ filter: ObservabilityFilter; depth: number }> = [
+    { filter: expression, depth: 1 },
+  ];
   let nodes = 0;
   while (pending.length > 0) {
     const current = pending.pop()!;
     nodes++;
-    if (nodes > MAX_CALLER_FILTER_NODES) throw new Error("The filter contains too many conditions.");
+    if (nodes > MAX_CALLER_FILTER_NODES)
+      throw new Error("The filter contains too many conditions.");
     if (current.depth > MAX_CALLER_FILTER_DEPTH) throw new Error("Filter nesting is too deep.");
     if (current.filter.kind === "group") {
       for (const child of current.filter.filters) {
@@ -156,7 +160,8 @@ const DISCOVERY_SAMPLE_SIZE = 500;
 const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 
 const logger = obsContext.createLogger({
-  component: "gatekeeper.cloudflare.observability-api", vendorId: VENDOR_ID,
+  component: "gatekeeper.cloudflare.observability-api",
+  vendorId: VENDOR_ID,
 });
 
 type QueryResult = {
@@ -195,7 +200,9 @@ function timeframe(value?: { from: Date; to: Date }): { from: number; to: number
     throw new Error("The observability timeframe cannot exceed seven days.");
   }
   if (value && to < Date.now() - MAX_TIMEFRAME_MS) {
-    throw new Error("The observability timeframe is outside Cloudflare's seven-day retention window.");
+    throw new Error(
+      "The observability timeframe is outside Cloudflare's seven-day retention window.",
+    );
   }
   return { from, to };
 }
@@ -221,7 +228,8 @@ async function readJson(response: Response): Promise<unknown> {
   if (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES) {
     await response.body?.cancel();
     throw new CloudflareObservabilityApiError(
-      invalidResponseStatus(response), "The Workers Observability response is too large.",
+      invalidResponseStatus(response),
+      "The Workers Observability response is too large.",
     );
   }
   if (!response.body) return null;
@@ -236,7 +244,8 @@ async function readJson(response: Response): Promise<unknown> {
     if (size > MAX_RESPONSE_BYTES) {
       await reader.cancel();
       throw new CloudflareObservabilityApiError(
-        invalidResponseStatus(response), "The Workers Observability response is too large.",
+        invalidResponseStatus(response),
+        "The Workers Observability response is too large.",
       );
     }
     chunks.push(value);
@@ -261,11 +270,12 @@ async function readJson(response: Response): Promise<unknown> {
 function providerError(data: unknown, status: number): CloudflareObservabilityApiError {
   if (isRecord(data) && Array.isArray(data.errors)) {
     const messages = data.errors
-      .flatMap(error => isRecord(error) &&
-        typeof error.message === "string" ? [error.message.slice(0, 200)] : [])
+      .flatMap((error) =>
+        isRecord(error) && typeof error.message === "string" ? [error.message.slice(0, 200)] : [],
+      )
       .slice(0, 3);
     const codes = data.errors
-      .flatMap(error => isRecord(error) && isFiniteNumber(error.code) ? [error.code] : [])
+      .flatMap((error) => (isRecord(error) && isFiniteNumber(error.code) ? [error.code] : []))
       .slice(0, 3);
     if (messages.length > 0) {
       // `true`: this message is Cloudflare's, so it must not be logged.
@@ -295,7 +305,7 @@ function retryDelay(response: Response): number | null {
 
 async function wait(milliseconds: number): Promise<void> {
   if (milliseconds === 0) return;
-  await new Promise(resolve => setTimeout(resolve, milliseconds));
+  await new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 export class CloudflareObservabilityApi {
@@ -311,9 +321,11 @@ export class CloudflareObservabilityApi {
 
   async #request(path: string, body: unknown): Promise<unknown> {
     const token = await this.getToken();
-    if (!token) throw new CloudflareObservabilityApiError(401, "Cloudflare credentials have expired.");
+    if (!token)
+      throw new CloudflareObservabilityApiError(401, "Cloudflare credentials have expired.");
 
-    const url = `${API_BASE}/accounts/${encodeURIComponent(this.accountId)}` +
+    const url =
+      `${API_BASE}/accounts/${encodeURIComponent(this.accountId)}` +
       `/workers/observability/telemetry/${path}`;
     for (let attempt = 1; attempt <= 2; attempt++) {
       let response: Response | undefined;
@@ -321,9 +333,9 @@ export class CloudflareObservabilityApi {
         response = await fetch(url, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
-            "Accept": "application/json",
+            Accept: "application/json",
           },
           body: JSON.stringify(body),
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -341,11 +353,16 @@ export class CloudflareObservabilityApi {
         // A connection reset or DNS failure is not an `AbortError` and not a typed provider error, so
         // normalize it here rather than letting a raw TypeError reach callers that switch on status.
         const error = timedOut
-          ? new CloudflareObservabilityApiError(504, "Cloudflare Workers Observability request timed out.")
+          ? new CloudflareObservabilityApiError(
+              504,
+              "Cloudflare Workers Observability request timed out.",
+            )
           : caught instanceof CloudflareObservabilityApiError
             ? caught
             : new CloudflareObservabilityApiError(
-              502, "Could not reach the Cloudflare Workers Observability API.");
+                502,
+                "Could not reach the Cloudflare Workers Observability API.",
+              );
         // The provider's own message is deliberately absent here: Cloudflare can echo a
         // caller-supplied filter value back in an error, and filter values are kept out of the audit
         // trail for exactly that reason (see `summarizeFilter`). Cloudflare's numeric codes identify
@@ -357,7 +374,10 @@ export class CloudflareObservabilityApi {
         // meant to withhold. When a provider error carries no codes, the status is all that is left,
         // and that is the fail-closed answer.
         logger.warn("Workers Observability request failed", {
-          event: "observability.request.failed", path, status: error.status, attempt,
+          event: "observability.request.failed",
+          path,
+          status: error.status,
+          attempt,
           ...(error.codes.length > 0 ? { providerCodes: error.codes.join(",") } : {}),
           ...(error.fromProvider ? {} : { error }),
         });
@@ -365,9 +385,12 @@ export class CloudflareObservabilityApi {
         // A timeout or transport failure gets one fast retry; a provider status only retries when it
         // is retryable and its own backoff hint fits the budget. Timeouts are checked first because a
         // body-read timeout arrives with an already-successful status, which is not itself retryable.
-        const delay = timedOut || response === undefined
-          ? RETRY_DELAY_MS
-          : RETRYABLE_STATUSES.has(response.status) ? retryDelay(response) : null;
+        const delay =
+          timedOut || response === undefined
+            ? RETRY_DELAY_MS
+            : RETRYABLE_STATUSES.has(response.status)
+              ? retryDelay(response)
+              : null;
         if (delay === null) throw error;
         await wait(delay);
       }
@@ -390,11 +413,12 @@ export class CloudflareObservabilityApi {
    * events we return are filtered and therefore safe, and this provider has surprised us often
    * enough that converting a hypothetical disclosure into a guaranteed outage is the worse trade.
    */
-  #scopeEvents(
-    events: CloudflareObservabilityEvent[],
-  ): { events: CloudflareObservabilityEvent[]; dropped: boolean } {
+  #scopeEvents(events: CloudflareObservabilityEvent[]): {
+    events: CloudflareObservabilityEvent[];
+    dropped: boolean;
+  } {
     if (!this.workerName) return { events, dropped: false };
-    const scoped = events.filter(event => event.$metadata.service === this.workerName);
+    const scoped = events.filter((event) => event.$metadata.service === this.workerName);
     if (scoped.length !== events.length) {
       // An operational alarm, not a routine event: it means the provider's filtering changed under
       // us and every aggregate this binding can return has silently widened.
@@ -434,18 +458,23 @@ export class CloudflareObservabilityApi {
         },
         // Rebuilt field-by-field rather than forwarded: extra properties are allowed to survive
         // RPC validation, and this is a trust boundary into the provider's query parser.
-        calculations: options?.calculations?.map(calculation => calculation.operator === "count"
-          ? { operator: calculation.operator, alias: calculation.alias }
-          : {
-            operator: calculation.operator,
-            key: observabilityFieldKey(calculation.key),
-            keyType: calculation.keyType,
-            alias: calculation.alias,
-          }),
-        groupBys: options?.groupBys?.map(
-          ({ value, type }) => ({ value: observabilityFieldKey(value), type })),
+        calculations: options?.calculations?.map((calculation) =>
+          calculation.operator === "count"
+            ? { operator: calculation.operator, alias: calculation.alias }
+            : {
+                operator: calculation.operator,
+                key: observabilityFieldKey(calculation.key),
+                keyType: calculation.keyType,
+                alias: calculation.alias,
+              },
+        ),
+        groupBys: options?.groupBys?.map(({ value, type }) => ({
+          value: observabilityFieldKey(value),
+          type,
+        })),
         orderBy: options?.orderBy && {
-          value: options.orderBy.value, order: options.orderBy.order,
+          value: options.orderBy.value,
+          order: options.orderBy.order,
         },
         limit,
       },
@@ -477,17 +506,21 @@ export class CloudflareObservabilityApi {
     return page.events;
   }
 
-  async listKeys(options?: CloudflareObservabilityDiscoveryOptions): Promise<CloudflareObservabilityKey[]> {
+  async listKeys(
+    options?: CloudflareObservabilityDiscoveryOptions,
+  ): Promise<CloudflareObservabilityKey[]> {
     const limit = validatedLimit(options?.limit);
     if (this.#requiresDerivedDiscovery(options)) {
       return deriveKeys(await this.#discoverySample(options), limit);
     }
-    return parseKeys(await this.#request("keys", {
-      ...timeframe(options?.timeframe),
-      datasets: DATASETS,
-      needle: options?.search,
-      limit,
-    }));
+    return parseKeys(
+      await this.#request("keys", {
+        ...timeframe(options?.timeframe),
+        datasets: DATASETS,
+        needle: options?.search,
+        limit,
+      }),
+    );
   }
 
   async listValues(
@@ -500,14 +533,16 @@ export class CloudflareObservabilityApi {
     if (this.#requiresDerivedDiscovery(options)) {
       return deriveValues(await this.#discoverySample(options), field, type, limit);
     }
-    return parseValues(await this.#request("values", {
-      timeframe: timeframe(options?.timeframe),
-      datasets: DATASETS,
-      needle: options?.search,
-      key: field,
-      type,
-      limit,
-    }));
+    return parseValues(
+      await this.#request("values", {
+        timeframe: timeframe(options?.timeframe),
+        datasets: DATASETS,
+        needle: options?.search,
+        key: field,
+        type,
+        limit,
+      }),
+    );
   }
 
   async #listEventsPage(options?: CloudflareObservabilityEventsQuery): Promise<EventsPageResult> {
@@ -535,7 +570,9 @@ export class CloudflareObservabilityApi {
     };
   }
 
-  async listEvents(options?: CloudflareObservabilityEventsQuery): Promise<CloudflareObservabilityEventsPage> {
+  async listEvents(
+    options?: CloudflareObservabilityEventsQuery,
+  ): Promise<CloudflareObservabilityEventsPage> {
     return (await this.#listEventsPage(options)).page;
   }
 
@@ -547,12 +584,14 @@ export class CloudflareObservabilityApi {
     // The provider returns a request-ID map, so iteration order is not a page order. Take the oldest
     // event as the cursor: results run newest-first, so that is the page's continuation point.
     const oldest = groups
-      .flatMap(group => group.events)
+      .flatMap((group) => group.events)
       .reduce<CloudflareObservabilityEvent | undefined>(
-        (last, event) => !last || event.timestamp < last.timestamp ? event : last, undefined);
+        (last, event) => (!last || event.timestamp < last.timestamp ? event : last),
+        undefined,
+      );
     const invocations = groups
       .map(({ requestId, events }) => ({ requestId, events: this.#scopeEvents(events).events }))
-      .filter(invocation => invocation.events.length > 0);
+      .filter((invocation) => invocation.events.length > 0);
     return {
       invocations,
       nextCursor: oldest?.$metadata.id,
@@ -560,9 +599,13 @@ export class CloudflareObservabilityApi {
     };
   }
 
-  async listTraces(options?: CloudflareObservabilityTracesQuery): Promise<CloudflareObservabilityTracesPage> {
+  async listTraces(
+    options?: CloudflareObservabilityTracesQuery,
+  ): Promise<CloudflareObservabilityTracesPage> {
     if (this.workerName) {
-      throw new Error("Trace summaries are available only from an account-scoped observability binding.");
+      throw new Error(
+        "Trace summaries are available only from an account-scoped observability binding.",
+      );
     }
     const result = await this.#query("traces", options);
     const traces = parseTraceSummaries(result.traces);
@@ -611,8 +654,8 @@ export class CloudflareObservabilityApi {
         abrLevel: page.statistics.abrLevel ?? statistics.abrLevel,
       };
       if (totalCount !== undefined && rawEventsRead >= totalCount) break;
-      const exhausted = result.rawCount < TRACE_PAGE_SIZE || !page.nextCursor ||
-        page.nextCursor === cursor;
+      const exhausted =
+        result.rawCount < TRACE_PAGE_SIZE || !page.nextCursor || page.nextCursor === cursor;
       if (exhausted) break;
       cursor = page.nextCursor;
       // Any bound we stop on other than "read everything" may have omitted matching events.
@@ -623,7 +666,9 @@ export class CloudflareObservabilityApi {
     }
     if (events.length === 0) {
       throw new CloudflareObservabilityApiError(
-        404, `Trace ${traceId} was not found in the requested timeframe.`);
+        404,
+        `Trace ${traceId} was not found in the requested timeframe.`,
+      );
     }
     return { traceId, events, count: events.length, truncated, statistics };
   }

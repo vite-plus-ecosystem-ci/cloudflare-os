@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { useServerConfig } from '../ServerConfigContext'
+import { useEffect, useState, type ReactNode } from "react";
+import { useServerConfig } from "../ServerConfigContext";
 
 export default function SiteLogo({
   size,
@@ -7,27 +7,27 @@ export default function SiteLogo({
   srcOverride,
   children,
 }: {
-  size: number
-  className?: string
-  srcOverride?: string | null
-  children: ReactNode
+  size: number;
+  className?: string;
+  srcOverride?: string | null;
+  children: ReactNode;
 }) {
-  const serverConfig = useServerConfig()
-  const configuredUrl = serverConfig?.siteLogo?.url
-  const src = srcOverride === undefined ? configuredUrl : srcOverride ?? undefined
-  const [failed, setFailed] = useState(false)
+  const serverConfig = useServerConfig();
+  const configuredUrl = serverConfig?.siteLogo?.url;
+  const src = srcOverride === undefined ? configuredUrl : (srcOverride ?? undefined);
+  const [failed, setFailed] = useState(false);
 
-  useEffect(() => setFailed(false), [src, serverConfig])
+  useEffect(() => setFailed(false), [src, serverConfig]);
 
-  if (!src || failed) return children
+  if (!src || failed) return children;
   return (
     <img
       src={src}
       alt=""
       width={size}
       height={size}
-      className={`object-contain ${className ?? ''}`}
+      className={`object-contain ${className ?? ""}`}
       onError={() => setFailed(true)}
     />
-  )
+  );
 }

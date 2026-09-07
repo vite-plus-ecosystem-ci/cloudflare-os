@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { ConfluenceApiError, attachmentBelongsToContent, buildCql } from "../src/confluence-api";
 
 describe("buildCql", () => {
@@ -15,18 +15,17 @@ describe("buildCql", () => {
   });
 
   it("ANDs a type filter", () => {
-    expect(buildCql({ text: "foo", type: "blogpost" }))
-      .toBe('type = blogpost AND text ~ "foo"');
+    expect(buildCql({ text: "foo", type: "blogpost" })).toBe('type = blogpost AND text ~ "foo"');
   });
 
   it("ANDs a space filter with quoting", () => {
-    expect(buildCql({ text: "foo", spaceKey: "ENG" }))
-      .toBe('space = "ENG" AND text ~ "foo"');
+    expect(buildCql({ text: "foo", spaceKey: "ENG" })).toBe('space = "ENG" AND text ~ "foo"');
   });
 
   it("combines type + space + text", () => {
-    expect(buildCql({ text: "foo", type: "page", spaceKey: "ENG" }))
-      .toBe('type = page AND space = "ENG" AND text ~ "foo"');
+    expect(buildCql({ text: "foo", type: "page", spaceKey: "ENG" })).toBe(
+      'type = page AND space = "ENG" AND text ~ "foo"',
+    );
   });
 
   it("falls back to a default browse query when nothing is specified", () => {
@@ -46,7 +45,9 @@ describe("buildCql", () => {
 describe("attachmentBelongsToContent", () => {
   it("is true only when the attachment's container id matches the content id", () => {
     expect(attachmentBelongsToContent({ id: "a", title: "f", pageId: "123" }, "123")).toBe(true);
-    expect(attachmentBelongsToContent({ id: "a", title: "f", blogPostId: "123" }, "123")).toBe(true);
+    expect(attachmentBelongsToContent({ id: "a", title: "f", blogPostId: "123" }, "123")).toBe(
+      true,
+    );
     expect(attachmentBelongsToContent({ id: "a", title: "f", pageId: "999" }, "123")).toBe(false);
     expect(attachmentBelongsToContent({ id: "a", title: "f" }, "123")).toBe(false);
   });

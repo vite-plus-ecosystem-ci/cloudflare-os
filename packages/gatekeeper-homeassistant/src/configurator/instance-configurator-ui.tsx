@@ -24,11 +24,16 @@ export default {
   // and let the user trust that the configurator wires up the correct account; the `ui`
   // capability is only used by `resourceUrl` above.
   render() {
-    return <Section>
-      <Field
-        label="Whole instance access"
-        description="This binding grants access to every area, device, entity, and dashboard on the connected Home Assistant instance.">
-      </Field>
-    </Section>;
+    return (
+      <Section>
+        <Field
+          label="Whole instance access"
+          description="This binding grants access to every area, device, entity, and dashboard on the connected Home Assistant instance."
+        ></Field>
+      </Section>
+    );
   },
-} satisfies ConfiguratorUISpec<HomeAssistantInstanceConfiguratorRpc, HomeAssistantInstanceConfiguratorValues>;
+} satisfies ConfiguratorUISpec<
+  HomeAssistantInstanceConfiguratorRpc,
+  HomeAssistantInstanceConfiguratorValues
+>;

@@ -5,9 +5,9 @@
 // emitted here is display-only: the durable record of an edit is the change row appended when the
 // tool call executes (see AiChatSubscriber.changeApplied).
 
-import { AiChatStreamEvent, AiToolCall, WorkpieceId } from '@gadgets/workshop-shared/api';
-import { StreamingToolInputParser } from './streaming-json-parser';
-import { createWorkshopLogger } from './observability';
+import { AiChatStreamEvent, AiToolCall, WorkpieceId } from "@gadgets/workshop-shared/api";
+import { StreamingToolInputParser } from "./streaming-json-parser";
+import { createWorkshopLogger } from "./observability";
 
 const logger = createWorkshopLogger("workshop.agent");
 
@@ -17,7 +17,7 @@ type CodePreviewEntry = {
   // The edit's target workpiece, resolved from the streaming input's prefix fields once they are
   // complete. `null` means resolution failed (e.g. the agent omitted `workpiece` in a workspace
   // with no default gadget) — the tool call itself will fail, so no preview is shown.
-  target?: {workpieceId: WorkpieceId} | null;
+  target?: { workpieceId: WorkpieceId } | null;
   // Whether we've already emitted the toolCallTarget event. To avoid emitting multiple times.
   targetEmitted?: boolean;
   // Whether an editPreviewStart has been emitted for this call (content deltas follow it), and
@@ -35,8 +35,10 @@ type CodePreviewEntry = {
 // stream ends): a delta boundary splitting a surrogate pair would put a lone surrogate on the
 // wire, where UTF-8 encoding turns it into U+FFFD and desynchronizes the client's accumulated
 // text from the real content.
-function takeStreamedDelta(parser: StreamingToolInputParser,
-                           state: {emittedLength: number}): string {
+function takeStreamedDelta(
+  parser: StreamingToolInputParser,
+  state: { emittedLength: number },
+): string {
   let value = parser.streamingValue;
   let end = value.length;
   if (!parser.streamComplete && end > state.emittedLength) {
@@ -61,16 +63,17 @@ function takeStreamedDelta(parser: StreamingToolInputParser,
  */
 export class CodePreviewManager {
   #previews = new Map<string, CodePreviewEntry>();
-  #activeFile: {workpieceId: WorkpieceId, filename: string} | null = null;
+  #activeFile: { workpieceId: WorkpieceId; filename: string } | null = null;
 
   /**
    * `resolveWorkpiece` resolves an edit's (optional) `workpiece` input field -- the chat binding
    * name of the target workpiece -- to the workpiece whose file is being edited (a filename
    * alone doesn't identify a file).
    */
-  constructor(private emit: (event: AiChatStreamEvent) => void,
-              private resolveWorkpiece:
-                  (workpiece?: string) => {workpieceId: WorkpieceId}) {}
+  constructor(
+    private emit: (event: AiChatStreamEvent) => void,
+    private resolveWorkpiece: (workpiece?: string) => { workpieceId: WorkpieceId },
+  ) {}
 
   startToolCall(toolCallId: string, toolName: AiToolCall["toolName"]) {
     if (toolName !== "writeFile" && toolName !== "editFile") {
@@ -99,7 +102,9 @@ export class CodePreviewManager {
       this.#withdrawPreview(toolCallId, entry);
       this.#previews.delete(toolCallId);
       logger.warn("failed to parse provisional tool input", {
-        event: "agent.provisional.tool.input.parse.failed", toolCallId, error: err,
+        event: "agent.provisional.tool.input.parse.failed",
+        toolCallId,
+        error: err,
       });
     }
   }
@@ -138,12 +143,12 @@ export class CodePreviewManager {
     if (this.#activeFile === null) return;
 
     this.#activeFile = null;
-    this.emit({type: "setActiveFile", file: null});
+    this.emit({ type: "setActiveFile", file: null });
   }
 
   #withdrawPreview(toolCallId: string, entry: CodePreviewEntry) {
     if (entry.previewing) {
-      this.emit({type: "editPreviewClear", toolCallId});
+      this.emit({ type: "editPreviewClear", toolCallId });
     }
     entry.previewing = false;
     entry.previewSkipped = true;
@@ -161,8 +166,9 @@ export class CodePreviewManager {
     if (entry.target === undefined) {
       let rawWorkpiece = prefix!.workpiece;
       try {
-        entry.target =
-            this.resolveWorkpiece(typeof rawWorkpiece === "string" ? rawWorkpiece : undefined);
+        entry.target = this.resolveWorkpiece(
+          typeof rawWorkpiece === "string" ? rawWorkpiece : undefined,
+        );
       } catch {
         // Unresolvable target: the tool call itself will fail, so show no preview for it.
         entry.target = null;
@@ -174,15 +180,18 @@ export class CodePreviewManager {
     // Tell the UI this call's target file so it can display before it finalizes.
     if (!entry.targetEmitted) {
       entry.targetEmitted = true;
-      this.emit({type: "toolCallTarget", toolCallId, file: {workpieceId, filename}});
+      this.emit({ type: "toolCallTarget", toolCallId, file: { workpieceId, filename } });
     }
 
-    if (this.#activeFile !== null && this.#activeFile.workpieceId === workpieceId &&
-        this.#activeFile.filename === filename) {
+    if (
+      this.#activeFile !== null &&
+      this.#activeFile.workpieceId === workpieceId &&
+      this.#activeFile.filename === filename
+    ) {
       return;
     }
-    this.#activeFile = {workpieceId, filename};
-    this.emit({type: "setActiveFile", file: {workpieceId, filename}});
+    this.#activeFile = { workpieceId, filename };
+    this.emit({ type: "setActiveFile", file: { workpieceId, filename } });
   }
 
   // Streams the edit's content as it decodes: an editPreviewStart once the target (and, for
@@ -209,14 +218,14 @@ export class CodePreviewManager {
       this.emit({
         type: "editPreviewStart",
         toolCallId,
-        file: {workpieceId: entry.target.workpieceId, filename},
-        ...(textToReplace !== undefined ? {textToReplace} : {}),
+        file: { workpieceId: entry.target.workpieceId, filename },
+        ...(textToReplace !== undefined ? { textToReplace } : {}),
       });
     }
 
     let delta = takeStreamedDelta(entry.parser, entry);
     if (delta !== "") {
-      this.emit({type: "editPreviewDelta", toolCallId, delta});
+      this.emit({ type: "editPreviewDelta", toolCallId, delta });
     }
   }
 }
@@ -228,7 +237,7 @@ export class CodePreviewManager {
  * characters decoded since the last event.
  */
 export class ExecuteCodeStreamManager {
-  #streams = new Map<string, {parser: StreamingToolInputParser, emittedLength: number}>();
+  #streams = new Map<string, { parser: StreamingToolInputParser; emittedLength: number }>();
 
   constructor(private emit: (event: AiChatStreamEvent) => void) {}
 
@@ -272,7 +281,8 @@ export class ExecuteCodeStreamManager {
       this.#streams.delete(toolCallId);
       logger.warn("failed to parse provisional executeCode input", {
         event: "agent.provisional.execute.code.input.parse.failed",
-        toolCallId, error: err,
+        toolCallId,
+        error: err,
       });
     }
   }

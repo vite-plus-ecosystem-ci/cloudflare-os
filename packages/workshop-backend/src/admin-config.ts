@@ -8,9 +8,25 @@
 // changed by a compromised admin session. Everything here is enabled by default; the admin UI opts
 // things *out*.
 
-import { AmbientGatekeeperMode, BannerConfig, BlueprintBinding, BlueprintMetadata, BlueprintOutput, DEFAULT_BANNER_COLOR, OutputFormatOffer, isAmbientGatekeeperMode, isBannerColor, isOutputIcon } from "@gadgets/workshop-shared/api";
+import {
+  AmbientGatekeeperMode,
+  BannerConfig,
+  BlueprintBinding,
+  BlueprintMetadata,
+  BlueprintOutput,
+  DEFAULT_BANNER_COLOR,
+  OutputFormatOffer,
+  isAmbientGatekeeperMode,
+  isBannerColor,
+  isOutputIcon,
+} from "@gadgets/workshop-shared/api";
 import { SupportedResource } from "@gadgets/workshop-shared/gatekeeper";
-import { ADMIN_CONFIG_KEY, BlueprintKvEnv, readBlueprintKvRecord, sanitizeBlueprintOutput } from "./blueprint-archive.js";
+import {
+  ADMIN_CONFIG_KEY,
+  BlueprintKvEnv,
+  readBlueprintKvRecord,
+  sanitizeBlueprintOutput,
+} from "./blueprint-archive.js";
 
 export type AdminConfig = {
   /**
@@ -107,11 +123,11 @@ function parseFormats(value: unknown): FormatCuration[] {
   let seen = new Set<string>();
   for (let raw of value) {
     if (!raw || typeof raw !== "object") continue;
-    let {blueprintId, enabled, agentHint, overrides} = raw as Partial<FormatCuration>;
+    let { blueprintId, enabled, agentHint, overrides } = raw as Partial<FormatCuration>;
     if (typeof blueprintId !== "string" || !blueprintId) continue;
     if (seen.has(blueprintId)) continue;
     seen.add(blueprintId);
-    let entry: FormatCuration = {blueprintId, enabled: enabled !== false};
+    let entry: FormatCuration = { blueprintId, enabled: enabled !== false };
     if (typeof agentHint === "string" && agentHint.trim()) {
       entry.agentHint = agentHint.trim().slice(0, MAX_AGENT_HINT);
     }
@@ -130,14 +146,19 @@ function parseFormats(value: unknown): FormatCuration[] {
  * promoted [A, B] passes both a length and a membership test, drops B, and leaves a duplicate that
  * makes every later reorder throw.
  */
-export function reorderFormats(formats: FormatCuration[], blueprintIds: string[])
-    : FormatCuration[] {
-  let byId = new Map(formats.map(f => [f.blueprintId, f]));
-  if (blueprintIds.length !== byId.size || new Set(blueprintIds).size !== blueprintIds.length
-      || blueprintIds.some(id => !byId.has(id))) {
+export function reorderFormats(
+  formats: FormatCuration[],
+  blueprintIds: string[],
+): FormatCuration[] {
+  let byId = new Map(formats.map((f) => [f.blueprintId, f]));
+  if (
+    blueprintIds.length !== byId.size ||
+    new Set(blueprintIds).size !== blueprintIds.length ||
+    blueprintIds.some((id) => !byId.has(id))
+  ) {
     throw new Error("Format order must list each promoted format exactly once.");
   }
-  return blueprintIds.map(id => byId.get(id)!);
+  return blueprintIds.map((id) => byId.get(id)!);
 }
 
 /**
@@ -169,9 +190,9 @@ export function defaultOutputFormatId(blueprintId: string): string {
  */
 export function sanitizeOutputOverrides(overrides: unknown): Partial<BlueprintOutput> | undefined {
   if (!overrides || typeof overrides !== "object") return undefined;
-  let {id, noun, plural, icon} = overrides as Partial<BlueprintOutput>;
+  let { id, noun, plural, icon } = overrides as Partial<BlueprintOutput>;
   let clean: Partial<BlueprintOutput> = {};
-  for (let [key, value] of Object.entries({id, noun, plural})) {
+  for (let [key, value] of Object.entries({ id, noun, plural })) {
     if (typeof value === "string" && value.trim() && value.trim().length <= 40) {
       clean[key as "id" | "noun" | "plural"] = value.trim();
     }
@@ -189,9 +210,14 @@ export function sanitizeOutputOverrides(overrides: unknown): Partial<BlueprintOu
  * gadget built from that blueprint still carries the deployment's naming.
  */
 export function deploymentOutputForBlueprint(
-    config: AdminConfig, blueprintId: string, declared: BlueprintOutput | undefined)
-    : BlueprintOutput | undefined {
-  return resolveFormatOutput(declared, config.formats.find(f => f.blueprintId === blueprintId)?.overrides);
+  config: AdminConfig,
+  blueprintId: string,
+  declared: BlueprintOutput | undefined,
+): BlueprintOutput | undefined {
+  return resolveFormatOutput(
+    declared,
+    config.formats.find((f) => f.blueprintId === blueprintId)?.overrides,
+  );
 }
 
 /**
@@ -200,9 +226,10 @@ export function deploymentOutputForBlueprint(
  * admin overrode nothing meaningful.
  */
 export function resolveFormatOutput(
-    declared: BlueprintOutput | undefined, overrides?: Partial<BlueprintOutput>)
-    : BlueprintOutput | undefined {
-  let merged = {...declared, ...overrides};
+  declared: BlueprintOutput | undefined,
+  overrides?: Partial<BlueprintOutput>,
+): BlueprintOutput | undefined {
+  let merged = { ...declared, ...overrides };
   if (!merged.id || !merged.noun || !merged.plural || !merged.icon) return undefined;
   return merged as BlueprintOutput;
 }
@@ -230,15 +257,18 @@ export type PromotedFormat = {
 };
 
 /** Join promoted entries with the blueprints they point at, preserving order. */
-export async function listPromotedFormats(env: BlueprintKvEnv, formats: FormatCuration[])
-    : Promise<PromotedFormat[]> {
+export async function listPromotedFormats(
+  env: BlueprintKvEnv,
+  formats: FormatCuration[],
+): Promise<PromotedFormat[]> {
   let records = await Promise.all(
-      formats.map(entry => readBlueprintKvRecord(env, entry.blueprintId)));
+    formats.map((entry) => readBlueprintKvRecord(env, entry.blueprintId)),
+  );
 
   return formats.map((entry, i) => {
     let metadata = records[i]?.metadata;
     let declared = sanitizeBlueprintOutput(metadata?.output);
-    return {entry, metadata, declared, output: resolveFormatOutput(declared, entry.overrides)};
+    return { entry, metadata, declared, output: resolveFormatOutput(declared, entry.overrides) };
   });
 }
 
@@ -257,13 +287,15 @@ export type FormatOffer = OutputFormatOffer & {
  * complete presentation. A promoted blueprint that has since been deleted, or that names nothing
  * to call itself, is silently skipped.
  */
-export async function listFormatOffers(env: BlueprintKvEnv, config: AdminConfig)
-    : Promise<FormatOffer[]> {
-  let enabled = config.formats.filter(entry => entry.enabled);
+export async function listFormatOffers(
+  env: BlueprintKvEnv,
+  config: AdminConfig,
+): Promise<FormatOffer[]> {
+  let enabled = config.formats.filter((entry) => entry.enabled);
   if (enabled.length === 0) return [];
 
   let offers: FormatOffer[] = [];
-  for (let {entry, metadata, output} of await listPromotedFormats(env, enabled)) {
+  for (let { entry, metadata, output } of await listPromotedFormats(env, enabled)) {
     if (!metadata || !output) continue;
     offers.push({
       blueprintId: entry.blueprintId,
@@ -271,7 +303,7 @@ export async function listFormatOffers(env: BlueprintKvEnv, config: AdminConfig)
       description: metadata.description,
       requiresSetup: Object.keys(metadata.bindings).length > 0,
       bindings: metadata.bindings,
-      ...(entry.agentHint ? {agentHint: entry.agentHint} : {}),
+      ...(entry.agentHint ? { agentHint: entry.agentHint } : {}),
     });
   }
   return offers;
@@ -302,7 +334,8 @@ export function parseAdminConfig(raw: string | null): AdminConfig {
       signupsEnabled: typeof p.signupsEnabled === "boolean" ? p.signupsEnabled : true,
       siteName: typeof p.siteName === "string" ? p.siteName : "",
       siteLogoConfigured: typeof p.siteLogoConfigured === "boolean" ? p.siteLogoConfigured : false,
-      instanceInstructions: typeof p.instanceInstructions === "string" ? p.instanceInstructions : "",
+      instanceInstructions:
+        typeof p.instanceInstructions === "string" ? p.instanceInstructions : "",
       announcement: typeof p.announcement === "string" ? p.announcement : "",
       banner: {
         text: typeof p.banner?.text === "string" ? p.banner.text : "",
@@ -310,7 +343,7 @@ export function parseAdminConfig(raw: string | null): AdminConfig {
       },
       accentColor: typeof p.accentColor === "string" ? p.accentColor : "",
       disabledResources,
-      disabledGatekeepers: strings(p.disabledGatekeepers).map(v => v.toLowerCase()),
+      disabledGatekeepers: strings(p.disabledGatekeepers).map((v) => v.toLowerCase()),
       ambientGatekeeperModes,
       formats: parseFormats(p.formats),
     };
@@ -331,15 +364,21 @@ export async function readAdminConfig(env: Cloudflare.Env): Promise<AdminConfig>
 // --- Resource-disable helpers ---
 
 export function isResourceDisabled(
-    config: AdminConfig, vendorId: string, urlPattern: string): boolean {
+  config: AdminConfig,
+  vendorId: string,
+  urlPattern: string,
+): boolean {
   return config.disabledResources[vendorId]?.includes(urlPattern) ?? false;
 }
 
 export function filterEnabledResources(
-    config: AdminConfig, vendorId: string, resources: SupportedResource[]): SupportedResource[] {
+  config: AdminConfig,
+  vendorId: string,
+  resources: SupportedResource[],
+): SupportedResource[] {
   let disabled = config.disabledResources[vendorId];
   if (!disabled || disabled.length === 0) return resources;
-  return resources.filter(r => !disabled.includes(r.urlPattern));
+  return resources.filter((r) => !disabled.includes(r.urlPattern));
 }
 
 // --- Agent system-prompt instructions ---
@@ -351,8 +390,10 @@ export function filterEnabledResources(
 export function formatInstanceInstructions(instructions: string): string {
   let trimmed = instructions.trim();
   if (!trimmed) return "";
-  return `# Deployment-specific instructions\n\n` +
-      `The administrator of this deployment has provided the following additional instructions. ` +
-      `Follow them unless they conflict with the user's safety or the instructions above.\n\n` +
-      `<deployment_instructions>\n${trimmed}\n</deployment_instructions>`;
+  return (
+    `# Deployment-specific instructions\n\n` +
+    `The administrator of this deployment has provided the following additional instructions. ` +
+    `Follow them unless they conflict with the user's safety or the instructions above.\n\n` +
+    `<deployment_instructions>\n${trimmed}\n</deployment_instructions>`
+  );
 }

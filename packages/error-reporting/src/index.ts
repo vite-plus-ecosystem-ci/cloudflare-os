@@ -59,11 +59,7 @@ export type ErrorReportOptions = Readonly<{
 export type FrontendErrorSurface = "workshop" | "gatekeeper-app" | "configurator";
 
 /** How a frontend failure was captured. */
-export type FrontendCaptureMechanism =
-  | "window.error"
-  | "unhandledrejection"
-  | "react"
-  | "explicit";
+export type FrontendCaptureMechanism = "window.error" | "unhandledrejection" | "react" | "explicit";
 
 /** Coarse browser telemetry for issue triage; never authoritative for identity or access. */
 export type FrontendBrowserFacts = Readonly<{
@@ -112,12 +108,20 @@ type BrowserPlatform = NonNullable<FrontendBrowserFacts["platform"]>;
 
 const severities = new Set<ErrorEventV1["severity"]>(["warning", "error", "fatal"]);
 const mechanisms = new Set<FrontendCaptureMechanism>([
-  "window.error", "unhandledrejection", "react", "explicit",
+  "window.error",
+  "unhandledrejection",
+  "react",
+  "explicit",
 ]);
 const surfaces = new Set<FrontendErrorSurface>(["workshop", "gatekeeper-app", "configurator"]);
 const browserFamilies = new Set<BrowserFamily>(["Chromium", "Firefox", "Safari", "Other"]);
 const browserPlatforms = new Set<BrowserPlatform>([
-  "Windows", "macOS", "Linux", "Android", "iOS", "Other",
+  "Windows",
+  "macOS",
+  "Linux",
+  "Android",
+  "iOS",
+  "Other",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -129,8 +133,10 @@ function ownValue(object: Record<string, unknown>, key: string): unknown {
 }
 
 function allowlistedString<T extends string>(
-    value: unknown, allowed: ReadonlySet<T>): T | undefined {
-  return typeof value === "string" && allowed.has(value as T) ? value as T : undefined;
+  value: unknown,
+  allowed: ReadonlySet<T>,
+): T | undefined {
+  return typeof value === "string" && allowed.has(value as T) ? (value as T) : undefined;
 }
 
 function clipped(value: string, maximum: number): { value: string; truncated: boolean } {
@@ -160,8 +166,7 @@ export function normalizePageLocation(value: unknown): string | undefined {
   return `${url.origin}${url.pathname}`;
 }
 
-function boundedString(
-    value: unknown, maximum: number, mark: () => void): string | undefined {
+function boundedString(value: unknown, maximum: number, mark: () => void): string | undefined {
   if (typeof value !== "string" || value.length === 0) return undefined;
   const result = clipped(value, maximum);
   if (result.truncated) mark();
@@ -181,8 +186,7 @@ function boundedPageLocation(value: unknown, mark: () => void): string | undefin
   return boundedString(normalizePageLocation(value), MAX_STRING_CHARS, mark);
 }
 
-function boundedContent(
-    value: unknown, maximum: number, mark: () => void): string | undefined {
+function boundedContent(value: unknown, maximum: number, mark: () => void): string | undefined {
   if (typeof value !== "string") return undefined;
   const result = clipped(value, maximum);
   if (result.truncated) mark();
@@ -198,7 +202,9 @@ function normalizeException(value: unknown, mark: () => void): ErrorExceptionV1 
   }
 
   let truncated = ownValue(value, "truncated") === true;
-  const markException = () => { truncated = true; };
+  const markException = () => {
+    truncated = true;
+  };
   const type = boundedString(ownValue(value, "type"), MAX_STRING_CHARS, markException) ?? "Error";
   const message = boundedContent(ownValue(value, "message"), MAX_MESSAGE_CHARS, markException);
   const stack = boundedContent(ownValue(value, "stack"), MAX_STACK_CHARS, markException);
@@ -212,20 +218,20 @@ function normalizeException(value: unknown, mark: () => void): ErrorExceptionV1 
 }
 
 function normalizeFrameReport(
-    input: unknown,
-    fallbackSite: string,
-    mark: () => void = () => {},
+  input: unknown,
+  fallbackSite: string,
+  mark: () => void = () => {},
 ): FrontendFrameErrorReportV1 | null {
   if (!isRecord(input)) return null;
   const handledValue = ownValue(input, "handled");
   const exception = normalizeException(ownValue(input, "exception"), mark);
   return {
-    failureSite: boundedString(ownValue(input, "failureSite"), MAX_STRING_CHARS, mark)
-      ?? fallbackSite,
+    failureSite:
+      boundedString(ownValue(input, "failureSite"), MAX_STRING_CHARS, mark) ?? fallbackSite,
     severity: allowlistedString(ownValue(input, "severity"), severities) ?? "error",
     handled: typeof handledValue === "boolean" ? handledValue : true,
-    captureMechanism: allowlistedString(ownValue(input, "captureMechanism"), mechanisms)
-      ?? "explicit",
+    captureMechanism:
+      allowlistedString(ownValue(input, "captureMechanism"), mechanisms) ?? "explicit",
     ...(exception && { exception }),
   };
 }
@@ -249,7 +255,9 @@ export function normalizeFrontendErrorReport(input: unknown): FrontendErrorRepor
   try {
     if (!isRecord(input) || ownValue(input, "schemaVersion") !== 1) return null;
     let truncated = ownValue(input, "truncated") === true;
-    const mark = () => { truncated = true; };
+    const mark = () => {
+      truncated = true;
+    };
     const frame = normalizeFrameReport(input, "browser.unknown", mark);
     if (!frame) return null;
     const surfaceValue = ownValue(input, "surface");
@@ -258,7 +266,9 @@ export function normalizeFrontendErrorReport(input: unknown): FrontendErrorRepor
     const reportedUserId = boundedString(ownValue(input, "reportedUserId"), MAX_STRING_CHARS, mark);
     const gadgetId = boundedString(ownValue(input, "gadgetId"), MAX_STRING_CHARS, mark);
     const gatekeeperVendorId = boundedString(
-      ownValue(input, "gatekeeperVendorId"), MAX_STRING_CHARS, mark,
+      ownValue(input, "gatekeeperVendorId"),
+      MAX_STRING_CHARS,
+      mark,
     );
     const browser = normalizeBrowser(ownValue(input, "browser"));
     return {

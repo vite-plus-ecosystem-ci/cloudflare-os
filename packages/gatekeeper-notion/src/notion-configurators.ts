@@ -33,7 +33,7 @@ export class NotionItemConfiguratorUI extends RpcTarget implements NotionItemCon
       page_size: OPTION_LIMIT,
       sort: { direction: "descending", timestamp: "last_edited_time" },
     });
-    return result.results.map(item => {
+    return result.results.map((item) => {
       const summary = itemResponseToSummary(item);
       const option: ConfiguratorOption = {
         value: summary.url,
@@ -48,7 +48,10 @@ export class NotionItemConfiguratorUI extends RpcTarget implements NotionItemCon
 
 // Capability exposed to the whole-workspace configurator iframe.
 @validateRpc()
-export class NotionWorkspaceConfiguratorUI extends RpcTarget implements NotionWorkspaceConfiguratorRpc {
+export class NotionWorkspaceConfiguratorUI
+  extends RpcTarget
+  implements NotionWorkspaceConfiguratorRpc
+{
   constructor(getToken: () => Promise<string>) {
     super();
     tokenGetters.set(this, getToken);

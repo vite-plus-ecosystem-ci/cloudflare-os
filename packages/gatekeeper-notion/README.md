@@ -19,9 +19,9 @@ tokens in a `UserAccount` Durable Object; access tokens are refreshed on a 401.
 
 ## Resources
 
-| Granularity | URL pattern | Session type |
-| --- | --- | --- |
-| Whole workspace | `https://*` (catch-all) | `NotionWorkspace` |
+| Granularity        | URL pattern                    | Session type                                            |
+| ------------------ | ------------------------------ | ------------------------------------------------------- |
+| Whole workspace    | `https://*` (catch-all)        | `NotionWorkspace`                                       |
 | A page or database | `https://www.notion.so/:path+` | `NotionPage` or `NotionDatabase` (detected server-side) |
 
 Only the pages/databases the user shares with the integration during the OAuth page-picker are

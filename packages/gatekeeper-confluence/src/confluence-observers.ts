@@ -69,7 +69,10 @@ export class ConfluenceAccessChecker {
   /** Checks current site membership through Atlassian's live accessible-resources endpoint. */
   async hasSiteAccess(cloudId: string): Promise<boolean> {
     return this.#check(async () =>
-      (await this.#getResources(await this.#getToken())).some(resource => resource.id === cloudId));
+      (await this.#getResources(await this.#getToken())).some(
+        (resource) => resource.id === cloudId,
+      ),
+    );
   }
 
   /**
@@ -102,8 +105,10 @@ export class ConfluenceAccessChecker {
     try {
       return await check();
     } catch (error) {
-      if (error instanceof ConfluenceApiError &&
-          (error.status === 401 || error.status === 403 || error.status === 404)) {
+      if (
+        error instanceof ConfluenceApiError &&
+        (error.status === 401 || error.status === 403 || error.status === 404)
+      ) {
         return false;
       }
       throw error;
@@ -171,16 +176,17 @@ export class ConfluenceObserverTracker {
   async addObserver(id: string, verifier: Fetcher<ConfluenceVerifierApi>): Promise<void> {
     const checked = new Set<ConfluenceObservedSet>();
     while (true) {
-      const sets = this.#listTrackedSets().filter(setId => !checked.has(setId));
+      const sets = this.#listTrackedSets().filter((setId) => !checked.has(setId));
       if (sets.length === 0) {
         this.#kv.put(this.#observerKey(id), verifier);
         return;
       }
-      const access = await Promise.all(sets.map(setId => this.#hasSetAccess(verifier, setId)));
-      if (access.some(hasAccess => !hasAccess)) {
+      const access = await Promise.all(sets.map((setId) => this.#hasSetAccess(verifier, setId)));
+      if (access.some((hasAccess) => !hasAccess)) {
         throw new Error(
           "This collaborator does not have access to Confluence data this workspace has read, so they " +
-          "cannot be allowed to observe it.");
+            "cannot be allowed to observe it.",
+        );
       }
       for (const setId of sets) checked.add(setId);
     }
@@ -198,7 +204,7 @@ export class ConfluenceObserverTracker {
    * authorization cannot turn a retry into an unchecked read.
    */
   async prepareObservation(sets: ConfluenceObservedSet[]): Promise<ConfluenceObservationCheck> {
-    const pendingSets = [...new Set(sets)].filter(setId => !this.#isObserved(setId));
+    const pendingSets = [...new Set(sets)].filter((setId) => !this.#isObserved(setId));
     if (pendingSets.length === 0) return { pendingSets, commit() {} };
 
     // Publish pending state before the first await so a concurrently admitted observer must check it.
@@ -206,10 +212,14 @@ export class ConfluenceObserverTracker {
       if (this.#state(setId) === undefined) this.#kv.put(this.#observedKey(setId), "pending");
     }
 
-    const observerAccess = await Promise.all([...this.#listObservers()].map(async ([id, verifier]) => {
-      const access = await Promise.all(pendingSets.map(setId => this.#hasSetAccess(verifier, setId)));
-      return [id, access.every(hasAccess => hasAccess)] as const;
-    }));
+    const observerAccess = await Promise.all(
+      [...this.#listObservers()].map(async ([id, verifier]) => {
+        const access = await Promise.all(
+          pendingSets.map((setId) => this.#hasSetAccess(verifier, setId)),
+        );
+        return [id, access.every((hasAccess) => hasAccess)] as const;
+      }),
+    );
     const excluded = observerAccess.filter(([, hasAccess]) => !hasAccess).map(([id]) => id);
     return {
       excludeObservers: excluded.length > 0 ? excluded : undefined,
@@ -224,8 +234,12 @@ export class ConfluenceObserverTracker {
   }
 
   // Centralize the persisted key formats so writers and prefix scans cannot drift apart.
-  #observerKey(id: string): string { return `observer:${id}`; }
-  #observedKey(setId: ConfluenceObservedSet): string { return `observed:${setId}`; }
+  #observerKey(id: string): string {
+    return `observer:${id}`;
+  }
+  #observedKey(setId: ConfluenceObservedSet): string {
+    return `observed:${setId}`;
+  }
 
   /** Returns whether this DO has already accounted for the resource in observer checks. */
   #isObserved(setId: ConfluenceObservedSet): boolean {
@@ -240,8 +254,9 @@ export class ConfluenceObserverTracker {
   /** Restores every typed observed-set ID from the DO's marker keys. */
   #listTrackedSets(): ConfluenceObservedSet[] {
     const prefix = "observed:";
-    return [...this.#kv.list<ObservedSetState>({ prefix })]
-      .map(([key]) => key.slice(prefix.length) as ConfluenceObservedSet);
+    return [...this.#kv.list<ObservedSetState>({ prefix })].map(
+      ([key]) => key.slice(prefix.length) as ConfluenceObservedSet,
+    );
   }
 
   /** Iterates opaque observer IDs and their persistent, vendor-specific verifier stubs. */
@@ -254,7 +269,8 @@ export class ConfluenceObserverTracker {
 
   /** Dispatches a typed set to the matching live ACL check on the observer's verifier. */
   #hasSetAccess(
-    verifier: Fetcher<ConfluenceVerifierApi>, setId: ConfluenceObservedSet,
+    verifier: Fetcher<ConfluenceVerifierApi>,
+    setId: ConfluenceObservedSet,
   ): Promise<boolean> {
     const separator = setId.indexOf(":");
     const kind = setId.slice(0, separator);
@@ -272,7 +288,8 @@ export class ConfluenceObserverTracker {
  * data came from the Gadget itself, and there is no external ACL or real ID for a verifier to test.
  */
 export function contentSets(ids: string[]): ConfluenceObservedSet[] {
-  return ids.filter(id => !id.startsWith("~"))
+  return ids
+    .filter((id) => !id.startsWith("~"))
     .map((id): ConfluenceObservedSet => `content:${id}`);
 }
 

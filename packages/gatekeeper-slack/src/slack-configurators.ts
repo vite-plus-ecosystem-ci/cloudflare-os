@@ -3,7 +3,8 @@ import { validateRpc } from "capnweb-validate";
 import { SlackApi } from "./slack-api";
 import type { SlackConversationInfo } from "./types";
 import type {
-  ConversationConfiguratorRpc, ConfiguratorOption,
+  ConversationConfiguratorRpc,
+  ConfiguratorOption,
 } from "./configurator/conversation-configurator-types";
 import type { WorkspaceConfiguratorRpc } from "./configurator/workspace-configurator-types";
 import type { ThreadConfiguratorRpc } from "./configurator/thread-configurator-types";
@@ -27,7 +28,7 @@ function optionMatches(parts: (string | undefined)[], query: string): boolean {
   let lowerQuery = query.trim().toLowerCase();
   if (!lowerQuery) return true;
   let corpus = parts.filter(Boolean).join(" ").toLowerCase();
-  return lowerQuery.split(/\s+/).every(term => corpus.includes(term));
+  return lowerQuery.split(/\s+/).every((term) => corpus.includes(term));
 }
 
 @validateRpc()
@@ -66,16 +67,19 @@ export class ConversationConfiguratorUI extends RpcTarget implements Conversatio
     let cursor: string | undefined;
     for (let page = 0; page < PICKER_MAX_PAGES; page++) {
       let result = await api.listUserConversations(
-          ["public_channel", "private_channel", "im", "mpim"], cursor, PICKER_PAGE_SIZE);
+        ["public_channel", "private_channel", "im", "mpim"],
+        cursor,
+        PICKER_PAGE_SIZE,
+      );
       items.push(...result.items);
       cursor = result.nextCursor;
       if (!cursor || items.length >= PICKER_MAX_OPTIONS * 3) break;
     }
 
     return items
-        .map(info => this.#toOption(info))
-        .filter(option => optionMatches([option.title, option.subtitle], query))
-        .slice(0, PICKER_MAX_OPTIONS);
+      .map((info) => this.#toOption(info))
+      .filter((option) => optionMatches([option.title, option.subtitle], query))
+      .slice(0, PICKER_MAX_OPTIONS);
   }
 
   #toOption(info: SlackConversationInfo): ConfiguratorOption {
@@ -87,7 +91,7 @@ export class ConversationConfiguratorUI extends RpcTarget implements Conversatio
       case "mpim":
         return { value: info.id, title: info.name ?? "Group DM", subtitle: "Group direct message" };
       case "im": {
-        let name = info.peer ? (info.peer.displayName || info.peer.username) : info.id;
+        let name = info.peer ? info.peer.displayName || info.peer.username : info.id;
         return { value: info.id, title: `@${name}`, subtitle: "Direct message" };
       }
     }

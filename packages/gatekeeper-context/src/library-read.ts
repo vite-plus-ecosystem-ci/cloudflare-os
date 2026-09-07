@@ -5,11 +5,19 @@ import { RpcStub as NativeRpcStub } from "cloudflare:workers";
 import { RpcTarget } from "capnweb";
 import { validateRpc } from "capnweb-validate";
 import type {
-  ObservationAuthorizer, ObservationDescription,
+  ObservationAuthorizer,
+  ObservationDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
 import {
-  ContextSearchResult, ContextListing, ContextListingEntry, ContextReadResult,
-  ContextCollectionVisibility, decodeDocId, encodeDocId, isTextContentType, VENDOR_ID,
+  ContextSearchResult,
+  ContextListing,
+  ContextListingEntry,
+  ContextReadResult,
+  ContextCollectionVisibility,
+  decodeDocId,
+  encodeDocId,
+  isTextContentType,
+  VENDOR_ID,
 } from "./context-types.js";
 import type { ContextCollectionDurableObject } from "./context-collection.js";
 import type { UserLibraryDurableObject } from "./user-library.js";
@@ -17,7 +25,8 @@ import { domainName } from "./domain.js";
 import { obsContext } from "./observability.js";
 
 const logger = obsContext.createLogger({
-  component: "gatekeeper.context", vendorId: VENDOR_ID,
+  component: "gatekeeper.context",
+  vendorId: VENDOR_ID,
 });
 
 // Fanout cap for whole-library search/list.
@@ -56,7 +65,9 @@ export class LibraryReadSession extends RpcTarget {
   }
 
   #userLib(): DurableObjectStub<UserLibraryDurableObject> {
-    return this.userLibraries.get(this.userLibraries.idFromName(domainName(this.domain, this.accountId)));
+    return this.userLibraries.get(
+      this.userLibraries.idFromName(domainName(this.domain, this.accountId)),
+    );
   }
 
   // Computed once per session; search/list/read share it.
@@ -64,21 +75,25 @@ export class LibraryReadSession extends RpcTarget {
     return (this.#enabledPromise ??= this.#userLib().getEnabledCollections(this.domain));
   }
 
-  async #authorize(
-      collectionIds: string[], description: ObservationDescription): Promise<void> {
-    let check = collectionIds.length > 0
-      ? await this.observeCollections(collectionIds)
-      : { pendingCollections: [], commit() {} };
+  async #authorize(collectionIds: string[], description: ObservationDescription): Promise<void> {
+    let check =
+      collectionIds.length > 0
+        ? await this.observeCollections(collectionIds)
+        : { pendingCollections: [], commit() {} };
     await this.authorizer.authorizeObservation({
-      ...description, excludeObservers: check.excludeObservers,
+      ...description,
+      excludeObservers: check.excludeObservers,
     });
     check.commit();
   }
 
-  async search(query: string, opts?: {
-    collectionId?: string;
-    limit?: number;
-  }): Promise<ContextSearchResult[]> {
+  async search(
+    query: string,
+    opts?: {
+      collectionId?: string;
+      limit?: number;
+    },
+  ): Promise<ContextSearchResult[]> {
     let enabled = await this.#enabled();
     let limit = opts?.limit ?? 20;
 
@@ -90,25 +105,31 @@ export class LibraryReadSession extends RpcTarget {
       targetIds = [...enabled.keys()];
     }
 
-    let perCollection = await mapWithConcurrency(targetIds, MAX_COLLECTION_FANOUT, async (collectionId) => {
-      try {
-        let hits = await this.#collection(collectionId).search(query, limit);
-        return hits.map((r): ContextSearchResult => ({
-          docId: encodeDocId(collectionId, r.path),
-          collectionId,
-          title: r.name,
-          path: r.path,
-          description: r.description,
-          snippet: r.snippet,
-          score: r.score,
-        }));
-      } catch (err) {
-        logger.warn("failed to search collection", {
-          event: "collection.search.failed", collectionId, error: err,
-        });
-        return [];
-      }
-    });
+    let perCollection = await mapWithConcurrency(
+      targetIds,
+      MAX_COLLECTION_FANOUT,
+      async (collectionId) => {
+        try {
+          let hits = await this.#collection(collectionId).search(query, limit);
+          return hits.map((r): ContextSearchResult => ({
+            docId: encodeDocId(collectionId, r.path),
+            collectionId,
+            title: r.name,
+            path: r.path,
+            description: r.description,
+            snippet: r.snippet,
+            score: r.score,
+          }));
+        } catch (err) {
+          logger.warn("failed to search collection", {
+            event: "collection.search.failed",
+            collectionId,
+            error: err,
+          });
+          return [];
+        }
+      },
+    );
 
     let results = perCollection.flat();
     results.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
@@ -116,7 +137,9 @@ export class LibraryReadSession extends RpcTarget {
 
     // Nothing matched → nothing was observed, so don't record an observation (mirrors read()).
     if (results.length === 0) return results;
-    let collectionIds = [...new Set(results.map(r => r.collectionId).filter((id): id is string => !!id))];
+    let collectionIds = [
+      ...new Set(results.map((r) => r.collectionId).filter((id): id is string => !!id)),
+    ];
     // Authorize after fetching, before returning data.
     await this.#authorize(collectionIds, {
       title: `Context search: ${query}`,
@@ -127,10 +150,7 @@ export class LibraryReadSession extends RpcTarget {
     return results;
   }
 
-  async list(opts?: {
-    collectionId?: string;
-    path?: string;
-  }): Promise<ContextListing> {
+  async list(opts?: { collectionId?: string; path?: string }): Promise<ContextListing> {
     let listing = await this.#fetchListing(opts);
     // Nothing listed → nothing was observed, so don't record an observation (mirrors read()).
     if (listing.entries.length === 0) return listing;
@@ -138,9 +158,11 @@ export class LibraryReadSession extends RpcTarget {
     let collectionIds = opts?.collectionId
       ? [opts.collectionId]
       : listing.entries
-          .filter((entry): entry is Extract<ContextListingEntry, { type: "collection" }> =>
-            entry.type === "collection")
-          .map(entry => entry.id);
+          .filter(
+            (entry): entry is Extract<ContextListingEntry, { type: "collection" }> =>
+              entry.type === "collection",
+          )
+          .map((entry) => entry.id);
     await this.#authorize(collectionIds, {
       title: opts?.collectionId
         ? `Context listing: ${opts.collectionId}${opts.path ? "/" + opts.path : ""}`
@@ -187,7 +209,9 @@ export class LibraryReadSession extends RpcTarget {
     let enabled = await this.#enabled();
 
     if (!opts?.collectionId) {
-      let collectionEntries = await mapWithConcurrency([...enabled.keys()], MAX_COLLECTION_FANOUT,
+      let collectionEntries = await mapWithConcurrency(
+        [...enabled.keys()],
+        MAX_COLLECTION_FANOUT,
         async (collectionId): Promise<ContextListingEntry | null> => {
           try {
             let meta = await this.#collection(collectionId).getMetadata();
@@ -200,11 +224,14 @@ export class LibraryReadSession extends RpcTarget {
             };
           } catch (err) {
             logger.warn("failed to list collection", {
-              event: "collection.list.failed", collectionId, error: err,
+              event: "collection.list.failed",
+              collectionId,
+              error: err,
             });
             return null;
           }
-        });
+        },
+      );
       return { entries: collectionEntries.filter((e): e is ContextListingEntry => e !== null) };
     }
 
@@ -213,7 +240,9 @@ export class LibraryReadSession extends RpcTarget {
     }
 
     let pathPrefix = opts.path ? opts.path + "/" : "";
-    let docs = await this.#collection(opts.collectionId).listContextDocuments(pathPrefix || undefined);
+    let docs = await this.#collection(opts.collectionId).listContextDocuments(
+      pathPrefix || undefined,
+    );
 
     let entries: ContextListingEntry[] = [];
     let seenDirs = new Set<string>();
@@ -244,7 +273,10 @@ export class LibraryReadSession extends RpcTarget {
 }
 
 async function mapWithConcurrency<T, R>(
-    items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
   let results: R[] = Array.from({ length: items.length });
   let next = 0;
   async function worker(): Promise<void> {

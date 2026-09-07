@@ -56,31 +56,33 @@ export function summarizeFilter(filter?: CloudflareObservabilityFilter): string 
 }
 
 @validateRpc()
-export class CloudflareObservabilitySessionImpl extends RpcTarget
-    implements CloudflareObservabilitySession {
+export class CloudflareObservabilitySessionImpl
+  extends RpcTarget
+  implements CloudflareObservabilitySession
+{
   readonly #api: CloudflareObservabilityApi;
   readonly #queue: RpcStub<ApprovalQueue>;
   readonly #target: string;
 
-  constructor(
-    api: CloudflareObservabilityApi,
-    queue: RpcStub<ApprovalQueue>,
-    target: string,
-  ) {
+  constructor(api: CloudflareObservabilityApi, queue: RpcStub<ApprovalQueue>, target: string) {
     super();
     this.#api = api;
     this.#queue = queue;
     this.#target = target.slice(0, MAX_TARGET_LENGTH);
   }
 
-  [Symbol.dispose](): void { this.#queue[Symbol.dispose](); }
+  [Symbol.dispose](): void {
+    this.#queue[Symbol.dispose]();
+  }
 
   #queryDescription(options?: CloudflareObservabilityDiscoveryOptions): string {
     const timeframe = options?.timeframe
       ? `${options.timeframe.from.toISOString()} to ${options.timeframe.to.toISOString()}`
       : "the last hour";
-    return `${this.#target}; timeframe ${timeframe}; ` +
-      `filter ${summarizeFilter(options?.filter)}; search ${options?.search ? "yes" : "no"}`;
+    return (
+      `${this.#target}; timeframe ${timeframe}; ` +
+      `filter ${summarizeFilter(options?.filter)}; search ${options?.search ? "yes" : "no"}`
+    );
   }
 
   #resultDescription(
@@ -88,8 +90,10 @@ export class CloudflareObservabilitySessionImpl extends RpcTarget
     noun: string,
     statistics?: CloudflareObservabilityStatistics,
   ): string {
-    return `returned ${count} ${noun}` +
-      (statistics ? `; ${statistics.rowsRead} rows and ${statistics.bytesRead} bytes scanned` : "");
+    return (
+      `returned ${count} ${noun}` +
+      (statistics ? `; ${statistics.rowsRead} rows and ${statistics.bytesRead} bytes scanned` : "")
+    );
   }
 
   async #observe<T>(
@@ -106,43 +110,91 @@ export class CloudflareObservabilitySessionImpl extends RpcTarget
     return result;
   }
 
-  async listKeys(options?: CloudflareObservabilityDiscoveryOptions): Promise<CloudflareObservabilityKey[]> {
-    return this.#observe("Discover Workers telemetry fields", options,
+  async listKeys(
+    options?: CloudflareObservabilityDiscoveryOptions,
+  ): Promise<CloudflareObservabilityKey[]> {
+    return this.#observe(
+      "Discover Workers telemetry fields",
+      options,
       () => this.#api.listKeys(options),
-      result => this.#resultDescription(result.length, "fields"));
+      (result) => this.#resultDescription(result.length, "fields"),
+    );
   }
 
-  async listValues(key: string, type: CloudflareObservabilityValueType,
-                   options?: CloudflareObservabilityDiscoveryOptions): Promise<CloudflareObservabilityValue[]> {
-    return this.#observe("Discover Workers telemetry values", options,
+  async listValues(
+    key: string,
+    type: CloudflareObservabilityValueType,
+    options?: CloudflareObservabilityDiscoveryOptions,
+  ): Promise<CloudflareObservabilityValue[]> {
+    return this.#observe(
+      "Discover Workers telemetry values",
+      options,
       () => this.#api.listValues(key, type, options),
-      result => this.#resultDescription(result.length, "values"));
+      (result) => this.#resultDescription(result.length, "values"),
+    );
   }
 
-  async listEvents(query?: CloudflareObservabilityEventsQuery): Promise<CloudflareObservabilityEventsPage> {
-    return this.#observe("Read Workers events", query, () => this.#api.listEvents(query), result =>
-      this.#resultDescription(result.events.length, "events", result.statistics));
+  async listEvents(
+    query?: CloudflareObservabilityEventsQuery,
+  ): Promise<CloudflareObservabilityEventsPage> {
+    return this.#observe(
+      "Read Workers events",
+      query,
+      () => this.#api.listEvents(query),
+      (result) => this.#resultDescription(result.events.length, "events", result.statistics),
+    );
   }
 
-  async listInvocations(query?: CloudflareObservabilityInvocationsQuery): Promise<CloudflareObservabilityInvocationsPage> {
-    return this.#observe("Read Worker invocations", query, () => this.#api.listInvocations(query), result =>
-      this.#resultDescription(result.invocations.length, "invocations", result.statistics));
+  async listInvocations(
+    query?: CloudflareObservabilityInvocationsQuery,
+  ): Promise<CloudflareObservabilityInvocationsPage> {
+    return this.#observe(
+      "Read Worker invocations",
+      query,
+      () => this.#api.listInvocations(query),
+      (result) =>
+        this.#resultDescription(result.invocations.length, "invocations", result.statistics),
+    );
   }
 
-  async listTraces(query?: CloudflareObservabilityTracesQuery): Promise<CloudflareObservabilityTracesPage> {
-    return this.#observe("Read Worker traces", query, () => this.#api.listTraces(query), result =>
-      this.#resultDescription(result.traces.length, "trace summaries", result.statistics));
+  async listTraces(
+    query?: CloudflareObservabilityTracesQuery,
+  ): Promise<CloudflareObservabilityTracesPage> {
+    return this.#observe(
+      "Read Worker traces",
+      query,
+      () => this.#api.listTraces(query),
+      (result) =>
+        this.#resultDescription(result.traces.length, "trace summaries", result.statistics),
+    );
   }
 
-  async getTrace(traceId: string, options?: CloudflareObservabilityTraceOptions): Promise<CloudflareObservabilityTrace> {
-    return this.#observe("Read Worker trace", options, () => this.#api.getTrace(traceId, options), result =>
-      this.#resultDescription(
-        result.count, `trace events${result.truncated ? " (truncated)" : ""}`, result.statistics,
-      ));
+  async getTrace(
+    traceId: string,
+    options?: CloudflareObservabilityTraceOptions,
+  ): Promise<CloudflareObservabilityTrace> {
+    return this.#observe(
+      "Read Worker trace",
+      options,
+      () => this.#api.getTrace(traceId, options),
+      (result) =>
+        this.#resultDescription(
+          result.count,
+          `trace events${result.truncated ? " (truncated)" : ""}`,
+          result.statistics,
+        ),
+    );
   }
 
-  async calculate(query: CloudflareObservabilityCalculationQuery): Promise<CloudflareObservabilityCalculationResult> {
-    return this.#observe("Calculate Workers metrics", query, () => this.#api.calculate(query), result =>
-      this.#resultDescription(result.calculations.length, "calculations", result.statistics));
+  async calculate(
+    query: CloudflareObservabilityCalculationQuery,
+  ): Promise<CloudflareObservabilityCalculationResult> {
+    return this.#observe(
+      "Calculate Workers metrics",
+      query,
+      () => this.#api.calculate(query),
+      (result) =>
+        this.#resultDescription(result.calculations.length, "calculations", result.statistics),
+    );
   }
 }

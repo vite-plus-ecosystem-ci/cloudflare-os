@@ -6,7 +6,7 @@ Make an agent tool call's chat-content side effects durable **iff** the tool cal
 transcript record is durable — one transaction per model step.
 
 Terminology: a **step** here is one model request plus its tool batch (pi calls this a
-"turn"; agent.ts's `turn_end` is the per-step event). The chat-level *turn* is the
+"turn"; agent.ts's `turn_end` is the per-step event). The chat-level _turn_ is the
 whole agent run, which may span many steps.
 
 Today an agent edit becomes a durable, broadcast `chatChanges` row the moment the
@@ -15,7 +15,7 @@ record that explains it persists only at the step's `turn_end` barrier, after th
 rest of the tool batch (agent.ts:3008-3111). A crash in between leaves content the
 transcript cannot account for; on resume the model re-runs the step against content
 that already contains its edits — `writeFile` survives by idempotence, `editFile`
-double-applies or fails on a missing find-string. This is a live bug. (The *other*
+double-applies or fails on a missing find-string. This is a live bug. (The _other_
 crash window — rows and step message durable, end-of-turn flush lost — is the one
 today's replay-discharge machinery handles; this plan makes both windows impossible
 and deletes that machinery.)
@@ -39,7 +39,7 @@ first).
   transaction: persist the step's tool-call message, append the buffered changes
   as rows, materialize them into the step's single `"changes"` message, retire
   the rows, and stamp pending gadget/binding records. Agent rows are thus **born and retired in
-  the same transaction** — the *live* rows in `chatChanges` become user-authored
+  the same transaction** — the _live_ rows in `chatChanges` become user-authored
   only, and no crash or mid-barrier exception can strand an agent row without its
   transcript record or vice versa. (A DO's synchronous writes are already
   implicitly atomic against crashes; the explicit transaction adds rollback when
@@ -52,7 +52,7 @@ first).
   message change doesn't exist (a watermark gap triggers rebuild, discarding
   unacked local edits after 5s — otClient.ts:295-348), and rows must remain in the
   protocol regardless for user edits (multi-tab) and the server's resubmission
-  transform window — so message-only delivery would *add* a client ingestion path
+  transform window — so message-only delivery would _add_ a client ingestion path
   while removing nothing.
 - **Streaming is unaffected.** The live preview is the `editPreview*` stream fed
   from the model's raw tool-call input fragments as it generates
@@ -65,7 +65,7 @@ first).
   land next step — retry") instead of running provisional code. Deliberately
   coarse — no per-gadget touched-set, no machinery in the gadget-loading path:
   editing code and then executing it in one step never worked (and agents don't
-  try it), and worktrees keep the same rule (their writes happen *inside*
+  try it), and worktrees keep the same rule (their writes happen _inside_
   executeCode, and a second executeCode in one step is never sensible — the
   agent writes one script that does both things). This replaces what the
   mid-tool flushes guaranteed, and closes by construction the historical
@@ -108,7 +108,7 @@ first).
   already guards against non-agent materialization during a turn
   (overseer.ts:2806-2809). Mid-tool flush call sites: setGadgetBinding
   (agent.ts:2630), createGadget (agent.ts:2690), blueprint copy (agent.ts:2740 —
-  deliberately *before* the step message, with its residual crash window
+  deliberately _before_ the step message, with its residual crash window
   documented at 2731-2739), executeCode (agent.ts:2803), compaction early-return
   (agent.ts:2265).
 - Crash recovery today: the rows-and-message-durable-but-flush-lost window is
@@ -200,7 +200,7 @@ first).
    - **User rows**: raise `CHAT_CHANGE_MATERIALIZE_THRESHOLD` from 128 to
      **1000** — its real job is compacting keystroke-granularity ops into few
      large ops (128 rows is only a line or two of typing) — and add a **byte
-     trigger** beside it: materialize the pending rows *before* appending a row
+     trigger** beside it: materialize the pending rows _before_ appending a row
      that would push the pending composition estimate past **1MB** (staying
      well clear of the 2MB record cap; the estimate is `codeChangeSerializedSize`
      — an O(entries) upper bound on the rows' V8-serialized storage footprint,
@@ -235,11 +235,11 @@ first).
      past the budget. **No carve-out**: no existing blueprint exceeds 1MB, and
      the planned Yjs→git blueprint format rework resolves this class of problem
      outright.
-   The changeId drift dies by deletion (one message per flush — live and
-   replay counting trivially agree), and a revert can never split a step's
-   effects: extras and edits share the step's single message. This also
-   resolves what an aggregate step-buffer bound is *for*: correctness (the one
-   message must fit a record), with bounded memory as a side effect.
+     The changeId drift dies by deletion (one message per flush — live and
+     replay counting trivially agree), and a revert can never split a step's
+     effects: extras and edits share the step's single message. This also
+     resolves what an aggregate step-buffer bound is _for_: correctness (the one
+     message must fit a record), with bounded memory as a side effect.
 4. **Mid-tool flushes removed** (agent.ts:2630, 2690, 2740, 2803). The blueprint's
    copies ride the buffer and persist with their `createGadget` call — the
    2731-2739 crash window closes. The end-of-turn flush in the `finally`
@@ -247,7 +247,7 @@ first).
    effects, and an abort's in-flight buffer is memory only. **Exception, until
    the machinery deletion lands (commit 3): the compaction early-return keeps a
    flush** (`flushReadoptedChanges`, backed by the transitional
-   `flushAgentChanges` hook) — a crashed *pre-barrier* turn's re-adopted
+   `flushAgentChanges` hook) — a crashed _pre-barrier_ turn's re-adopted
    rows/creations/bindings must be covered by a message before compaction
    removes the log tail replay re-adopts them from. It dies with the
    re-adoption machinery itself.
@@ -269,10 +269,10 @@ first).
 
 - **`createGadget` record creation stays immediate.** The registry record (and its
   name reservation via the unique `byBindingName` index) is created mid-step as
-  today, `pending` and unstamped; only its *stamping* is barrier-bound. Deferring
+  today, `pending` and unstamped; only its _stamping_ is barrier-bound. Deferring
   creation to the barrier would surface name conflicts after the model already saw
   the tool succeed. The stamped⇔persisted-call equivalence is what lets the
-  vouching scan die: an unstamped record now *always* means a mid-step crash.
+  vouching scan die: an unstamped record now _always_ means a mid-step crash.
 - **Step-buffer size**: per-file and per-change caps bound each buffered item
   (`MAX_CODE_CHANGE_SIZE`, the file-size caps), and `STEP_CHANGE_BUDGET` bounds
   the step's total at write time (Design §3) — needed for correctness (the
@@ -341,7 +341,7 @@ first).
    nothing else here and fixes the changeId numbering drift on its own. Delete
    the chunking loop (one message per materialize call), raise the materialize
    threshold 128 → 1000, and add the 1MB byte trigger at row-append time on
-   user submissions. The agent path gets a *transitional* equivalent — until
+   user submissions. The agent path gets a _transitional_ equivalent — until
    commit 2, agent rows still append per-tool and compose over a whole turn
    (many steps), so a turn-spanning composition must be kept storable — but it
    lives **agent-side, not in the overseer**: `appendAgentEdit` tracks the

@@ -11,8 +11,9 @@ import type { ActionRecord, AutoApproveTagRecord } from "./overseer.js";
 const logger = createWorkshopLogger("workshop.auto.approval");
 
 export interface AutoApprovalStorage {
-  actions: Collection<ActionRecord, number>
-      & { pendingByGatekeeper: NonUniqueIndex<ActionRecord, number> };
+  actions: Collection<ActionRecord, number> & {
+    pendingByGatekeeper: NonUniqueIndex<ActionRecord, number>;
+  };
   autoApproveTags: Collection<AutoApproveTagRecord>;
 }
 
@@ -21,9 +22,10 @@ export interface AutoApprovalStorage {
  * caller has already validated that the record is still pending.
  */
 export type ApplyPendingActionFn = (
-    record: ActionRecord & {type: "action"},
-    resolvedBy: AiChatAuthorInfo,
-    autoApproved: boolean) => Promise<void>;
+  record: ActionRecord & { type: "action" },
+  resolvedBy: AiChatAuthorInfo,
+  autoApproved: boolean,
+) => Promise<void>;
 
 export class AutoApprovalDrainer {
   // Per-gatekeeper single-flight state. Key present => a drain is running for that gatekeeper; the
@@ -32,12 +34,13 @@ export class AutoApprovalDrainer {
   #draining = new Map<number, boolean>();
 
   constructor(
-      private storage: AutoApprovalStorage,
-      private applyPendingAction: ApplyPendingActionFn) {}
+    private storage: AutoApprovalStorage,
+    private applyPendingAction: ApplyPendingActionFn,
+  ) {}
 
   async drain(gatekeeperId: number): Promise<void> {
     if (this.#draining.has(gatekeeperId)) {
-      this.#draining.set(gatekeeperId, true);  // ask the running drain to loop again
+      this.#draining.set(gatekeeperId, true); // ask the running drain to loop again
       return;
     }
     this.#draining.set(gatekeeperId, false);
@@ -68,9 +71,8 @@ export class AutoApprovalDrainer {
       if (record.type !== "action") continue;
 
       let tag = record.description.actionKind?.tag;
-      let rule = tag !== undefined
-          ? this.storage.autoApproveTags.get(`${gatekeeperId}:${tag}`)
-          : undefined;
+      let rule =
+        tag !== undefined ? this.storage.autoApproveTags.get(`${gatekeeperId}:${tag}`) : undefined;
       if (record.description.autoApprovable !== true || rule === undefined) {
         // A manual gate. Stop rather than skipping ahead to any later auto-eligible action.
         return;
@@ -90,7 +92,9 @@ export class AutoApprovalDrainer {
       } catch (err) {
         // Leave the action pending for manual handling and stop the drain (never skip ahead).
         logger.error("auto-approval failed", {
-          event: "auto.approval.failed", actionId: fresh.id, error: err,
+          event: "auto.approval.failed",
+          actionId: fresh.id,
+          error: err,
         });
         return;
       }

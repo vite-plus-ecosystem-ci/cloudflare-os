@@ -28,8 +28,16 @@ export type DriveInfo = { id: string; name: string };
 
 /** The per-file field mask. `getFile` sends this; {@link DRIVE_FILE_FIELDS} wraps it for lists. */
 export const DRIVE_FILE_ITEM_FIELDS = [
-  "id", "name", "mimeType", "modifiedTime", "size", "parents", "driveId", "trashed",
-  "owners(displayName,emailAddress)", "webViewLink",
+  "id",
+  "name",
+  "mimeType",
+  "modifiedTime",
+  "size",
+  "parents",
+  "driveId",
+  "trashed",
+  "owners(displayName,emailAddress)",
+  "webViewLink",
   "shortcutDetails(targetId,targetMimeType)",
 ].join(",");
 
@@ -146,15 +154,17 @@ function googleErrorReasonFromText(text: string): string | undefined {
 
 async function errorReason(response: Response): Promise<string | undefined> {
   let text = await readBoundedText(
-    response, MAX_ERROR_BODY_BYTES, "Google Drive error response was too large").catch(() => "");
+    response,
+    MAX_ERROR_BODY_BYTES,
+    "Google Drive error response was too large",
+  ).catch(() => "");
   return googleErrorReasonFromText(text);
 }
 
 async function driveError(response: Response): Promise<Error> {
   let reason = await errorReason(response);
   if (response.status === 403 && reason === API_DISABLED_REASON) {
-    return new DriveApiDisabledError(
-      "the Google Drive API is not enabled for this OAuth project");
+    return new DriveApiDisabledError("the Google Drive API is not enabled for this OAuth project");
   }
   return new DriveApiRequestError(response.status, reason);
 }
@@ -175,7 +185,10 @@ function optionalBoolean(value: unknown, field: string): boolean | undefined {
   return value;
 }
 
-function optionalFields(value: Record<string, unknown>, fields: readonly string[]): Record<string, string> {
+function optionalFields(
+  value: Record<string, unknown>,
+  fields: readonly string[],
+): Record<string, string> {
   let result: Record<string, string> = {};
   for (let field of fields) {
     let parsed = optionalString(value[field], `file ${field}`);
@@ -191,7 +204,7 @@ function parseDriveFile(value: unknown): DriveFile {
   let owners: DriveFile["owners"];
   if (value.owners !== undefined) {
     if (!Array.isArray(value.owners)) throw new Error("Invalid Google Drive file owners");
-    owners = value.owners.map(owner => {
+    owners = value.owners.map((owner) => {
       if (!isRecord(owner)) throw new Error("Invalid Google Drive file owner");
       return optionalFields(owner, ["displayName", "emailAddress"]);
     });
@@ -203,7 +216,10 @@ function parseDriveFile(value: unknown): DriveFile {
   }
   let parents: string[] | undefined;
   if (value.parents !== undefined) {
-    if (!Array.isArray(value.parents) || value.parents.some(parent => typeof parent !== "string")) {
+    if (
+      !Array.isArray(value.parents) ||
+      value.parents.some((parent) => typeof parent !== "string")
+    ) {
       throw new Error("Invalid Google Drive file parents");
     }
     parents = value.parents as string[];
@@ -212,9 +228,7 @@ function parseDriveFile(value: unknown): DriveFile {
   return {
     id: value.id,
     name: value.name,
-    ...optionalFields(value, [
-      "mimeType", "modifiedTime", "size", "driveId", "webViewLink",
-    ]),
+    ...optionalFields(value, ["mimeType", "modifiedTime", "size", "driveId", "webViewLink"]),
     ...(parents ? { parents } : {}),
     ...(owners ? { owners } : {}),
     ...(trashed === undefined ? {} : { trashed }),
@@ -249,9 +263,11 @@ export function buildDriveQuery(query: DriveFileQuery): string {
   if (name) clauses.push(literalClause("name", "contains", name));
   let fullText = query.fullTextContains?.trim();
   if (fullText) clauses.push(literalClause("fullText", "contains", fullText));
-  let mimeTypes = query.mimeTypes?.map(value => value.trim()).filter(Boolean);
+  let mimeTypes = query.mimeTypes?.map((value) => value.trim()).filter(Boolean);
   if (mimeTypes?.length) {
-    clauses.push(`(${mimeTypes.map(value => literalClause("mimeType", "=", value)).join(" or ")})`);
+    clauses.push(
+      `(${mimeTypes.map((value) => literalClause("mimeType", "=", value)).join(" or ")})`,
+    );
   }
   for (let mimeType of query.excludeMimeTypes ?? []) {
     if (mimeType.trim()) clauses.push(literalClause("mimeType", "!=", mimeType.trim()));
@@ -274,15 +290,21 @@ type BatchAccessPart = { status: number; body: string };
  * unrecognised part rather than guessing.
  */
 async function parseBatchAccessParts(
-  response: Response, count: number,
+  response: Response,
+  count: number,
 ): Promise<BatchAccessPart[]> {
   let contentType = response.headers.get("Content-Type") ?? "";
   let boundaryMatch = /boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(contentType);
   let responseBoundary = boundaryMatch?.[1] ?? boundaryMatch?.[2];
   if (!responseBoundary) throw new Error("Invalid Google Drive batch response boundary");
   let text = await readBoundedText(
-    response, MAX_BATCH_RESPONSE_BYTES, "Google Drive batch response was too large");
-  let responseParts = text.split(`--${responseBoundary}`).filter(part => /HTTP\/1\.[01] \d{3}/.test(part));
+    response,
+    MAX_BATCH_RESPONSE_BYTES,
+    "Google Drive batch response was too large",
+  );
+  let responseParts = text
+    .split(`--${responseBoundary}`)
+    .filter((part) => /HTTP\/1\.[01] \d{3}/.test(part));
   if (responseParts.length !== count) {
     throw new Error("Google Drive batch response did not contain one result per file");
   }
@@ -299,7 +321,7 @@ async function parseBatchAccessParts(
     let status = Number(/HTTP\/1\.[01] (\d{3})/.exec(part)?.[1]);
     placed[index] = { status, body: part.split(/\r?\n\r?\n/).at(-1) ?? "" };
   }
-  return placed.map(part => {
+  return placed.map((part) => {
     if (part === undefined) {
       throw new Error("Google Drive batch response did not contain one result per file");
     }
@@ -311,8 +333,7 @@ function batchPartAllowed(part: BatchAccessPart): boolean {
   if (part.status >= 200 && part.status < 300) return true;
   let reason = googleErrorReasonFromText(part.body);
   if (part.status === 403 && reason === API_DISABLED_REASON) {
-    throw new DriveApiDisabledError(
-      "the Google Drive API is not enabled for this OAuth project");
+    throw new DriveApiDisabledError("the Google Drive API is not enabled for this OAuth project");
   }
   if (part.status === 403 && reason !== undefined && QUOTA_403_REASONS.has(reason)) {
     throw new Error("Google Drive batch subrequest failed: 403");
@@ -365,7 +386,8 @@ export class DriveApi {
   /** One page of shared drives visible to the connected account. */
   async listDrives(options: DriveListDrivesOptions = {}): Promise<DriveList> {
     let params = new URLSearchParams({
-      pageSize: String(options.pageSize ?? 100), fields: "nextPageToken,drives(id,name)",
+      pageSize: String(options.pageSize ?? 100),
+      fields: "nextPageToken,drives(id,name)",
     });
     if (options.pageToken) params.set("pageToken", options.pageToken);
     if (options.namePrefix?.trim()) {
@@ -403,47 +425,56 @@ export class DriveApi {
   async checkFileAccess(fileIds: readonly string[]): Promise<boolean[]> {
     let result: boolean[] = [];
     for (let offset = 0; offset < fileIds.length; offset += MAX_BATCH_FILES) {
-      result.push(...await this.#checkFileAccessBatch(fileIds.slice(offset, offset + MAX_BATCH_FILES)));
+      result.push(
+        ...(await this.#checkFileAccessBatch(fileIds.slice(offset, offset + MAX_BATCH_FILES))),
+      );
     }
     return result;
   }
 
   async #checkFileAccessBatch(fileIds: readonly string[]): Promise<boolean[]> {
     let boundary = `gadgets_drive_${crypto.randomUUID()}`;
-    let parts = fileIds.map((fileId, index) => [
-      `--${boundary}`,
-      "Content-Type: application/http",
-      `Content-ID: <item-${index}>`,
-      "",
-      `GET /drive/v3/files/${encodeURIComponent(fileId)}?fields=id&supportsAllDrives=true HTTP/1.1`,
-      "Accept: application/json",
-      "",
-      "",
-    ].join("\r\n"));
+    let parts = fileIds.map((fileId, index) =>
+      [
+        `--${boundary}`,
+        "Content-Type: application/http",
+        `Content-ID: <item-${index}>`,
+        "",
+        `GET /drive/v3/files/${encodeURIComponent(fileId)}?fields=id&supportsAllDrives=true HTTP/1.1`,
+        "Accept: application/json",
+        "",
+        "",
+      ].join("\r\n"),
+    );
     let body = `${parts.join("")}--${boundary}--\r\n`;
 
     // Capture the token this batch actually sent so an inner 401 can invalidate the same cache
     // entry `fetchWithAuthRetry` would have refreshed, had the outer POST not been 200.
     let lastToken: string | undefined;
-    let getToken: AccessTokenProvider = async opts => {
+    let getToken: AccessTokenProvider = async (opts) => {
       lastToken = await this.getAccessToken(opts);
       return lastToken;
     };
 
     let replayed = false;
     for (;;) {
-      let response = await fetchWithAuthRetry(DRIVE_BATCH_URL, {
-        method: "POST",
-        headers: {
-          Accept: "multipart/mixed",
-          "Content-Type": `multipart/mixed; boundary=${boundary}`,
+      let response = await fetchWithAuthRetry(
+        DRIVE_BATCH_URL,
+        {
+          method: "POST",
+          headers: {
+            Accept: "multipart/mixed",
+            "Content-Type": `multipart/mixed; boundary=${boundary}`,
+          },
+          body,
         },
-        body,
-      }, getToken, { idempotent: true });
+        getToken,
+        { idempotent: true },
+      );
       if (!response.ok) throw await driveError(response);
 
       let placed = await parseBatchAccessParts(response, fileIds.length);
-      if (placed.some(part => part.status === 401)) {
+      if (placed.some((part) => part.status === 401)) {
         // The batch POST itself returns 200 when a subrequest 401s, so fetchWithAuthRetry's
         // one-shot refresh never sees it and a stale cached token would deny every file forever.
         // Force the same cache invalidation the helper uses, then replay the (read-only) batch once.
@@ -463,10 +494,14 @@ export class DriveApi {
     let response = await fetchWithAuthRetry(
       `${DRIVE_API_BASE}${path}?${params}`,
       { headers: { Accept: "application/json" } },
-      this.getAccessToken);
+      this.getAccessToken,
+    );
     if (!response.ok) throw await driveError(response);
     let text = await readBoundedText(
-      response, MAX_JSON_RESPONSE_BYTES, "Google Drive response was too large");
+      response,
+      MAX_JSON_RESPONSE_BYTES,
+      "Google Drive response was too large",
+    );
     return JSON.parse(text);
   }
 }

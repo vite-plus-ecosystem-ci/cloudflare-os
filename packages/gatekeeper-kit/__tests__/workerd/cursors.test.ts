@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   ArrayCursor,
   OffsetCursor,
@@ -12,17 +12,19 @@ type Issue = { id: number; open: boolean };
 /** Pages a fixed list the way a provider does: a short page means the end. */
 function pagedApi(items: Issue[]) {
   return vi.fn(async (page: number, perPage: number) =>
-    items.slice((page - 1) * perPage, page * perPage));
+    items.slice((page - 1) * perPage, page * perPage),
+  );
 }
 
 /** Serves a scripted sequence of token pages; past the end the provider reports exhaustion. */
 function tokenApi(pages: TokenPage<Issue>[]) {
   let index = 0;
-  return vi.fn(async (_token: string | undefined, _perPage: number) =>
-    pages[index++] ?? { items: [] });
+  return vi.fn(
+    async (_token: string | undefined, _perPage: number) => pages[index++] ?? { items: [] },
+  );
 }
 
-const ids = (page: Issue[] | null) => page?.map(issue => issue.id);
+const ids = (page: Issue[] | null) => page?.map((issue) => issue.id);
 
 describe("ArrayCursor", () => {
   it("pages a held list, then reports the end", async () => {
@@ -45,27 +47,30 @@ describe("ArrayCursor", () => {
 
 describe("PageNumberCursor", () => {
   it("fetches only the provider pages a page of results needs", async () => {
-    const fetchPage = pagedApi([1, 2, 3, 4, 5].map(id => ({ id, open: true })));
+    const fetchPage = pagedApi([1, 2, 3, 4, 5].map((id) => ({ id, open: true })));
     const cursor = new PageNumberCursor<Issue>({ fetchPage, pageSize: 2, remotePageSize: 2 });
 
-    expect((await cursor.next())?.map(issue => issue.id)).toEqual([1, 2]);
+    expect((await cursor.next())?.map((issue) => issue.id)).toEqual([1, 2]);
     expect(fetchPage).toHaveBeenCalledOnce();
 
-    expect((await cursor.next())?.map(issue => issue.id)).toEqual([3, 4]);
-    expect((await cursor.next())?.map(issue => issue.id)).toEqual([5]);
+    expect((await cursor.next())?.map((issue) => issue.id)).toEqual([3, 4]);
+    expect((await cursor.next())?.map((issue) => issue.id)).toEqual([5]);
     expect(await cursor.next()).toBeNull();
   });
 
   it("serializes concurrent callers instead of duplicating and skipping pages", async () => {
-    const items = [1, 2, 3, 4, 5, 6].map(id => ({ id, open: true }));
+    const items = [1, 2, 3, 4, 5, 6].map((id) => ({ id, open: true }));
     const fetchPage = pagedApi(items);
     const cursor = new PageNumberCursor<Issue>({ fetchPage, pageSize: 2, remotePageSize: 2 });
 
     // A gadget can pipeline these; the provider page counter must not be read twice before it moves.
     const pages = await Promise.all([cursor.next(), cursor.next(), cursor.next()]);
 
-    expect(pages.map(page => page?.map(issue => issue.id)))
-      .toEqual([[1, 2], [3, 4], [5, 6]]);
+    expect(pages.map((page) => page?.map((issue) => issue.id))).toEqual([
+      [1, 2],
+      [3, 4],
+      [5, 6],
+    ]);
     expect(fetchPage.mock.calls.map(([page]) => page)).toEqual([1, 2, 3]);
   });
 
@@ -84,7 +89,7 @@ describe("PageNumberCursor", () => {
     const pages = [[{ id: 1, open: true }], [{ id: 2, open: true }]];
     let attempt = 0;
     const cursor = new PageNumberCursor<Issue>({
-      fetchPage: async page => {
+      fetchPage: async (page) => {
         if (++attempt === 1) throw new Error("provider 503");
         return pages[page - 1] ?? [];
       },
@@ -104,7 +109,7 @@ describe("PageNumberCursor", () => {
     let attempt = 0;
     const cursor = new PageNumberCursor<Issue>({
       fetchPage,
-      retain: items => {
+      retain: (items) => {
         if (++attempt === 1) throw new Error("authorization unavailable");
         return items;
       },
@@ -133,10 +138,16 @@ describe("PageNumberCursor", () => {
 
   it("walks past a page holding only rows the caller may not see", async () => {
     // The shape that truncates GitHub's issue list today: page 1 is entirely dropped rows.
-    const pages = [[{ id: 1, open: false }, { id: 2, open: false }], [{ id: 3, open: true }]];
+    const pages = [
+      [
+        { id: 1, open: false },
+        { id: 2, open: false },
+      ],
+      [{ id: 3, open: true }],
+    ];
     const cursor = new PageNumberCursor<Issue>({
-      fetchPage: async page => pages[page - 1] ?? [],
-      retain: items => items.filter(issue => issue.open),
+      fetchPage: async (page) => pages[page - 1] ?? [],
+      retain: (items) => items.filter((issue) => issue.open),
       pageSize: 2,
       remotePageSize: 2,
     });
@@ -147,8 +158,12 @@ describe("PageNumberCursor", () => {
 
   it("bounds one call rather than walking a whole history of dropped pages", async () => {
     const fetchPage = vi.fn(async () => [{ id: 1, open: false }]);
-    const cursor = new PageNumberCursor<Issue>(
-      { fetchPage, retain: () => [], pageSize: 2, remotePageSize: 1 });
+    const cursor = new PageNumberCursor<Issue>({
+      fetchPage,
+      retain: () => [],
+      pageSize: 2,
+      remotePageSize: 1,
+    });
 
     // `[]` invites another call, where null would claim the list had ended.
     expect(await cursor.next()).toEqual([]);
@@ -161,24 +176,28 @@ describe("PageNumberCursor", () => {
     const fetchPage = vi.fn(async (page: number) => [{ id: page, open: page % 3 === 0 }]);
     const cursor = new PageNumberCursor<Issue>({
       fetchPage,
-      retain: items => items.filter(issue => issue.open),
+      retain: (items) => items.filter((issue) => issue.open),
       pageSize: 100,
       remotePageSize: 1,
     });
 
-    expect((await cursor.next())?.map(issue => issue.id)).toEqual([3, 6, 9]);
+    expect((await cursor.next())?.map((issue) => issue.id)).toEqual([3, 6, 9]);
     expect(fetchPage).toHaveBeenCalledTimes(10);
     // The walk resumes where the window ended rather than starting over or skipping.
-    expect((await cursor.next())?.map(issue => issue.id)).toEqual([12, 15, 18]);
+    expect((await cursor.next())?.map((issue) => issue.id)).toEqual([12, 15, 18]);
   });
 
   it("rejects page sizes that would never terminate", () => {
     const fetchPage = pagedApi([]);
-    expect(() => new PageNumberCursor<Issue>({ fetchPage, pageSize: 0 })).toThrow(/positive integer/);
-    expect(() => new PageNumberCursor<Issue>({ fetchPage, pageSize: 2, remotePageSize: 0 }))
-      .toThrow(/positive integer/);
-    expect(() => new PageNumberCursor<Issue>({ fetchPage, pageSize: 2.5 }))
-      .toThrow(/positive integer/);
+    expect(() => new PageNumberCursor<Issue>({ fetchPage, pageSize: 0 })).toThrow(
+      /positive integer/,
+    );
+    expect(
+      () => new PageNumberCursor<Issue>({ fetchPage, pageSize: 2, remotePageSize: 0 }),
+    ).toThrow(/positive integer/);
+    expect(() => new PageNumberCursor<Issue>({ fetchPage, pageSize: 2.5 })).toThrow(
+      /positive integer/,
+    );
   });
 });
 
@@ -196,12 +215,17 @@ describe("OffsetCursor", () => {
   });
 
   it("advances by the raw page, not what retain kept", async () => {
-    const items = [{ id: 1, open: false }, { id: 2, open: true }, { id: 3, open: true }];
-    const fetchPage =
-      vi.fn(async (offset: number, limit: number) => items.slice(offset, offset + limit));
+    const items = [
+      { id: 1, open: false },
+      { id: 2, open: true },
+      { id: 3, open: true },
+    ];
+    const fetchPage = vi.fn(async (offset: number, limit: number) =>
+      items.slice(offset, offset + limit),
+    );
     const cursor = new OffsetCursor<Issue>({
       fetchPage,
-      retain: page => page.filter(issue => issue.open),
+      retain: (page) => page.filter((issue) => issue.open),
       pageSize: 10,
       remotePageSize: 2,
     });
@@ -216,7 +240,7 @@ describe("OffsetCursor", () => {
     const items = [{ id: 1, open: true }];
     let attempt = 0;
     const cursor = new OffsetCursor<Issue>({
-      fetchPage: async offset => {
+      fetchPage: async (offset) => {
         if (++attempt === 1) throw new Error("provider 503");
         return items.slice(offset, offset + 1);
       },
@@ -235,7 +259,13 @@ describe("TokenCursor", () => {
     // Marketo's shape: an empty window mid-walk, and `""` as a real continuation token. Ending on
     // either -- as page-number paging must -- silently truncates the walk.
     const fetchPage = tokenApi([
-      { items: [{ id: 1, open: true }, { id: 2, open: true }], nextToken: "a" },
+      {
+        items: [
+          { id: 1, open: true },
+          { id: 2, open: true },
+        ],
+        nextToken: "a",
+      },
       { items: [], nextToken: "b" },
       { items: [{ id: 3, open: true }], nextToken: "" },
       { items: [{ id: 4, open: true }] },
@@ -245,7 +275,10 @@ describe("TokenCursor", () => {
     expect(ids(await cursor.next())).toEqual([1, 2, 3, 4]);
     expect(await cursor.next()).toBeNull();
     expect(fetchPage.mock.calls).toEqual([
-      [undefined, 25], ["a", 25], ["b", 25], ["", 25],
+      [undefined, 25],
+      ["a", 25],
+      ["b", 25],
+      ["", 25],
     ]);
   });
 
@@ -269,7 +302,7 @@ describe("TokenCursor", () => {
     const asked: (string | undefined)[] = [];
     let attempt = 0;
     const cursor = new TokenCursor<Issue>({
-      fetchPage: async token => {
+      fetchPage: async (token) => {
         asked.push(token);
         if (++attempt === 2) throw new Error("provider 503");
         return { items: [{ id: attempt, open: true }], nextToken: attempt < 3 ? "t2" : undefined };
@@ -287,7 +320,8 @@ describe("TokenCursor", () => {
     const fetchPage = vi.fn(async (token: string | undefined): Promise<TokenPage<Issue>> =>
       token === undefined
         ? { items: [{ id: 1, open: true }], nextToken: "same" }
-        : { items: [{ id: 2, open: true }], nextToken: token });
+        : { items: [{ id: 2, open: true }], nextToken: token },
+    );
     const cursor = new TokenCursor<Issue>({ fetchPage, pageSize: 10 });
 
     await expect(cursor.next()).rejects.toThrow(/same continuation token/);
@@ -297,22 +331,35 @@ describe("TokenCursor", () => {
 
   it("serializes concurrent callers instead of duplicating and skipping pages", async () => {
     const fetchPage = tokenApi([
-      { items: [{ id: 1, open: true }, { id: 2, open: true }], nextToken: "a" },
-      { items: [{ id: 3, open: true }, { id: 4, open: true }], nextToken: "b" },
+      {
+        items: [
+          { id: 1, open: true },
+          { id: 2, open: true },
+        ],
+        nextToken: "a",
+      },
+      {
+        items: [
+          { id: 3, open: true },
+          { id: 4, open: true },
+        ],
+        nextToken: "b",
+      },
       { items: [{ id: 5, open: true }] },
     ]);
     const cursor = new TokenCursor<Issue>({ fetchPage, pageSize: 2, remotePageSize: 2 });
 
     const pages = await Promise.all([cursor.next(), cursor.next(), cursor.next()]);
 
-    expect(pages.map(page => ids(page))).toEqual([[1, 2], [3, 4], [5]]);
+    expect(pages.map((page) => ids(page))).toEqual([[1, 2], [3, 4], [5]]);
     expect(fetchPage.mock.calls.map(([token]) => token)).toEqual([undefined, "a", "b"]);
   });
 
   it("rejects page sizes that would never terminate", () => {
     const fetchPage = tokenApi([]);
     expect(() => new TokenCursor<Issue>({ fetchPage, pageSize: 0 })).toThrow(/positive integer/);
-    expect(() => new TokenCursor<Issue>({ fetchPage, pageSize: 2, remotePageSize: 1.5 }))
-      .toThrow(/positive integer/);
+    expect(() => new TokenCursor<Issue>({ fetchPage, pageSize: 2, remotePageSize: 1.5 })).toThrow(
+      /positive integer/,
+    );
   });
 });

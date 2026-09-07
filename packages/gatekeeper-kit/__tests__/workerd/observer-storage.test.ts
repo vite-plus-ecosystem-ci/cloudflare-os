@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 // Exercise verifier-stub persistence, which the cloning Node fake cannot represent.
 function host(name: string) {
@@ -44,7 +44,8 @@ describe("tracked observers over real Durable Object storage", () => {
     // The fence is in memory, keyed by the storage object, so it only reaches a second tracker if
     // `ctx.storage.kv` answers with one identity per Durable Object. Nothing in the Workers types
     // promises that; a fresh wrapper per access would admit an observer the open read excludes.
-    expect(await tracker.admitDuringWithheldRead("mallory", { allowed: [] }))
-      .toMatch(/can no longer be observed/);
+    expect(await tracker.admitDuringWithheldRead("mallory", { allowed: [] })).toMatch(
+      /can no longer be observed/,
+    );
   });
 });

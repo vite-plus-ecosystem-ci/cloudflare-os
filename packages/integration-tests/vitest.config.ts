@@ -1,14 +1,16 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 import { FORCE_RERUN_TRIGGERS, WATCH_PATHS } from "./src/worker-inputs.js";
 
 export default defineConfig({
-  plugins: [{
-    name: "watch-integration-worker-inputs",
-    configureServer(server) {
-      // Wrangler loads these outside Vitest's module graph, so nothing registers them for us.
-      server.watcher.add(WATCH_PATHS);
+  plugins: [
+    {
+      name: "watch-integration-worker-inputs",
+      configureServer(server) {
+        // Wrangler loads these outside Vitest's module graph, so nothing registers them for us.
+        server.watcher.add(WATCH_PATHS);
+      },
     },
-  }],
+  ],
   test: {
     include: ["__tests__/**/*.test.ts"],
     globalSetup: ["./src/global-setup.ts"],

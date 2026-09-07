@@ -27,7 +27,11 @@ import {
   type NotionPageResponse,
 } from "./notion-api";
 import type { RpcStub } from "cloudflare:workers";
-import type { ActionDescription, ApprovalQueue, ObservationDescription } from "@gadgets/workshop-shared/gatekeeper";
+import type {
+  ActionDescription,
+  ApprovalQueue,
+  ObservationDescription,
+} from "@gadgets/workshop-shared/gatekeeper";
 import type {
   NotionComment,
   NotionDatabaseSchema,
@@ -57,7 +61,12 @@ export type NotionAction =
       properties: Record<string, NotionPropertyInput>;
       previousProperties: Record<string, NotionPropertyInput>;
     }
-  | { type: "setIcon"; pageId: string; icon: NotionIconInput | null; previousIcon: NotionIconInput | null }
+  | {
+      type: "setIcon";
+      pageId: string;
+      icon: NotionIconInput | null;
+      previousIcon: NotionIconInput | null;
+    }
   | { type: "archive"; pageId: string }
   | { type: "restore"; pageId: string }
   | { type: "addComment"; pageId: string; text: string }
@@ -154,7 +163,7 @@ export class NotionStore {
   }
 
   pendingActions(): StoredActionRecord[] {
-    return this.allActions().filter(r => r.state === "pending");
+    return this.allActions().filter((r) => r.state === "pending");
   }
 
   /**
@@ -164,7 +173,7 @@ export class NotionStore {
    */
   pendingForPage(pageId: string): StoredActionRecord[] {
     const target = this.resolveId(pageId);
-    return this.pendingActions().filter(r => {
+    return this.pendingActions().filter((r) => {
       const t = actionPageId(r.action);
       return t !== null && this.resolveId(t) === target;
     });
@@ -193,13 +202,15 @@ export class NotionStore {
   knowsProvisional(id: string): boolean {
     if (this.resolveId(id) !== id) return true; // already applied -> real ID mapped
     return this.allActions().some(
-      r => r.action.type === "createPage" && r.action.provisionalId === id);
+      (r) => r.action.type === "createPage" && r.action.provisionalId === id,
+    );
   }
 
   /** The createPage action for a provisional ID, if any. */
   createActionFor(provisionalId: string): StoredActionRecord | undefined {
     return this.allActions().find(
-      r => r.action.type === "createPage" && r.action.provisionalId === provisionalId);
+      (r) => r.action.type === "createPage" && r.action.provisionalId === provisionalId,
+    );
   }
 
   // --- base data fetch with caching ---
@@ -255,7 +266,10 @@ export class NotionStore {
     const cached = this.#kv.get<DataSourceCache>(`cache:ds:${dataSourceId}`);
     if (cached && Date.now() - cached.fetchedAt < DB_TTL_MS) return cached.dataSource;
     const dataSource = await this.#api.retrieveDataSource(dataSourceId);
-    this.#kv.put<DataSourceCache>(`cache:ds:${dataSourceId}`, { fetchedAt: Date.now(), dataSource });
+    this.#kv.put<DataSourceCache>(`cache:ds:${dataSourceId}`, {
+      fetchedAt: Date.now(),
+      dataSource,
+    });
     return dataSource;
   }
 
@@ -288,28 +302,50 @@ export class NotionStore {
 // pending row's property set matches the shape of an approved row.
 function defaultValueForType(type: NotionPropertyValue["type"]): NotionPropertyValue {
   switch (type) {
-    case "title": return { type: "title", text: "" };
-    case "rich_text": return { type: "rich_text", text: "" };
-    case "number": return { type: "number", number: null };
-    case "select": return { type: "select", option: null };
-    case "multi_select": return { type: "multi_select", options: [] };
-    case "status": return { type: "status", status: null };
-    case "date": return { type: "date", start: null, end: null };
-    case "checkbox": return { type: "checkbox", checked: false };
-    case "url": return { type: "url", url: null };
-    case "email": return { type: "email", email: null };
-    case "phone_number": return { type: "phone_number", phoneNumber: null };
-    case "people": return { type: "people", people: [] };
-    case "relation": return { type: "relation", pageIds: [] };
-    case "files": return { type: "files", files: [] };
-    case "formula": return { type: "formula", value: null };
-    case "rollup": return { type: "rollup", summary: "" };
-    case "unique_id": return { type: "unique_id", value: "" };
-    case "created_time": return { type: "created_time", time: new Date() };
-    case "last_edited_time": return { type: "last_edited_time", time: new Date() };
-    case "created_by": return { type: "created_by", user: null };
-    case "last_edited_by": return { type: "last_edited_by", user: null };
-    default: return { type: "unsupported", rawType: String(type) };
+    case "title":
+      return { type: "title", text: "" };
+    case "rich_text":
+      return { type: "rich_text", text: "" };
+    case "number":
+      return { type: "number", number: null };
+    case "select":
+      return { type: "select", option: null };
+    case "multi_select":
+      return { type: "multi_select", options: [] };
+    case "status":
+      return { type: "status", status: null };
+    case "date":
+      return { type: "date", start: null, end: null };
+    case "checkbox":
+      return { type: "checkbox", checked: false };
+    case "url":
+      return { type: "url", url: null };
+    case "email":
+      return { type: "email", email: null };
+    case "phone_number":
+      return { type: "phone_number", phoneNumber: null };
+    case "people":
+      return { type: "people", people: [] };
+    case "relation":
+      return { type: "relation", pageIds: [] };
+    case "files":
+      return { type: "files", files: [] };
+    case "formula":
+      return { type: "formula", value: null };
+    case "rollup":
+      return { type: "rollup", summary: "" };
+    case "unique_id":
+      return { type: "unique_id", value: "" };
+    case "created_time":
+      return { type: "created_time", time: new Date() };
+    case "last_edited_time":
+      return { type: "last_edited_time", time: new Date() };
+    case "created_by":
+      return { type: "created_by", user: null };
+    case "last_edited_by":
+      return { type: "last_edited_by", user: null };
+    default:
+      return { type: "unsupported", rawType: String(type) };
   }
 }
 
@@ -317,7 +353,9 @@ function defaultValueForType(type: NotionPropertyValue["type"]): NotionPropertyV
  * All columns of a schema with their default (empty) values, used to seed a pending row so it has
  * the same property keys an approved row would.
  */
-export function defaultPropertiesFromSchema(schema: NotionDatabaseSchema): Record<string, NotionPropertyValue> {
+export function defaultPropertiesFromSchema(
+  schema: NotionDatabaseSchema,
+): Record<string, NotionPropertyValue> {
   const props: Record<string, NotionPropertyValue> = {};
   for (const [name, prop] of Object.entries(schema.properties)) {
     props[name] = defaultValueForType(prop.type as NotionPropertyValue["type"]);
@@ -352,7 +390,7 @@ function inputToValue(input: NotionPropertyInput): NotionPropertyValue {
     case "phone_number":
       return { type: "phone_number", phoneNumber: input.phoneNumber };
     case "people":
-      return { type: "people", people: input.userIds.map(id => ({ id })) };
+      return { type: "people", people: input.userIds.map((id) => ({ id })) };
     case "relation":
       return { type: "relation", pageIds: input.pageIds };
     case "files":
@@ -384,16 +422,18 @@ export function simulatePageMetadata(
   if (base) {
     meta = { ...base };
   } else {
-    const create = records.find(r => r.action.type === "createPage");
+    const create = records.find((r) => r.action.type === "createPage");
     const action = create?.action.type === "createPage" ? create.action : undefined;
     meta = {
       id: pageId,
       title: action?.title ?? "",
       url: notionUrlFromId(pageId),
       parent:
-        action?.parent.kind === "page" ? { type: "page", pageId: action.parent.pageId }
-        : action?.parent.kind === "database" ? { type: "database", databaseId: action.parent.databaseId }
-        : { type: "workspace" },
+        action?.parent.kind === "page"
+          ? { type: "page", pageId: action.parent.pageId }
+          : action?.parent.kind === "database"
+            ? { type: "database", databaseId: action.parent.databaseId }
+            : { type: "workspace" },
       createdAt: new Date(create?.submittedAt ?? Date.now()),
       lastEditedAt: new Date(create?.submittedAt ?? Date.now()),
       createdBy: null,
@@ -426,10 +466,10 @@ export function simulatedTitle(records: StoredActionRecord[], baseTitle: string)
       title = a.title;
     } else if (a.type === "createPage") {
       if (a.title !== undefined) title = a.title;
-      const tp = Object.values(a.properties ?? {}).find(p => p.type === "title");
+      const tp = Object.values(a.properties ?? {}).find((p) => p.type === "title");
       if (tp && tp.type === "title") title = tp.text;
     } else if (a.type === "setProperties") {
-      const tp = Object.values(a.properties).find(p => p.type === "title");
+      const tp = Object.values(a.properties).find((p) => p.type === "title");
       if (tp && tp.type === "title") title = tp.text;
     }
   }
@@ -452,8 +492,9 @@ export function simulatePageProperties(
   const props: Record<string, NotionPropertyValue> = base ? { ...base } : { ...seed };
   // The title column name for a provisional row: prefer the create action's recorded data-source
   // title column (e.g. "Name") so the simulated shape matches the post-approval shape.
-  const create = records.find(r => r.action.type === "createPage");
-  const titleKey = create?.action.type === "createPage" ? create.action.titlePropertyName : undefined;
+  const create = records.find((r) => r.action.type === "createPage");
+  const titleKey =
+    create?.action.type === "createPage" ? create.action.titlePropertyName : undefined;
   // Seed provisional pages from their create action.
   if (!base && create?.action.type === "createPage") {
     for (const [name, input] of Object.entries(create.action.properties ?? {})) {
@@ -487,19 +528,17 @@ function setTitleValue(
 // nested lists flattened, tables/blank lines collapsed, etc.) rather than echoing the raw input.
 function normalizeAppendedMarkdown(markdown: string): string {
   const blocks = markdownToBlocks(markdown) as Array<Record<string, unknown>>;
-  return blocksToMarkdown(blocks.map(block => ({ block: block as BlockWithChildren["block"] })));
+  return blocksToMarkdown(blocks.map((block) => ({ block: block as BlockWithChildren["block"] })));
 }
 
 /** Simulated page body Markdown. */
-export function simulatePageContent(
-  base: string | null,
-  records: StoredActionRecord[],
-): string {
+export function simulatePageContent(base: string | null, records: StoredActionRecord[]): string {
   const parts: string[] = [];
   if (base) parts.push(base);
   for (const r of records) {
     const a = r.action;
-    if (a.type === "createPage" && !base && a.content) parts.push(normalizeAppendedMarkdown(a.content));
+    if (a.type === "createPage" && !base && a.content)
+      parts.push(normalizeAppendedMarkdown(a.content));
     else if (a.type === "appendContent") parts.push(normalizeAppendedMarkdown(a.markdown));
   }
   return parts.filter(Boolean).join("\n\n");
@@ -553,7 +592,7 @@ function recordsTargeting(
   pending: StoredActionRecord[],
   realId: string,
 ): StoredActionRecord[] {
-  return pending.filter(r => {
+  return pending.filter((r) => {
     const target = actionPageId(r.action);
     return target !== null && store.resolveId(target) === realId;
   });
@@ -565,7 +604,7 @@ function createdInScope(
   store: NotionStore,
   predicate: (action: Extract<NotionAction, { type: "createPage" }>) => boolean,
 ): StoredActionRecord[] {
-  return store.pendingActions().filter(r => {
+  return store.pendingActions().filter((r) => {
     if (r.action.type !== "createPage" || !predicate(r.action)) return false;
     return pendingArchivedState(store.pendingForPage(r.action.provisionalId)) !== true;
   });
@@ -586,7 +625,7 @@ export function overlayDatabaseRows(
   seed?: Record<string, NotionPropertyValue>,
 ): NotionPageSummary[] {
   const pending = store.pendingActions();
-  let result = rows.map(row => {
+  let result = rows.map((row) => {
     const records = recordsTargeting(store, pending, row.id);
     if (records.length === 0) return row;
     return {
@@ -596,12 +635,14 @@ export function overlayDatabaseRows(
     };
   });
   // Drop rows archived while pending.
-  result = result.filter(row => pendingArchivedState(recordsTargeting(store, pending, row.id)) !== true);
+  result = result.filter(
+    (row) => pendingArchivedState(recordsTargeting(store, pending, row.id)) !== true,
+  );
   if (firstPage) {
     const created = createdInScope(
       store,
-      a => a.parent.kind === "database" && a.parent.databaseId === databaseId,
-    ).map(r => createdPageSummary(r, store, seed));
+      (a) => a.parent.kind === "database" && a.parent.databaseId === databaseId,
+    ).map((r) => createdPageSummary(r, store, seed));
     result = [...created, ...result];
   }
   return result;
@@ -616,13 +657,15 @@ export function overlayChildPages(
 ): NotionItemSummary[] {
   const pending = store.pendingActions();
   let result = items.filter(
-    item => pendingArchivedState(recordsTargeting(store, pending, item.id)) !== true,
+    (item) => pendingArchivedState(recordsTargeting(store, pending, item.id)) !== true,
   );
   if (firstPage) {
     const created = createdInScope(
       store,
-      a => a.parent.kind === "page" && store.resolveId(a.parent.pageId) === store.resolveId(parentPageId),
-    ).map(r => itemFromCreated(createdPageSummary(r, store)));
+      (a) =>
+        a.parent.kind === "page" &&
+        store.resolveId(a.parent.pageId) === store.resolveId(parentPageId),
+    ).map((r) => itemFromCreated(createdPageSummary(r, store)));
     result = [...created, ...result];
   }
   return result;
@@ -650,15 +693,17 @@ export function overlaySearch(
   kindFilter?: "page" | "database",
 ): NotionItemSummary[] {
   const pending = store.pendingActions();
-  let result = items.map(item => {
+  let result = items.map((item) => {
     const records = recordsTargeting(store, pending, item.id);
     return records.length ? { ...item, title: simulatedTitle(records, item.title) } : item;
   });
   result = result.filter(
-    item => pendingArchivedState(recordsTargeting(store, pending, item.id)) !== true,
+    (item) => pendingArchivedState(recordsTargeting(store, pending, item.id)) !== true,
   );
   if (firstPage && kindFilter !== "database") {
-    const created = createdInScope(store, () => true).map(r => itemFromCreated(createdPageSummary(r, store)));
+    const created = createdInScope(store, () => true).map((r) =>
+      itemFromCreated(createdPageSummary(r, store)),
+    );
     result = [...created, ...result];
   }
   return result;
@@ -723,11 +768,13 @@ export function describeAction(action: NotionAction): ActionDescription {
       };
     case "createPage": {
       const where =
-        action.parent.kind === "page" ? "as a sub-page"
-        : action.parent.kind === "database" ? "as a database row"
-        // Workspace-level: the API needs a concrete parent, so the page lands under the most
-        // recently edited shared page (chosen when this action is approved).
-        : "under the most recently edited shared page (Notion has no true top-level page)";
+        action.parent.kind === "page"
+          ? "as a sub-page"
+          : action.parent.kind === "database"
+            ? "as a database row"
+            : // Workspace-level: the API needs a concrete parent, so the page lands under the most
+              // recently edited shared page (chosen when this action is approved).
+              "under the most recently edited shared page (Notion has no true top-level page)";
       return {
         title: "Create Notion page",
         description: `Create a new page ${where} titled **${action.title ?? "Untitled"}**.`,
@@ -748,7 +795,10 @@ function truncate(text: string, max = 2000): string {
  * Apply a previously-submitted action against Notion. Mutates and persists the record (e.g. to
  * store created IDs for later revert). Throws on failure (the overseer surfaces this to the user).
  */
-export async function applyNotionAction(store: NotionStore, record: StoredActionRecord): Promise<void> {
+export async function applyNotionAction(
+  store: NotionStore,
+  record: StoredActionRecord,
+): Promise<void> {
   const api = store.api;
   const action = record.action;
 
@@ -765,7 +815,11 @@ export async function applyNotionAction(store: NotionStore, record: StoredAction
     }
     case "setTitle": {
       const pageId = requireResolved(store, action.pageId);
-      await api.updatePage(pageId, { properties: { [await titlePropName(store, action.pageId)]: { title: plainToRichText(action.title) } } });
+      await api.updatePage(pageId, {
+        properties: {
+          [await titlePropName(store, action.pageId)]: { title: plainToRichText(action.title) },
+        },
+      });
       store.invalidatePage(action.pageId);
       break;
     }
@@ -795,13 +849,22 @@ export async function applyNotionAction(store: NotionStore, record: StoredAction
     }
     case "addComment": {
       const pageId = requireResolved(store, action.pageId);
-      await api.createComment({ parent: { page_id: pageId }, rich_text: plainToRichText(action.text) });
+      await api.createComment({
+        parent: { page_id: pageId },
+        rich_text: plainToRichText(action.text),
+      });
       break;
     }
     case "createPage": {
       const parent = await resolveCreateParent(store, action.parent);
       const body = buildCreateBody(
-        parent, action.title, action.properties, action.content, action.icon, action.titlePropertyName);
+        parent,
+        action.title,
+        action.properties,
+        action.content,
+        action.icon,
+        action.titlePropertyName,
+      );
       const page = await api.createPage(body);
       record.createdPageId = page.id;
       // Persist the real ID immediately — a crash before the end of this function would otherwise
@@ -847,19 +910,29 @@ export async function revertNotionAction(
     }
     case "setTitle": {
       const pageId = requireResolved(store, action.pageId);
-      await api.updatePage(pageId, { properties: { [await titlePropName(store, action.pageId)]: { title: plainToRichText(action.previousTitle) } } });
+      await api.updatePage(pageId, {
+        properties: {
+          [await titlePropName(store, action.pageId)]: {
+            title: plainToRichText(action.previousTitle),
+          },
+        },
+      });
       store.invalidatePage(action.pageId);
       break;
     }
     case "setProperties": {
       const pageId = requireResolved(store, action.pageId);
-      await api.updatePage(pageId, { properties: propertyInputsToNotion(action.previousProperties) });
+      await api.updatePage(pageId, {
+        properties: propertyInputsToNotion(action.previousProperties),
+      });
       store.invalidatePage(action.pageId);
       break;
     }
     case "setIcon": {
       const pageId = requireResolved(store, action.pageId);
-      await api.updatePage(pageId, { icon: action.previousIcon ? iconInputToNotion(action.previousIcon) : null });
+      await api.updatePage(pageId, {
+        icon: action.previousIcon ? iconInputToNotion(action.previousIcon) : null,
+      });
       store.invalidatePage(action.pageId);
       break;
     }
@@ -884,7 +957,10 @@ export async function revertNotionAction(
     }
     case "addComment":
       // Can't be undone via the API; leave the record applied so it isn't treated as reverted.
-      return { message: "Notion comments can't be deleted through the API; please remove the comment manually." };
+      return {
+        message:
+          "Notion comments can't be deleted through the API; please remove the comment manually.",
+      };
   }
 
   // Mark the action reverted so it no longer blocks reverting earlier actions on the same page.
@@ -896,12 +972,17 @@ export async function revertNotionAction(
 // add content (append/comment/create) return an empty set — reverting them never clobbers a field.
 function mutatedFields(action: NotionAction): string[] {
   switch (action.type) {
-    case "setTitle": return ["title"];
-    case "setProperties": return ["title", "props"]; // may include the title property
-    case "setIcon": return ["icon"];
+    case "setTitle":
+      return ["title"];
+    case "setProperties":
+      return ["title", "props"]; // may include the title property
+    case "setIcon":
+      return ["icon"];
     case "archive":
-    case "restore": return ["archived"];
-    default: return [];
+    case "restore":
+      return ["archived"];
+    default:
+      return [];
   }
 }
 
@@ -915,11 +996,11 @@ function laterConflictingApplied(store: NotionStore, record: StoredActionRecord)
   const rawTarget = actionPageId(record.action);
   if (!rawTarget) return false;
   const target = store.resolveId(rawTarget);
-  return store.allActions().some(r => {
+  return store.allActions().some((r) => {
     if (r.id <= record.id || r.state !== "applied") return false;
     const t = actionPageId(r.action);
     if (t === null || store.resolveId(t) !== target) return false;
-    return mutatedFields(r.action).some(f => fields.has(f));
+    return mutatedFields(r.action).some((f) => fields.has(f));
   });
 }
 
@@ -931,7 +1012,7 @@ function requireResolved(store: NotionStore, id: string): string {
   if (NotionStore.isProvisional(resolved)) {
     throw new Error(
       `Cannot apply this action yet: it targets a page (${id}) whose creation has not been ` +
-      `approved. Approve the page creation first.`,
+        `approved. Approve the page creation first.`,
     );
   }
   return resolved;
@@ -991,9 +1072,12 @@ export function buildCreateBody(
     if (parent.type === "page_id") {
       notionProperties["title"] = { title: plainToRichText(title) };
     } else {
-      const hasTitle = properties ? Object.values(properties).some(p => p.type === "title") : false;
+      const hasTitle = properties
+        ? Object.values(properties).some((p) => p.type === "title")
+        : false;
       // Use the data source's actual title column name when known, else fall back to "Name".
-      if (!hasTitle) notionProperties[titlePropertyName ?? "Name"] = { title: plainToRichText(title) };
+      if (!hasTitle)
+        notionProperties[titlePropertyName ?? "Name"] = { title: plainToRichText(title) };
     }
   }
 
@@ -1051,8 +1135,12 @@ export function rejectStoredAction(store: NotionStore, id: number): void | { res
     for (;;) {
       let added = false;
       for (const r of pending) {
-        if (r.action.type === "createPage" && r.action.parent.kind === "page" &&
-            purge.has(r.action.parent.pageId) && !purge.has(r.action.provisionalId)) {
+        if (
+          r.action.type === "createPage" &&
+          r.action.parent.kind === "page" &&
+          purge.has(r.action.parent.pageId) &&
+          !purge.has(r.action.provisionalId)
+        ) {
           purge.add(r.action.provisionalId);
           added = true;
         }

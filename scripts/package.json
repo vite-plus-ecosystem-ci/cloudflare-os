@@ -2,12 +2,12 @@
   "name": "@gadgets/scripts",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "bin": {
-    "gadgets-with-timeout": "./with-timeout.ts",
     "gadgets-build-configurator": "./build-gatekeeper-configurator.ts",
-    "gadgets-clean-error-reporting": "./clean-error-reporting-artifacts.ts"
+    "gadgets-clean-error-reporting": "./clean-error-reporting-artifacts.ts",
+    "gadgets-with-timeout": "./with-timeout.ts"
   },
+  "type": "module",
   "exports": {
     "./vitest-task": {
       "types": "./vitest-task-vite-config.ts",

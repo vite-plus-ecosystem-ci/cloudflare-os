@@ -6,8 +6,8 @@ Cloudflare OS is an "operating system" for AI productivity originally developed 
 
 This is not a traditional computer operating system. We use the term "operating system" in two senses:
 
-* An operating system for *the company* to be productive with AI, in a way that is safe, so that the security team can sleep at night.
-* An operating system for AI workloads, analogous to the sense in which a traditional operating system manages compute workloads.
+- An operating system for _the company_ to be productive with AI, in a way that is safe, so that the security team can sleep at night.
+- An operating system for AI workloads, analogous to the sense in which a traditional operating system manages compute workloads.
 
 Cloudflare OS provides three things in particular:
 
@@ -15,7 +15,7 @@ Cloudflare OS provides three things in particular:
 2. Sandboxed application development, so that you can ask agents to build "gadgets" (small personal apps) and safely share what you've built with others.
 3. A security framework, called Gatekeepers, that applies guardrails to both agents and apps such that non-technical users can safely "go nuts" and nothing bad will happen.
 
-We are making Cloudflare OS open source so that others can copy it and customize it for their own company. The idea is not that your company uses Cloudflare OS, but rather that you make it "*Your Company* OS".
+We are making Cloudflare OS open source so that others can copy it and customize it for their own company. The idea is not that your company uses Cloudflare OS, but rather that you make it "_Your Company_ OS".
 
 ## Quick Start
 
@@ -35,11 +35,11 @@ Alternatively, you can [deploy to your Cloudflare account](https://os.cloudflare
 
 Try prompts like:
 
-* "Make slides for my upcoming meeting with a customer." (This will use the built-in slides blueprint.)
-* "Make a collaborative whiteboard app." (This will create a new app from scratch.)
-* "Make a tic tac toe game." followed by "I'll be X and you be O. I've made my first move. Your turn."
-* "Make an issue dashboard for this GitHub repo." (Attach a repo; requires that the GitHub integration is configured.)
-* "Fix the typos in this Google Doc." (Attach a doc; requires that the Google integration is configured.)
+- "Make slides for my upcoming meeting with a customer." (This will use the built-in slides blueprint.)
+- "Make a collaborative whiteboard app." (This will create a new app from scratch.)
+- "Make a tic tac toe game." followed by "I'll be X and you be O. I've made my first move. Your turn."
+- "Make an issue dashboard for this GitHub repo." (Attach a repo; requires that the GitHub integration is configured.)
+- "Fix the typos in this Google Doc." (Attach a doc; requires that the Google integration is configured.)
 
 ### WARNING: Early access
 
@@ -53,9 +53,10 @@ As of the August 2026 release, Cloudflare OS v2 is very capable, but still has m
 
 Cloudflare OS is more than just another chatbox with connectors. The system revolves around a new approach to software, where every user runs their own copy of the productivity apps they use.
 
-When you create a slide deck in Cloudflare OS, you are not calling out to some SaaS software running in the cloud. The system creates a *private instance* of the slide deck software *just for you*. We call this a "gadget". This instance runs in a separate sandbox from everyone else's slide decks.
+When you create a slide deck in Cloudflare OS, you are not calling out to some SaaS software running in the cloud. The system creates a _private instance_ of the slide deck software _just for you_. We call this a "gadget". This instance runs in a separate sandbox from everyone else's slide decks.
 
 This has two profound effects:
+
 1. It's impossible for the slide deck app to have a security bug that leaks your slides to an attacker. The Cloudflare OS sandbox controls all access to your private instance of the app.
 2. If you want, you can freely modify the code. If the slide deck app is missing a feature you need, you can just ask your agent to add it. And because of point 1, it's totally safe to do so.
 
@@ -66,15 +67,16 @@ This is a big departure from the last 25 years of cloud architecture and "Softwa
 Gatekeepers are like supercharged MCP servers.
 
 When you introduce an agent or Gadget to an external resource, a Gatekeeper is created to manage that access. The Gatekeeper is a piece of software specific to each external service which moderates a Gadget's connection to that service. It:
-* Provides a clean Cap'n Web API to the service (wrapping whatever API the service provides natively).
-* Handles authorization (e.g. via OAuth).
-* Enforces narrow access to only the specific resource the user intended.
-* Logs every action the Gadget (or agent) performs, for your review.
-* For any action which has side effects, provides the human user an opportunity to approve or deny the action ("human in the loop").
 
-On the last point, Gatekeepers implement a significant advancement in the state of the art. Traditionally, human-in-the-loop setups require the human to approve actions *synchronously*. When the agent wants to do something, it has to *stop* and wait for said approval before it can continue. This is annoying: you give your agent a task, then walk away and get a coffee, only to come back and find the agent got stuck on an approval on the first step and has made no progress. As a result, people often give in and set their agents to "auto-approve", or `--dangerously-skip-permissions`, which is, obviously, unsafe.
+- Provides a clean Cap'n Web API to the service (wrapping whatever API the service provides natively).
+- Handles authorization (e.g. via OAuth).
+- Enforces narrow access to only the specific resource the user intended.
+- Logs every action the Gadget (or agent) performs, for your review.
+- For any action which has side effects, provides the human user an opportunity to approve or deny the action ("human in the loop").
 
-Gatekeepers provide a better way: When the agent (or Gadget) performs an action that requires approval, the Gatekeeper will *simulate* the outcome locally, allowing the agent to proceed and queue up more actions. The Gatekeeper tells the agent that the action completed, and if the agent tries to read back the results, the Gatekeeper gives it simulated results. Once the agent is done, the user may approve or reject the actions in bulk, or one-by-one, but either way, they can do it later, when it is convenient.
+On the last point, Gatekeepers implement a significant advancement in the state of the art. Traditionally, human-in-the-loop setups require the human to approve actions _synchronously_. When the agent wants to do something, it has to _stop_ and wait for said approval before it can continue. This is annoying: you give your agent a task, then walk away and get a coffee, only to come back and find the agent got stuck on an approval on the first step and has made no progress. As a result, people often give in and set their agents to "auto-approve", or `--dangerously-skip-permissions`, which is, obviously, unsafe.
+
+Gatekeepers provide a better way: When the agent (or Gadget) performs an action that requires approval, the Gatekeeper will _simulate_ the outcome locally, allowing the agent to proceed and queue up more actions. The Gatekeeper tells the agent that the action completed, and if the agent tries to read back the results, the Gatekeeper gives it simulated results. Once the agent is done, the user may approve or reject the actions in bulk, or one-by-one, but either way, they can do it later, when it is convenient.
 
 Logistically, each Gatekeeper is implemented as a separate Worker. In the future, we envision Gatekeeper services being deployed and maintained independently from OS instances, but the details have yet to be worked out. For now, we have provided a few interesting Gatekeepers in this repository which you can deploy together with your own OS instance.
 
@@ -92,10 +94,10 @@ Like office docs, you can create new templates (blueprints) from your own docs (
 
 ### It kind of is an Operating System
 
-The OS terminology isn't *entirely* marketing. Cloudflare OS is actually analogous to an operating system on a technical level.
+The OS terminology isn't _entirely_ marketing. Cloudflare OS is actually analogous to an operating system on a technical level.
 
 | Normal OS      | Cloudflare OS              |
-|----------------|----------------------------|
+| -------------- | -------------------------- |
 | kernel         | packages/workshop-backend  |
 | device drivers | packages/gatekeeper-*      |
 | shell          | packages/workshop-frontend |
@@ -135,9 +137,10 @@ Because of the tightly-integrated and simplified nature of the platform, even wh
 
 ### Collaborate with AI
 
-Every app built with Cloudflare OS automatically has an agent-friendly API. That means, after you've asked AI to build the app, you can also ask AI to collaborate with you *inside* the app. No need to build an MCP server nor integrate a custom agent loop. It's just there by default.
+Every app built with Cloudflare OS automatically has an agent-friendly API. That means, after you've asked AI to build the app, you can also ask AI to collaborate with you _inside_ the app. No need to build an MCP server nor integrate a custom agent loop. It's just there by default.
 
 This works because the client and server portions of a Gadget are required to communicate via [Cap'n Web RPC](https://github.com/cloudflare/capnweb). This is a win-win:
+
 1. Cap'n Web is extremely low-boilerplate, which makes it easy for agents to work with. You basically just define a method on your server, then call it from your client, as if it were a local call.
 2. Meanwhile, it means that the server necessarily exposes an easy-to-understand API which could be called directly by an agent. The AI Agent harness uses [Code Mode](https://blog.cloudflare.com/code-mode/) for tool calling, making it trivial to expose the Gadget's API directly for the agent to invoke.
 
@@ -153,19 +156,20 @@ If you've created a Gadget that might be useful to others, but you don't want to
 
 It may sound simple, but Blueprints are a major change from cloud software tradition. Traditionally, if you create a web app that you want to share with other users, you host the app on your server, and the users connect to that. Blueprints are much more like mobile apps and traditional PC apps: every user runs their own copy of the software.
 
-In the age of AI, this change is critically important. On one hand, AI empowers an individual developer to build more than ever, but it is still difficult for an individual developer to maintain an online service; this eliminates the need. On the other hand -- and even more importantly -- allowing each user to run their own copy of the software empowers the user to *change* the software to meet their needs, using AI. No need to file a feature request, no need to beg the developer to prioritize it. The end user can solve their own problems.
+In the age of AI, this change is critically important. On one hand, AI empowers an individual developer to build more than ever, but it is still difficult for an individual developer to maintain an online service; this eliminates the need. On the other hand -- and even more importantly -- allowing each user to run their own copy of the software empowers the user to _change_ the software to meet their needs, using AI. No need to file a feature request, no need to beg the developer to prioritize it. The end user can solve their own problems.
 
 ### Sandboxed and secure by default
 
 Each Gadget runs in a secure sandbox that prevents it from talking to the internet at all without your explicit consent. In particular:
-* The server runs in a [Dynamic Worker](https://blog.cloudflare.com/dynamic-workers/) which has had its access to the internet disabled. It can only communicate with specific external resources that you have explicitly designated, via [Workers Bindings](https://blog.cloudflare.com/workers-environment-live-object-bindings/).
-* The client code runs in a sandboxed iframe. This iframe can communicate with its server only via a Cap'n Web RPC session provided over `postMessage()` to the parent frame. The iframe is otherwise blocked from accessing the internet (to the maximum extent allowed by browsers, via `Content-Security-Policy` and iframe sandbox settings).
+
+- The server runs in a [Dynamic Worker](https://blog.cloudflare.com/dynamic-workers/) which has had its access to the internet disabled. It can only communicate with specific external resources that you have explicitly designated, via [Workers Bindings](https://blog.cloudflare.com/workers-environment-live-object-bindings/).
+- The client code runs in a sandboxed iframe. This iframe can communicate with its server only via a Cap'n Web RPC session provided over `postMessage()` to the parent frame. The iframe is otherwise blocked from accessing the internet (to the maximum extent allowed by browsers, via `Content-Security-Policy` and iframe sandbox settings).
 
 ### Capability-based access control
 
 Each agent, and each Gadget, by default has access to nothing. Even if you've configured the Gadget Workshop with access to external accounts, agents and Gadgets do NOT automatically get to use them.
 
-Instead, you must *introduce* each agent (or Gadget) to any particular resources you want it to access. For instance, you may introduce a GitHub repository by pasting a link to it, or clicking "add resource" and selecting it via the UI. An agent can also request an introduction to a resource it thinks it needs, which you can then provide or deny.
+Instead, you must _introduce_ each agent (or Gadget) to any particular resources you want it to access. For instance, you may introduce a GitHub repository by pasting a link to it, or clicking "add resource" and selecting it via the UI. An agent can also request an introduction to a resource it thinks it needs, which you can then provide or deny.
 
 This differs from most agent harnesses, where MCP servers are configured upfront, making broad access to all your services ambiently available to the agent in every chat. Capability-based introductions keep each agent restricted to only the access it actually needs for the job at hand.
 
@@ -205,17 +209,17 @@ Many Gatekeepers require configuration in order to be able to connect to third-p
 
 Each gatekeeper package contains instructions for how to set it up:
 
-* [GitHub API](packages/gatekeeper-github/README.md)
-* [Google API](packages/gatekeeper-google/README.md)
-* [Cloudflare API](packages/gatekeeper-cloudflare/README.md)
-* [Supabase API](packages/gatekeeper-supabase/README.md)
-* [Notion API](packages/gatekeeper-notion/README.md)
-* [Confluence API](packages/gatekeeper-confluence/README.md)
-* [Email Workers](packages/gatekeeper-email/README.md)
-* [Home Assistant](packages/gatekeeper-homeassistant/README.md)
-* [Slack API](packages/gatekeeper-slack/README.md)
-* [Spotify](packages/gatekeeper-spotify/README.md)
-* [ZoomInfo API](packages/gatekeeper-zoominfo/README.md)
+- [GitHub API](packages/gatekeeper-github/README.md)
+- [Google API](packages/gatekeeper-google/README.md)
+- [Cloudflare API](packages/gatekeeper-cloudflare/README.md)
+- [Supabase API](packages/gatekeeper-supabase/README.md)
+- [Notion API](packages/gatekeeper-notion/README.md)
+- [Confluence API](packages/gatekeeper-confluence/README.md)
+- [Email Workers](packages/gatekeeper-email/README.md)
+- [Home Assistant](packages/gatekeeper-homeassistant/README.md)
+- [Slack API](packages/gatekeeper-slack/README.md)
+- [Spotify](packages/gatekeeper-spotify/README.md)
+- [ZoomInfo API](packages/gatekeeper-zoominfo/README.md)
 
 ## Developing
 
@@ -242,7 +246,7 @@ This policy may change in the future as the project matures. Until then, thank y
 
 Cloudflare OS has far too many open source dependencies to list here. But, we'd like to highlight a few that do particularly heavy lifting:
 
-* [Pi](https://pi.dev/) (specifically, `pi-agent-core`), which made it easy to support every LLM provider with one API.
-* [CodeMirror](https://codemirror.net/) provides our code editor UI and operational transform implementation for synchronizing real-time edits.
-* [isomorphic-git](https://isomorphic-git.org/) is used to implement the backing storage for Gadget code and integration with external git servers.
-* [Vite](https://vite.dev/), which makes the development loop so pleasant.
+- [Pi](https://pi.dev/) (specifically, `pi-agent-core`), which made it easy to support every LLM provider with one API.
+- [CodeMirror](https://codemirror.net/) provides our code editor UI and operational transform implementation for synchronizing real-time edits.
+- [isomorphic-git](https://isomorphic-git.org/) is used to implement the backing storage for Gadget code and integration with external git servers.
+- [Vite](https://vite.dev/), which makes the development loop so pleasant.

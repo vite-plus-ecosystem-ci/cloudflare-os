@@ -11,7 +11,8 @@ export function gatekeeperBindingName(vendorId: string): string {
 
 /** Return the gatekeeper vendor service binding for `vendorId`, or null if not bound. */
 export function getAuthVendorBinding(
-  env: Cloudflare.Env, vendorId: string,
+  env: Cloudflare.Env,
+  vendorId: string,
 ): Service<GatekeeperVendor> | null {
   const binding = (env as unknown as Record<string, unknown>)[gatekeeperBindingName(vendorId)];
   return (binding as Service<GatekeeperVendor>) ?? null;
@@ -29,7 +30,10 @@ export function buildGatekeeperVendorMap(
   for (const bindingName in env) {
     if (bindingName.startsWith("GATEKEEPER_")) {
       const vendorId = bindingName.slice("GATEKEEPER_".length).toLowerCase();
-      vendors.set(vendorId, (env as unknown as Record<string, Service<GatekeeperVendor>>)[bindingName]);
+      vendors.set(
+        vendorId,
+        (env as unknown as Record<string, Service<GatekeeperVendor>>)[bindingName],
+      );
     }
   }
   return vendors;

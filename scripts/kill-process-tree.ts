@@ -17,18 +17,20 @@ import { execFile, spawn } from "node:child_process";
 // The pids a child-lister prints for one parent. Resolves empty when the parent has no children or
 // the lister reports failure -- `pgrep` exits 1 for "no matches", which is not an error here.
 function listChildren(command: string, args: string[]): Promise<number[]> {
-  return new Promise<number[]>(resolve => {
+  return new Promise<number[]>((resolve) => {
     const child = spawn(command, args, { stdio: ["ignore", "pipe", "ignore"] });
     let output = "";
-    child.stdout.on("data", (chunk: Buffer) => { output += chunk.toString("ascii"); });
+    child.stdout.on("data", (chunk: Buffer) => {
+      output += chunk.toString("ascii");
+    });
     // `error` fires instead of `close` when the lister binary is missing.
     child.on("error", () => resolve([]));
-    child.on("close", code => {
+    child.on("close", (code) => {
       // Upstream (index.js:108) calls `.forEach` straight on the match result, which throws when the
       // lister exits 0 having printed no pids. That throw happens inside this handler, so it would
       // surface as an uncaught exception rather than a rejection a caller could catch.
       if (code !== 0) return resolve([]);
-      resolve((output.match(/\d+/g) ?? []).map(pid => parseInt(pid, 10)));
+      resolve((output.match(/\d+/g) ?? []).map((pid) => parseInt(pid, 10)));
     });
   });
 }
@@ -47,8 +49,9 @@ export async function collectTree(pid: number): Promise<number[]> {
   let frontier = [pid];
   while (frontier.length > 0) {
     const listed = await Promise.all(
-      frontier.map(parent => listChildren(...childListerFor(parent))));
-    frontier = listed.flat().filter(child => !collected.has(child));
+      frontier.map((parent) => listChildren(...childListerFor(parent))),
+    );
+    frontier = listed.flat().filter((child) => !collected.has(child));
     for (const child of frontier) collected.add(child);
   }
   return [...collected];
@@ -85,7 +88,7 @@ export async function killProcessTree(
 
   if (process.platform === "win32") {
     // `/T` kills the tree for us. An argv array rather than upstream's interpolated `exec` string.
-    await new Promise<void>(resolve => {
+    await new Promise<void>((resolve) => {
       execFile("taskkill", ["/pid", String(pid), "/T", "/F"], () => resolve());
     });
     return;
@@ -119,8 +122,11 @@ export async function killProcessTree(
  */
 export async function killProcessTreeEscalating(
   pid: number,
-  { graceMs = 5_000, forceSignal, initialSignal = "SIGTERM" }:
-      { graceMs?: number; forceSignal?: AbortSignal; initialSignal?: NodeJS.Signals } = {},
+  {
+    graceMs = 5_000,
+    forceSignal,
+    initialSignal = "SIGTERM",
+  }: { graceMs?: number; forceSignal?: AbortSignal; initialSignal?: NodeJS.Signals } = {},
 ): Promise<void> {
   if (!Number.isInteger(pid) || pid <= 0) throw new Error("pid must be a positive integer");
 
@@ -144,7 +150,7 @@ export async function killProcessTreeEscalating(
     // Checked here rather than in the condition above, where it reads as an unmodified loop
     // variable: what changes is `.aborted`, not the signal.
     if (forceSignal?.aborted) break;
-    await new Promise(resolve => setTimeout(resolve, 25));
+    await new Promise((resolve) => setTimeout(resolve, 25));
     survivors = survivors.filter(isAlive);
   }
   for (const treePid of survivors) signalPid(treePid, "SIGKILL");

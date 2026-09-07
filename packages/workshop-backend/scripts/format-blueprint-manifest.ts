@@ -3,8 +3,18 @@
 
 // Icons a blueprint may declare. Duplicated from the shared API's OUTPUT_ICONS because these
 // scripts run before (and without) a TypeScript build; runtime validates against the real list.
-const OUTPUT_ICONS = ["fileText", "gridNine", "presentation", "appWindow", "flowArrow",
-    "kanban", "chartBar", "table", "notebook", "listChecks"];
+const OUTPUT_ICONS = [
+  "fileText",
+  "gridNine",
+  "presentation",
+  "appWindow",
+  "flowArrow",
+  "kanban",
+  "chartBar",
+  "table",
+  "notebook",
+  "listChecks",
+];
 
 // Must match isReservedBlueprintKey() in src/blueprint-archive.ts.
 const RESERVED_BLUEPRINT_KEYS = new Set([".featured", ".adminConfig"]);
@@ -13,8 +23,8 @@ export type FormatBlueprintManifest = {
   blueprintId: string;
   title: string;
   description: string;
-  output: {id: string; noun: string; plural: string; icon: string};
-  author: {type: "user"; name: string; id: string};
+  output: { id: string; noun: string; plural: string; icon: string };
+  author: { type: "user"; name: string; id: string };
   revision: number;
   created: string;
   version: number;
@@ -22,8 +32,10 @@ export type FormatBlueprintManifest = {
   bindings: Record<string, unknown>;
 };
 
-export type FormatBlueprintPresentation = Omit<FormatBlueprintManifest,
-    "created" | "version" | "lastUpdated" | "bindings">;
+export type FormatBlueprintPresentation = Omit<
+  FormatBlueprintManifest,
+  "created" | "version" | "lastUpdated" | "bindings"
+>;
 
 export function parseFormatBlueprintPresentation(
   label: string,
@@ -32,20 +44,26 @@ export function parseFormatBlueprintPresentation(
   return parsePresentation(label, JSON.parse(raw), []);
 }
 
-export function parseFormatBlueprintManifest(
-  name: string,
-  raw: string,
-): FormatBlueprintManifest {
+export function parseFormatBlueprintManifest(name: string, raw: string): FormatBlueprintManifest {
   let label = `${name}/blueprint.json`;
-  let bad = (message: string): never => { throw new Error(`${label}: ${message}`); };
+  let bad = (message: string): never => {
+    throw new Error(`${label}: ${message}`);
+  };
   let parsed = JSON.parse(raw);
-  let presentation = parsePresentation(label, parsed,
-      ["created", "version", "lastUpdated", "bindings"]);
-  let {created, version, lastUpdated, bindings} = parsed;
+  let presentation = parsePresentation(label, parsed, [
+    "created",
+    "version",
+    "lastUpdated",
+    "bindings",
+  ]);
+  let { created, version, lastUpdated, bindings } = parsed;
   if (typeof version !== "number" || !Number.isInteger(version) || version < 1) {
     bad("version must be a positive integer");
   }
-  for (let [key, value] of [["created", created], ["lastUpdated", lastUpdated]] as const) {
+  for (let [key, value] of [
+    ["created", created],
+    ["lastUpdated", lastUpdated],
+  ] as const) {
     if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) {
       bad(`${key} must be an ISO date string`);
     }
@@ -68,11 +86,11 @@ function parsePresentation(
   parsed: Record<string, unknown>,
   allowedExtra: string[],
 ): FormatBlueprintPresentation {
-  let bad = (message: string): never => { throw new Error(`${label}: ${message}`); };
-  let {
-    blueprintId, title, description, output, author, revision, $comment, ...rest
-  } = parsed;
-  let unknown = Object.keys(rest).filter(key => !allowedExtra.includes(key));
+  let bad = (message: string): never => {
+    throw new Error(`${label}: ${message}`);
+  };
+  let { blueprintId, title, description, output, author, revision, $comment, ...rest } = parsed;
+  let unknown = Object.keys(rest).filter((key) => !allowedExtra.includes(key));
   if (unknown.length > 0) bad(`unknown keys: ${unknown.join(", ")}`);
 
   let string = (value: unknown, what: string): string => {
@@ -99,7 +117,10 @@ function parsePresentation(
   }
   if (typeof author !== "object" || author === null) bad("author is required");
   let {
-    type: authorType, name: authorName, id: authorId, ...authorRest
+    type: authorType,
+    name: authorName,
+    id: authorId,
+    ...authorRest
   } = author as Record<string, unknown>;
   if (Object.keys(authorRest).length > 0) {
     bad(`unknown author keys: ${Object.keys(authorRest).join(", ")}`);

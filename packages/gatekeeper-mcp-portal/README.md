@@ -19,10 +19,10 @@ One resource type, **MCP portal server**, at two grant breadths. A grant always 
 server; "everything the portal offers" is not offered, since it would hand a Gadget every tool of
 every system the organization has connected in one click.
 
-| Granularity | Resource URL | Session type |
-| --- | --- | --- |
-| **Server** — every tool of one upstream server, including ones it adds later | `<endpoint>#server=github` | `Mcp<Name><tag>Session` |
-| **Named tools** — only the listed tools of that server | `<endpoint>#server=github&tool=github_a&tool=github_b` | `Mcp<Name><tag>Session` |
+| Granularity                                                                  | Resource URL                                           | Session type            |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------ | ----------------------- |
+| **Server** — every tool of one upstream server, including ones it adds later | `<endpoint>#server=github`                             | `Mcp<Name><tag>Session` |
+| **Named tools** — only the listed tools of that server                       | `<endpoint>#server=github&tool=github_a&tool=github_b` | `Mcp<Name><tag>Session` |
 
 `<tag>` is four hex characters derived from the resource URL. It matters most here: two grants
 pinning different tools of one upstream server share both the name and the endpoint, so the scope is
@@ -46,15 +46,15 @@ within the explicit scan limits above; exceeding a limit fails rather than prete
 
 ## Configuration
 
-| Variable | Meaning |
-| --- | --- |
-| `MCP_PORTAL_URL` | The portal's MCP endpoint. Unset means the connector hides itself. |
-| `MCP_PORTAL_NAME` | Display name in the connector list and every approval prompt. Defaults to `MCP Server Portal (<host>)`. |
-| `MCP_PORTAL_AUTH` | `oauth` (default), `none`, or `token`. |
-| `MCP_PORTAL_TOKEN` | Secret bearer token, for `MCP_PORTAL_AUTH: "token"`. |
-| `MCP_PORTAL_TRUST_ANNOTATIONS` | `true` to let upstream tool annotations drive auto-approval. Off by default; see below. |
-| `MCP_PORTAL_HIDDEN_SERVER_IDS` | Comma-separated upstream server IDs to hide from the configurator and refuse at the grant boundary. |
-| `MCP_ALLOW_INSECURE` | `"true"` to disable the endpoint checks entirely: permits `http://` **and** private, loopback, link-local, and cloud-metadata hosts, for the portal and every OAuth URL discovered from it. Local dev only. |
+| Variable                       | Meaning                                                                                                                                                                                                     |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MCP_PORTAL_URL`               | The portal's MCP endpoint. Unset means the connector hides itself.                                                                                                                                          |
+| `MCP_PORTAL_NAME`              | Display name in the connector list and every approval prompt. Defaults to `MCP Server Portal (<host>)`.                                                                                                     |
+| `MCP_PORTAL_AUTH`              | `oauth` (default), `none`, or `token`.                                                                                                                                                                      |
+| `MCP_PORTAL_TOKEN`             | Secret bearer token, for `MCP_PORTAL_AUTH: "token"`.                                                                                                                                                        |
+| `MCP_PORTAL_TRUST_ANNOTATIONS` | `true` to let upstream tool annotations drive auto-approval. Off by default; see below.                                                                                                                     |
+| `MCP_PORTAL_HIDDEN_SERVER_IDS` | Comma-separated upstream server IDs to hide from the configurator and refuse at the grant boundary.                                                                                                         |
+| `MCP_ALLOW_INSECURE`           | `"true"` to disable the endpoint checks entirely: permits `http://` **and** private, loopback, link-local, and cloud-metadata hosts, for the portal and every OAuth URL discovered from it. Local dev only. |
 
 The portal must expose upstream tools directly. Use a portal where Code Mode is off or opt-in, or
 append `?codemode=off` when its policy is default-on. Enforced Code Mode is unsupported. Do not add
@@ -145,7 +145,7 @@ recovered from two facts in the portal's documented contract:
 
 Detection is a capability probe — does the endpoint offer `portal_list_servers`? — not a hostname
 match, so it works for a custom portal hostname and for any other aggregator adopting the
-convention. A *truncated* listing counts as a portal whether or not the probe tool is in it:
+convention. A _truncated_ listing counts as a portal whether or not the probe tool is in it:
 `tools/list` is unordered, so concluding "not a portal" because the evidence fell past the cut would
 fail open on the `portal_*` exclusion below. Truncation is reported by the client rather than
 inferred from the tool count, because either cap can stop a listing — the count the caller asked for,
@@ -218,11 +218,11 @@ the same way, by `global_fetch_strictly_public` rather than by hostname patterns
 
 ## Layout
 
-| File | Purpose |
-| --- | --- |
-| `src/portal.ts` | Vendor, account DO, user, gatekeeper facet, session, configurator RPC |
-| `src/config.ts` | Reading and validating the deployment's portal configuration |
-| `src/configurator/` | The grant UI (compiled into `src/generated/`) |
+| File                | Purpose                                                               |
+| ------------------- | --------------------------------------------------------------------- |
+| `src/portal.ts`     | Vendor, account DO, user, gatekeeper facet, session, configurator RPC |
+| `src/config.ts`     | Reading and validating the deployment's portal configuration          |
+| `src/configurator/` | The grant UI (compiled into `src/generated/`)                         |
 
 Everything else comes from [`@gadgets/mcp-shared`](../mcp-shared/README.md).
 

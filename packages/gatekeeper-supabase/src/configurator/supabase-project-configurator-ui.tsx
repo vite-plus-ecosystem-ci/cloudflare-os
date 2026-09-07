@@ -16,16 +16,21 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return <Section>
-      <Field label="Project" description="Search the projects in your connected Supabase account.">
-        <Autocomplete
-          name="ref"
-          value={values.ref}
-          placeholder="Search projects..."
-          loadOptions={query => ui.listProjects(query)}
-          onChange={ref => setValues({ ref })}
-        />
-      </Field>
-    </Section>;
+    return (
+      <Section>
+        <Field
+          label="Project"
+          description="Search the projects in your connected Supabase account."
+        >
+          <Autocomplete
+            name="ref"
+            value={values.ref}
+            placeholder="Search projects..."
+            loadOptions={(query) => ui.listProjects(query)}
+            onChange={(ref) => setValues({ ref })}
+          />
+        </Field>
+      </Section>
+    );
   },
 } satisfies ConfiguratorUISpec<SupabaseProjectConfiguratorRpc, SupabaseProjectConfiguratorValues>;

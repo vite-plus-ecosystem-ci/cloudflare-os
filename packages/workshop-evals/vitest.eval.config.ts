@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 import { EVAL_TEST_TIMEOUT_MS } from "./src/budgets.js";
 
 export default defineConfig({

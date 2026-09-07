@@ -24,9 +24,11 @@ async function removeReportingArtifacts(dir: string): Promise<void> {
     if ((error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") return;
     throw error;
   }
-  await Promise.all(names
-      .filter(name => name.endsWith(".js") || name.endsWith(".js.map"))
-      .map(name => rm(join(dir, name), { force: true })));
+  await Promise.all(
+    names
+      .filter((name) => name.endsWith(".js") || name.endsWith(".js.map"))
+      .map((name) => rm(join(dir, name), { force: true })),
+  );
 }
 
 await removeReportingArtifacts(join(packageDir, "src", "generated"));

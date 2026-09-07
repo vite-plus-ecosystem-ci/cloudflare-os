@@ -1,21 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouterState } from '@tanstack/react-router'
-import { List, X } from '@phosphor-icons/react'
-import TopBarNotice from '../../TopBarNotice'
-import ReconnectingChip from '../ReconnectingChip'
-import { useConnectionLost } from '../../RpcContext'
-import Sidebar from './Sidebar'
-import CommandPalette from './CommandPalette'
-import { OPEN_COMMAND_PALETTE_EVENT } from './commandPaletteBus'
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouterState } from "@tanstack/react-router";
+import { List, X } from "@phosphor-icons/react";
+import TopBarNotice from "../../TopBarNotice";
+import ReconnectingChip from "../ReconnectingChip";
+import { useConnectionLost } from "../../RpcContext";
+import Sidebar from "./Sidebar";
+import CommandPalette from "./CommandPalette";
+import { OPEN_COMMAND_PALETTE_EVENT } from "./commandPaletteBus";
 
-const STORAGE_KEY_COLLAPSED = 'gadgets:sidebar-collapsed'
+const STORAGE_KEY_COLLAPSED = "gadgets:sidebar-collapsed";
 
 // Read synchronously for the initial state so the rail doesn't flash open then collapse.
 function readCollapsed(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY_COLLAPSED) === '1'
+    return localStorage.getItem(STORAGE_KEY_COLLAPSED) === "1";
   } catch {
-    return false
+    return false;
   }
 }
 
@@ -29,82 +29,90 @@ function readCollapsed(): boolean {
  * is simpler and matches how the rest of the app handles small screens.
  */
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState<boolean>(readCollapsed)
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [paletteOpen, setPaletteOpen] = useState(false)
-  const drawerRef = useRef<HTMLDivElement>(null)
-  const menuButtonRef = useRef<HTMLButtonElement>(null)
-  const connectionLost = useConnectionLost()
+  const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const connectionLost = useConnectionLost();
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {
-      const next = !prev
-      try { localStorage.setItem(STORAGE_KEY_COLLAPSED, next ? '1' : '0') } catch {}
-      return next
-    })
-  }, [])
+      const next = !prev;
+      try {
+        localStorage.setItem(STORAGE_KEY_COLLAPSED, next ? "1" : "0");
+      } catch {}
+      return next;
+    });
+  }, []);
 
   // Close mobile drawer when escape is pressed.
   useEffect(() => {
-    if (!mobileOpen) return
-    const previousFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : menuButtonRef.current
-    drawerRef.current?.focus()
+    if (!mobileOpen) return;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : menuButtonRef.current;
+    drawerRef.current?.focus();
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setMobileOpen(false)
-        return
+      if (e.key === "Escape") {
+        setMobileOpen(false);
+        return;
       }
-      if (e.key !== 'Tab' || !drawerRef.current) return
-      const focusable = [...drawerRef.current.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      )]
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (e.shiftKey && (document.activeElement === first || document.activeElement === drawerRef.current)) {
-        e.preventDefault()
-        last.focus()
+      if (e.key !== "Tab" || !drawerRef.current) return;
+      const focusable = [
+        ...drawerRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (
+        e.shiftKey &&
+        (document.activeElement === first || document.activeElement === drawerRef.current)
+      ) {
+        e.preventDefault();
+        last.focus();
       } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
+        e.preventDefault();
+        first.focus();
       }
-    }
-    document.addEventListener('keydown', handler)
+    };
+    document.addEventListener("keydown", handler);
     return () => {
-      document.removeEventListener('keydown', handler)
-      window.setTimeout(() => previousFocus?.focus(), 0)
-    }
-  }, [mobileOpen])
+      document.removeEventListener("keydown", handler);
+      window.setTimeout(() => previousFocus?.focus(), 0);
+    };
+  }, [mobileOpen]);
 
   // Close the mobile drawer on navigation. Links in the drawer (primary nav, Gatekeepers, the user
   // menu, workspace rows) otherwise navigate while leaving the drawer covering the page — so on a
   // phone it looks like nothing happened. Watching the pathname catches every navigation source
   // without prop-drilling a close callback through the whole rail. No-op on desktop, where the
   // drawer is never open.
-  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   useEffect(() => {
-    setMobileOpen(false)
-  }, [pathname])
+    setMobileOpen(false);
+  }, [pathname]);
 
   // Global ⌘K / Ctrl+K opens the command palette; the rail's search button opens it via a custom
   // event so it doesn't have to prop-drill into the palette.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
-        e.preventDefault()
-        setPaletteOpen((o) => !o)
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
       }
-    }
-    const onOpen = () => setPaletteOpen(true)
-    document.addEventListener('keydown', onKey)
-    window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpen)
+    };
+    const onOpen = () => setPaletteOpen(true);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpen);
     return () => {
-      document.removeEventListener('keydown', onKey)
-      window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpen)
-    }
-  }, [])
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpen);
+    };
+  }, []);
 
   return (
     <div className="flex h-full min-h-0 w-full overflow-hidden bg-kumo-base">
@@ -148,7 +156,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             type="button"
             ref={menuButtonRef}
             onClick={() => setMobileOpen((o) => !o)}
-            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
             className="flex h-11 w-11 items-center justify-center rounded-md text-kumo-default transition-colors hover:bg-kumo-tint md:hidden"
           >
             {mobileOpen ? <X size={16} /> : <List size={16} />}
@@ -169,5 +177,5 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
-  )
+  );
 }

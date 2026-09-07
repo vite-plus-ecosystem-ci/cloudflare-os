@@ -13,6 +13,11 @@ const GENERIC_HOST_LABELS = new Set(["mcp", "api", "www", "server", "app"]);
  */
 export function serverIdFromEndpoint(endpoint: string): string {
   const labels = new URL(endpoint).hostname.split(".");
-  const chosen = labels.find(label => !GENERIC_HOST_LABELS.has(label)) ?? labels[0];
-  return chosen.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "server";
+  const chosen = labels.find((label) => !GENERIC_HOST_LABELS.has(label)) ?? labels[0];
+  return (
+    chosen
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "server"
+  );
 }

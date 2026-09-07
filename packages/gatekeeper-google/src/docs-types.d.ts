@@ -6,7 +6,6 @@ export type { DocMetadata, GoogleDocReadSession } from "./docs-read-types";
  * Metadata works with any number of tabs; content conversion and edits require exactly one tab.
  */
 export interface GoogleDocSession extends GoogleDocReadSession {
-
   /**
    * Find `oldMarkdown` in the current document content and replace it with `newMarkdown`.
    * Both parameters are Markdown text.

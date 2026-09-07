@@ -9,7 +9,8 @@ export default {
   test: {
     alias: {
       "cloudflare:workers": fileURLToPath(
-        new URL("../mcp-shared/__tests__/stubs/cloudflare-workers.ts", import.meta.url)),
+        new URL("../mcp-shared/__tests__/stubs/cloudflare-workers.ts", import.meta.url),
+      ),
     },
   },
 };

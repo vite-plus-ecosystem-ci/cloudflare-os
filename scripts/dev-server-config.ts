@@ -33,7 +33,10 @@ export function getWranglerPortFromBackendHost(backendHost: string): string | nu
  * Resolve where the dev server's backend lives: an explicit `--port` wins, else
  * `VITE_BACKEND_HOST`, else `localhost:8787`.
  */
-export function getDevServerConfig(args: readonly string[], envBackendHost?: string): {
+export function getDevServerConfig(
+  args: readonly string[],
+  envBackendHost?: string,
+): {
   backendHost: string;
   wranglerPort: string | null;
 } {

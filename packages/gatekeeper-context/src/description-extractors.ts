@@ -91,7 +91,8 @@ const extractors: DescriptionExtractor[] = [
   },
   // YAML data files: a top-level description/summary key, else the leading `#` comment block.
   {
-    appliesTo: (ct) => ct === "application/yaml" || ct === "application/x-yaml" || ct === "text/yaml",
+    appliesTo: (ct) =>
+      ct === "application/yaml" || ct === "application/x-yaml" || ct === "text/yaml",
     extract: (body) => {
       const lines = body.split(/\r?\n/);
       return yamlDescription(lines) ?? leadingYamlComment(lines);
@@ -105,7 +106,8 @@ const extractors: DescriptionExtractor[] = [
       if (body.length > MAX_JSON_EXTRACT_BYTES) return null;
       try {
         const obj = JSON.parse(body) as Record<string, unknown>;
-        if (obj && typeof obj === "object") return firstNonEmpty(obj._comment, obj.description, obj.summary);
+        if (obj && typeof obj === "object")
+          return firstNonEmpty(obj._comment, obj.description, obj.summary);
       } catch {
         // Incomplete/invalid JSON (e.g. mid-edit) — no description yet.
       }

@@ -1,56 +1,56 @@
-import { Plus } from '@phosphor-icons/react'
-import { Link } from '@tanstack/react-router'
-import { useAuthenticatedApi } from '../AuthContext'
-import { useState, useEffect } from 'react'
-import { logoComponents } from './ConnectionLogos'
-import { getVendorIconBackground } from './vendorColors'
-import { useTheme } from '../ThemeContext'
-import { AccountsSubscriberAdapter } from '../accountsSubscriber'
+import { Plus } from "@phosphor-icons/react";
+import { Link } from "@tanstack/react-router";
+import { useAuthenticatedApi } from "../AuthContext";
+import { useState, useEffect } from "react";
+import { logoComponents } from "./ConnectionLogos";
+import { getVendorIconBackground } from "./vendorColors";
+import { useTheme } from "../ThemeContext";
+import { AccountsSubscriberAdapter } from "../accountsSubscriber";
 
 interface ConnectedAccount {
-  id: number
-  name: string
-  logo: string
+  id: number;
+  name: string;
+  logo: string;
 }
 
 export default function ConnectionChips() {
-  const { authenticatedApi } = useAuthenticatedApi()
-  const { resolvedThemeMode } = useTheme()
-  const [accounts, setAccounts] = useState<ConnectedAccount[]>([])
+  const { authenticatedApi } = useAuthenticatedApi();
+  const { resolvedThemeMode } = useTheme();
+  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
-    const accountMap = new Map<number, ConnectedAccount>()
+    const accountMap = new Map<number, ConnectedAccount>();
 
     const subscriber = new AccountsSubscriberAdapter({
       add({ id, description, vendor, vendorId }) {
-        if (cancelled) return
+        if (cancelled) return;
         accountMap.set(id, {
           id,
           name: description.displayName ?? description.uniqueName ?? vendor.displayName,
           logo: vendorId,
-        })
-        setAccounts(Array.from(accountMap.values()))
+        });
+        setAccounts(Array.from(accountMap.values()));
       },
       remove(id) {
-        accountMap.delete(id)
-        if (!cancelled) setAccounts(Array.from(accountMap.values()))
+        accountMap.delete(id);
+        if (!cancelled) setAccounts(Array.from(accountMap.values()));
       },
-    })
-    const subscription = authenticatedApi.subscribeConnectedAccounts(subscriber)
-    subscription.catch(() => {})
+    });
+    const subscription = authenticatedApi.subscribeConnectedAccounts(subscriber);
+    subscription.catch(() => {});
 
     return () => {
-      cancelled = true
-      subscription[Symbol.dispose]()
-    }
-  }, [authenticatedApi])
+      cancelled = true;
+      subscription[Symbol.dispose]();
+    };
+  }, [authenticatedApi]);
 
   return (
     <div className="flex items-center justify-center gap-2 flex-wrap max-w-2xl mx-auto">
       {accounts.slice(0, 5).map((account) => {
-        const LogoComponent = logoComponents[account.logo]
+        const LogoComponent = logoComponents[account.logo];
         return (
           <button
             key={account.id}
@@ -63,16 +63,12 @@ export default function ConnectionChips() {
               {LogoComponent ? (
                 <LogoComponent size={12} />
               ) : (
-                <span className="text-[9px] font-bold text-kumo-strong">
-                  {account.name[0]}
-                </span>
+                <span className="text-[9px] font-bold text-kumo-strong">{account.name[0]}</span>
               )}
             </div>
-            <span className="text-sm text-kumo-default">
-              {account.name}
-            </span>
+            <span className="text-sm text-kumo-default">{account.name}</span>
           </button>
-        )
+        );
       })}
       <Link
         to="/gatekeepers"
@@ -81,5 +77,5 @@ export default function ConnectionChips() {
         <Plus size={14} />
       </Link>
     </div>
-  )
+  );
 }

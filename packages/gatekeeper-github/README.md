@@ -14,7 +14,7 @@ This package provides GitHub OAuth integration for Gadgets. It serves two purpos
 > parameter, which is what makes the minimal-on-login / full-on-connect behavior work, and the
 > `user:email` scope is what grants access to the user's verified email. A **GitHub App** (client id
 > starting with `Iv…`) ignores `scope` entirely and will return `Resource not accessible by
-> integration` for the email lookup unless you separately grant it the **Email addresses** account
+integration` for the email lookup unless you separately grant it the **Email addresses** account
 > permission — and even then login won't be minimal-scope. See [Using a GitHub App
 > instead](#using-a-github-app-instead) if you must.
 
@@ -91,7 +91,7 @@ If you must use a **GitHub App** (client id `Iv…`) rather than an OAuth App, b
   permission: App settings → **Permissions & events** → **Account permissions** → **Email
   addresses → Read-only** → save. Existing users must then re-authorize (re-run the sign-in flow) to
   approve the added permission. Without it, the email lookup fails with `Resource not accessible by
-  integration` and sign-in is rejected.
+integration` and sign-in is rejected.
 
 For these reasons an **OAuth App is recommended** for sign-in.
 

@@ -242,9 +242,21 @@ export interface WorkerBuild {
 // wrangler.jsonc keys this generator understands. Anything else fails closed — a new config key
 // on a deployable worker needs an explicit decision about how customer instances get it.
 const HANDLED_CONFIG_KEYS = new Set([
-  "$schema", "name", "main", "build", "compatibility_date", "compatibility_flags", "rules",
-  "migrations", "observability", "kv_namespaces", "r2_buckets", "worker_loaders", "services",
-  "assets", "vars",
+  "$schema",
+  "name",
+  "main",
+  "build",
+  "compatibility_date",
+  "compatibility_flags",
+  "rules",
+  "migrations",
+  "observability",
+  "kv_namespaces",
+  "r2_buckets",
+  "worker_loaders",
+  "services",
+  "assets",
+  "vars",
   // Browser Rendering (Gadget PDF exports). Unlike artifacts it is generally available, so it
   // passes through to customer instances as a placeholder-free binding, like the AI binding.
   "browser",
@@ -258,11 +270,11 @@ const ARTIFACTS_CUT_ALLOWED = new Set(["gatekeeper-context"]);
 // Installable gatekeepers that do NOT take third-party OAuth app credentials; everyone else
 // defaults to CLIENT_ID/CLIENT_SECRET secret inputs (overridable via deploy-inputs.json).
 const NO_DEFAULT_CRED_INPUTS = new Set([
-  "gatekeeper-context",       // no third-party service; uses its own storage
+  "gatekeeper-context", // no third-party service; uses its own storage
   "gatekeeper-homeassistant", // users connect their own Home Assistant URL + token in-app
-  "gatekeeper-scheduler",     // auto-provisioned; no third-party OAuth app
-  "gatekeeper-mcp",           // MCP OAuth uses dynamic client registration, not a static app
-  "gatekeeper-mcp-portal",    // same MCP OAuth chain as gatekeeper-mcp
+  "gatekeeper-scheduler", // auto-provisioned; no third-party OAuth app
+  "gatekeeper-mcp", // MCP OAuth uses dynamic client registration, not a static app
+  "gatekeeper-mcp-portal", // same MCP OAuth chain as gatekeeper-mcp
 ]);
 
 // Not installable on customer instances: Email Routing needs a zone, which workers.dev-hosted
@@ -293,11 +305,11 @@ const PREINSTALL = new Set(["gatekeeper-context", "gatekeeper-scheduler"]);
 // multi-install. Independent of PREINSTALL in principle; the ambient two coincide with it today
 // only because every ambient gatekeeper we ship is also preinstalled.
 const SINGLETON = new Set([
-  "gatekeeper-context",       // (1) ambient ContextLibrary
-  "gatekeeper-scheduler",     // (1) ambient ScheduleSession
+  "gatekeeper-context", // (1) ambient ContextLibrary
+  "gatekeeper-scheduler", // (1) ambient ScheduleSession
   "gatekeeper-homeassistant", // (2) no inputs; users connect their own URL + token in-app
-  "gatekeeper-mcp",           // (2) no inputs; users paste their own endpoints in-app
-  "gatekeeper-mcp-portal",    // (2) no inputs; the one portal comes from the deployment's vars
+  "gatekeeper-mcp", // (2) no inputs; users paste their own endpoints in-app
+  "gatekeeper-mcp-portal", // (2) no inputs; the one portal comes from the deployment's vars
 ]);
 
 /** Default wizard inputs for an installable gatekeeper that fronts a third-party OAuth app. */
@@ -319,19 +331,19 @@ const GATEKEEPER_PREFIX = "gatekeeper-";
 /** Read every deployable package and its Wrangler configuration, sorted by package name. */
 export function readDeployablePackages(packagesDir: string): DeployablePackage[] {
   return readdirSync(packagesDir)
-      .filter((name) => {
-    try {
-      return statSync(join(packagesDir, name, "wrangler.jsonc")).isFile();
-    } catch {
-      return false;
-    }
-  })
-      .toSorted()
-      .map((name) => {
-    const dir = join(packagesDir, name);
-    const config = parse(readFileSync(join(dir, "wrangler.jsonc"), "utf8")) as WranglerConfig;
-    return { name, dir, config };
-  });
+    .filter((name) => {
+      try {
+        return statSync(join(packagesDir, name, "wrangler.jsonc")).isFile();
+      } catch {
+        return false;
+      }
+    })
+    .toSorted()
+    .map((name) => {
+      const dir = join(packagesDir, name);
+      const config = parse(readFileSync(join(dir, "wrangler.jsonc"), "utf8")) as WranglerConfig;
+      return { name, dir, config };
+    });
 }
 
 /** True when a deployable package is a gatekeeper worker. */
@@ -371,10 +383,12 @@ const MAX_SLUG_LEN = 20;
 export function releaseShortName(pkgName: string): string {
   const shortName = gatekeeperShortName(pkgName).replace(/[^a-z0-9]/g, "");
   if (!SLUG_RE.test(shortName) || shortName.length > MAX_SLUG_LEN) {
-    throw new Error(`${pkgName} folds to "${shortName}", which is not a legal install slug: ` +
+    throw new Error(
+      `${pkgName} folds to "${shortName}", which is not a legal install slug: ` +
         `it must be 1-${MAX_SLUG_LEN} lowercase letters and digits starting with a letter ` +
         `(it becomes a GATEKEEPER_<SLUG> binding and a /gatekeeper/<slug> route). Rename the ` +
-        `package so its name folds to one.`);
+        `package so its name folds to one.`,
+    );
   }
   return shortName;
 }
@@ -397,18 +411,26 @@ function workerKind(pkgName: string): WorkerEntry["kind"] {
  * Builds one worker's manifest entry from its parsed wrangler.jsonc and collected modules.
  * `modules` entries are { name, type, sha256, size } (bytes stripped by the caller).
  */
-export function buildWorkerEntry(
-  { pkgName, config, mainModule, modules, deployInputs }: WorkerBuild,
-): WorkerEntry {
+export function buildWorkerEntry({
+  pkgName,
+  config,
+  mainModule,
+  modules,
+  deployInputs,
+}: WorkerBuild): WorkerEntry {
   const kind = workerKind(pkgName);
   const unknownKeys = Object.keys(config).filter((k) => !HANDLED_CONFIG_KEYS.has(k));
   if (unknownKeys.length > 0) {
-    throw new Error(`${pkgName}/wrangler.jsonc has key(s) this generator doesn't handle: ` +
-        unknownKeys.join(", "));
+    throw new Error(
+      `${pkgName}/wrangler.jsonc has key(s) this generator doesn't handle: ` +
+        unknownKeys.join(", "),
+    );
   }
   if (config.artifacts && !ARTIFACTS_CUT_ALLOWED.has(pkgName)) {
-    throw new Error(`${pkgName} declares an artifacts binding; only gatekeeper-context's is ` +
-        `known (and cut). Decide how customer instances should handle this one.`);
+    throw new Error(
+      `${pkgName} declares an artifacts binding; only gatekeeper-context's is ` +
+        `known (and cut). Decide how customer instances should handle this one.`,
+    );
   }
 
   const bindings: ManifestBinding[] = [];
@@ -494,8 +516,7 @@ export function buildWorkerEntry(
     vars.BASE_URL = `$PUBLIC_BASE_URL/gatekeeper/${releaseShortName(pkgName)}`;
     installable = !NOT_INSTALLABLE.has(pkgName);
     if (installable) {
-      inputs = deployInputs ??
-          (NO_DEFAULT_CRED_INPUTS.has(pkgName) ? [] : DEFAULT_CRED_INPUTS);
+      inputs = deployInputs ?? (NO_DEFAULT_CRED_INPUTS.has(pkgName) ? [] : DEFAULT_CRED_INPUTS);
     } else {
       inputs = [];
     }
@@ -506,8 +527,10 @@ export function buildWorkerEntry(
       }
     }
     if (PREINSTALL.has(pkgName) && inputs.length > 0) {
-      throw new Error(`${pkgName} is preinstalled but declares input(s); preinstalls run ` +
-          `with no user interaction, so this release would be broken`);
+      throw new Error(
+        `${pkgName} is preinstalled but declares input(s); preinstalls run ` +
+          `with no user interaction, so this release would be broken`,
+      );
     }
   }
 
@@ -519,7 +542,11 @@ export function buildWorkerEntry(
     ...(SINGLETON.has(pkgName) ? { singleton: true } : {}),
     mainModule,
     modules: modules.map(({ name, type, sha256, size }) => ({
-      name, type, sha256, size, r2Key: moduleR2Key(sha256),
+      name,
+      type,
+      sha256,
+      size,
+      r2Key: moduleR2Key(sha256),
     })),
     compatibilityDate: config.compatibility_date,
     compatibilityFlags: config.compatibility_flags ?? [],
@@ -552,7 +579,12 @@ export function assetR2Key(cfHash: string): string {
  *    every worker entry that has an assetsConfig (today: just the router).
  */
 export function generateManifest({
-  releaseId, commit, createdAt, wranglerVersion, workers, assetVariants,
+  releaseId,
+  commit,
+  createdAt,
+  wranglerVersion,
+  workers,
+  assetVariants,
 }: {
   releaseId: string;
   commit: string;
@@ -573,9 +605,11 @@ export function generateManifest({
     if (entry.shortName !== undefined) {
       const owner = shortNameOwner.get(entry.shortName);
       if (owner !== undefined) {
-        throw new Error(`${owner} and ${w.pkgName} both emit shortName "${entry.shortName}"; ` +
+        throw new Error(
+          `${owner} and ${w.pkgName} both emit shortName "${entry.shortName}"; ` +
             `install slugs must be unique (each becomes a GATEKEEPER_<SLUG> binding and a ` +
-            `/gatekeeper/<slug> route). Rename one package so the slugs differ.`);
+            `/gatekeeper/<slug> route). Rename one package so the slugs differ.`,
+        );
       }
       shortNameOwner.set(entry.shortName, w.pkgName);
     }

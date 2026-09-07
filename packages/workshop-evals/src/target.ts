@@ -1,5 +1,7 @@
 import {
-  openAgentSession, type AgentSessionOptions, type WorkshopAgentSession,
+  openAgentSession,
+  type AgentSessionOptions,
+  type WorkshopAgentSession,
 } from "@gadgets/integration-tests/agent-session";
 import { startHarness, type WorkerConfig } from "@gadgets/integration-tests/harness";
 import { NetworkInterceptor } from "@gadgets/integration-tests/network-interceptor";
@@ -13,23 +15,26 @@ import type { EvalModel } from "./config.js";
  * available for providers whose inference cannot ride the binding. Direct access is Workers AI's
  * own REST endpoint.
  */
-export type LocalModelAccess = {
-  kind: "gateway";
-  gateway: string;
-  accountId: string;
-  transport: "binding";
-  apiToken?: string;
-} | {
-  kind: "gateway";
-  gateway: string;
-  accountId: string;
-  transport: "https";
-  apiToken: string;
-} | {
-  kind: "direct";
-  accountId: string;
-  apiToken: string;
-};
+export type LocalModelAccess =
+  | {
+      kind: "gateway";
+      gateway: string;
+      accountId: string;
+      transport: "binding";
+      apiToken?: string;
+    }
+  | {
+      kind: "gateway";
+      gateway: string;
+      accountId: string;
+      transport: "https";
+      apiToken: string;
+    }
+  | {
+      kind: "direct";
+      accountId: string;
+      apiToken: string;
+    };
 
 type GatewayAccess = Extract<LocalModelAccess, { kind: "gateway" }>;
 
@@ -51,15 +56,18 @@ function value(environment: NodeJS.ProcessEnv, key: string): string | undefined 
 }
 
 /** Resolve the model transport used by the local Workshop. */
-export function resolveModelAccess(
-    environment: NodeJS.ProcessEnv = process.env): LocalModelAccess {
+export function resolveModelAccess(environment: NodeJS.ProcessEnv = process.env): LocalModelAccess {
   const gateway = value(environment, "CF_AI_GATEWAY");
   const gatewayAccountId = value(environment, "CF_AI_GATEWAY_ACCOUNT_ID");
   const gatewayApiToken = value(environment, "CF_AI_GATEWAY_API_TOKEN");
   // Normalized like the backend, so a stray " False " opts out rather than reading as unset.
   const useBinding = value(environment, "CF_AI_GATEWAY_USE_BINDING")?.toLowerCase();
-  if (gateway !== undefined || gatewayAccountId !== undefined || gatewayApiToken !== undefined ||
-      useBinding !== undefined) {
+  if (
+    gateway !== undefined ||
+    gatewayAccountId !== undefined ||
+    gatewayApiToken !== undefined ||
+    useBinding !== undefined
+  ) {
     if (gateway === undefined || gatewayAccountId === undefined) {
       throw new Error(
         "Local AI Gateway evals require CF_AI_GATEWAY and CF_AI_GATEWAY_ACCOUNT_ID together",
@@ -70,25 +78,31 @@ export function resolveModelAccess(
     }
     // Unset: the token decides, so an injected token rides HTTPS unless the binding is asked for.
     const ridesHttps =
-        useBinding === undefined ? gatewayApiToken !== undefined : useBinding === "false";
+      useBinding === undefined ? gatewayApiToken !== undefined : useBinding === "false";
     if (ridesHttps) {
       if (gatewayApiToken === undefined) {
         throw new Error(
           "CF_AI_GATEWAY_API_TOKEN must be set when CF_AI_GATEWAY_USE_BINDING is false: " +
-          "opting out of the Workers AI binding leaves HTTPS as the only gateway transport",
+            "opting out of the Workers AI binding leaves HTTPS as the only gateway transport",
         );
       }
       return {
-        kind: "gateway", gateway, accountId: gatewayAccountId, transport: "https",
+        kind: "gateway",
+        gateway,
+        accountId: gatewayAccountId,
+        transport: "https",
         apiToken: gatewayApiToken,
       };
     }
     return gatewayApiToken === undefined
       ? { kind: "gateway", gateway, accountId: gatewayAccountId, transport: "binding" }
       : {
-        kind: "gateway", gateway, accountId: gatewayAccountId, transport: "binding",
-        apiToken: gatewayApiToken,
-      };
+          kind: "gateway",
+          gateway,
+          accountId: gatewayAccountId,
+          transport: "binding",
+          apiToken: gatewayApiToken,
+        };
   }
 
   const accountId = value(environment, "CLOUDFLARE_ACCOUNT_ID");
@@ -98,7 +112,7 @@ export function resolveModelAccess(
   }
   throw new Error(
     "Local Workshop evals need model access: configure an AI Gateway name and account, or " +
-    "CLOUDFLARE_ACCOUNT_ID with CLOUDFLARE_API_TOKEN",
+      "CLOUDFLARE_ACCOUNT_ID with CLOUDFLARE_API_TOKEN",
   );
 }
 
@@ -111,16 +125,19 @@ export function assertModelAccess(access: LocalModelAccess, model: EvalModel): v
     if (model.provider !== "cloudflare") {
       throw new Error(
         `Direct Workers AI credentials only run cloudflare models, not ${model.provider} ` +
-        `(${model.model}); configure an AI Gateway to run it.`,
+          `(${model.model}); configure an AI Gateway to run it.`,
       );
     }
     return;
   }
-  if (access.transport === "binding" && HTTPS_ONLY_PROVIDERS.has(model.provider) &&
-      access.apiToken === undefined) {
+  if (
+    access.transport === "binding" &&
+    HTTPS_ONLY_PROVIDERS.has(model.provider) &&
+    access.apiToken === undefined
+  ) {
     throw new Error(
       `${model.provider} inference cannot ride the Workers AI binding transport, so running a ` +
-      `${model.provider} model requires CF_AI_GATEWAY_API_TOKEN.`,
+        `${model.provider} model requires CF_AI_GATEWAY_API_TOKEN.`,
     );
   }
 }
@@ -144,7 +161,11 @@ function configureGateway(config: WorkerConfig, access: GatewayAccess, model: Ev
 }
 
 function allowsModelEgress(
-    access: LocalModelAccess, model: EvalModel, url: URL, method: string): boolean {
+  access: LocalModelAccess,
+  model: EvalModel,
+  url: URL,
+  method: string,
+): boolean {
   const account = encodeURIComponent(access.accountId);
   if (access.kind === "gateway") {
     const gateway = encodeURIComponent(access.gateway);
@@ -152,28 +173,40 @@ function allowsModelEgress(
       // Inference rides HTTPS when the binding is opted out, or for providers whose adapter
       // cannot ride the binding at all (the backend's AiGatewayConfig.bindingFor).
       const route = GATEWAY_ROUTES[model.provider];
-      const ridesHttps =
-          access.transport === "https" || HTTPS_ONLY_PROVIDERS.has(model.provider);
-      return route !== undefined && ridesHttps &&
+      const ridesHttps = access.transport === "https" || HTTPS_ONLY_PROVIDERS.has(model.provider);
+      return (
+        route !== undefined &&
+        ridesHttps &&
         url.origin === "https://gateway.ai.cloudflare.com" &&
-        url.pathname.startsWith(`/v1/${account}/${gateway}/${route}/`);
+        url.pathname.startsWith(`/v1/${account}/${gateway}/${route}/`)
+      );
     }
     // Cost-log reads are same-account, so the backend reads them through the binding whenever
     // the binding transport is active, even for HTTPS-only inference providers.
     if (access.transport !== "https") return false;
-    const logPrefix =
-        `/client/v4/accounts/${account}/ai-gateway/gateways/${gateway}/logs/`;
+    const logPrefix = `/client/v4/accounts/${account}/ai-gateway/gateways/${gateway}/logs/`;
     const logId = url.pathname.slice(logPrefix.length);
-    return method === "GET" && url.origin === "https://api.cloudflare.com" &&
-      url.pathname.startsWith(logPrefix) && logId !== "" && !logId.includes("/");
+    return (
+      method === "GET" &&
+      url.origin === "https://api.cloudflare.com" &&
+      url.pathname.startsWith(logPrefix) &&
+      logId !== "" &&
+      !logId.includes("/")
+    );
   }
-  return method === "POST" && url.origin === "https://api.cloudflare.com" &&
-    url.pathname === `/client/v4/accounts/${account}/ai/v1/chat/completions`;
+  return (
+    method === "POST" &&
+    url.origin === "https://api.cloudflare.com" &&
+    url.pathname === `/client/v4/accounts/${account}/ai/v1/chat/completions`
+  );
 }
 
 /** Start an isolated local workerd Workshop and one fresh agent session. */
 export async function openLocalEvalTarget(
-    access: LocalModelAccess, model: EvalModel, turnTimeoutMs: number): Promise<LocalEvalTarget> {
+  access: LocalModelAccess,
+  model: EvalModel,
+  turnTimeoutMs: number,
+): Promise<LocalEvalTarget> {
   const interceptor = new NetworkInterceptor({
     handlers: [
       () => new Response("External network access is disabled during this eval.", { status: 403 }),

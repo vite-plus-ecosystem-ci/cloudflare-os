@@ -122,14 +122,14 @@ fit the viewport.
 
 `COMPONENTS` in `client.js` is the catalog. Each entry declares:
 
-| field            | purpose                                                 |
-| ---------------- | ------------------------------------------------------- |
-| `name`           | Display name (palette + inspector header).              |
-| `defaultBlock()` | Returns `{ x, y, w?, h?, props }` for a freshly added block. |
-| `fields`         | Inspector schema (`text`, `multiline`, `number`, `select`, `checkbox`, `color`, `image`, `svg`). Set `advanced: true` on a field to tuck it under the inspector's "Advanced" disclosure (along with position/size). |
-| `resizableW/H`   | Whether the corner handle adjusts that dimension.       |
-| `fullBleed`      | If true (arrow), the block ignores wrapper position and renders an absolutely-positioned overlay. |
-| `render(props, ctx)` | Returns the DOM. `ctx.inlineText(elem, propKey, transform?)` wires up contentEditable in edit mode. |
+| field                | purpose                                                                                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`               | Display name (palette + inspector header).                                                                                                                                                                          |
+| `defaultBlock()`     | Returns `{ x, y, w?, h?, props }` for a freshly added block.                                                                                                                                                        |
+| `fields`             | Inspector schema (`text`, `multiline`, `number`, `select`, `checkbox`, `color`, `image`, `svg`). Set `advanced: true` on a field to tuck it under the inspector's "Advanced" disclosure (along with position/size). |
+| `resizableW/H`       | Whether the corner handle adjusts that dimension.                                                                                                                                                                   |
+| `fullBleed`          | If true (arrow), the block ignores wrapper position and renders an absolutely-positioned overlay.                                                                                                                   |
+| `render(props, ctx)` | Returns the DOM. `ctx.inlineText(elem, propKey, transform?)` wires up contentEditable in edit mode.                                                                                                                 |
 
 Components exposed in the palette (generic, reusable):
 
@@ -229,7 +229,7 @@ broadcast, plus an initial `getUndoState()` call at boot.
 - `Delete` / `Backspace` (edit mode) — delete the selected block
 - `Ctrl/Cmd + C` / `X` / `V` (edit mode) — copy / cut / paste the selected
   block. The clipboard is in-memory (per tab); paste inserts onto the
-  *current* slide with a small position offset so the new block doesn't
+  _current_ slide with a small position offset so the new block doesn't
   sit perfectly on top of its source, and the new block becomes selected.
 - `Ctrl/Cmd + D` (edit mode) — duplicate the selected block in place
   (same as the inspector's duplicate icon, doesn't touch the clipboard).
@@ -292,8 +292,8 @@ need to touch styles when adding a new field type.
   derived from the `fit` prop so the SVG scales to the block bounds.
   Agents can author / replace SVG blocks programmatically over the
   `GADGET` binding: call `addBlock(slideId, { type: "svg", x, y, w, h,
-  props: { markup: "<svg ...>...</svg>" } })` or `updateBlock(...,
-  { props: { markup: "..." } })`.
+props: { markup: "<svg ...>...</svg>" } })` or `updateBlock(...,
+{ props: { markup: "..." } })`.
 - Arrows are special-cased: they render a full 1200×675 SVG overlay and
   store endpoints in `props.x1/y1/x2/y2`. Endpoint handles appear when an
   arrow is selected. **Important**: full-bleed blocks must NOT make their

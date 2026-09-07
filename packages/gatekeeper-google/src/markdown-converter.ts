@@ -29,12 +29,12 @@ export type DocSnapshot = {
   committedWriteIds?: string[];
   /** The endIndex of the last structural element in the document body. */
   bodyEndIndex: number;
-}
+};
 
 export type SourceMap = {
   /** One entry per structural element (paragraph/heading/list item), in document order. */
   blocks: BlockMapping[];
-}
+};
 
 export type BlockMapping = {
   /** Range in the Markdown string [mdStart, mdEnd). */
@@ -45,7 +45,7 @@ export type BlockMapping = {
   docEnd: number;
   /** Fine-grained segments within this block. */
   segments: Segment[];
-}
+};
 
 /**
  * A segment maps a range of Markdown characters to Google Docs characters.
@@ -122,7 +122,14 @@ export function docToMarkdown(document: GoogleDocsDocument): DocSnapshot {
     }
 
     // Emit paragraph content (text runs).
-    emitParagraphContent(para, segments, () => md.length, (text) => { md += text; });
+    emitParagraphContent(
+      para,
+      segments,
+      () => md.length,
+      (text) => {
+        md += text;
+      },
+    );
 
     // Trailing newline. Every Google Docs paragraph ends with \n in the doc
     // character space. In Markdown, we use \n as the line terminator.
@@ -343,7 +350,7 @@ type ParsedBlock = {
   nestingLevel: number;
   /** Inline formatting spans, relative to plainText. */
   spans: FormattingSpan[];
-}
+};
 
 type FormattingSpan = {
   start: number;
@@ -352,7 +359,7 @@ type FormattingSpan = {
   italic?: boolean;
   strikethrough?: boolean;
   link?: string;
-}
+};
 
 /**
  * Parse a Markdown string into blocks. This is a simple parser that handles
@@ -463,7 +470,11 @@ function parseInlineFormatting(text: string): { plainText: string; spans: Format
   let i = 0;
 
   // Stack of open formatting contexts.
-  let formatStack: { type: "bold" | "italic" | "bolditalic" | "strikethrough" | "link"; start: number; url?: string }[] = [];
+  let formatStack: {
+    type: "bold" | "italic" | "bolditalic" | "strikethrough" | "link";
+    start: number;
+    url?: string;
+  }[] = [];
 
   while (i < text.length) {
     // Check for link: [text](url)
@@ -497,7 +508,7 @@ function parseInlineFormatting(text: string): { plainText: string; spans: Format
 
     // Check for bold+italic: ***
     if (text.slice(i, i + 3) === "***") {
-      let openIdx = formatStack.findIndex(f => f.type === "bolditalic");
+      let openIdx = formatStack.findIndex((f) => f.type === "bolditalic");
       if (openIdx !== -1) {
         // Closing.
         let open = formatStack.splice(openIdx, 1)[0];
@@ -511,7 +522,7 @@ function parseInlineFormatting(text: string): { plainText: string; spans: Format
 
     // Check for bold: **
     if (text.slice(i, i + 2) === "**") {
-      let openIdx = formatStack.findIndex(f => f.type === "bold");
+      let openIdx = formatStack.findIndex((f) => f.type === "bold");
       if (openIdx !== -1) {
         let open = formatStack.splice(openIdx, 1)[0];
         spans.push({ start: open.start, end: plainText.length, bold: true });
@@ -524,7 +535,7 @@ function parseInlineFormatting(text: string): { plainText: string; spans: Format
 
     // Check for strikethrough: ~~
     if (text.slice(i, i + 2) === "~~") {
-      let openIdx = formatStack.findIndex(f => f.type === "strikethrough");
+      let openIdx = formatStack.findIndex((f) => f.type === "strikethrough");
       if (openIdx !== -1) {
         let open = formatStack.splice(openIdx, 1)[0];
         spans.push({ start: open.start, end: plainText.length, strikethrough: true });
@@ -537,7 +548,7 @@ function parseInlineFormatting(text: string): { plainText: string; spans: Format
 
     // Check for italic: *
     if (text[i] === "*") {
-      let openIdx = formatStack.findIndex(f => f.type === "italic");
+      let openIdx = formatStack.findIndex((f) => f.type === "italic");
       if (openIdx !== -1) {
         let open = formatStack.splice(openIdx, 1)[0];
         spans.push({ start: open.start, end: plainText.length, italic: true });
@@ -576,7 +587,7 @@ export function markdownToDocRequests(markdown: string, insertAt: number): any[]
   // First pass: compute the full plain text to insert (all blocks joined with \n).
   // No trailing \n — the document's existing structure provides paragraph
   // terminators after the insertion point.
-  let fullText = blocks.map(b => b.plainText).join("\n");
+  let fullText = blocks.map((b) => b.plainText).join("\n");
   if (fullText.length === 0) {
     // `parseMarkdown()` treats whitespace-only input as blank Markdown blocks, but replacements
     // can legitimately insert whitespace inside existing text, e.g. splitting a word in two.
@@ -612,9 +623,10 @@ export function markdownToDocRequests(markdown: string, insertAt: number): any[]
 
     // List items.
     if (block.listType) {
-      let preset = block.listType === "numbered"
-        ? "NUMBERED_DECIMAL_ALPHA_ROMAN"
-        : "BULLET_DISC_CIRCLE_SQUARE";
+      let preset =
+        block.listType === "numbered"
+          ? "NUMBERED_DECIMAL_ALPHA_ROMAN"
+          : "BULLET_DISC_CIRCLE_SQUARE";
       requests.push({
         createParagraphBullets: {
           range: { startIndex: blockStart, endIndex: blockEnd + 1 },
@@ -632,9 +644,18 @@ export function markdownToDocRequests(markdown: string, insertAt: number): any[]
       if (span.bold || span.italic || span.strikethrough) {
         let textStyle: any = {};
         let fields: string[] = [];
-        if (span.bold) { textStyle.bold = true; fields.push("bold"); }
-        if (span.italic) { textStyle.italic = true; fields.push("italic"); }
-        if (span.strikethrough) { textStyle.strikethrough = true; fields.push("strikethrough"); }
+        if (span.bold) {
+          textStyle.bold = true;
+          fields.push("bold");
+        }
+        if (span.italic) {
+          textStyle.italic = true;
+          fields.push("italic");
+        }
+        if (span.strikethrough) {
+          textStyle.strikethrough = true;
+          fields.push("strikethrough");
+        }
         requests.push({
           updateTextStyle: {
             range: { startIndex: spanStart, endIndex: spanEnd },
@@ -683,16 +704,21 @@ export function computeReplaceOperations(
 
   // Trim unchanged prefix.
   let prefixLen = 0;
-  while (prefixLen < oldText.length && prefixLen < newMarkdown.length &&
-         oldText[prefixLen] === newMarkdown[prefixLen]) {
+  while (
+    prefixLen < oldText.length &&
+    prefixLen < newMarkdown.length &&
+    oldText[prefixLen] === newMarkdown[prefixLen]
+  ) {
     prefixLen++;
   }
 
   // Trim unchanged suffix.
   let suffixLen = 0;
-  while (suffixLen < oldText.length - prefixLen &&
-         suffixLen < newMarkdown.length - prefixLen &&
-         oldText[oldText.length - 1 - suffixLen] === newMarkdown[newMarkdown.length - 1 - suffixLen]) {
+  while (
+    suffixLen < oldText.length - prefixLen &&
+    suffixLen < newMarkdown.length - prefixLen &&
+    oldText[oldText.length - 1 - suffixLen] === newMarkdown[newMarkdown.length - 1 - suffixLen]
+  ) {
     suffixLen++;
   }
 
@@ -712,7 +738,8 @@ export function computeReplaceOperations(
   if (!docRange) {
     throw new Error(
       "replaceText: could not map the Markdown range to document indices. " +
-      "The match may span unsupported content.");
+        "The match may span unsupported content.",
+    );
   }
 
   let requests: any[] = [];

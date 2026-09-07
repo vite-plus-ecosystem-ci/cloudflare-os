@@ -161,7 +161,8 @@ export class ProvisionalIds<Id extends string> {
     const id = format(sequence);
     if (this.#isProvisional?.(id) === false) {
       throw new Error(
-        `Formatter produced ${id}, which isProvisional does not classify as provisional.`);
+        `Formatter produced ${id}, which isProvisional does not classify as provisional.`,
+      );
     }
     this.#kv.put(key, sequence + 1);
     if (options?.kind !== undefined) {

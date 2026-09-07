@@ -170,7 +170,7 @@ const SERIALIZED_LINE_OVERHEAD = 8;
  * unit-weighted measure at validation time.
  */
 export function codeChangeSerializedSize(change: CodeChange): number {
-  let bytes = SERIALIZED_ENTRY_OVERHEAD;  // the change object's own framing
+  let bytes = SERIALIZED_ENTRY_OVERHEAD; // the change object's own framing
   for (let [gadgetKey, entries] of Object.entries(change)) {
     bytes += SERIALIZED_ENTRY_OVERHEAD + 2 * gadgetKey.length;
     for (let [path, fileChange] of entries) {
@@ -204,7 +204,9 @@ function toChangeSet(change: TextChange): ChangeSet {
 // Text round-trips all line-separator exotica losslessly: only "\n" is treated as a line
 // boundary, so "\r", "\r\n", "\u2028", "\u2029", and NUL stay inside their lines.
 function applyTextChange(text: string, change: TextChange): string {
-  return toChangeSet(change).apply(Text.of(text.split("\n"))).toString();
+  return toChangeSet(change)
+    .apply(Text.of(text.split("\n")))
+    .toString();
 }
 
 // Iterates a CodeChange's gadget entries as numeric ids. Assumes canonical keys
@@ -221,17 +223,19 @@ function makeCodeChange(gadgets: Map<number, Map<string, FileChange>>): CodeChan
   for (let gadgetId of [...gadgets.keys()].toSorted((x, y) => x - y)) {
     let files = gadgets.get(gadgetId)!;
     if (files.size === 0) continue;
-    change[gadgetId] = [...files.keys()].toSorted().map(path => [path, files.get(path)!]);
+    change[gadgetId] = [...files.keys()].toSorted().map((path) => [path, files.get(path)!]);
   }
   return change;
 }
 
 // Pairs up two CodeChanges' file entries: yields (gadgetId, path, a's FileChange | undefined,
 // b's FileChange | undefined) over the union of paths.
-function* pairedFileChanges(a: CodeChange, b: CodeChange):
-    Generator<[number, string, FileChange | undefined, FileChange | undefined]> {
-  let toMaps = (change: CodeChange) => new Map(
-      gadgetEntries(change).map(([id, entries]) => [id, new Map(entries)]));
+function* pairedFileChanges(
+  a: CodeChange,
+  b: CodeChange,
+): Generator<[number, string, FileChange | undefined, FileChange | undefined]> {
+  let toMaps = (change: CodeChange) =>
+    new Map(gadgetEntries(change).map(([id, entries]) => [id, new Map(entries)]));
   let aGadgets = toMaps(a);
   let bGadgets = toMaps(b);
   for (let gadgetId of new Set([...aGadgets.keys(), ...bGadgets.keys()])) {
@@ -296,8 +300,11 @@ export function composeCodeChange(a: CodeChange, b: CodeChange): CodeChange {
 }
 
 function composeFileChange(
-    gadgetId: number, path: string, a: FileChange | undefined, b: FileChange | undefined)
-    : FileChange {
+  gadgetId: number,
+  path: string,
+  a: FileChange | undefined,
+  b: FileChange | undefined,
+): FileChange {
   if (a === undefined) return b!;
   if (b === undefined) return a;
   // b is later: its `set` or `remove` wholesale-supersedes whatever a did.
@@ -421,7 +428,7 @@ export function diffFiles(before: CodeContent, after: CodeContent): CodeChange {
 // replacement. fast-diff never splits surrogate pairs (verified by fuzz tests), so the
 // resulting boundaries always pass validateCodeChangeContent.
 function diffTextChange(before: string, after: string): TextChange {
-  let specs: { from: number, to: number, insert?: string }[] = [];
+  let specs: { from: number; to: number; insert?: string }[] = [];
   let diffs = fastDiff(before, after);
   let pos = 0;
   for (let i = 0; i < diffs.length; i++) {
@@ -459,7 +466,11 @@ function diffTextChange(before: string, after: string): TextChange {
  * at construction).
  */
 export function replaceSpanChange(
-    docLength: number, from: number, replaced: string, insert: string): TextChange {
+  docLength: number,
+  from: number,
+  replaced: string,
+  insert: string,
+): TextChange {
   let maxTrim = Math.min(replaced.length, insert.length);
   let pre = 0;
   while (pre < maxTrim && replaced.charCodeAt(pre) === insert.charCodeAt(pre)) pre++;
@@ -468,8 +479,10 @@ export function replaceSpanChange(
   // (conservative) check covers both.
   if (pre > 0 && isHighSurrogate(replaced.charCodeAt(pre - 1))) pre--;
   let suf = 0;
-  while (suf < maxTrim - pre && replaced.charCodeAt(replaced.length - 1 - suf) ===
-      insert.charCodeAt(insert.length - 1 - suf)) {
+  while (
+    suf < maxTrim - pre &&
+    replaced.charCodeAt(replaced.length - 1 - suf) === insert.charCodeAt(insert.length - 1 - suf)
+  ) {
     suf++;
   }
   // Likewise, back off a retained suffix starting on a low surrogate.
@@ -487,7 +500,9 @@ export function replaceSpanChange(
 
 /** The gadget ids a change touches, ascending. Empty for the identity change. */
 export function changedGadgets(change: CodeChange): number[] {
-  return Object.keys(change).map(Number).toSorted((a, b) => a - b);
+  return Object.keys(change)
+    .map(Number)
+    .toSorted((a, b) => a - b);
 }
 
 // =======================================================================================
@@ -628,8 +643,10 @@ export function validateCodeChangeContent(change: CodeChange, content: CodeConte
         if (text === undefined) throw new Error(`edit of absent file: ${where}`);
         let changes = toChangeSet(fileChange.edit);
         if (changes.length !== text.length) {
-          throw new Error(`file change edit length mismatch: ${where}: ` +
-              `change expects ${changes.length}, file has ${text.length}`);
+          throw new Error(
+            `file change edit length mismatch: ${where}: ` +
+              `change expects ${changes.length}, file has ${text.length}`,
+          );
         }
         changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
           if (!isCodePointBoundary(text, fromA) || !isCodePointBoundary(text, toA)) {
@@ -666,7 +683,7 @@ function hasLoneSurrogate(text: string): boolean {
     let code = text.charCodeAt(i);
     if (isHighSurrogate(code)) {
       if (i + 1 >= text.length || !isLowSurrogate(text.charCodeAt(i + 1))) return true;
-      i++;  // Skip the low half of a well-formed pair.
+      i++; // Skip the low half of a well-formed pair.
     } else if (isLowSurrogate(code)) {
       return true;
     }

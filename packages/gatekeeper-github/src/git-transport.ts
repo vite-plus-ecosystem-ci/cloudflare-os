@@ -97,9 +97,21 @@ export class PktLineParser {
         throw new Error(`malformed pkt-line length: ${JSON.stringify(digits)}`);
       }
       let length = parseInt(digits, 16);
-      if (length === 0) { this.#take(4); items.push({ kind: "flush" }); continue; }
-      if (length === 1) { this.#take(4); items.push({ kind: "delim" }); continue; }
-      if (length === 2) { this.#take(4); items.push({ kind: "response-end" }); continue; }
+      if (length === 0) {
+        this.#take(4);
+        items.push({ kind: "flush" });
+        continue;
+      }
+      if (length === 1) {
+        this.#take(4);
+        items.push({ kind: "delim" });
+        continue;
+      }
+      if (length === 2) {
+        this.#take(4);
+        items.push({ kind: "response-end" });
+        continue;
+      }
       if (length === 3) throw new Error("malformed pkt-line length: 0003");
       if (this.#buffered < length) return items;
       items.push({ kind: "data", data: this.#take(length).subarray(4) });
@@ -135,7 +147,10 @@ export class PktLineParser {
       out.set(chunk.subarray(offset, offset + want), copied);
       copied += want;
       offset += want;
-      if (offset === chunk.byteLength) { index += 1; offset = 0; }
+      if (offset === chunk.byteLength) {
+        index += 1;
+        offset = 0;
+      }
     }
     if (consume) {
       this.#chunks.splice(0, index);
@@ -224,7 +239,7 @@ export function buildGitFetchRequest(oids: GitOid[], hints: GitPullHints): Uint8
     if (!OID_PATTERN.test(oid)) throw new Error(`invalid git oid: ${JSON.stringify(oid)}`);
   }
 
-  let args = wants.map(oid => `want ${oid}`);
+  let args = wants.map((oid) => `want ${oid}`);
   args.push("ofs-delta", "no-progress");
   let history = hints.commitHistory;
   if (history.kind === "depth") {
@@ -298,9 +313,11 @@ async function* demuxPackData(
       let result = await reader.read();
       if (result.done) {
         parser.finish();
-        throw new Error(inPackfile
+        throw new Error(
+          inPackfile
             ? "truncated git fetch response: missing final flush"
-            : "git fetch response contained no packfile section");
+            : "git fetch response contained no packfile section",
+        );
       }
       let value = result.value;
       received += value.byteLength;
@@ -381,12 +398,16 @@ export async function pullGitObjectsIntoCache(
   if (response.body === null) {
     throw new Error("git fetch failed: response had no body");
   }
-  let stored = new Set(await cache.consumePack(
-      demuxGitFetchResponse(response.body, MAX_GIT_FETCH_BYTES)));
-  let missing = oids.filter(oid => !stored.has(oid));
+  let stored = new Set(
+    await cache.consumePack(demuxGitFetchResponse(response.body, MAX_GIT_FETCH_BYTES)),
+  );
+  let missing = oids.filter((oid) => !stored.has(oid));
   if (missing.length > 0 && !(hints.type === "blob" && hints.filterBlobSize !== undefined)) {
-    throw new Error(`git fetch did not provide the requested object${
-        missing.length === 1 ? "" : "s"} ${missing.join(", ")}`);
+    throw new Error(
+      `git fetch did not provide the requested object${
+        missing.length === 1 ? "" : "s"
+      } ${missing.join(", ")}`,
+    );
   }
 }
 
@@ -423,10 +444,15 @@ export function validateBranchName(branch: string): string {
   // One check for everything git forbids in a refname component, plus NUL/space/DEL and the
   // rest of the control range, which also covers the "@{", "..", and "//" sequences.
   // oxlint-disable-next-line no-control-regex -- intentionally rejecting control chars (protocol-framing guard)
-  if (/[\u0000-\u0020\u007f~^:?*[\\]|\.\.|@\{|\/\/|\.\/|\.lock(\/|$)/.test(branch) ||
-      branch.startsWith("/") || branch.endsWith("/") ||
-      branch.startsWith(".") || branch.endsWith(".") ||
-      branch.includes("/.") || branch === "@") {
+  if (
+    /[\u0000-\u0020\u007f~^:?*[\\]|\.\.|@\{|\/\/|\.\/|\.lock(\/|$)/.test(branch) ||
+    branch.startsWith("/") ||
+    branch.endsWith("/") ||
+    branch.startsWith(".") ||
+    branch.endsWith(".") ||
+    branch.includes("/.") ||
+    branch === "@"
+  ) {
     throw new Error(`invalid branch name: ${JSON.stringify(branch.slice(0, 64))}`);
   }
   return branch;
@@ -455,8 +481,9 @@ export function buildRefUpdateRequest(update: GitRefUpdate): Uint8Array {
   if (update.oldSha === update.newSha) {
     throw new Error("ref update is a no-op");
   }
-  let command = `${update.oldSha} ${update.newSha} refs/heads/${update.branch}` +
-      `\0report-status agent=${GIT_AGENT}`;
+  let command =
+    `${update.oldSha} ${update.newSha} refs/heads/${update.branch}` +
+    `\0report-status agent=${GIT_AGENT}`;
   let pieces = [encodePktLine(command), FLUSH_PKT];
   let out = new Uint8Array(pieces.reduce((total, piece) => total + piece.byteLength, 0));
   let offset = 0;
@@ -473,7 +500,7 @@ export function buildRefUpdateRequest(update: GitRefUpdate): Uint8Array {
  * has -- since receive-pack still expects a pack for any non-delete command.
  */
 export async function emptyPackBytes(): Promise<Uint8Array> {
-  let header = new Uint8Array([0x50, 0x41, 0x43, 0x4b, 0, 0, 0, 2, 0, 0, 0, 0]);  // "PACK", v2, 0
+  let header = new Uint8Array([0x50, 0x41, 0x43, 0x4b, 0, 0, 0, 2, 0, 0, 0, 0]); // "PACK", v2, 0
   let trailer = new Uint8Array(await crypto.subtle.digest("SHA-1", header));
   let out = new Uint8Array(header.byteLength + trailer.byteLength);
   out.set(header, 0);
@@ -505,9 +532,11 @@ export function parseReceivePackResponse(body: Uint8Array, refName: string): voi
     }
     // Lines about other refs (there are none in our one-command requests) are ignored.
   }
-  throw new Error(unpackSeen
+  throw new Error(
+    unpackSeen
       ? `git push failed: the server's status report did not mention ${refName}`
-      : "git push failed: malformed receive-pack response (no unpack status)");
+      : "git push failed: malformed receive-pack response (no unpack status)",
+  );
 }
 
 /**
@@ -516,7 +545,10 @@ export function parseReceivePackResponse(body: Uint8Array, refName: string): voi
  * apply. Distinguished so the caller can map it to its branch-moved guidance.
  */
 export class GitRefUpdateRejectedError extends Error {
-  constructor(refName: string, public readonly reason: string) {
+  constructor(
+    refName: string,
+    public readonly reason: string,
+  ) {
     super(`git push rejected for ${refName}: ${reason}`);
   }
 }
@@ -536,9 +568,11 @@ export async function pushGitRefUpdate(
 ): Promise<void> {
   let header = buildRefUpdateRequest(update);
   if ((update.newSha === ZERO_OID) !== (pack === null)) {
-    throw new Error(pack === null
+    throw new Error(
+      pack === null
         ? "a non-delete ref update requires a pack"
-        : "a ref deletion must not send a pack");
+        : "a ref deletion must not send a pack",
+    );
   }
 
   let headerSent = false;
@@ -579,8 +613,10 @@ export async function pushGitRefUpdate(
 }
 
 // Collects a byte stream into one buffer, enforcing a size cap as chunks arrive.
-async function collectStream(stream: ReadableStream<Uint8Array>, maxBytes: number)
-    : Promise<Uint8Array> {
+async function collectStream(
+  stream: ReadableStream<Uint8Array>,
+  maxBytes: number,
+): Promise<Uint8Array> {
   let chunks: Uint8Array[] = [];
   let total = 0;
   let reader = stream.getReader();

@@ -32,7 +32,7 @@ export interface Worktree {
    * descendants with `recursive: true`. Every returned path is a full path from the worktree
    * root, suitable for passing back to the other file operations.
    */
-  listFiles(path?: string, options?: {recursive?: boolean}): Promise<WorktreeFileEntry[]>;
+  listFiles(path?: string, options?: { recursive?: boolean }): Promise<WorktreeFileEntry[]>;
 
   /** Read a file as text. */
   readFile(path: string): Promise<string>;

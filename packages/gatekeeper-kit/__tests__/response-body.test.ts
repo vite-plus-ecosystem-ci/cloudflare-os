@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { readTextCapped, ResponseTooLargeError } from "../src/response-body";
 
 /** A body delivered in chunks, reporting whether it was pulled and whether it was cancelled. */
@@ -88,7 +88,9 @@ describe("readTextCapped", () => {
     // The lock outlives the failed read otherwise, so a caller that retries on the same body
     // gets an opaque "already locked" error instead of the provider's.
     const body = new ReadableStream<Uint8Array>({
-      pull() { throw new Error("connection reset"); },
+      pull() {
+        throw new Error("connection reset");
+      },
     });
 
     await expect(readTextCapped(new Response(body), 64)).rejects.toThrow("connection reset");

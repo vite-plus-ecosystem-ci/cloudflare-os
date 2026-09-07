@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import {
-  SUGGESTED_MODELS, type AiModelProvider, type SuggestedModelId,
+  SUGGESTED_MODELS,
+  type AiModelProvider,
+  type SuggestedModelId,
 } from "@gadgets/workshop-shared/api";
 
 /**
@@ -19,15 +21,19 @@ export type EvalModelId = SuggestedModelId | (keyof typeof EVAL_ONLY_MODELS & st
 export type EvalModel = { provider: AiModelProvider; model: EvalModelId };
 
 // The default must be a Workers AI picker model so it runs in both direct and gateway mode.
-const DEFAULT_MODELS: readonly SuggestedModelId<"cloudflare">[] =
-  ["@cf/deepseek-ai/deepseek-v4-pro-0813"];
+const DEFAULT_MODELS: readonly SuggestedModelId<"cloudflare">[] = [
+  "@cf/deepseek-ai/deepseek-v4-pro-0813",
+];
 const GIT_SHA_PATTERN = /^[a-f0-9]{40}$/;
 
 export type EvalIdentity = { gitCommit: string; taskVersion: string };
 export type EvalMatrix = { models: EvalModelId[]; trials: number };
 
 function commaList(value: string): string[] {
-  return value.split(",").map(item => item.trim()).filter(Boolean);
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function localGitCommit(): string {
@@ -40,13 +46,13 @@ function localWorktreeDirty(): boolean {
 
 /** Identify the checkout that supplied the local Workshop and eval code. */
 export function resolveEvalCommit(
-    environment: NodeJS.ProcessEnv = process.env,
-    readLocalCommit: () => string = localGitCommit,
-    isLocalWorktreeDirty: () => boolean = localWorktreeDirty): string {
+  environment: NodeJS.ProcessEnv = process.env,
+  readLocalCommit: () => string = localGitCommit,
+  isLocalWorktreeDirty: () => boolean = localWorktreeDirty,
+): string {
   const configured = environment.WORKSHOP_EVAL_COMMIT?.trim() || environment.GITHUB_SHA?.trim();
   if (configured === undefined && isLocalWorktreeDirty()) {
-    throw new Error(
-      "Local evals require a clean worktree or an explicit WORKSHOP_EVAL_COMMIT");
+    throw new Error("Local evals require a clean worktree or an explicit WORKSHOP_EVAL_COMMIT");
   }
   const commit = configured ?? readLocalCommit();
   if (!GIT_SHA_PATTERN.test(commit)) {
@@ -68,13 +74,15 @@ export function resolveEvalModel(modelId: string): EvalModel {
   }
   throw new Error(
     `Unknown eval model ${JSON.stringify(modelId)}: eval models must be listed in ` +
-    "SUGGESTED_MODELS or EVAL_ONLY_MODELS");
+      "SUGGESTED_MODELS or EVAL_ONLY_MODELS",
+  );
 }
 
 /** Parse the model and repetition controls before a trial can spend inference. */
 export function evalMatrix(environment: NodeJS.ProcessEnv = process.env): EvalMatrix {
-  const models = commaList(environment.WORKSHOP_EVAL_MODELS ?? "")
-      .map(modelId => resolveEvalModel(modelId).model);
+  const models = commaList(environment.WORKSHOP_EVAL_MODELS ?? "").map(
+    (modelId) => resolveEvalModel(modelId).model,
+  );
   const rawTrials = environment.WORKSHOP_EVAL_TRIALS?.trim();
   const trials = rawTrials === undefined || rawTrials === "" ? 1 : Number(rawTrials);
   if (!Number.isInteger(trials) || trials < 1) {

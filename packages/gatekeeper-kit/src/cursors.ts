@@ -61,8 +61,10 @@ abstract class BufferedCursor<T> extends RpcTarget implements Cursor<T> {
   constructor(options: CursorShape) {
     super();
     this.#pageSize = requirePositiveInt("pageSize", options.pageSize);
-    this.remotePageSize =
-      requirePositiveInt("remotePageSize", options.remotePageSize ?? DEFAULT_REMOTE_PAGE_SIZE);
+    this.remotePageSize = requirePositiveInt(
+      "remotePageSize",
+      options.remotePageSize ?? DEFAULT_REMOTE_PAGE_SIZE,
+    );
   }
 
   /** Loads the next provider page into the buffer. */
@@ -76,9 +78,11 @@ abstract class BufferedCursor<T> extends RpcTarget implements Cursor<T> {
   /** @returns One local page, `[]` when the fetch window is spent, or `null` at exhaustion. */
   async #fill(): Promise<T[] | null> {
     let pages = 0;
-    while (this.buffer.length < this.#pageSize
-      && !this.remoteExhausted
-      && pages++ < MAX_PROVIDER_PAGES_PER_CALL) {
+    while (
+      this.buffer.length < this.#pageSize &&
+      !this.remoteExhausted &&
+      pages++ < MAX_PROVIDER_PAGES_PER_CALL
+    ) {
       await this[loadMore]();
     }
     // Only exhaustion ends the walk. A spent window yields `[]`, which says "ask again".
@@ -171,7 +175,7 @@ export class PageNumberCursor<T> extends PositionCursor<T> {
    * @param options Provider fetch and page-size settings.
    */
   constructor(options: PageNumberCursorOptions<T>) {
-    super(options, 1, page => page + 1);
+    super(options, 1, (page) => page + 1);
   }
 }
 
@@ -209,9 +213,9 @@ export type TokenCursorOptions<T> = CursorShape & {
 };
 
 /**
- * Fetches provider pages lazily using an opaque continuation token. 
- * 
- * Only `undefined` ends the walk; an empty string is a valid token, 
+ * Fetches provider pages lazily using an opaque continuation token.
+ *
+ * Only `undefined` ends the walk; an empty string is a valid token,
  * and an echoed token throws without advancing.
  *
  * @example
@@ -246,7 +250,8 @@ export class TokenCursor<T> extends BufferedCursor<T> {
     // Refuse an echoed token before moving cursor state so retrying asks for the same token.
     if (!exhausted && page.nextToken === asked) {
       throw new Error(
-        "Provider returned the same continuation token it was asked to continue from.");
+        "Provider returned the same continuation token it was asked to continue from.",
+      );
     }
     this.remoteExhausted = exhausted;
     this.#token = page.nextToken;

@@ -17,7 +17,10 @@
 // Usage: node scripts/release/build-release.ts --out <dir> [--release-id <id>] [--concurrency <n>]
 
 import {
-  execFile, execFileSync, type ChildProcess, type ExecFileOptions,
+  execFile,
+  execFileSync,
+  type ChildProcess,
+  type ExecFileOptions,
 } from "node:child_process";
 import { setMaxListeners } from "node:events";
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
@@ -29,11 +32,17 @@ import { killProcessTree, killProcessTreeEscalating } from "../kill-process-tree
 import { mapConcurrent } from "../map-concurrent.ts";
 import { vpRunEnv } from "../vp/concurrency.ts";
 import {
-  collectAssets, collectModules, stableStringify, type CollectedAssets,
+  collectAssets,
+  collectModules,
+  stableStringify,
+  type CollectedAssets,
 } from "./hash-lib.ts";
 import {
-  generateManifest, readDeployablePackages, readDeployInputs,
-  type DeployablePackage, type WorkerBuild,
+  generateManifest,
+  readDeployablePackages,
+  readDeployInputs,
+  type DeployablePackage,
+  type WorkerBuild,
 } from "./manifest-lib.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -83,7 +92,6 @@ class CancelledBySignal extends Error {
   }
 }
 
-
 function parseArgs(argv: string[]): {
   out: string;
   releaseId: string | undefined;
@@ -114,7 +122,10 @@ function parseArgs(argv: string[]): {
 // interleaved line by line would be unreadable. A whole block per command carries the same
 // information; only the order the blocks appear in is no longer fixed.
 function run(
-  label: string, command: string, argv: string[], options: ExecFileOptions = {},
+  label: string,
+  command: string,
+  argv: string[],
+  options: ExecFileOptions = {},
 ): Promise<void> {
   const signal = options.signal;
   // Aborted before we spawn anything: nothing to cancel, and no reason to start a process just to
@@ -137,28 +148,31 @@ function run(
     // and esbuild descendants that do the actual work running and writing -- and it settles this
     // promise the moment the signal fires rather than when the child exits, so awaiting it would
     // return while the build is still live. Both are what the abort handler below fixes.
-    const child = execFile(command, argv,
-        { cwd: ROOT, maxBuffer: MAX_CAPTURED_OUTPUT, ...options, signal: undefined },
-        (error, stdout, stderr) => {
-      signal?.removeEventListener("abort", onAbort);
-      running.delete(child);
-      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-      // A command we killed, which died to a signal, was cancelled rather than broken: its output
-      // is noise and its "failure" is the root cause's, so reject with that same object -- the
-      // caller dedupes failures by identity, which is what keeps a cancelled command out of the
-      // summary.
-      if (killedByUs && error?.signal) {
-        console.log(`cancelled: ${label} (${elapsed}s)`);
-        rejectRun(signal!.reason);
-        return;
-      }
-      process.stdout.write(`\n----- ${label} (${elapsed}s) -----\n${stdout}${stderr}`);
-      // Just the label and the status: the command's own diagnostics are in the block above, and
-      // `error.message` repeats them, so carrying it would print the same failure twice more (a
-      // third time when several are collected into an AggregateError).
-      if (error) rejectRun(new Error(`${label} failed (exit ${error.signal ?? error.code})`));
-      else resolveRun();
-    });
+    const child = execFile(
+      command,
+      argv,
+      { cwd: ROOT, maxBuffer: MAX_CAPTURED_OUTPUT, ...options, signal: undefined },
+      (error, stdout, stderr) => {
+        signal?.removeEventListener("abort", onAbort);
+        running.delete(child);
+        const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+        // A command we killed, which died to a signal, was cancelled rather than broken: its output
+        // is noise and its "failure" is the root cause's, so reject with that same object -- the
+        // caller dedupes failures by identity, which is what keeps a cancelled command out of the
+        // summary.
+        if (killedByUs && error?.signal) {
+          console.log(`cancelled: ${label} (${elapsed}s)`);
+          rejectRun(signal!.reason);
+          return;
+        }
+        process.stdout.write(`\n----- ${label} (${elapsed}s) -----\n${stdout}${stderr}`);
+        // Just the label and the status: the command's own diagnostics are in the block above, and
+        // `error.message` repeats them, so carrying it would print the same failure twice more (a
+        // third time when several are collected into an AggregateError).
+        if (error) rejectRun(new Error(`${label} failed (exit ${error.signal ?? error.code})`));
+        else resolveRun();
+      },
+    );
 
     running.add(child);
 
@@ -178,11 +192,12 @@ function run(
       // otherwise keep this promise pending forever. It is still tracked, because a force exit does
       // have to wait for it; see `escalations`.
       const escalation = killProcessTreeEscalating(child.pid, { forceSignal: forceKill.signal })
-          .catch(() => {}).then(() => {
-        child.stdout?.destroy();
-        child.stderr?.destroy();
-        child.unref();
-      });
+        .catch(() => {})
+        .then(() => {
+          child.stdout?.destroy();
+          child.stderr?.destroy();
+          child.unref();
+        });
       escalations.add(escalation);
       void escalation.then(() => escalations.delete(escalation));
     }
@@ -191,8 +206,10 @@ function run(
 }
 
 function gitCommit(): string {
-  return process.env.CI_COMMIT_SHA
-      || execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  return (
+    process.env.CI_COMMIT_SHA ||
+    execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim()
+  );
 }
 
 function defaultReleaseId(commit: string): string {
@@ -211,8 +228,8 @@ function defaultReleaseId(commit: string): string {
 
 function pinnedWranglerVersion(): string {
   const pkg = JSON.parse(
-      readFileSync(join(ROOT, "node_modules", "wrangler", "package.json"), "utf8")) as
-      { version: string };
+    readFileSync(join(ROOT, "node_modules", "wrangler", "package.json"), "utf8"),
+  ) as { version: string };
   return pkg.version;
 }
 
@@ -225,8 +242,12 @@ function pinnedWranglerVersion(): string {
 // concurrency limit (vp/concurrency.ts); the limit is not a task input, so it never affects the hash.
 async function buildFrontend(signal: AbortSignal): Promise<CollectedAssets> {
   const env = { ...vpRunEnv(), VITE_CF_ACCESS_MODE: "true" };
-  await run("frontend (access mode)", "pnpm",
-      ["exec", "vp", "run", "-F", "@gadgets/workshop-frontend", "build"], { env, signal });
+  await run(
+    "frontend (access mode)",
+    "pnpm",
+    ["exec", "vp", "run", "-F", "@gadgets/workshop-frontend", "build"],
+    { env, signal },
+  );
   return collectAssets(join(FRONTEND_DIR, "dist"));
 }
 
@@ -235,8 +256,10 @@ async function buildFrontend(signal: AbortSignal): Promise<CollectedAssets> {
 // which is what makes these safe to overlap.
 async function bundleWorker(pkg: DeployablePackage, bundleDir: string, signal: AbortSignal) {
   const outDir = join(bundleDir, pkg.name);
-  await run(pkg.name, "pnpm", ["exec", "wrangler", "deploy", "--dry-run", "--outdir", outDir],
-      { cwd: pkg.dir, signal });
+  await run(pkg.name, "pnpm", ["exec", "wrangler", "deploy", "--dry-run", "--outdir", outDir], {
+    cwd: pkg.dir,
+    signal,
+  });
   return collectModules(outDir);
 }
 
@@ -260,7 +283,10 @@ async function bundleWorker(pkg: DeployablePackage, bundleDir: string, signal: A
 // descendant is dead when a task settles; `run` says why that is tolerated. A cancelled command
 // rejects with the abort reason, i.e. the root cause itself, which is what lets the failure summary
 // below dedupe down to the real failures by identity.
-async function buildAll(packages: DeployablePackage[], concurrency: number): Promise<{
+async function buildAll(
+  packages: DeployablePackage[],
+  concurrency: number,
+): Promise<{
   bundles: ReturnType<typeof collectModules>[];
   assets: CollectedAssets;
 }> {
@@ -270,7 +296,10 @@ async function buildAll(packages: DeployablePackage[], concurrency: number): Pro
   // pure noise.
   setMaxListeners(0, controller.signal);
   const failFast = <T>(p: Promise<T>): Promise<T> =>
-      p.catch((error: unknown) => { controller.abort(error); throw error; });
+    p.catch((error: unknown) => {
+      controller.abort(error);
+      throw error;
+    });
 
   // Termination from outside runs the same cancellation path a build failure does, which is the only
   // way the descendants get stopped and the scratch directory below gets removed. Installing these
@@ -293,15 +322,18 @@ async function buildAll(packages: DeployablePackage[], concurrency: number): Pro
       if (forcing) return;
       forcing = true;
       forceKill.abort();
-      void Promise.all([...escalations, ...[...running].map((child) =>
-          child.pid === undefined ? null : killProcessTree(child.pid, "SIGKILL").catch(() => {}))])
-          .then(() => {
-            // process.exit() below skips the `finally`, so the scratch directory has to go here
-            // too. Ordered after the SIGKILLs, for the same reason the `finally` is ordered after
-            // the awaits: nothing may still be writing into what this removes.
-            rmSync(bundleDir, { recursive: true, force: true });
-            process.exit(exitCode);
-          });
+      void Promise.all([
+        ...escalations,
+        ...[...running].map((child) =>
+          child.pid === undefined ? null : killProcessTree(child.pid, "SIGKILL").catch(() => {}),
+        ),
+      ]).then(() => {
+        // process.exit() below skips the `finally`, so the scratch directory has to go here
+        // too. Ordered after the SIGKILLs, for the same reason the `finally` is ordered after
+        // the awaits: nothing may still be writing into what this removes.
+        rmSync(bundleDir, { recursive: true, force: true });
+        process.exit(exitCode);
+      });
       return;
     }
     console.error(`\n${signal} received: cancelling in-flight builds`);
@@ -315,16 +347,23 @@ async function buildAll(packages: DeployablePackage[], concurrency: number): Pro
   try {
     const frontend = failFast(buildFrontend(controller.signal));
     const [bundlesResult, frontendResult] = await Promise.allSettled([
-      mapConcurrent(packages, concurrency, async (pkg) => {
-        if (pkg.config.assets) await frontend;
-        return failFast(bundleWorker(pkg, bundleDir, controller.signal));
-      }, controller.signal),
+      mapConcurrent(
+        packages,
+        concurrency,
+        async (pkg) => {
+          if (pkg.config.assets) await frontend;
+          return failFast(bundleWorker(pkg, bundleDir, controller.signal));
+        },
+        controller.signal,
+      ),
       frontend,
     ]);
     if (bundlesResult.status === "rejected" || frontendResult.status === "rejected") {
-      const failures = new Set([bundlesResult, frontendResult]
+      const failures = new Set(
+        [bundlesResult, frontendResult]
           .filter((r) => r.status === "rejected")
-          .flatMap((r) => r.reason instanceof AggregateError ? r.reason.errors : [r.reason]));
+          .flatMap((r) => (r.reason instanceof AggregateError ? r.reason.errors : [r.reason])),
+      );
       if (failures.size === 1) throw [...failures][0];
       throw new AggregateError([...failures], `${failures.size} builds failed`);
     }
@@ -351,8 +390,10 @@ async function main() {
   const commit = gitCommit();
   const releaseId = args.releaseId ?? defaultReleaseId(commit);
   const wranglerVersion = pinnedWranglerVersion();
-  console.log(`building release ${releaseId} (commit ${commit}, wrangler ${wranglerVersion}, ` +
-      `${args.concurrency} bundles at a time)`);
+  console.log(
+    `building release ${releaseId} (commit ${commit}, wrangler ${wranglerVersion}, ` +
+      `${args.concurrency} bundles at a time)`,
+  );
 
   rmSync(args.out, { recursive: true, force: true });
   mkdirSync(join(args.out, "modules"), { recursive: true });
@@ -399,8 +440,10 @@ async function main() {
   writeFileSync(join(args.out, "manifest.json"), stableStringify(manifest) + "\n");
 
   const moduleCount = workers.reduce((n, w) => n + w.modules.length, 0);
-  console.log(`\nrelease ${releaseId}: ${workers.length} workers, ${moduleCount} modules, ` +
-      `${Object.keys(manifest.assets).length} unique asset blobs -> ${args.out}`);
+  console.log(
+    `\nrelease ${releaseId}: ${workers.length} workers, ${moduleCount} modules, ` +
+      `${Object.keys(manifest.assets).length} unique asset blobs -> ${args.out}`,
+  );
 }
 
 try {

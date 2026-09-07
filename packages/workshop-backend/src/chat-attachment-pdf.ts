@@ -27,8 +27,9 @@ export const PDF_MIME_TYPE = "application/pdf";
 
 /** Whether PDF attachments can reach this pi API (natively or via bridgePdfAttachments()). */
 export function modelApiSupportsPdfAttachments(api: Api): boolean {
-  return api === "anthropic-messages" || api === "openai-responses" ||
-      api === "google-generative-ai";
+  return (
+    api === "anthropic-messages" || api === "openai-responses" || api === "google-generative-ai"
+  );
 }
 
 /**
@@ -38,23 +39,27 @@ export function modelApiSupportsPdfAttachments(api: Api): boolean {
  */
 export function bridgePdfAttachments(api: Api, payload: unknown): unknown | undefined {
   switch (api) {
-    case "anthropic-messages": return bridgeAnthropicMessages(payload);
-    case "openai-responses": return bridgeOpenAiResponses(payload);
-    default: return undefined;
+    case "anthropic-messages":
+      return bridgeAnthropicMessages(payload);
+    case "openai-responses":
+      return bridgeOpenAiResponses(payload);
+    default:
+      return undefined;
   }
 }
 
 type UnknownRecord = Record<string, unknown>;
 
 const isRecord = (value: unknown): value is UnknownRecord =>
-    typeof value === "object" && value !== null;
+  typeof value === "object" && value !== null;
 
 // Rewrite the elements of each user message's content array, returning undefined when no element
 // changed. PDF parts appear only in user messages (tool-result media rides nested blocks that a
 // top-level scan never matches), so other roles pass through untouched.
 function rewriteUserContent(
-    messages: unknown,
-    rewritePart: (part: unknown) => unknown | undefined): unknown[] | undefined {
+  messages: unknown,
+  rewritePart: (part: unknown) => unknown | undefined,
+): unknown[] | undefined {
   if (!Array.isArray(messages)) return undefined;
   let changed = false;
   const result = messages.map((message) => {
@@ -78,8 +83,12 @@ function rewriteUserContent(
 function bridgeAnthropicMessages(payload: unknown): unknown | undefined {
   if (!isRecord(payload)) return undefined;
   const messages = rewriteUserContent(payload.messages, (part) => {
-    if (isRecord(part) && part.type === "image" && isRecord(part.source) &&
-        part.source.media_type === PDF_MIME_TYPE) {
+    if (
+      isRecord(part) &&
+      part.type === "image" &&
+      isRecord(part.source) &&
+      part.source.media_type === PDF_MIME_TYPE
+    ) {
       // Anthropic's PDF block is the image block with a different tag; every other field (the
       // base64 source, any cache_control marker) carries over unchanged.
       return { ...part, type: "document" };
@@ -92,8 +101,12 @@ function bridgeAnthropicMessages(payload: unknown): unknown | undefined {
 function bridgeOpenAiResponses(payload: unknown): unknown | undefined {
   if (!isRecord(payload)) return undefined;
   const input = rewriteUserContent(payload.input, (part) => {
-    if (isRecord(part) && part.type === "input_image" && typeof part.image_url === "string" &&
-        part.image_url.startsWith(`data:${PDF_MIME_TYPE};`)) {
+    if (
+      isRecord(part) &&
+      part.type === "input_image" &&
+      typeof part.image_url === "string" &&
+      part.image_url.startsWith(`data:${PDF_MIME_TYPE};`)
+    ) {
       // file_data takes the same data URL; `detail` is an image-only field and is dropped.
       return { type: "input_file", filename: "attachment.pdf", file_data: part.image_url };
     }

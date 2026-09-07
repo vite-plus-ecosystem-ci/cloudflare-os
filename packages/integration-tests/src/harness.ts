@@ -37,16 +37,22 @@ const WORKER_CONFIG = z.looseObject({
   name: z.string(),
   main: z.string(),
   account_id: z.string().optional(),
-  ai: z.looseObject({
-    binding: z.string(),
-    remote: z.boolean().optional(),
-  }).optional(),
+  ai: z
+    .looseObject({
+      binding: z.string(),
+      remote: z.boolean().optional(),
+    })
+    .optional(),
   build: z.looseObject({ command: z.string().optional(), cwd: z.string().optional() }).optional(),
-  services: z.array(z.looseObject({
-    binding: z.string(),
-    service: z.string(),
-    entrypoint: z.string().optional(),
-  })).optional(),
+  services: z
+    .array(
+      z.looseObject({
+        binding: z.string(),
+        service: z.string(),
+        entrypoint: z.string().optional(),
+      }),
+    )
+    .optional(),
   vars: z.record(z.string(), z.unknown()).optional(),
   worker_loaders: z.unknown().optional(),
 });
@@ -91,9 +97,10 @@ function readWorkerConfig(dir: string): WorkerConfig {
 }
 
 function workshopConfig(
-    gatekeepers: { binding: string; name: string }[],
-    enableGadgetExecution: boolean,
-    patch?: (config: WorkerConfig) => void): WorkerConfig {
+  gatekeepers: { binding: string; name: string }[],
+  enableGadgetExecution: boolean,
+  patch?: (config: WorkerConfig) => void,
+): WorkerConfig {
   const config = readWorkerConfig(WORKSHOP_DIR);
   // globalSetup completed the destructive shared `.wrangler/validate` build before file workers
   // started. Rebuilding it in each fork would race on that directory.
@@ -102,7 +109,7 @@ function workshopConfig(
   // The checked-in config declares no services; run-dev-server.ts adds one per gatekeeper. We add
   // only the ones the suite asked for, so buildGatekeeperVendorMap() discovers exactly those vendors
   // and the observer-config prompt has no surprise rows.
-  config.services = gatekeepers.map(gk => ({
+  config.services = gatekeepers.map((gk) => ({
     binding: `GATEKEEPER_${gk.binding}`,
     service: gk.name,
     entrypoint: "GatekeeperVendor",
@@ -132,8 +139,10 @@ export type Harness = {
    * Typed as the harness's own dispatch signature: this package sees both Node and Workers global
    * types, so spelling out Request/Response here would pick the wrong flavour.
    */
-  fetchWorker(name: string, ...args: Parameters<TestHarness["fetch"]>)
-      : ReturnType<TestHarness["fetch"]>;
+  fetchWorker(
+    name: string,
+    ...args: Parameters<TestHarness["fetch"]>
+  ): ReturnType<TestHarness["fetch"]>;
 };
 
 export async function startHarness(opts: {
@@ -145,7 +154,7 @@ export async function startHarness(opts: {
 }): Promise<Harness> {
   // Each gatekeeper's config is read (and patched) exactly once; the service binding below points at
   // the name the booted worker will actually carry, patches included.
-  const gatekeepers = opts.gatekeepers.map(gk => {
+  const gatekeepers = opts.gatekeepers.map((gk) => {
     const config = readWorkerConfig(gk.dir);
     gk.patch?.(config);
     return { binding: gk.binding, name: config.name, config };
@@ -155,8 +164,13 @@ export async function startHarness(opts: {
     root: opts.root ?? REPO_ROOT,
     // workshop-backend is primary, so unrouted requests (e.g. /api) go to it.
     workers: [
-      { config: workshopConfig(gatekeepers, opts.enableGadgetExecution ?? false,
-          opts.patchWorkshop) },
+      {
+        config: workshopConfig(
+          gatekeepers,
+          opts.enableGadgetExecution ?? false,
+          opts.patchWorkshop,
+        ),
+      },
       ...gatekeepers.map(({ config }) => ({ config })),
     ],
   });
@@ -185,12 +199,13 @@ export const RESTART_SETTLE_MS = 400;
  * before the triggering test drops its connection.
  */
 export function settleRestart(): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, RESTART_SETTLE_MS));
+  return new Promise((resolve) => setTimeout(resolve, RESTART_SETTLE_MS));
 }
 
 /** Boot the Workshop with only the bundled fixture gatekeeper bound. */
-export function startTestGatekeeperHarness(options: { enableGadgetExecution?: boolean } = {})
-    : Promise<Harness> {
+export function startTestGatekeeperHarness(
+  options: { enableGadgetExecution?: boolean } = {},
+): Promise<Harness> {
   return startHarness({
     gatekeepers: [{ binding: TEST_GATEKEEPER_BINDING, dir: TEST_GATEKEEPER_DIR }],
     enableGadgetExecution: options.enableGadgetExecution,

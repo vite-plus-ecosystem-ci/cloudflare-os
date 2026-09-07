@@ -33,7 +33,7 @@ agent-facing `Worktree` binding API).
   the chat. Fresh agents create their own worktrees. Nothing structural forbids
   workspace-scoped worktrees later (worktrees get ordinary `WorkpieceId`s from the
   shared counter), but no cross-chat visibility ships now.
-- **No UI — worktree *content* is stripped from client deliveries.** Worktrees do
+- **No UI — worktree _content_ is stripped from client deliveries.** Worktrees do
   not appear in the workshop UI at all; a future change can add a `WorkpieceSummary`
   variant when the UI is ready for large repos. This takes more than filtering
   `subscribeToWorkpieces`: the frontend's OT client consumes the same chat change
@@ -47,11 +47,11 @@ agent-facing `Worktree` binding API).
   metadata pins. This is sound because `CodeChange` transform is per-workpiece: ids
   are disjoint, so a client's gadget edits transform identically against a stripped
   row and the original. Two deliberate non-goals sharpen what "no UI" means:
-  - **Worktree *ids* are not hidden from clients.** The delivered `createWorktree`
+  - **Worktree _ids_ are not hidden from clients.** The delivered `createWorktree`
     tool call carries `worktreeId`, and the transcript renders the creation (§4) —
     both intentional, and a follow-up intends to expose worktrees to clients
     outright. Stripping only guarantees that nothing in delivered traffic makes
-    the *existing* client fetch worktree content: no worktree `CodeChange`
+    the _existing_ client fetch worktree content: no worktree `CodeChange`
     entries, no worktree pins (a pin is what triggers `otClient.ts`'s
     `getCodeAtCommit` base fetch), no commit content.
   - **Client-submitted worktree changes are not rejected.** `submitCodeChange`
@@ -71,11 +71,11 @@ agent-facing `Worktree` binding API).
     descriptive read errors; an `edit`'s base seeding throws them on its own), at
     submit time only — recorded rows are never re-checked, so folds stay
     deterministic.
-  (Frontend-side "ignore unknown ids" was rejected: the client's workpiece list
-  arrives on a different subscription than the change stream, so classification
-  would race.)
+    (Frontend-side "ignore unknown ids" was rejected: the client's workpiece list
+    arrives on a different subscription than the change stream, so classification
+    would race.)
 - **Edits ride the existing chat OT stream.** `CodeChange` is already keyed by
-  `WorkpieceId` and pins are `{gadgetId, baseCommit}`; a worktree is *born pinned* at
+  `WorkpieceId` and pins are `{gadgetId, baseCommit}`; a worktree is _born pinned_ at
   its base commit, so readFile/writeFile/editFile, the read-before-edit gate,
   `chatChanges` rows, replay, and compaction all work unchanged. Agent-authored rows
   are born at the step persistence barrier per plans/step-transactionality.md — a
@@ -108,7 +108,7 @@ agent-facing `Worktree` binding API).
   `mergeChanges`' epoch reset evaporates all pins, so accept writes a local
   **auto-commit** per dirty worktree and re-pins at it in the new generation — content
   is never lost. But the worktree API never reveals auto-commits: reported HEAD is the
-  last *explicit* commit, and a new explicit `commit()` parents on the last explicit
+  last _explicit_ commit, and a new explicit `commit()` parents on the last explicit
   commit (auto-commits become dangling objects; there is no GC, and dangling loose
   objects are cheap).
 - **Transport: custom smart-HTTP fetch client, not isomorphic-git's high-level fetch.**
@@ -142,7 +142,7 @@ agent-facing `Worktree` binding API).
 - **Push authorization is declared on the action and enforced at `submitAction` —
   there are no read-time rules and no gatekeeper-induced pulls.**
   `ActionDescription.pushedCommits` names the commits an action will push; before
-  queuing, the overseer verifies that their ancestry reaches commits *proven* on
+  queuing, the overseer verifies that their ancestry reaches commits _proven_ on
   that gatekeeper's remote and marks the push closure "pending push" (§1). The
   gatekeeper's whole cache view is then trivial: `get()`/`has()`/`stat()` answer
   for objects proven on its remote plus objects pending push to it, and nothing
@@ -150,7 +150,7 @@ agent-facing `Worktree` binding API).
   successful push to it; an advertisement is just an assertion and never
   qualifies (§1's metadata grades). One content-free predicate deliberately
   sits outside the scoped view: `GitCache.isAncestor()` (§1), which lets the
-  gatekeeper run its fast-forward policy check *before* queuing — the commits
+  gatekeeper run its fast-forward policy check _before_ queuing — the commits
   aren't in view until `submitAction()` marks them — at the cost of one bit of
   ancestry between oids the caller already holds (nothing, under the
   trust-model watch-for). The design serves two purposes, and neither
@@ -163,12 +163,12 @@ agent-facing `Worktree` binding API).
   gatekeeper needs to **simulate a not-yet-approved push**. Beyond those two,
   the tight view is least-authority hygiene rather than a security boundary.
   Versus the read-time-rules and `GitCache.ensure()` designs this replaced:
-  repo *copying* stays structurally out of scope (cross-remote transfer moves
+  repo _copying_ stays structurally out of scope (cross-remote transfer moves
   only a verified push closure, batched at apply), and everything happens at
   the same chokepoint every other gatekeeper effect already flows through.
 - **Trees eager; blobs eager under a modest size limit.** Any pull of a worktree base
   fetches the commit, its full tree structure, and all blobs under `EAGER_BLOB_LIMIT`
-  in one round trip (`filter blob:limit=…`). This shape is a property of the *pull*,
+  in one round trip (`filter blob:limit=…`). This shape is a property of the _pull_,
   not of creation as an event: creating a worktree on a gatekeeper-known commit issues
   it up front, while creating one on an already-local commit pulls nothing — and if
   that commit's trees were never fetched, the first base read faults with the same
@@ -190,23 +190,23 @@ agent-facing `Worktree` binding API).
   all five — unlike today's gadget-only paths, which reject what they never
   write (`readCommitFiles`) and write `100644` unconditionally
   (`#writeTreeNode`; that gadget path stays as-is). Operable content is
-  regular files of *either* mode: editing an executable preserves its
+  regular files of _either_ mode: editing an executable preserves its
   `100755` — `writeChangedFilesAsCommit` carries the base entry's mode into
-  the rebuilt tree, and only genuinely *new* files default to `100644`. No
+  the rebuilt tree, and only genuinely _new_ files default to `100644`. No
   API creates an executable or changes a mode for now (future work). Symlinks
   and gitlinks are **inert, and touching one throws**: `listFiles` surfaces
   them with their kind, but readFile/writeFile/editFile/deleteFile on such a
   path throws a descriptive error — for a symlink, `"<path> is a symlink to
-  <target>"` (the target *is* the blob's content, so the message tells the
+<target>"` (the target _is_ the blob's content, so the message tells the
   agent everything it needs); for a gitlink, `"<path> is a submodule
-  (gitlink) pointing at commit <oid>"` — and grep skips them with a note,
+(gitlink) pointing at commit <oid>"` — and grep skips them with a note,
   like binaries. Untouched entries of every kind ride through commits
   unchanged (tree rebuilds copy mode + oid verbatim), and symlink blobs
-  travel in push closures like any blob; gitlink target *commits* are still
+  travel in push closures like any blob; gitlink target _commits_ are still
   never pulled, walked, or pushed (§1).
 - **Paths are strict UTF-8; a non-UTF-8 tree entry name throws.** Git permits
   arbitrary non-NUL bytes in entry names, but every layer above the object
-  store here speaks string paths, and a *lossy* decode (replacement
+  store here speaks string paths, and a _lossy_ decode (replacement
   characters) could alias two distinct byte names to one string path —
   making an edit silently target or overwrite the wrong entry. So the tree
   parser decodes entry names with a fatal `TextDecoder`: parsing a tree that
@@ -230,7 +230,7 @@ agent-facing `Worktree` binding API).
   for the existing full-materialization paths and for **all writes** (which never
   fault), keeping the write side single-sourced; tests cross-verify the two codecs
   over the same store.
-- **No eviction yet.** The `GitCache` contract *permits* eviction (that's why
+- **No eviction yet.** The `GitCache` contract _permits_ eviction (that's why
   provenance exists — evicted objects are re-pullable), but v1 implements none.
   The metadata rows (`onRemote`/`pullableFrom`, §1) are the future re-pull index;
   gadget-history objects remain rooted by records/pins as documented in
@@ -296,7 +296,7 @@ agent-facing `Worktree` binding API).
     behaves correctly either way. A `pendingPush(G)` object that is locally
     absent is **pulled through** from its recorded source on demand — this is
     what lets the gatekeeper simulate a queued cross-remote push as if it had
-    already landed; an absent `onRemote(G)` object is *not* pulled (null). The
+    already landed; an absent `onRemote(G)` object is _not_ pulled (null). The
     optional `hints: GitPullHints` are advisory prefetch for that pull-through,
     so a gatekeeper walking objects by hand doesn't fault once per `get()`
     (defaults: exact-object, type from metadata). Doc-comment the simulation
@@ -330,7 +330,7 @@ agent-facing `Worktree` binding API).
     gatekeepers: `gitPull` strips protocol framing and pipes the pack body here.
     The pack decoder is hostile-input parsing (see watch-fors).
   - `isAncestor(ancestor, descendant)` (added with commit 7) — whether `ancestor`
-    is reachable from `descendant` (inclusive) over *locally cached* commits:
+    is reachable from `descendant` (inclusive) over _locally cached_ commits:
     the walk never pulls, a parent chain that leaves the cache simply stops
     (false = "not verifiable over cached history" — the right grade for a
     queue-time fast-forward check), and an unknown descendant throws so callers
@@ -338,26 +338,26 @@ agent-facing `Worktree` binding API).
     Deliberately **not** restricted to the gatekeeper's scoped view: the caller
     names both oids, and oids are capabilities (trust-model watch-for), so one
     bit of ancestry between oids it already holds reveals nothing new. This is
-    what lets a gatekeeper validate a push's fast-forward requirement *before*
+    what lets a gatekeeper validate a push's fast-forward requirement _before_
     `submitAction()` — the commits to be pushed enter its scoped view only when
     the action is queued, so without this method the check could only run
     post-queue, and a failure would strand an already-queued action with no way
     to withdraw it.
 - **`gitObjectMetadata` collection**: one row per oid — `{oid, type, size?,
-  onRemote: WorkpieceId[], pullableFrom: WorkpieceId[], pendingPush:
-  {gatekeeperId: WorkpieceId, actionId}[]}` (arrays rather than one row per pair,
+onRemote: WorkpieceId[], pullableFrom: WorkpieceId[], pendingPush:
+{gatekeeperId: WorkpieceId, actionId}[]}` (arrays rather than one row per pair,
   the idiomatic typed-storage shape). Gatekeeper ids are the `GatekeeperRecord`'s
   `WorkpieceId` (the gatekeeper DO is per-resource, so it identifies the repo
   too); multiple gatekeepers may appear on the same oid. Kept separate from
   `gitObjects` for two reasons: reading a `gitObjects` row means reading the
   whole object content, which is wasteful when only metadata is wanted; and
-  metadata routinely exists for objects we *don't* hold — advertised commits,
+  metadata routinely exists for objects we _don't_ hold — advertised commits,
   filtered-out tree entries, and oversized blobs we declined to store.
   `size` is recorded **only from bytes we actually measured**: a normal
   `put()`, or a `put()` rejected for exceeding the size cap (we had the
   content in hand; the measurement is proof-grade, and it lets later
   reads/greps of that blob fail fast instead of re-downloading it). Nothing
-  is ever inferred from a blob's *absence* — an omitted blob's size is
+  is ever inferred from a blob's _absence_ — an omitted blob's size is
   unknowable (tree entries carry no sizes, upload-pack reports nothing about
   what a filter suppressed), and any absence-based record would durably
   trust a gatekeeper's behavior as if it were a measurement: a buggy
@@ -367,8 +367,8 @@ agent-facing `Worktree` binding API).
   sent. Blobs too large for the transfer limiter itself never complete a
   `put()`, so they also record nothing and error (agent-visibly) on each
   attempt — accepted for such an extreme case.
-  `type` is **required** — every write knows one: *measured* from bytes in
-  hand (put/consumePack, including oversize rejections), or *asserted* by the
+  `type` is **required** — every write knows one: _measured_ from bytes in
+  hand (put/consumePack, including oversize rejections), or _asserted_ by the
   context that introduced the oid (a tree entry's mode, a commit's
   tree/parent headers, `advertiseCommit`'s commits-only scope). The grade is
   read off `size` (present iff the bytes were measured — measured writers
@@ -389,14 +389,14 @@ agent-facing `Worktree` binding API).
   push carry walk-stamped types). The two
   gatekeeper sets differ in **evidentiary grade** — proof versus assertion —
   which is what keeps the mistake-safeguard reliable:
-  - `onRemote` — *proof* that the gatekeeper's remote possesses the object.
+  - `onRemote` — _proof_ that the gatekeeper's remote possesses the object.
     Entered only by a hash-verified `put()` from that gatekeeper (during
     `gitPull`, or opportunistically — a gatekeeper may `put()` a commit's
     bytes in addition to advertising it, upgrading the advertisement to
     proof) or by a successful push to it. This is what
     `get()` serves, what ancestry verification terminates on, and what the
     marking walk skips.
-  - `pullableFrom` — unproven *hints*: `GitCache.advertiseCommit()`
+  - `pullableFrom` — unproven _hints_: `GitCache.advertiseCommit()`
     advertisements, plus the referent oids
     recorded whenever a gatekeeper `put()`s a tree or commit (each entry / tree
     pointer / parent, type derived from the entry mode or header — this is what
@@ -418,7 +418,7 @@ agent-facing `Worktree` binding API).
   the same instantiated-facet path every other invocation of an existing
   gatekeeper uses (observations, actions, hooks; overseer.ts:4261) — call
   `gitPull(oids, cache, hints)`, verify the requested oids are now present —
-  where "present" admits one deliberate exception: a requested *blob* still
+  where "present" admits one deliberate exception: a requested _blob_ still
   absent after a success return, when the hints carried a blob filter, is
   read as "unavailable at the supported size" and surfaces the ordinary
   too-large read error rather than "pull failed". Nothing is recorded for it
@@ -438,7 +438,7 @@ agent-facing `Worktree` binding API).
   hints), then parses. Gadget-history reads never fault (their objects are
   always local) and keep using isomorphic-git untouched.
 - **Push authorization at `submitAction`** (resolves the sketch's `pull()` TODO
-  by *deleting* it, along with the `GitCache.ensure()` design that briefly
+  by _deleting_ it, along with the `GitCache.ensure()` design that briefly
   succeeded it): when an `ActionDescription` carries `pushedCommits`, the
   overseer, before queuing:
   1. **Verifies ancestry.** Every parent chain from each declared head must
@@ -448,14 +448,14 @@ agent-facing `Worktree` binding API).
      destination"), and so is a parentless commit that isn't itself `onRemote` —
      **no vacuous pass for roots**. Pushing derived work back to its origin
      trivially passes (the worktree's base was pulled from there); pushing to a
-     *related* remote requires first pulling a shared ancestor commit from it,
+     _related_ remote requires first pulling a shared ancestor commit from it,
      which both proves the repos are related and makes the accidental
      push-to-the-wrong-remote mistake fail closed at queue time. Verification
-     never needs ancestors *beyond* the proven commits, so shallow pulls stay
+     never needs ancestors _beyond_ the proven commits, so shallow pulls stay
      shallow. The practical v1 bound this implies, stated plainly: the commit
      chain from head to proven ancestor must already be cached, which in
      practice means agent-authored commits atop a destination-proven base.
-     Pushing a *pre-existing* branch whose head sits N commits above the shared
+     Pushing a _pre-existing_ branch whose head sits N commits above the shared
      ancestor requires those N commit objects — a history-deepening pull v1
      doesn't offer (deep-history pulls are punted) — so the error message
      should state the limitation plainly rather than send the agent hunting.
@@ -469,13 +469,13 @@ agent-facing `Worktree` binding API).
      foreign repo's commit). An absent tree/blob that isn't remote-known is
      still marked; when its bytes later arrive (any `put()`), the mark
      **propagates lazily** to its referents under the same rules and action id.
-     Marks land on the metadata rows *and* in a non-unique `pushMarks`
+     Marks land on the metadata rows _and_ in a non-unique `pushMarks`
      action-id index, so cleanup and conversion iterate the action's oids
      without re-walking.
 - **Mark lifecycle.** Applied successfully → the action's marks convert to
   `onRemote` (the remote provably has them now; they also become re-pullable),
   idempotently and in the same durable step as the queue's completion record, so
-  a crash between the push and the conversion strands nothing *locally* — the
+  a crash between the push and the conversion strands nothing _locally_ — the
   remote side of that same window is the gatekeeper's `applyAction` idempotency
   responsibility (§3/§4). Rejected /
   expired / terminally failed → marks removed via the index. Reverting an
@@ -511,7 +511,7 @@ agent-facing `Worktree` binding API).
   - `listTreeEntries(oid, path?)` / walk helpers for `listFiles` and grep
     enumeration (tree objects are always local — trees are eager).
   - `writeChangedFilesAsCommit({treeBase, parents}, changes: Map<path, string |
-    null>)` — builds the new tree by reusing unchanged subtree oids from
+null>)` — builds the new tree by reusing unchanged subtree oids from
     `treeBase`, so committing at repo scale never materializes the full file map
     (`null` = delete). `treeBase` and `parents` are separate parameters: an
     explicit worktree commit builds its tree from `pinBase` but parents on
@@ -559,7 +559,7 @@ agent-facing `Worktree` binding API).
     sweeps (no head-commit work), blueprint enumeration/creation, ambient
     reconciliation, and the loader paths.
   - **Storage migration — version 3 → 4, stamping existing rows.** `type` is a
-    *required* field on the unified record (an optional absent-means-gadget
+    _required_ field on the unified record (an optional absent-means-gadget
     default was rejected: it would push `undefined`-handling into every consumer
     the audit touches, forever, to save a one-time rewrite of a small registry),
     so gadget rows written before this change must be stamped `type: "gadget"`.
@@ -594,10 +594,10 @@ agent-facing `Worktree` binding API).
   `createGadget` — stamped at the step barrier); add the chat binding; record
   `{worktreeId, changeId}` as the tool output so replay never re-creates. For gatekeeper-known commits, creation performs the **initial
   pull**: `gitPull([commit], cache, {type: "commit", commitHistory: {kind: "depth",
-  depth: 1}, filterBlobSize: EAGER_BLOB_LIMIT})` — one fetch for commit + all trees
-  + small blobs. The pull covers only what's missing: a commit already present locally
-  pulls nothing at creation, and any trees it lacks fault in later with the same eager
-  shape on the first base read (see the trees-eager locked decision).
+depth: 1}, filterBlobSize: EAGER_BLOB_LIMIT})` — one fetch for commit + all trees
+  - small blobs. The pull covers only what's missing: a commit already present locally
+    pulls nothing at creation, and any trees it lacks fault in later with the same eager
+    shape on the first base read (see the trees-eager locked decision).
 - **Pin at birth**: creation declares the pin `{gadgetId: worktreeId, baseCommit}` on
   the same `"changes"` batch that records the creation (which rides the new
   `createdWorktrees` message field — deliberately separate from `createdGadgets` so
@@ -614,7 +614,7 @@ agent-facing `Worktree` binding API).
     frozen per chat for exactly this reason, agent.ts:1332-1341; mid-chat
     acquisitions are announced via chat history, not the prompt). Since worktrees
     are created mid-chat by the agent itself, the `createWorktree` call and tool
-    result in the chat history *are* the announcement; adding a prompt line would
+    result in the chat history _are_ the announcement; adding a prompt line would
     self-inflict a cache miss on every turn after a creation. Post-compaction,
     knowledge of the worktree rides the handoff summary like every other mid-chat
     acquisition (the checkpoint's `chatBindings` keep the binding functional, and
@@ -628,14 +628,14 @@ agent-facing `Worktree` binding API).
     pattern for shipping the text.
 - **Lazy content in the OT machinery**: `buildChatContent` / session content for
   worktree roots must not materialize the whole tree. Applying a `CodeChange` needs
-  base text only for *touched* paths; reads resolve through
-  `readFileAtCommit(pinBase, path)` (fault-pulling the blob if missing).   Content maps
+  base text only for _touched_ paths; reads resolve through
+  `readFileAtCommit(pinBase, path)` (fault-pulling the blob if missing). Content maps
   for worktree ids hold only touched/read files over a lazy base resolver.
   Oversized/binary base files: clean tool error on read; a `set` (whole-file write)
   is still allowed on those — but not on symlink/gitlink paths, which reject
-  reads *and* writes with the descriptive errors from the modes locked decision.
-  A path naming a base *directory* also rejects writes and deletes (`"<path> is a
-  directory"`; reads report "no such file"): a git tree cannot hold a file and a
+  reads _and_ writes with the descriptive errors from the modes locked decision.
+  A path naming a base _directory_ also rejects writes and deletes (`"<path> is a
+directory"`; reads report "no such file"): a git tree cannot hold a file and a
   directory of one name, so such a write could never commit, and failing at the
   write keeps the error next to its cause rather than surfacing at a far-away
   `commit()` or accept-time auto-commit. The check covers base entries only — a
@@ -652,7 +652,7 @@ agent-facing `Worktree` binding API).
   must be able to re-establish worktree bases from the log alone. Per worktree: if
   the closed epoch left it dirty (flatten ≠ `pinBase` tree), write an auto-commit
   via `writeChangedFilesAsCommit({treeBase: pinBase, parents: [pinBase]},
-  touchedFiles)` — or reuse `headCommit` outright when the flatten equals its tree
+touchedFiles)` — or reuse `headCommit` outright when the flatten equals its tree
   (the agent committed and then made no further edits; no new object needed) — and
   set `pinBase` to it; a clean worktree re-pins at its unchanged `pinBase`.
   Auto-commit identity is the accepting user's profile — the same
@@ -670,7 +670,7 @@ agent-facing `Worktree` binding API).
   - `readFile(path) → string`, `writeFile(path, text)`, `deleteFile(path)` — text
     oriented, regular files only (symlink/gitlink paths throw the descriptive
     errors from the modes locked decision, and writing or deleting a base
-    *directory* path throws `"<path> is a directory"` — see the lazy-content
+    _directory_ path throws `"<path> is a directory"` — see the lazy-content
     bullet; deleting a directory's last file prunes the directory at commit);
     writes/deletes are OT rows exactly like the file tools' (they join
     the same step buffer and land through the same barrier, so replay and the
@@ -678,7 +678,7 @@ agent-facing `Worktree` binding API).
     minimal edit computed via `diffFiles` (fast-diff) against current content, not
     a whole-file `set` — keeping rows and composed changes bounded by changed
     regions. `set` is used only for new files and for bases we can't read
-    (oversized/binary). (The gadget `writeFile` *tool* emits whole-file `set`s
+    (oversized/binary). (The gadget `writeFile` _tool_ emits whole-file `set`s
     today; adopting the same helper there is a cheap follow-up, out of scope here.)
   - `grep(path, pattern)` / `structuredGrep(path, pattern)` — regex over a file or
     recursively over a directory; **one batched fetch** fills any missing blobs
@@ -694,7 +694,7 @@ agent-facing `Worktree` binding API).
     built the same way `mergeChanges` builds one — since the current content is by
     definition `pinBase`'s tree with the current epoch's overlay applied,
     `writeChangedFilesAsCommit({treeBase: pinBase, parents: [headCommit]},
-    overlayTouchedPaths)` produces it directly, with no diff computation. Then
+overlayTouchedPaths)` produces it directly, with no diff computation. Then
     **only `headCommit` advances**; `pinBase`, the chat's pin, and the OT rows are
     all untouched, so the rows remain the single record of the overlay and replay
     cannot double-apply it. Right after a commit the content is unchanged and
@@ -735,7 +735,7 @@ agent-facing `Worktree` binding API).
   from the git cache rather than from GitHub is never advertised**. Such a read
   is either a commit that came from this remote in the first place (provenance
   already recorded; re-advertising is a no-op) or a simulated pending-push
-  commit, which is *not* on the remote yet — advertising it would outlive a
+  commit, which is _not_ on the remote yet — advertising it would outlive a
   rejection as a permanently wrong `pullableFrom` hint that also makes a future
   push's marking walk skip the object as remote-known, under-filling its pack.
   Concretely: `getCommit` reports cache-served results (the session skips the
@@ -755,7 +755,7 @@ agent-facing `Worktree` binding API).
     authorize, then return a lazy `StreamingCursor`), so at method-call time no
     commit ids exist to advertise. The up-front `authorizeObservation` still
     gates the read exactly as today; the commit ids are
-    advertised by the *pages*: the session wraps the returned cursor in an
+    advertised by the _pages_: the session wraps the returned cursor in an
     advertising cursor holding a `dup()` of the session's cache stub, and each
     `next()` advertises that page's commit ids (parallel `advertiseCommit()`
     calls; a page with no commit ids advertises nothing). An advertisement is
@@ -765,7 +765,7 @@ agent-facing `Worktree` binding API).
     iterates.
   - Advertise the SHAs existing observations already return, too (`readDiff`'s
     base/head SHAs, `getDetails` branch refs). Advertisements are pull-routing
-    hints only; a gatekeeper *may* also `put()` a commit's bytes to upgrade the
+    hints only; a gatekeeper _may_ also `put()` a commit's bytes to upgrade the
     hint to `onRemote` proof (§1) — not needed for
     the v1 flows, where worktree creation pulls the base.
   - Observer verification: unchanged — strategy B's repo ACL covers git data.
@@ -803,7 +803,7 @@ agent-facing `Worktree` binding API).
     aborts record nothing).
 - **Push** — queued action `push(branch, commitId, {force?})`:
   - Queue: the `ActionDescription` declares `pushedCommits: [commitId]`, and the
-    overseer's `submitAction` verification + marking (§1) *is* the validation —
+    overseer's `submitAction` verification + marking (§1) _is_ the validation —
     an unrelated commit, a missing ancestor, or an unproven root fails right
     there, agent-visible, before anything is queued. **The queue path also
     binds the expected remote ref state**: the DO reads the branch's current
@@ -816,7 +816,7 @@ agent-facing `Worktree` binding API).
     record — what the user approves is "move `branch` from `expectedOldSha` to
     `newSha`", not "move `branch` from wherever it is by then". A non-force
     push additionally requires `expectedOldSha` to be an ancestor of `newSha`,
-    checked at queue time — *before* `submitAction()`, via
+    checked at queue time — _before_ `submitAction()`, via
     `GitCache.isAncestor()` (§1; added for exactly this, since the commits
     aren't in the gatekeeper's scoped view until the action is queued, and a
     post-queue failure would strand an unwithdrawable action) — over the
@@ -828,7 +828,7 @@ agent-facing `Worktree` binding API).
     is no old head to fast-forward from, and the zero-id CAS at apply is what
     protects against a branch appearing in the interim — so non-force pushes
     can create branches. `force`
-    controls *only* this fast-forward policy check — it does not loosen
+    controls _only_ this fast-forward policy check — it does not loosen
     old-SHA matching at apply (below). Description names repo, branch, commit,
     force-ness, and the expected old head. Simulation overlays the pending
     push onto `listBranches`/`getCommit` reads per the write-gatekeeper
@@ -836,7 +836,7 @@ agent-facing `Worktree` binding API).
     exactly the transition apply will enforce — reading pending commits via
     `GitCache.get()`, which serves (pulling through if needed) exactly what is
     queued for push to this remote, to be treated as already pushed. Two
-    sharp edges of the overlay: a queued *creation* injects its branch into
+    sharp edges of the overlay: a queued _creation_ injects its branch into
     `listBranches` only while the remote still lacks the name (checked against
     the live branch — once a same-named branch appears, the creation's
     expectation is invalidated exactly like a moved head's, and the real row
@@ -848,7 +848,7 @@ agent-facing `Worktree` binding API).
     with the apply call — §1/§4) and stream the pack into a send-pack request
     with the ref-update command (`old-sha new-sha refs/heads/branch`), where
     **old-sha is the queue-time `expectedOldSha`** (zero-id for branch
-    creation). Receive-pack's old-SHA compare-and-swap applies to *every*
+    creation). Receive-pack's old-SHA compare-and-swap applies to _every_
     update, force or not — the wire protocol has no force bit, and fast-forward
     policy was already enforced at queue time — so a branch that moved between
     approval and apply fails the apply cleanly instead of being clobbered:
@@ -893,7 +893,7 @@ agent-facing `Worktree` binding API).
     `isAncestor()` (§1; `isAncestor` was added with commit 7 — the fast-forward
     check has to run before `submitAction()` puts the commits in view); the
     sketch's `pull()` TODO resolves by
-    *deletion* — gatekeepers never trigger pulls. The interface extends
+    _deletion_ — gatekeepers never trigger pulls. The interface extends
     `RpcTarget`, and `gitPull`/`applyAction` receive it as `RpcStub<GitCache>`.
     Doc-comment the scoped view
     (`onRemote ∪ pendingPush`, null otherwise, uniformly across
@@ -910,8 +910,8 @@ agent-facing `Worktree` binding API).
     the bulk path for packs; the stub is facet-to-parent, always local).
   - `ActionDescription.pushedCommits?: GitOid[]` — the push declaration
     `submitAction` verifies and marks (§1). Doc-comment the symmetry:
-    gatekeepers *advertise* commits (`advertiseCommit()` — unproven pull-routing
-    hints), actions *declare* pushes (`pushedCommits` — ancestry-checked as a
+    gatekeepers _advertise_ commits (`advertiseCommit()` — unproven pull-routing
+    hints), actions _declare_ pushes (`pushedCommits` — ancestry-checked as a
     mistake-safeguard, and the source of the pending-push view that simulation
     reads).
   - `Gatekeeper.applyAction()` gains a `GitCache` parameter (§1 — the queue-time
@@ -943,8 +943,8 @@ agent-facing `Worktree` binding API).
     implementations (per repo convention — it goes on implementations, not
     interfaces).
 - `worktree.d.ts` finalized per §2 (file ops filled in, commit-squash semantics
-  documented from the *agent's* point of view — i.e. not documented at all: the API
-  simply reports the last explicit commit as HEAD; the modes behavior *is*
+  documented from the _agent's_ point of view — i.e. not documented at all: the API
+  simply reports the last explicit commit as HEAD; the modes behavior _is_
   documented — `listFiles` kinds, executables keeping their bit, symlinks/
   submodules erroring on touch — since the agent needs it to interpret errors).
 - `api.ts` changes are minimal but real (tool calls and chat-log message shapes
@@ -954,20 +954,20 @@ agent-facing `Worktree` binding API).
   - `createdWorktrees` on `"changes"` messages — separate from `createdGadgets` so
     the frontend never renders a worktree as a gadget creation;
   - `worktreeCommits` on `"changes"` messages — `{worktreeId, commit,
-    previousHead}[]`, the durable record of explicit `commit()` head advancements
+previousHead}[]`, the durable record of explicit `commit()` head advancements
     (recorded at the step barrier on the step's single `"changes"` message, like
     `createdGadgets` — a step's extras and edits revert together; the revert
     rollback anchor — see the edge case);
   - `worktreePins` on `"merge"` messages — the epoch re-pins (§2), the durable
     record `buildChatContent` and compaction checkpoints re-establish worktree
     bases from.
-  Frontend impact is one small diff, not zero: `AiToolCall` is an exhaustive
-  union in `ChatInterface.tsx` (`getToolCallSummary`, `describeToolCallCount`,
-  `getProvisionalToolVerb` — the last with an explicit `never` check), so the new
-  variant needs its rendering cases ("Created worktree …" / "Creating worktree").
-  That's desirable anyway: the transcript should show the creation. The new
-  message *fields* are ignored by the frontend, and all worktree content is
-  stripped from client deliveries (see the delivery-filtering locked decision).
+    Frontend impact is one small diff, not zero: `AiToolCall` is an exhaustive
+    union in `ChatInterface.tsx` (`getToolCallSummary`, `describeToolCallCount`,
+    `getProvisionalToolVerb` — the last with an explicit `never` check), so the new
+    variant needs its rendering cases ("Created worktree …" / "Creating worktree").
+    That's desirable anyway: the transcript should show the creation. The new
+    message _fields_ are ignored by the frontend, and all worktree content is
+    stripped from client deliveries (see the delivery-filtering locked decision).
 
 ## Constants (tunable, named in one place)
 
@@ -979,7 +979,7 @@ agent-facing `Worktree` binding API).
 ## Verification spikes (early, cheap, before the transport commits)
 
 1. **GitHub upload-pack capabilities** against a live repo: protocol v2 fetch with
-   SHA `want`s for commits *and* blobs, `shallow` combined with `filter`,
+   SHA `want`s for commits _and_ blobs, `shallow` combined with `filter`,
    `blob:limit` and `tree:<depth>` support — including the exact-object mappings
    the pull-through defaults depend on (`tree:0` alongside a commit want — also
    the "pull a shared ancestor commit alone" flow; `tree:1` alongside a tree
@@ -1011,7 +1011,7 @@ agent-facing `Worktree` binding API).
 
 - **Provenance loss**: a disconnected/deleted gatekeeper record makes its objects
   unpullable. No eviction in v1 means already-pulled objects keep working; only
-  *new* faults fail, with an actionable error — including a `get()`/`buildPack()`
+  _new_ faults fail, with an actionable error — including a `get()`/`buildPack()`
   pull-through mid-simulation or mid-apply ("reconnect X").
 - **Trust model: oids are capabilities, and gatekeepers are trusted with them.**
   The scoped cache view is a mistake-safeguard and a simulation aid, **not a
@@ -1019,7 +1019,7 @@ agent-facing `Worktree` binding API).
   read any object whose oid it knows: for a tree/blob it can fabricate a commit
   naming the oid, parent the fabrication on an `onRemote` commit of its own,
   and declare it in `pushedCommits`; and the shared-ancestry rule is not
-  security-grade either — obtaining the *content* of any one commit in a
+  security-grade either — obtaining the _content_ of any one commit in a
   history (a root commit may even be guessable) and `put()`ing it makes
   everything chaining onto it pushable to, and hence readable by, that
   gatekeeper. This is consistent with the existing trust model: gatekeepers
@@ -1050,14 +1050,14 @@ agent-facing `Worktree` binding API).
   any remote, and root commits get no vacuous pass. The queue-time error should
   say so plainly; exporting local work to a fresh repo is the punted,
   explicitly-human flow.
-- **Prefix resolution** in `createWorktree` is against *local knowledge only*
+- **Prefix resolution** in `createWorktree` is against _local knowledge only_
   (`gitObjects` ∪ `gitObjectMetadata`) — never a remote lookup. Remote
   truncated-id resolution is `getCommit(ref)` on the gatekeeper, which returns
   (and advertises) the full oid.
 - **Auto-commit chains**: `pinBase` may advance through several auto-commits across
   several accepts before an explicit `commit()`. This costs nothing at commit time:
   the tree is always built from `pinBase` + the current epoch's overlay (pre-reset
-  changes are already inside `pinBase`'s tree), and only the *parent* pointer names
+  changes are already inside `pinBase`'s tree), and only the _parent_ pointer names
   `headCommit`.
 - **`mergeChanges` staleness**: worktree pins must be excluded from the fast-forward
   gate (no mainline head to compare) and from `updateChatFromMainline`'s stale set.
@@ -1069,7 +1069,7 @@ agent-facing `Worktree` binding API).
   worktree ids (it should — ids are opaque).
 - **Chat deletion**: delete worktree records + chat bindings; objects stay (no GC,
   dangling is fine and consistent with gadget history behavior).
-- **Turn abort / revert vs. `commit()`**: a `commit()` happens *inside*
+- **Turn abort / revert vs. `commit()`**: a `commit()` happens _inside_
   `executeCode`, with no log event of its own, while reverts mark messages, not
   calls. That is why advancements ride the step's `"changes"` message's
   `worktreeCommits` field (§2/§4): the durable record has a chat sequence, like
@@ -1086,12 +1086,12 @@ agent-facing `Worktree` binding API).
     revert; the user reverts explicitly if they want the work gone).
   - **Accept/merge**: cannot run mid-turn (turns hold the chat), so it never
     observes a mid-step advancement.
-  The commit objects themselves always remain — dangling and harmless, like
-  auto-commits; a queued push referencing a rolled-back commit's oid stays valid,
-  since the object is real. Test: abort after a mid-step commit (buffer dropped,
-  `headCommit` unchanged); a user revert spanning a step that committed twice;
-  crash-resume mid-step (no durable trace; the re-run's `commit()` parents on
-  the unchanged head).
+    The commit objects themselves always remain — dangling and harmless, like
+    auto-commits; a queued push referencing a rolled-back commit's oid stays valid,
+    since the object is real. Test: abort after a mid-step commit (buffer dropped,
+    `headCommit` unchanged); a user revert spanning a step that committed twice;
+    crash-resume mid-step (no durable trace; the re-run's `commit()` parents on
+    the unchanged head).
 - **Delivery filtering must cover every client path**: live `changeApplied` events,
   subscribe-replay of retained rows, message delivery (`"changes"`/`"merge"`
   payloads and pins), and chat metadata (`codeBase` pins). Miss one and the
@@ -1099,7 +1099,7 @@ agent-facing `Worktree` binding API).
   client to a chat with an active worktree and asserting no worktree `CodeChange`
   entry, pin, or commit content appears anywhere in the received traffic — and
   that the revision stream stays gapless across stripped rows. The assertion is
-  deliberately *not* "no worktree id anywhere": the delivered `createWorktree`
+  deliberately _not_ "no worktree id anywhere": the delivered `createWorktree`
   tool call carries `worktreeId` by design (see the delivery-filtering locked
   decision), and a bare id triggers nothing in the existing client — the test
   guards exactly the set of things that would make `otClient.ts` fetch content.
@@ -1117,7 +1117,7 @@ agent-facing `Worktree` binding API).
   (for GitHub, bytes it relayed over TLS — but any gatekeeper can feed it
   anything), so parse defensively (bounded allocations, no trust in claimed
   sizes) — hash verification of each decoded object is the backstop for object
-  *content*, exactly as with `put()`.
+  _content_, exactly as with `put()`.
 - **Rate/size limits**: one fetch per worktree creation and per batch fault keeps
   request counts trivial; the transfer-size limiter pattern from artifact-sync
   (64MB) should wrap the fetch body.
@@ -1125,7 +1125,7 @@ agent-facing `Worktree` binding API).
 ## Commit sequence
 
 Ordered so kernel diffs are isolated and reviewable apart from the gatekeeper work
-(AGENTS.md kernel bar). Each commit keeps the packages it *modifies* building and
+(AGENTS.md kernel bar). Each commit keeps the packages it _modifies_ building and
 testing green; packages that merely depend on a modified one are allowed — and
 expected — to be temporarily broken until the later commit that adapts them (e.g.
 workshop-backend does not compile between commits 1 and 2). No vacuous stubs just
@@ -1337,7 +1337,7 @@ to keep dependents compiling. PR boundaries to be decided later.
 - Diff-based `writeFile` for the gadget writeFile agent tool (same helper).
 - Deep-history pulls (`commitHistory: full/since` are specified but GitHub-side
   usage ships shallow-only defaults) — also the missing piece for cross-remote
-  pushes of *pre-existing* diverged branches (§1's ancestry-verification bound:
+  pushes of _pre-existing_ diverged branches (§1's ancestry-verification bound:
   the head-to-ancestor commit chain must be cached).
 - Fetch negotiation (`have`s): v1 sends none, because every pull is filtered or
   tree-limited and a `have` asserts full reachability — no fetched object here is

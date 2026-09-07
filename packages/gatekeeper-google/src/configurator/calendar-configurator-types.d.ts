@@ -6,7 +6,7 @@ export type { CalendarAvailabilityMode } from "../calendar-types";
 export type CalendarConfiguratorValues = {
   calendarId?: string | null;
   availabilityMode?: CalendarAvailabilityMode | null;
-}
+};
 
 export interface CalendarConfiguratorRpc {
   /** List writable calendars matching the search query. */

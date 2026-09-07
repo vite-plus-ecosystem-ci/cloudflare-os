@@ -1,8 +1,10 @@
 /* Clips the mirror when the textarea scrolls. */
 .clip {
   position: absolute;
-  top: 0; bottom: 0;
-  left: -4px; right: -4px;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
@@ -10,7 +12,8 @@
 
 .mirror {
   position: absolute;
-  top: 0; bottom: 0;
+  top: 0;
+  bottom: 0;
   left: 4px;
   pointer-events: none;
   overflow: visible;
@@ -20,14 +23,18 @@
   box-sizing: border-box;
   color: var(--text-color-kumo-default);
 }
-.disabled { color: var(--text-color-kumo-inactive); }
+.disabled {
+  color: var(--text-color-kumo-inactive);
+}
 
 .textarea {
   color: transparent;
   -webkit-text-fill-color: transparent;
   caret-color: var(--text-color-kumo-default);
 }
-.textarea::placeholder { -webkit-text-fill-color: var(--text-color-kumo-inactive); }
+.textarea::placeholder {
+  -webkit-text-fill-color: var(--text-color-kumo-inactive);
+}
 .textarea::selection {
   background-color: color-mix(in srgb, var(--color-selection-bg) 70%, transparent);
   color: transparent;
@@ -52,5 +59,7 @@
   background-color: var(--color-kumo-tint);
   box-shadow: 0 0 0 1px var(--color-kumo-tint);
   border-radius: 4px;
-  transition: background-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }

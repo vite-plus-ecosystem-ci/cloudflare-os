@@ -1,5 +1,5 @@
 import { decodeJwt, SignJWT } from "jose";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   PreviewOAuth,
   PreviewOAuthConfigurationError,
@@ -25,7 +25,10 @@ const PREVIEW_ENV: PreviewOAuthEnv = {
   OAUTH_REDIRECT_URI: STABLE_CALLBACK,
 };
 
-async function signedState(returnUrl: string, extra: Record<string, unknown> = {}): Promise<string> {
+async function signedState(
+  returnUrl: string,
+  extra: Record<string, unknown> = {},
+): Promise<string> {
   return new SignJWT({ ...STATE, returnUrl, ...extra })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setIssuedAt()
@@ -40,8 +43,9 @@ describe("PreviewOAuth", () => {
 
     expect(oauth.redirectUri).toBe(STABLE_CALLBACK);
     expect(encoded).toBe(`${STATE.userObjectId}:${STATE.oauthNonce}`);
-    await expect(oauth.handleCallback(new URL(`${STABLE_CALLBACK}?state=${encoded}`)))
-      .resolves.toEqual({ kind: "local", state: STATE });
+    await expect(
+      oauth.handleCallback(new URL(`${STABLE_CALLBACK}?state=${encoded}`)),
+    ).resolves.toEqual({ kind: "local", state: STATE });
   });
 
   it("creates Google's compatible short-lived HS256 state for a preview", async () => {
@@ -56,27 +60,38 @@ describe("PreviewOAuth", () => {
     expect(typeof payload.exp).toBe("number");
     expect((payload.exp ?? 0) - (payload.iat ?? 0)).toBe(10 * 60);
 
-    await expect(oauth.handleCallback(
-      new URL(`${PREVIEW_CALLBACK}?code=code&state=${encodeURIComponent(encoded)}`),
-    )).resolves.toEqual({ kind: "local", state: STATE });
+    await expect(
+      oauth.handleCallback(
+        new URL(`${PREVIEW_CALLBACK}?code=code&state=${encodeURIComponent(encoded)}`),
+      ),
+    ).resolves.toEqual({ kind: "local", state: STATE });
   });
 
   it("requires the exact enable value and a signing secret for dynamic callbacks", () => {
     for (const value of [undefined, false, "false", "TRUE"]) {
-      expect(() => new PreviewOAuth({
-        callbackUri: PREVIEW_CALLBACK,
-        env: { ...PREVIEW_ENV, OAUTH_ALLOW_PREVIEW_REDIRECTS: value },
-      })).toThrow(PreviewOAuthConfigurationError);
+      expect(
+        () =>
+          new PreviewOAuth({
+            callbackUri: PREVIEW_CALLBACK,
+            env: { ...PREVIEW_ENV, OAUTH_ALLOW_PREVIEW_REDIRECTS: value },
+          }),
+      ).toThrow(PreviewOAuthConfigurationError);
     }
 
-    expect(() => new PreviewOAuth({
-      callbackUri: PREVIEW_CALLBACK,
-      env: { ...PREVIEW_ENV, OAUTH_ALLOW_PREVIEW_REDIRECTS: true },
-    })).not.toThrow();
-    expect(() => new PreviewOAuth({
-      callbackUri: PREVIEW_CALLBACK,
-      env: { ...PREVIEW_ENV, OAUTH_STATE_SIGNING_SECRET: undefined },
-    })).toThrow(/signing secret/i);
+    expect(
+      () =>
+        new PreviewOAuth({
+          callbackUri: PREVIEW_CALLBACK,
+          env: { ...PREVIEW_ENV, OAUTH_ALLOW_PREVIEW_REDIRECTS: true },
+        }),
+    ).not.toThrow();
+    expect(
+      () =>
+        new PreviewOAuth({
+          callbackUri: PREVIEW_CALLBACK,
+          env: { ...PREVIEW_ENV, OAUTH_STATE_SIGNING_SECRET: undefined },
+        }),
+    ).toThrow(/signing secret/i);
   });
 
   it("returns OAUTH_REDIRECT_URI byte-for-byte", () => {
@@ -98,13 +113,20 @@ describe("PreviewOAuth", () => {
       "https://unrelated.example.workers.dev/oauth",
       "https://preview-gatekeeper.example.workers.dev/not-oauth",
     ]) {
-      expect(() => new PreviewOAuth({ callbackUri, env: PREVIEW_ENV }))
-        .toThrow(PreviewOAuthConfigurationError);
+      expect(() => new PreviewOAuth({ callbackUri, env: PREVIEW_ENV })).toThrow(
+        PreviewOAuthConfigurationError,
+      );
     }
-    expect(() => new PreviewOAuth({
-      callbackUri: PREVIEW_CALLBACK,
-      env: { ...PREVIEW_ENV, OAUTH_REDIRECT_URI: "http://gatekeeper.example.workers.dev/oauth" },
-    })).toThrow(PreviewOAuthConfigurationError);
+    expect(
+      () =>
+        new PreviewOAuth({
+          callbackUri: PREVIEW_CALLBACK,
+          env: {
+            ...PREVIEW_ENV,
+            OAUTH_REDIRECT_URI: "http://gatekeeper.example.workers.dev/oauth",
+          },
+        }),
+    ).toThrow(PreviewOAuthConfigurationError);
   });
 
   it("rejects tampered, expired, malformed, and non-HS256 state", async () => {
@@ -113,9 +135,11 @@ describe("PreviewOAuth", () => {
     const segments = valid.split(".");
     if (!segments[1]) throw new Error("Expected a three-segment JWT");
     segments[1] = `${segments[1].startsWith("A") ? "B" : "A"}${segments[1].slice(1)}`;
-    await expect(oauth.handleCallback(
-      new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(segments.join("."))}`),
-    )).rejects.toThrow();
+    await expect(
+      oauth.handleCallback(
+        new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(segments.join("."))}`),
+      ),
+    ).rejects.toThrow();
 
     const now = Math.floor(Date.now() / 1000);
     const expired = await new SignJWT({ ...STATE, returnUrl: PREVIEW_CALLBACK })
@@ -123,39 +147,45 @@ describe("PreviewOAuth", () => {
       .setIssuedAt(now - 120)
       .setExpirationTime(now - 60)
       .sign(STATE_KEY);
-    await expect(oauth.handleCallback(
-      new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(expired)}`),
-    )).rejects.toThrow();
+    await expect(
+      oauth.handleCallback(new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(expired)}`)),
+    ).rejects.toThrow();
 
     const wrongAlgorithm = await new SignJWT({ ...STATE, returnUrl: PREVIEW_CALLBACK })
       .setProtectedHeader({ alg: "HS384", typ: "JWT" })
       .setIssuedAt()
       .setExpirationTime("10m")
       .sign(STATE_KEY);
-    await expect(oauth.handleCallback(
-      new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(wrongAlgorithm)}`),
-    )).rejects.toThrow();
-    await expect(oauth.handleCallback(new URL(`${STABLE_CALLBACK}?state=not-valid-state`)))
-      .rejects.toThrow(/invalid/i);
+    await expect(
+      oauth.handleCallback(
+        new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(wrongAlgorithm)}`),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      oauth.handleCallback(new URL(`${STABLE_CALLBACK}?state=not-valid-state`)),
+    ).rejects.toThrow(/invalid/i);
   });
 
   it("requires exact signed claims and well-formed local identifiers", async () => {
     const oauth = new PreviewOAuth({ callbackUri: STABLE_CALLBACK, env: STABLE_ENV });
     const unexpected = await signedState(PREVIEW_CALLBACK, { unexpected: true });
-    await expect(oauth.handleCallback(
-      new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(unexpected)}`),
-    )).rejects.toThrow(/invalid/i);
+    await expect(
+      oauth.handleCallback(new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(unexpected)}`)),
+    ).rejects.toThrow(/invalid/i);
 
     const missingTimes = await new SignJWT({ ...STATE, returnUrl: PREVIEW_CALLBACK })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .sign(STATE_KEY);
-    await expect(oauth.handleCallback(
-      new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(missingTimes)}`),
-    )).rejects.toThrow();
+    await expect(
+      oauth.handleCallback(new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(missingTimes)}`)),
+    ).rejects.toThrow();
 
-    await expect(new PreviewOAuth({ callbackUri: STABLE_CALLBACK, env: {} })
-      .createAuthorizationState({ ...STATE, userObjectId: "not-an-id" }))
-      .rejects.toThrow(/invalid/i);
+    await expect(
+      new PreviewOAuth({ callbackUri: STABLE_CALLBACK, env: {} }).createAuthorizationState({
+        ...STATE,
+        userObjectId: "not-an-id",
+      }),
+    ).rejects.toThrow(/invalid/i);
     await expect(oauth.handleCallback(new URL(STABLE_CALLBACK))).rejects.toThrow(/state/i);
   });
 
@@ -163,11 +193,11 @@ describe("PreviewOAuth", () => {
     const oauth = new PreviewOAuth({ callbackUri: STABLE_CALLBACK, env: STABLE_ENV });
     for (const returnUrl of [STABLE_CALLBACK, PREVIEW_CALLBACK, DOT_PREVIEW_CALLBACK]) {
       const encoded = await signedState(returnUrl);
-      await expect(oauth.handleCallback(
-        new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(encoded)}`),
-      )).resolves.toMatchObject(returnUrl === STABLE_CALLBACK
-        ? { kind: "local", state: STATE }
-        : { kind: "relay" });
+      await expect(
+        oauth.handleCallback(new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(encoded)}`)),
+      ).resolves.toMatchObject(
+        returnUrl === STABLE_CALLBACK ? { kind: "local", state: STATE } : { kind: "relay" },
+      );
     }
 
     for (const returnUrl of [
@@ -181,9 +211,9 @@ describe("PreviewOAuth", () => {
       "https://preview-gatekeeper.example.workers.dev:8443/oauth",
     ]) {
       const encoded = await signedState(returnUrl);
-      await expect(oauth.handleCallback(
-        new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(encoded)}`),
-      )).rejects.toThrow(/return URL/i);
+      await expect(
+        oauth.handleCallback(new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(encoded)}`)),
+      ).rejects.toThrow(/return URL/i);
     }
   });
 
@@ -194,9 +224,9 @@ describe("PreviewOAuth", () => {
     });
     const encoded = await signedState(PREVIEW_CALLBACK);
 
-    await expect(oauth.handleCallback(
-      new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(encoded)}`),
-    )).rejects.toThrow(/not allowed/i);
+    await expect(
+      oauth.handleCallback(new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(encoded)}`)),
+    ).rejects.toThrow(/not allowed/i);
   });
 
   it("requires the shared secret when a stable Worker receives signed state", async () => {
@@ -206,9 +236,9 @@ describe("PreviewOAuth", () => {
     });
     const encoded = await signedState(PREVIEW_CALLBACK);
 
-    await expect(oauth.handleCallback(
-      new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(encoded)}`),
-    )).rejects.toBeInstanceOf(PreviewOAuthConfigurationError);
+    await expect(
+      oauth.handleCallback(new URL(`${STABLE_CALLBACK}?state=${encodeURIComponent(encoded)}`)),
+    ).rejects.toBeInstanceOf(PreviewOAuthConfigurationError);
   });
 
   it("relays only the provider result and unchanged signed state", async () => {

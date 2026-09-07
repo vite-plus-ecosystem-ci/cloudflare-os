@@ -69,9 +69,7 @@ function menuLayout(anchor: HTMLElement): MenuLayout {
     left: Math.min(Math.max(rect.left, margin), viewportWidth - width - margin),
     maxHeight: Math.min(440, available),
     width,
-    ...(openBelow
-      ? { top: rect.bottom + gap }
-      : { bottom: viewportHeight - rect.top + gap }),
+    ...(openBelow ? { top: rect.bottom + gap } : { bottom: viewportHeight - rect.top + gap }),
   };
 }
 
@@ -115,17 +113,22 @@ export default function ComposerAddMenu({
     return filterSlashCommandCatalog(offerable, query);
   }, [catalog, chatExists, query, skillsAvailable]);
 
-  const items = useMemo<MenuItem[]>(() => [
-    ...(!hasQuery ? [
-      { kind: "upload" as const, key: "upload" },
-      { kind: "connection" as const, key: "connection" },
-    ] : []),
-    ...skills.map((choice) => ({
-      kind: "skill" as const,
-      key: slashCommandKey(choice.selection),
-      choice,
-    })),
-  ], [hasQuery, skills]);
+  const items = useMemo<MenuItem[]>(
+    () => [
+      ...(!hasQuery
+        ? [
+            { kind: "upload" as const, key: "upload" },
+            { kind: "connection" as const, key: "connection" },
+          ]
+        : []),
+      ...skills.map((choice) => ({
+        kind: "skill" as const,
+        key: slashCommandKey(choice.selection),
+        choice,
+      })),
+    ],
+    [hasQuery, skills],
+  );
 
   const close = (restoreFocus = true) => {
     setOpen(false);
@@ -140,8 +143,7 @@ export default function ComposerAddMenu({
     else if (item.kind === "connection") {
       triggerRef.current?.focus();
       onAddConnection();
-    }
-    else onSelectSkill(item.choice);
+    } else onSelectSkill(item.choice);
   };
 
   useEffect(() => {
@@ -185,7 +187,8 @@ export default function ComposerAddMenu({
     });
     const onPointerDown = (event: PointerEvent) => {
       if (!(event.target instanceof Node)) return;
-      if (popupRef.current?.contains(event.target) || triggerRef.current?.contains(event.target)) return;
+      if (popupRef.current?.contains(event.target) || triggerRef.current?.contains(event.target))
+        return;
       close(false);
     };
     document.addEventListener("pointerdown", onPointerDown, true);
@@ -213,7 +216,8 @@ export default function ComposerAddMenu({
   }, [anchorRef, open]);
 
   useEffect(() => {
-    listRef.current?.querySelector<HTMLElement>(`[data-index="${activeIndex}"]`)
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-index="${activeIndex}"]`)
       ?.scrollIntoView({ block: "nearest" });
   }, [activeIndex]);
 
@@ -245,9 +249,11 @@ export default function ComposerAddMenu({
   };
 
   const search = skillsAvailable ? (
-    <div className={`shrink-0 bg-kumo-base px-4 ${
-      layout?.top !== undefined ? "order-first pb-0 pt-3" : "order-last pb-3 pt-2"
-    }`}>
+    <div
+      className={`shrink-0 bg-kumo-base px-4 ${
+        layout?.top !== undefined ? "order-first pb-0 pt-3" : "order-last pb-3 pt-2"
+      }`}
+    >
       <input
         ref={searchRef}
         value={query}
@@ -257,9 +263,9 @@ export default function ComposerAddMenu({
         aria-autocomplete="list"
         aria-expanded="true"
         aria-controls={listboxId}
-        aria-activedescendant={items[activeIndex]
-          ? `${listboxId}-option-${activeIndex}`
-          : undefined}
+        aria-activedescendant={
+          items[activeIndex] ? `${listboxId}-option-${activeIndex}` : undefined
+        }
         placeholder="Search skills…"
         className="w-full border-0 bg-transparent p-0 text-[14px] leading-6 text-kumo-default outline-none placeholder:text-kumo-inactive"
         onChange={(event) => setQuery(event.target.value)}
@@ -268,104 +274,116 @@ export default function ComposerAddMenu({
     </div>
   ) : null;
 
-  const popup = open && layout ? createPortal(
-    <div
-      ref={popupRef}
-      className="themed-floating-shadow-lg fixed z-[1100] flex flex-col overflow-hidden rounded-2xl border border-kumo-line/70 bg-kumo-base"
-      style={layout}
-      role="dialog"
-      aria-label="Add to conversation"
-    >
-      {search}
-      <div
-        ref={listRef}
-        id={listboxId}
-        role="listbox"
-        aria-label="Files, connections, and skills"
-        aria-busy={loading}
-        tabIndex={skillsAvailable ? undefined : -1}
-        onKeyDown={skillsAvailable ? undefined : handleKeyDown}
-        className={`sidebar-scroll min-h-0 flex-1 overflow-y-auto p-2 outline-none ${
-          skillsAvailable && layout.bottom !== undefined ? "pb-0" : ""
-        }`}
-      >
-        {items.map((item, index) => {
-          const active = index === activeIndex;
-          if (item.kind !== "skill") {
-            const upload = item.kind === "upload";
-            const Icon = upload ? PaperclipIcon : PlugIcon;
-            return (
-              <button
-                key={item.key}
-                id={`${listboxId}-option-${index}`}
-                data-index={index}
-                type="button"
-                role="option"
-                aria-selected={active}
-                tabIndex={-1}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-kumo-default transition-colors ${active ? "bg-kumo-tint" : "hover:bg-kumo-tint/70"}`}
-                onPointerMove={() => setActiveIndex(index)}
-                onClick={() => activate(item)}
-              >
-                <Icon size={16} className="shrink-0" />
-                <span>{upload ? "Upload files or photos" : "Add a new connection"}</span>
-              </button>
-            );
-          }
+  const popup =
+    open && layout
+      ? createPortal(
+          <div
+            ref={popupRef}
+            className="themed-floating-shadow-lg fixed z-[1100] flex flex-col overflow-hidden rounded-2xl border border-kumo-line/70 bg-kumo-base"
+            style={layout}
+            role="dialog"
+            aria-label="Add to conversation"
+          >
+            {search}
+            <div
+              ref={listRef}
+              id={listboxId}
+              role="listbox"
+              aria-label="Files, connections, and skills"
+              aria-busy={loading}
+              tabIndex={skillsAvailable ? undefined : -1}
+              onKeyDown={skillsAvailable ? undefined : handleKeyDown}
+              className={`sidebar-scroll min-h-0 flex-1 overflow-y-auto p-2 outline-none ${
+                skillsAvailable && layout.bottom !== undefined ? "pb-0" : ""
+              }`}
+            >
+              {items.map((item, index) => {
+                const active = index === activeIndex;
+                if (item.kind !== "skill") {
+                  const upload = item.kind === "upload";
+                  const Icon = upload ? PaperclipIcon : PlugIcon;
+                  return (
+                    <button
+                      key={item.key}
+                      id={`${listboxId}-option-${index}`}
+                      data-index={index}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      tabIndex={-1}
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-kumo-default transition-colors ${active ? "bg-kumo-tint" : "hover:bg-kumo-tint/70"}`}
+                      onPointerMove={() => setActiveIndex(index)}
+                      onClick={() => activate(item)}
+                    >
+                      <Icon size={16} className="shrink-0" />
+                      <span>{upload ? "Upload files or photos" : "Add a new connection"}</span>
+                    </button>
+                  );
+                }
 
-          const choice = item.choice;
-          return (
-            <Fragment key={item.key}>
-              {!hasQuery && index === 2 && (
-                <div role="separator" className="mx-2 my-1 border-t border-kumo-line/70" />
+                const choice = item.choice;
+                return (
+                  <Fragment key={item.key}>
+                    {!hasQuery && index === 2 && (
+                      <div role="separator" className="mx-2 my-1 border-t border-kumo-line/70" />
+                    )}
+                    <button
+                      id={`${listboxId}-option-${index}`}
+                      data-index={index}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      tabIndex={-1}
+                      title={[
+                        choice.name,
+                        choice.description,
+                        [choice.providerLabel, choice.resourceLabel].filter(Boolean).join(" · "),
+                      ].join("\n")}
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${active ? "bg-kumo-tint" : "hover:bg-kumo-tint/70"}`}
+                      onPointerMove={() => setActiveIndex(index)}
+                      onClick={() => activate(item)}
+                    >
+                      {choice.selection.builtin === true &&
+                      choice.selection.commandId === "compact" ? (
+                        <ArrowsInIcon size={16} className="shrink-0" />
+                      ) : (
+                        <ScrollIcon size={16} className="shrink-0" />
+                      )}
+                      <span className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className="min-w-0 shrink-0 truncate text-kumo-default sm:max-w-[35%]">
+                          {choice.name}
+                        </span>
+                        <CaretRightIcon
+                          size={11}
+                          aria-hidden="true"
+                          className="shrink-0 text-kumo-inactive"
+                        />
+                        <span className="min-w-0 flex-1 truncate text-kumo-subtle">
+                          {choice.description}
+                        </span>
+                      </span>
+                      <span className="max-w-[30%] shrink-0 truncate text-[11.5px] text-kumo-inactive">
+                        {[choice.providerLabel, choice.resourceLabel].filter(Boolean).join(" · ")}
+                      </span>
+                    </button>
+                  </Fragment>
+                );
+              })}
+              {skillsAvailable && !loading && items.length === 0 && (
+                <p className="m-0 px-3 py-8 text-center text-[13px] text-kumo-inactive">
+                  {error ? "Couldn’t load skills." : "No skills match your search."}
+                </p>
               )}
-              <button
-                id={`${listboxId}-option-${index}`}
-                data-index={index}
-                type="button"
-                role="option"
-                aria-selected={active}
-                tabIndex={-1}
-                title={[
-                  choice.name,
-                  choice.description,
-                  [choice.providerLabel, choice.resourceLabel].filter(Boolean).join(" · "),
-                ].join("\n")}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${active ? "bg-kumo-tint" : "hover:bg-kumo-tint/70"}`}
-                onPointerMove={() => setActiveIndex(index)}
-                onClick={() => activate(item)}
-              >
-                {choice.selection.builtin === true && choice.selection.commandId === "compact"
-                  ? <ArrowsInIcon size={16} className="shrink-0" />
-                  : <ScrollIcon size={16} className="shrink-0" />}
-                <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="min-w-0 shrink-0 truncate text-kumo-default sm:max-w-[35%]">
-                    {choice.name}
-                  </span>
-                  <CaretRightIcon size={11} aria-hidden="true" className="shrink-0 text-kumo-inactive" />
-                  <span className="min-w-0 flex-1 truncate text-kumo-subtle">
-                    {choice.description}
-                  </span>
-                </span>
-                <span className="max-w-[30%] shrink-0 truncate text-[11.5px] text-kumo-inactive">
-                  {[choice.providerLabel, choice.resourceLabel].filter(Boolean).join(" · ")}
-                </span>
-              </button>
-            </Fragment>
-          );
-        })}
-        {skillsAvailable && !loading && items.length === 0 && (
-          <p className="m-0 px-3 py-8 text-center text-[13px] text-kumo-inactive">
-            {error ? "Couldn’t load skills." : "No skills match your search."}
-          </p>
-        )}
-        {skillsAvailable && loading && catalog.length === 0 && query && (
-          <p className="m-0 px-3 py-8 text-center text-[13px] text-kumo-inactive">Loading skills…</p>
-        )}
-      </div>
-    </div>,
-    document.body,
-  ) : null;
+              {skillsAvailable && loading && catalog.length === 0 && query && (
+                <p className="m-0 px-3 py-8 text-center text-[13px] text-kumo-inactive">
+                  Loading skills…
+                </p>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <>

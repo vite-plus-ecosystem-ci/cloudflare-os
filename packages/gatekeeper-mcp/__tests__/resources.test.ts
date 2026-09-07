@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { mcpResourceFor, mcpResources } from "../src/resources.js";
 
 describe("mcpResources", () => {
   it("advertises HTTP only in insecure mode", () => {
-    expect(mcpResources(false).map(resource => resource.urlPattern)).toEqual(["https://*"]);
-    expect(mcpResources(true).map(resource => resource.urlPattern)).toEqual([
+    expect(mcpResources(false).map((resource) => resource.urlPattern)).toEqual(["https://*"]);
+    expect(mcpResources(true).map((resource) => resource.urlPattern)).toEqual([
       "https://*",
       "http://*",
     ]);

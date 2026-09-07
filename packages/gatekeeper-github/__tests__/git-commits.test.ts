@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   CommitAdvertisingCursor,
   advertiseCommits,
@@ -82,11 +82,13 @@ describe("normalizeCommitSummary", () => {
   });
 
   it("tolerates missing identities and accounts", () => {
-    const summary = normalizeCommitSummary(commitResponse({
-      commit: { message: "Initial commit", author: null },
-      author: null,
-      parents: [],
-    }));
+    const summary = normalizeCommitSummary(
+      commitResponse({
+        commit: { message: "Initial commit", author: null },
+        author: null,
+        parents: [],
+      }),
+    );
     expect(summary.author).toEqual({ name: undefined, email: undefined, date: undefined });
     expect(summary.committer).toEqual({ name: undefined, email: undefined, date: undefined });
     expect(summary.authorAccount).toBeNull();
@@ -96,9 +98,11 @@ describe("normalizeCommitSummary", () => {
 
 describe("normalizeCommitDetails", () => {
   it("includes stats when present and omits them otherwise", () => {
-    const withStats = normalizeCommitDetails(commitResponse({
-      stats: { additions: 10, deletions: 2, total: 12 },
-    }));
+    const withStats = normalizeCommitDetails(
+      commitResponse({
+        stats: { additions: 10, deletions: 2, total: 12 },
+      }),
+    );
     expect(withStats.stats).toEqual({ additions: 10, deletions: 2, total: 12 });
 
     const withoutStats = normalizeCommitDetails(commitResponse());
@@ -108,15 +112,21 @@ describe("normalizeCommitDetails", () => {
 
 describe("branch and tag normalization", () => {
   it("maps branches, defaulting protection to false", () => {
-    expect(normalizeBranchSummary({ name: "main", commit: { sha: oid(7) }, protected: true }))
-      .toEqual({ name: "main", headCommit: oid(7), protected: true });
-    expect(normalizeBranchSummary({ name: "dev", commit: { sha: oid(8) } }))
-      .toEqual({ name: "dev", headCommit: oid(8), protected: false });
+    expect(
+      normalizeBranchSummary({ name: "main", commit: { sha: oid(7) }, protected: true }),
+    ).toEqual({ name: "main", headCommit: oid(7), protected: true });
+    expect(normalizeBranchSummary({ name: "dev", commit: { sha: oid(8) } })).toEqual({
+      name: "dev",
+      headCommit: oid(8),
+      protected: false,
+    });
   });
 
   it("maps tags", () => {
-    expect(normalizeTagSummary({ name: "v1.0.0", commit: { sha: oid(9) } }))
-      .toEqual({ name: "v1.0.0", commit: oid(9) });
+    expect(normalizeTagSummary({ name: "v1.0.0", commit: { sha: oid(9) } })).toEqual({
+      name: "v1.0.0",
+      commit: oid(9),
+    });
   });
 });
 
@@ -165,10 +175,7 @@ describe("CommitAdvertisingCursor", () => {
   it("advertises every commit id on each fetched page, and nothing from unfetched pages", async () => {
     const advertiser = new RecordingAdvertiser();
     const cursor = new CommitAdvertisingCursor<Item>(
-      new PagesCursor([
-        [{ id: oid(1), parents: [oid(2)] }],
-        [{ id: oid(3), parents: [] }],
-      ]),
+      new PagesCursor([[{ id: oid(1), parents: [oid(2)] }], [{ id: oid(3), parents: [] }]]),
       advertiser,
       extract,
     );
@@ -202,10 +209,7 @@ describe("CommitAdvertisingCursor", () => {
     // Consecutive history pages overlap heavily: each commit's parent is usually the next
     // commit in the list.
     const cursor = new CommitAdvertisingCursor<Item>(
-      new PagesCursor([
-        [{ id: oid(1), parents: [oid(2)] }],
-        [{ id: oid(2), parents: [oid(3)] }],
-      ]),
+      new PagesCursor([[{ id: oid(1), parents: [oid(2)] }], [{ id: oid(2), parents: [oid(3)] }]]),
       advertiser,
       extract,
     );
@@ -234,17 +238,20 @@ describe("parseGitCommitPayload", () => {
   }
 
   it("parses tree, parents, identities, and the message", () => {
-    const parsed = parseGitCommitPayload(payload([
-      `tree ${oid(9)}`,
-      `parent ${oid(1)}`,
-      `parent ${oid(2)}`,
-      "author Ada Lovelace <ada@example.com> 1700000000 +0130",
-      "committer Charles Babbage <charles@example.com> 1700000100 -0500",
-      "",
-      "Add the engine",
-      "",
-      "With details.",
-    ]), oid(7));
+    const parsed = parseGitCommitPayload(
+      payload([
+        `tree ${oid(9)}`,
+        `parent ${oid(1)}`,
+        `parent ${oid(2)}`,
+        "author Ada Lovelace <ada@example.com> 1700000000 +0130",
+        "committer Charles Babbage <charles@example.com> 1700000100 -0500",
+        "",
+        "Add the engine",
+        "",
+        "With details.",
+      ]),
+      oid(7),
+    );
     expect(parsed.tree).toBe(oid(9));
     expect(parsed.parents).toEqual([oid(1), oid(2)]);
     expect(parsed.author).toEqual({
@@ -257,41 +264,49 @@ describe("parseGitCommitPayload", () => {
   });
 
   it("tolerates unknown and multi-line headers (gpgsig continuation lines)", () => {
-    const parsed = parseGitCommitPayload(payload([
-      `tree ${oid(9)}`,
-      "author A <a@example.com> 1700000000 +0000",
-      "committer A <a@example.com> 1700000000 +0000",
-      "gpgsig -----BEGIN PGP SIGNATURE-----",
-      " lineone",
-      " -----END PGP SIGNATURE-----",
-      "",
-      "signed commit",
-    ]), oid(7));
+    const parsed = parseGitCommitPayload(
+      payload([
+        `tree ${oid(9)}`,
+        "author A <a@example.com> 1700000000 +0000",
+        "committer A <a@example.com> 1700000000 +0000",
+        "gpgsig -----BEGIN PGP SIGNATURE-----",
+        " lineone",
+        " -----END PGP SIGNATURE-----",
+        "",
+        "signed commit",
+      ]),
+      oid(7),
+    );
     expect(parsed.parents).toEqual([]);
     expect(parsed.message).toBe("signed commit");
   });
 
   it("rejects payloads that are not well-formed commits", () => {
-    expect(() => parseGitCommitPayload(payload(["not a commit"]), oid(7)))
-      .toThrow(/not a well-formed commit/);
-    expect(() => parseGitCommitPayload(payload([`parent ${oid(1)}`, "", "no tree"]), oid(7)))
-      .toThrow(/not a well-formed commit/);
-    expect(() => parseGitCommitPayload(payload([`tree ${oid(9)}`, "parent nope", "", "m"]), oid(7)))
-      .toThrow(/not a well-formed commit/);
+    expect(() => parseGitCommitPayload(payload(["not a commit"]), oid(7))).toThrow(
+      /not a well-formed commit/,
+    );
+    expect(() =>
+      parseGitCommitPayload(payload([`parent ${oid(1)}`, "", "no tree"]), oid(7)),
+    ).toThrow(/not a well-formed commit/);
+    expect(() =>
+      parseGitCommitPayload(payload([`tree ${oid(9)}`, "parent nope", "", "m"]), oid(7)),
+    ).toThrow(/not a well-formed commit/);
   });
 });
 
 describe("commitDetailsFromGitObject", () => {
   it("synthesizes the details shape from exact bytes, omitting GitHub-only fields", () => {
-    const bytes = new TextEncoder().encode([
-      `tree ${oid(9)}`,
-      `parent ${oid(1)}`,
-      "author Ada Lovelace <ada@example.com> 1700000000 +0000",
-      "committer Ada Lovelace <ada@example.com> 1700000100 +0000",
-      "",
-      "feat: pending work",
-      "",
-    ].join("\n"));
+    const bytes = new TextEncoder().encode(
+      [
+        `tree ${oid(9)}`,
+        `parent ${oid(1)}`,
+        "author Ada Lovelace <ada@example.com> 1700000000 +0000",
+        "committer Ada Lovelace <ada@example.com> 1700000100 +0000",
+        "",
+        "feat: pending work",
+        "",
+      ].join("\n"),
+    );
     const details = commitDetailsFromGitObject(oid(7), bytes, "https://github.com/acme/widgets");
     expect(details).toEqual({
       id: oid(7),

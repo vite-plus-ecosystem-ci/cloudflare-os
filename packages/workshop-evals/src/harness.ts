@@ -1,21 +1,26 @@
 import type { AgentTurnResult } from "@gadgets/integration-tests/agent-session";
 import type { AiChatMessage } from "@gadgets/workshop-shared/api";
 import {
-  attachHarnessRunToError, createHarness, normalizeHarnessRun, type JsonValue,
+  attachHarnessRunToError,
+  createHarness,
+  normalizeHarnessRun,
+  type JsonValue,
   type TranscriptEvent,
 } from "vitest-evals";
 import { EVAL_AGENT_BUDGET_MS, EVAL_VERIFICATION_BUDGET_MS } from "./budgets.js";
 import { resolveEvalModel, type EvalIdentity } from "./config.js";
 import type { EvalCheck, EvalRunInput, EvalRunOutput, EvalTask, EvalTurnResult } from "./task.js";
 import { measureHistory, toTranscriptEvents } from "./transcript.js";
-import {
-  openLocalEvalTarget, type LocalEvalTarget, type LocalModelAccess,
-} from "./target.js";
+import { openLocalEvalTarget, type LocalEvalTarget, type LocalModelAccess } from "./target.js";
 import { EvalVerifier } from "./verifier.js";
 
 class EvalDeadlineError extends Error {}
 
-async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+async function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
   const expired = Promise.withResolvers<never>();
   const timer = setTimeout(() => expired.reject(new EvalDeadlineError(message)), timeoutMs);
   expired.promise.catch(() => {});
@@ -28,8 +33,11 @@ async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message:
 }
 
 async function beforeDeadline<T>(
-    start: () => Promise<T>, deadline: number, message: string,
-    signal?: AbortSignal): Promise<T> {
+  start: () => Promise<T>,
+  deadline: number,
+  message: string,
+  signal?: AbortSignal,
+): Promise<T> {
   if (signal?.aborted) throw new EvalDeadlineError("Eval run was cancelled");
   const remaining = deadline - Date.now();
   if (remaining <= 0) throw new EvalDeadlineError(message);
@@ -48,7 +56,10 @@ async function beforeDeadline<T>(
 
 /** Run one real Workshop task and retain its functional result and trajectory. */
 export function createWorkshopHarness(
-    task: EvalTask, access: LocalModelAccess, identity: EvalIdentity) {
+  task: EvalTask,
+  access: LocalModelAccess,
+  identity: EvalIdentity,
+) {
   return createHarness<EvalRunInput, EvalRunOutput>({
     name: "workshop-agent",
     run: async ({ input, signal }) => {
@@ -75,17 +86,25 @@ export function createWorkshopHarness(
             signal,
           });
           const result = await withTimeout(
-              running, agentTurnBudget + verificationBudget,
-              "Agent turn and canonical snapshot exceeded their time budget");
+            running,
+            agentTurnBudget + verificationBudget,
+            "Agent turn and canonical snapshot exceeded their time budget",
+          );
           const turnWallMs = Date.now() - turnStartedAt;
-          if (result.history.some(message =>
-            message.sequence > previousSequence && message.type === "message" &&
-            message.author.type === "user" && message.message === turn.prompt)) {
+          if (
+            result.history.some(
+              (message) =>
+                message.sequence > previousSequence &&
+                message.type === "message" &&
+                message.author.type === "user" &&
+                message.message === turn.prompt,
+            )
+          ) {
             unrecordedPrompt = undefined;
           }
           if (result.history.length > 0) history = result.history;
-          const cumulativeCost = result.usage.observedCumulativeChatCostUsd ??
-            usage.observedCumulativeChatCostUsd;
+          const cumulativeCost =
+            result.usage.observedCumulativeChatCostUsd ?? usage.observedCumulativeChatCostUsd;
           usage = {};
           if (result.usage.lastStepTokens !== undefined) {
             usage.lastStepTokens = result.usage.lastStepTokens;
@@ -97,9 +116,10 @@ export function createWorkshopHarness(
           const verificationDeadline = verificationStartedAt + verificationBudget;
           if (result.outcome.status !== "completed" || signal?.aborted) {
             runError = new EvalDeadlineError(
-                result.outcome.status === "completed"
-                  ? "Eval run was cancelled"
-                  : result.outcome.message);
+              result.outcome.status === "completed"
+                ? "Eval run was cancelled"
+                : result.outcome.message,
+            );
             turns.push({
               outcome: result.outcome,
               checks: [],
@@ -112,14 +132,20 @@ export function createWorkshopHarness(
           let checks: EvalCheck[];
           try {
             checks = await beforeDeadline(
-                () => verifier.collect(turn.verify), verificationDeadline,
-                "Eval verification exceeded its time budget", signal);
+              () => verifier.collect(turn.verify),
+              verificationDeadline,
+              "Eval verification exceeded its time budget",
+              signal,
+            );
           } catch (error) {
-            checks = [...verifier.results(), {
-              id: "verifier.timeout",
-              pass: false,
-              evidence: error instanceof Error ? error.message : String(error),
-            }];
+            checks = [
+              ...verifier.results(),
+              {
+                id: "verifier.timeout",
+                pass: false,
+                evidence: error instanceof Error ? error.message : String(error),
+              },
+            ];
             turns.push({
               outcome: result.outcome,
               checks,
@@ -129,7 +155,7 @@ export function createWorkshopHarness(
             throw error;
           }
 
-          if (checks.some(check => !check.pass)) {
+          if (checks.some((check) => !check.pass)) {
             turns.push({
               outcome: result.outcome,
               checks,
@@ -141,8 +167,9 @@ export function createWorkshopHarness(
 
           const verifyAfterAccept = turn.verifyAfterAccept;
           if (result.outcome.status === "completed" && verifyAfterAccept !== undefined) {
-            const hasChangesToReload = result.history.some(message =>
-              message.sequence > previousSequence && message.type === "changes");
+            const hasChangesToReload = result.history.some(
+              (message) => message.sequence > previousSequence && message.type === "changes",
+            );
             if (!hasChangesToReload) {
               checks.push({
                 id: "accept.no-changes",
@@ -160,8 +187,11 @@ export function createWorkshopHarness(
             const session = opened.session;
             try {
               await beforeDeadline(
-                  () => session.acceptChanges(), verificationDeadline,
-                  "Accepting verified agent changes exceeded its time budget", signal);
+                () => session.acceptChanges(),
+                verificationDeadline,
+                "Accepting verified agent changes exceeded its time budget",
+                signal,
+              );
             } catch (error) {
               checks.push({
                 id: "accept.failed",
@@ -179,9 +209,14 @@ export function createWorkshopHarness(
 
             const afterAccept = new EvalVerifier(session, result.workpieces);
             try {
-              checks.push(...await beforeDeadline(
-                  () => afterAccept.collect(verifyAfterAccept), verificationDeadline,
-                  "Post-accept verification exceeded its time budget", signal));
+              checks.push(
+                ...(await beforeDeadline(
+                  () => afterAccept.collect(verifyAfterAccept),
+                  verificationDeadline,
+                  "Post-accept verification exceeded its time budget",
+                  signal,
+                )),
+              );
             } catch (error) {
               checks.push(...afterAccept.results(), {
                 id: "post-accept-verifier.timeout",
@@ -219,11 +254,14 @@ export function createWorkshopHarness(
       }
 
       const metrics = measureHistory(history);
-      const checks = turns.flatMap(turn => turn.checks);
-      const success = runError === undefined && cleanupError === undefined &&
+      const checks = turns.flatMap((turn) => turn.checks);
+      const success =
+        runError === undefined &&
+        cleanupError === undefined &&
         turns.length === task.turns.length &&
-        turns.every(turn => turn.outcome.status === "completed") &&
-        checks.length > 0 && checks.every(check => check.pass);
+        turns.every((turn) => turn.outcome.status === "completed") &&
+        checks.length > 0 &&
+        checks.every((check) => check.pass);
       const usageMetadata: Record<string, JsonValue> = {};
       if (usage.lastStepTokens !== undefined) usageMetadata.lastStepTokens = usage.lastStepTokens;
       if (usage.observedCumulativeChatCostUsd !== undefined) {
@@ -241,8 +279,9 @@ export function createWorkshopHarness(
       if (events.length === 0) {
         events.push({ type: "message", role: "user", content: task.turns[0].prompt });
       }
-      const errors = history.flatMap(message =>
-        message.type === "error" ? [{ name: "AgentError", message: message.message }] : []);
+      const errors = history.flatMap((message) =>
+        message.type === "error" ? [{ name: "AgentError", message: message.message }] : [],
+      );
       if (runError !== undefined) errors.push({ name: "EvalRunError", message: runError.message });
       if (cleanupError !== undefined) {
         errors.push({ name: "EvalCleanupError", message: cleanupError.message });
@@ -270,9 +309,10 @@ export function createWorkshopHarness(
       };
 
       if (runError !== undefined || cleanupError !== undefined) {
-        const error = runError !== undefined && cleanupError !== undefined
-          ? new AggregateError([runError, cleanupError], "Eval run and cleanup failed")
-          : runError ?? cleanupError ?? new Error("Eval failed");
+        const error =
+          runError !== undefined && cleanupError !== undefined
+            ? new AggregateError([runError, cleanupError], "Eval run and cleanup failed")
+            : (runError ?? cleanupError ?? new Error("Eval failed"));
         throw attachHarnessRunToError(error, normalizeHarnessRun(input, result));
       }
       return result;

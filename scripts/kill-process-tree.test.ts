@@ -17,7 +17,7 @@ async function waitUntilGone(pid: number, timeoutMs = 10_000): Promise<boolean> 
   const deadline = Date.now() + timeoutMs;
   while (isAlive(pid)) {
     if (Date.now() >= deadline) return false;
-    await new Promise(resolve => setTimeout(resolve, 25));
+    await new Promise((resolve) => setTimeout(resolve, 25));
   }
   return true;
 }
@@ -28,7 +28,9 @@ async function waitUntilGone(pid: number, timeoutMs = 10_000): Promise<boolean> 
 describe("killProcessTree", { concurrency: true }, () => {
   it("rejects a non-numeric pid rather than signalling a process group", async () => {
     await assert.rejects(
-        killProcessTree("not-a-pid" as unknown as number), /pid must be a positive integer/);
+      killProcessTree("not-a-pid" as unknown as number),
+      /pid must be a positive integer/,
+    );
   });
 
   it("rejects pids that would address process groups or only look numeric", async () => {
@@ -45,7 +47,7 @@ describe("killProcessTree", { concurrency: true }, () => {
     const child = spawn(process.execPath, ["-e", ""], { stdio: "ignore" });
     const { pid } = child;
     assert.ok(pid, "the child was not spawned");
-    await new Promise(resolve => child.on("exit", resolve));
+    await new Promise((resolve) => child.on("exit", resolve));
     await waitUntilGone(pid);
 
     // ESRCH is the expected outcome here, not a failure.
@@ -76,15 +78,20 @@ async function spawnWrapper(grandchildBody: string): Promise<{
   grandchildPid: number;
   cleanUp: () => void;
 }> {
-  const wrapper = spawn(process.execPath, ["-e",
-    `const { spawn } = require("node:child_process");
+  const wrapper = spawn(
+    process.execPath,
+    [
+      "-e",
+      `const { spawn } = require("node:child_process");
      const child = spawn(process.execPath, ["-e", ${JSON.stringify(grandchildBody)}],
          { stdio: "ignore" });
      // The test runner sets FORCE_COLOR for a TTY; writing a number through console.log would add
      // an ANSI color code whose leading "33" could be mistaken for the pid below.
      process.stdout.write(String(child.pid) + "\\n");
      ${IDLE}`,
-  ], { stdio: ["ignore", "pipe", "ignore"] });
+    ],
+    { stdio: ["ignore", "pipe", "ignore"] },
+  );
 
   const wrapperPid = wrapper.pid;
   assert.ok(wrapperPid, "the wrapper was not spawned");
@@ -94,7 +101,12 @@ async function spawnWrapper(grandchildBody: string): Promise<{
   // alive as long as any spawned process does.
   const cleanUp = () => {
     for (const pid of [wrapperPid, grandchildPid]) {
-      if (pid) try { process.kill(pid, "SIGKILL"); } catch { /* already gone */ }
+      if (pid)
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch {
+          /* already gone */
+        }
     }
   };
 
@@ -156,12 +168,17 @@ describe("killProcessTreeEscalating", { concurrency: true }, () => {
       // delivered before it goes.
       const force = new AbortController();
       const startedAt = Date.now();
-      const escalation = killProcessTreeEscalating(
-          wrapperPid, { graceMs: 60_000, forceSignal: force.signal });
+      const escalation = killProcessTreeEscalating(wrapperPid, {
+        graceMs: 60_000,
+        forceSignal: force.signal,
+      });
       setTimeout(() => force.abort(), 100);
       await escalation;
       assert.ok(Date.now() - startedAt < 5_000, "waited out the grace despite the force signal");
-      assert.ok(await waitUntilGone(grandchildPid), "the grandchild outlived the forced escalation");
+      assert.ok(
+        await waitUntilGone(grandchildPid),
+        "the grandchild outlived the forced escalation",
+      );
     } finally {
       cleanUp();
     }
@@ -169,8 +186,7 @@ describe("killProcessTreeEscalating", { concurrency: true }, () => {
 
   it("rejects pids that would address process groups", async () => {
     for (const pid of [0, -123, 12.5]) {
-      await assert.rejects(
-          killProcessTreeEscalating(pid), /pid must be a positive integer/);
+      await assert.rejects(killProcessTreeEscalating(pid), /pid must be a positive integer/);
     }
   });
 });

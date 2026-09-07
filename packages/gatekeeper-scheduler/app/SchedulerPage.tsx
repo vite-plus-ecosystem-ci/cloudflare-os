@@ -373,7 +373,8 @@ function ScheduleRow({
             </span>
             <span className="block truncate text-xs text-kumo-subtle">
               {[formatCadence(schedule.cadence), formatOccurrences(schedule), target]
-                .filter(Boolean).join(" · ")}
+                .filter(Boolean)
+                .join(" · ")}
               {/* Narrow screens drop the timing column, so carry the relative time here instead. */}
               <span className="sm:hidden"> · {timing.relative}</span>
             </span>

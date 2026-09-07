@@ -10,7 +10,7 @@ export type EmailAddress = {
   address: string;
   /** The sender- or recipient-provided display name. */
   name?: string;
-}
+};
 
 /**
  * One recipient mailbox, either a bare address or a display-name form such as
@@ -42,7 +42,7 @@ export type GmailThreadInfo = {
   unread: boolean;
   /** Labels applied to at least one represented message. */
   labels: GmailLabel[];
-}
+};
 
 /** Metadata describing a Gmail message. */
 export type GmailMessageInfo = {
@@ -64,7 +64,7 @@ export type GmailMessageInfo = {
   timestamp: Date;
   /** Labels currently applied to the message. */
   labels: GmailLabel[];
-}
+};
 
 /** One RFC 5322 header from a message. Header names are case-insensitive. */
 export type GmailHeader = {
@@ -72,7 +72,7 @@ export type GmailHeader = {
   name: string;
   /** Unfolded header value. */
   value: string;
-}
+};
 
 /** Email content in its available representations. */
 export type EmailContent = {
@@ -80,7 +80,7 @@ export type EmailContent = {
   text?: string;
   /** HTML content, when the message contains it. */
   html?: string;
-}
+};
 
 /** Optional fields for a new message or forward. */
 export type GmailComposeOptions = {
@@ -90,7 +90,7 @@ export type GmailComposeOptions = {
   bcc?: EmailRecipient[];
   /** HTML alternative for the plain-text body, which may be empty. */
   html?: string;
-}
+};
 
 /**
  * Optional fields for a reply or reply-all. When every recipient field is
@@ -107,7 +107,7 @@ export type GmailReplyOptions = {
   cc?: EmailRecipient[];
   /** Replacement blind-carbon-copy recipients. */
   bcc?: EmailRecipient[];
-}
+};
 
 /** Initial content for a Gmail draft. Every field may be filled in later. */
 export type GmailDraftInput = {
@@ -123,7 +123,7 @@ export type GmailDraftInput = {
   text?: string;
   /** HTML alternative to the plain-text body. */
   html?: string;
-}
+};
 
 /** Fields to replace on an existing Gmail draft. Omitted fields remain unchanged. */
 export type GmailDraftPatch = {
@@ -139,7 +139,7 @@ export type GmailDraftPatch = {
   text?: string;
   /** Replacement HTML body, or `null` to remove the HTML alternative. */
   html?: string | null;
-}
+};
 
 /** Metadata describing a Gmail draft. */
 export type GmailDraftInfo = {
@@ -166,7 +166,7 @@ export type GmailDraftInfo = {
     /** Gmail's stable identifier for the source message. */
     messageId: string;
   };
-}
+};
 
 /** Metadata describing an attachment or inline MIME part. */
 export type GmailAttachmentInfo = {
@@ -182,7 +182,7 @@ export type GmailAttachmentInfo = {
   contentId?: string;
   /** Whether `GmailAttachment.getContent()` can read this part. */
   readable: boolean;
-}
+};
 
 // ── Capability interfaces ───────────────────────────────────────────
 // These are RPC stubs — all methods are async. Capabilities can be
@@ -194,7 +194,7 @@ export type GmailThreadEntry = {
   info: GmailThreadInfo;
   /** Capability for reading or changing this thread. */
   thread: GmailThread;
-}
+};
 
 /** A message cursor entry containing metadata and a message capability. */
 export type GmailMessageEntry = {
@@ -202,7 +202,7 @@ export type GmailMessageEntry = {
   info: GmailMessageInfo;
   /** Capability for reading or changing this message. */
   message: GmailMessage;
-}
+};
 
 /** A draft cursor entry containing metadata and a draft capability. */
 export type GmailDraftEntry = {
@@ -210,7 +210,7 @@ export type GmailDraftEntry = {
   info: GmailDraftInfo;
   /** Capability for reading or changing this draft. */
   draft: GmailDraft;
-}
+};
 
 /** An attachment entry containing metadata and a content capability. */
 export type GmailAttachmentEntry = {
@@ -218,7 +218,7 @@ export type GmailAttachmentEntry = {
   info: GmailAttachmentInfo;
   /** Capability for reading this MIME part's content. */
   attachment: GmailAttachment;
-}
+};
 
 /** Access to the messages and drafts admitted by any Gmail binding. */
 export interface GmailScopedSession {
@@ -538,35 +538,52 @@ export interface GmailAttachment {
 
 /** Well-known Gmail system label names. */
 export type GmailSystemLabel =
-  | "INBOX" | "TRASH" | "SPAM" | "UNREAD" | "STARRED"
-  | "IMPORTANT" | "SENT" | "DRAFT" | "CHAT"
-  | "CATEGORY_PRIMARY" | "CATEGORY_PERSONAL" | "CATEGORY_SOCIAL"
-  | "CATEGORY_PROMOTIONS" | "CATEGORY_UPDATES" | "CATEGORY_FORUMS";
+  | "INBOX"
+  | "TRASH"
+  | "SPAM"
+  | "UNREAD"
+  | "STARRED"
+  | "IMPORTANT"
+  | "SENT"
+  | "DRAFT"
+  | "CHAT"
+  | "CATEGORY_PRIMARY"
+  | "CATEGORY_PERSONAL"
+  | "CATEGORY_SOCIAL"
+  | "CATEGORY_PROMOTIONS"
+  | "CATEGORY_UPDATES"
+  | "CATEGORY_FORUMS";
 
 /** System labels that callers can add or remove from messages. */
 export type GmailMutableSystemLabel =
-  | "INBOX" | "TRASH" | "SPAM" | "UNREAD" | "STARRED" | "IMPORTANT"
-  | "CATEGORY_PERSONAL" | "CATEGORY_SOCIAL" | "CATEGORY_PROMOTIONS"
-  | "CATEGORY_UPDATES" | "CATEGORY_FORUMS";
+  | "INBOX"
+  | "TRASH"
+  | "SPAM"
+  | "UNREAD"
+  | "STARRED"
+  | "IMPORTANT"
+  | "CATEGORY_PERSONAL"
+  | "CATEGORY_SOCIAL"
+  | "CATEGORY_PROMOTIONS"
+  | "CATEGORY_UPDATES"
+  | "CATEGORY_FORUMS";
 
 /** A mutable Gmail system label. */
 export type GmailMutableSystemLabelInfo = {
   id: string;
   name: GmailMutableSystemLabel;
   type: "system";
-}
+};
 
 /** A custom label owned by the connected mailbox. */
 export type GmailCustomLabel = {
   id: string;
   name: string;
   type: "custom";
-}
+};
 
 /** A system or custom label that can be added to or removed from messages. */
 export type GmailMutableLabel = GmailMutableSystemLabelInfo | GmailCustomLabel;
 
 /** A Gmail label, identified by the stable ID used for label operations. */
-export type GmailLabel =
-  | { id: string; name: GmailSystemLabel; type: "system" }
-  | GmailCustomLabel;
+export type GmailLabel = { id: string; name: GmailSystemLabel; type: "system" } | GmailCustomLabel;

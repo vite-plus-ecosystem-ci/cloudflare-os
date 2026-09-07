@@ -188,7 +188,7 @@ const NOT_CONFIGURED_HTML = `<!DOCTYPE html>
 // Small helpers
 
 function hexEncode(bytes: Uint8Array): string {
-  return [...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("");
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function generateNonce(): string {
@@ -213,7 +213,9 @@ function getBasePath(env: Env): string {
   return path === "/" ? "" : path;
 }
 
-function ensureConfigured(env: Env): asserts env is Env & { CLIENT_ID: string; CLIENT_SECRET: string } {
+function ensureConfigured(
+  env: Env,
+): asserts env is Env & { CLIENT_ID: string; CLIENT_SECRET: string } {
   if (!env.CLIENT_ID || !env.CLIENT_SECRET) {
     throw new Error("The ZoomInfo gatekeeper is not configured.");
   }
@@ -259,7 +261,9 @@ export default {
     // Auth initiation: /<doId>/<initiationNonce>
     if (path.length === 2 && path[0].length === 64 && path[1].length === NONCE_BYTES * 2) {
       if (!env.CLIENT_ID || !env.CLIENT_SECRET) {
-        return new Response(NOT_CONFIGURED_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+        return new Response(NOT_CONFIGURED_HTML, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
       }
 
       const doId = path[0];
@@ -267,7 +271,9 @@ export default {
       const stub = ctx.exports.UserAccount.get(ctx.exports.UserAccount.idFromString(doId));
       const begun = await stub.beginOAuthFlow(initiationNonce);
       if (begun === null) {
-        return new Response(INVALID_LINK_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+        return new Response(INVALID_LINK_HTML, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
       }
 
       const oauth = resolveOAuthConfig(env);
@@ -307,10 +313,14 @@ export default {
       );
       const accepted = await stub.acceptAuthCode(code, oauthNonce);
       if (!accepted) {
-        return new Response(INVALID_LINK_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+        return new Response(INVALID_LINK_HTML, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
       }
 
-      return new Response(SELF_CLOSING_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+      return new Response(SELF_CLOSING_HTML, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
     }
 
     return new Response("Not Found", { status: 404 });
@@ -361,7 +371,10 @@ export class GatekeeperVendor extends WorkerEntrypoint<Env> implements Gatekeepe
 // tokens (persisting rotated refresh tokens).
 
 export class UserAccount extends DurableObject<Env> {
-  async setCallback(callback: Fetcher<GatekeeperConnectCallback>, initiationNonce: string): Promise<void> {
+  async setCallback(
+    callback: Fetcher<GatekeeperConnectCallback>,
+    initiationNonce: string,
+  ): Promise<void> {
     if (!this.ctx.storage.kv.get<string>("refreshToken")) {
       await this.ctx.storage.setAlarm(Date.now() + CONNECT_TIMEOUT_MS);
     }
@@ -391,8 +404,12 @@ export class UserAccount extends DurableObject<Env> {
     initiationNonce: string,
   ): Promise<{ oauthNonce: string; codeChallenge: string } | null> {
     const stored = this.ctx.storage.kv.get<StoredNonce>("nonce");
-    if (!stored || stored.stage !== "initiation" || Date.now() >= stored.expiresAt ||
-        !constantTimeEqual(stored.value, initiationNonce)) {
+    if (
+      !stored ||
+      stored.stage !== "initiation" ||
+      Date.now() >= stored.expiresAt ||
+      !constantTimeEqual(stored.value, initiationNonce)
+    ) {
       return null;
     }
     const oauthNonce = generateNonce();
@@ -409,8 +426,12 @@ export class UserAccount extends DurableObject<Env> {
 
   async acceptAuthCode(code: string, oauthNonce: string): Promise<boolean> {
     const stored = this.ctx.storage.kv.get<StoredNonce>("nonce");
-    if (!stored || stored.stage !== "oauth" || Date.now() >= stored.expiresAt ||
-        !constantTimeEqual(stored.value, oauthNonce)) {
+    if (
+      !stored ||
+      stored.stage !== "oauth" ||
+      Date.now() >= stored.expiresAt ||
+      !constantTimeEqual(stored.value, oauthNonce)
+    ) {
       return false;
     }
     const codeVerifier = this.ctx.storage.kv.get<string>("codeVerifier");
@@ -479,7 +500,12 @@ export class UserAccount extends DurableObject<Env> {
 
     let grant;
     try {
-      grant = await refreshAccessToken(refreshToken, this.env.CLIENT_ID, this.env.CLIENT_SECRET, oauth.tokenUrl);
+      grant = await refreshAccessToken(
+        refreshToken,
+        this.env.CLIENT_ID,
+        this.env.CLIENT_SECRET,
+        oauth.tokenUrl,
+      );
     } catch (err) {
       if (err instanceof ZoomInfoApiError && (err.isAuthError || err.status === 400)) {
         await this.noteCredentialsExpired();
@@ -528,9 +554,14 @@ type GatekeeperUserImplProps = {
 };
 
 @validateRpc()
-export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImplProps> implements GatekeeperUser {
+export class GatekeeperUserImpl
+  extends WorkerEntrypoint<Env, GatekeeperUserImplProps>
+  implements GatekeeperUser
+{
   #userAccount(): DurableObjectStub<UserAccount> {
-    return this.ctx.exports.UserAccount.get(this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
+    return this.ctx.exports.UserAccount.get(
+      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
+    );
   }
 
   async describe(): Promise<AccountDescription> {
@@ -560,7 +591,10 @@ export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImpl
     resource: SupportedResource;
   }> {
     const props: ZoomInfoGatekeeperImplProps = { userObjectId: this.ctx.props.userObjectId };
-    return { class: this.ctx.exports.ZoomInfoGatekeeperImpl({ props }), resource: ACCOUNT_RESOURCE };
+    return {
+      class: this.ctx.exports.ZoomInfoGatekeeperImpl({ props }),
+      resource: ACCOUNT_RESOURCE,
+    };
   }
 
   async startResourceConfigurator(resourceUrlPattern: string): Promise<ResourceConfiguratorFrame> {
@@ -612,11 +646,14 @@ class ZoomInfoAccountConfiguratorUI extends RpcTarget implements ZoomInfoAccount
 // GatekeeperImpl — per-Gadget binding to the connected account.
 
 @validateRpc()
-export class ZoomInfoGatekeeperImpl extends DurableObject<Env, ZoomInfoGatekeeperImplProps>
-  implements Gatekeeper<ZoomInfoSession> {
-
+export class ZoomInfoGatekeeperImpl
+  extends DurableObject<Env, ZoomInfoGatekeeperImplProps>
+  implements Gatekeeper<ZoomInfoSession>
+{
   #userAccount(): DurableObjectStub<UserAccount> {
-    return this.ctx.exports.UserAccount.get(this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
+    return this.ctx.exports.UserAccount.get(
+      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
+    );
   }
 
   async describe(): Promise<ResourceDescription> {
@@ -647,7 +684,11 @@ export class ZoomInfoGatekeeperImpl extends DurableObject<Env, ZoomInfoGatekeepe
 
   async startSession(approvalQueue: RpcStub<ApprovalQueue>): Promise<ZoomInfoSession> {
     return new ZoomInfoSessionImpl(
-      this.#userAccount(), approvalQueue.dup(), resolveOAuthConfig(this.env).apiBaseUrl, this.ctx.storage.kv);
+      this.#userAccount(),
+      approvalQueue.dup(),
+      resolveOAuthConfig(this.env).apiBaseUrl,
+      this.ctx.storage.kv,
+    );
   }
 
   /**
@@ -664,7 +705,9 @@ export class ZoomInfoGatekeeperImpl extends DurableObject<Env, ZoomInfoGatekeepe
     }
     const account = this.#userAccount();
     try {
-      const result = await callZoomInfo(account, () => performEnrichment(this.#makeApi(account), pending));
+      const result = await callZoomInfo(account, () =>
+        performEnrichment(this.#makeApi(account), pending),
+      );
       store.putResult(action, { status: "ready", result });
     } catch (error) {
       store.putResult(action, {
@@ -690,8 +733,8 @@ export class ZoomInfoGatekeeperImpl extends DurableObject<Env, ZoomInfoGatekeepe
     new EnrichmentStore(this.ctx.storage.kv).removeResult(action);
     return {
       message:
-          "Enrichment can't be reverted: any ZoomInfo credits spent are not refundable. The " +
-          "retrieved data has been discarded from this Gadget.",
+        "Enrichment can't be reverted: any ZoomInfo credits spent are not refundable. The " +
+        "retrieved data has been discarded from this Gadget.",
     };
   }
 
@@ -703,7 +746,7 @@ export class ZoomInfoGatekeeperImpl extends DurableObject<Env, ZoomInfoGatekeepe
   async addObserver(_id: string, _user: Fetcher<GatekeeperUserVerifier>): Promise<void> {
     throw new Error(
       "ZoomInfo data cannot be shared with other users: this workspace's ZoomInfo account may only " +
-      "be observed by its owner.",
+        "be observed by its owner.",
     );
   }
 
@@ -734,7 +777,8 @@ function str(value: unknown): string | undefined {
 
 function num(value: unknown): number | undefined {
   if (typeof value === "number") return value;
-  if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) return Number(value);
+  if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value)))
+    return Number(value);
   return undefined;
 }
 
@@ -769,7 +813,7 @@ function assertNoCompanyIdentity(
   searchMethod: string,
   enrichMethod: string,
 ): void {
-  const offending = SIGNAL_COMPANY_IDENTITY_FIELDS.filter(f => company?.[f] !== undefined);
+  const offending = SIGNAL_COMPANY_IDENTITY_FIELDS.filter((f) => company?.[f] !== undefined);
   if (offending.length > 0) {
     throw new Error(
       `${offending.join(", ")} ${offending.length === 1 ? "is" : "are"} not supported by ` +
@@ -784,7 +828,10 @@ function assertNoCompanyIdentity(
 // broadens the results to the whole country — returning wrong data with no error. Rather than let
 // that pass quietly, reject the combination up front so the caller keeps exactly one location
 // filter. Applies to every company-filter bag (flat for company search, nested for the others).
-function assertCompatibleLocation(company: Record<string, unknown> | undefined, method: string): void {
+function assertCompatibleLocation(
+  company: Record<string, unknown> | undefined,
+  method: string,
+): void {
   if (company?.state !== undefined && company?.country !== undefined) {
     throw new Error(
       `${method}: \`state\` and \`country\` cannot be combined — ZoomInfo ignores \`state\` when ` +
@@ -802,7 +849,11 @@ function pageQuery(page?: PageRequest): QueryParams {
   return query;
 }
 
-function toSearchPage<T>(doc: JsonApiDoc, map: (r: JsonApiResource) => T, page?: PageRequest): SearchPage<T> {
+function toSearchPage<T>(
+  doc: JsonApiDoc,
+  map: (r: JsonApiResource) => T,
+  page?: PageRequest,
+): SearchPage<T> {
   const results = asResources(doc).map(map);
   const pageNumber = doc.meta?.page?.number ?? page?.page ?? 1;
   const pageSize = page?.pageSize ?? 25;
@@ -811,10 +862,17 @@ function toSearchPage<T>(doc: JsonApiDoc, map: (r: JsonApiResource) => T, page?:
   return { results, totalResults, page: pageNumber, pageSize, hasMore };
 }
 
-const MATCHED_STATUSES = new Set<EnrichMatchStatus>(["FULL_MATCH", "COMPANY_ONLY_MATCH", "CONTACT_ONLY_MATCH"]);
+const MATCHED_STATUSES = new Set<EnrichMatchStatus>([
+  "FULL_MATCH",
+  "COMPANY_ONLY_MATCH",
+  "CONTACT_ONLY_MATCH",
+]);
 const ERROR_STATUSES = new Set<EnrichMatchStatus>(["INVALID_INPUT", "LIMIT_EXCEEDED"]);
 
-function mapEnrichResult<T>(resource: JsonApiResource, buildRecord: (r: JsonApiResource) => T): EnrichResult<T> {
+function mapEnrichResult<T>(
+  resource: JsonApiResource,
+  buildRecord: (r: JsonApiResource) => T,
+): EnrichResult<T> {
   const meta = (resource.meta ?? {}) as { matchStatus?: EnrichMatchStatus; input?: unknown };
   const matchStatus: EnrichMatchStatus =
     meta.matchStatus ?? (resource.type === "NoMatch" ? "NO_MATCH" : "FULL_MATCH");
@@ -822,15 +880,18 @@ function mapEnrichResult<T>(resource: JsonApiResource, buildRecord: (r: JsonApiR
   if (ERROR_STATUSES.has(matchStatus)) {
     return { status: "error", input: meta.input, message: matchStatus };
   }
-  const hasRecord = resource.type !== "NoMatch" && resource.attributes !== undefined &&
+  const hasRecord =
+    resource.type !== "NoMatch" &&
+    resource.attributes !== undefined &&
     MATCHED_STATUSES.has(matchStatus);
   if (!hasRecord) {
     return { status: "noMatch", matchStatus, input: meta.input };
   }
   // Best-effort: if ZoomInfo tells us the record is already under management, no credit was charged;
   // otherwise assume a credit was charged (worst case).
-  const managementStatus = (resource.attributes as { managementStatus?: { underManagement?: boolean } })
-    ?.managementStatus;
+  const managementStatus = (
+    resource.attributes as { managementStatus?: { underManagement?: boolean } }
+  )?.managementStatus;
   const creditCharged = managementStatus?.underManagement !== true;
   return { status: "matched", matchStatus, record: buildRecord(resource), creditCharged };
 }
@@ -838,15 +899,21 @@ function mapEnrichResult<T>(resource: JsonApiResource, buildRecord: (r: JsonApiR
 // Run a ZoomInfo API call, translating auth failures into a reconnect-prompting error and notifying
 // the account so the user is asked to reconnect. Shared by the session (reads) and applyAction
 // (approved enrichments).
-async function callZoomInfo<T>(account: DurableObjectStub<UserAccount>, fn: () => Promise<T>): Promise<T> {
+async function callZoomInfo<T>(
+  account: DurableObjectStub<UserAccount>,
+  fn: () => Promise<T>,
+): Promise<T> {
   try {
     return await fn();
   } catch (error) {
     if (error instanceof ZoomInfoApiError && error.isAuthError) {
       await account.noteCredentialsExpired();
-      throw new Error("ZoomInfo credentials have expired or been revoked. Please reconnect the account.", {
-        cause: error,
-      });
+      throw new Error(
+        "ZoomInfo credentials have expired or been revoked. Please reconnect the account.",
+        {
+          cause: error,
+        },
+      );
     }
     throw error;
   }
@@ -943,21 +1010,29 @@ async function performEnrichment(api: ZoomInfoApi, pending: PendingEnrichment): 
   switch (kind) {
     case "companies": {
       const doc = await api.post("/data/v1/companies/enrich", "CompanyEnrich", attributes);
-      return asResources(doc).map(r => mapEnrichResult<CompanyRecord>(r, res => ({
-        id: res.id ?? str(attrs(res).id) ?? "",
-        fields: attrs(res),
-      })));
+      return asResources(doc).map((r) =>
+        mapEnrichResult<CompanyRecord>(r, (res) => ({
+          id: res.id ?? str(attrs(res).id) ?? "",
+          fields: attrs(res),
+        })),
+      );
     }
     case "corporateHierarchy": {
-      const doc = await api.post("/data/v1/companies/corporate-hierarchy/enrich", "CorporateHierarchyEnrich", attributes);
-      return asResources(doc).map(r => mapEnrichResult<CorporateHierarchyRecord>(r, res => ({
-        companyId: str(attrs(res).companyId) ?? res.id ?? "",
-        fields: attrs(res),
-      })));
+      const doc = await api.post(
+        "/data/v1/companies/corporate-hierarchy/enrich",
+        "CorporateHierarchyEnrich",
+        attributes,
+      );
+      return asResources(doc).map((r) =>
+        mapEnrichResult<CorporateHierarchyRecord>(r, (res) => ({
+          companyId: str(attrs(res).companyId) ?? res.id ?? "",
+          fields: attrs(res),
+        })),
+      );
     }
     case "hashtags": {
       const doc = await api.post("/data/v1/companies/hashtags/enrich", "HashtagEnrich", attributes);
-      return asResources(doc).map(r => {
+      return asResources(doc).map((r) => {
         const a = attrs(r);
         return {
           id: r.id ?? "",
@@ -972,17 +1047,29 @@ async function performEnrichment(api: ZoomInfoApi, pending: PendingEnrichment): 
     }
     case "contacts": {
       const doc = await api.post("/data/v1/contacts/enrich", "ContactEnrich", attributes);
-      return asResources(doc).map(r => mapEnrichResult<ContactRecord>(r, res => ({
-        id: res.id ?? str(attrs(res).id) ?? "",
-        fields: attrs(res),
-      })));
+      return asResources(doc).map((r) =>
+        mapEnrichResult<ContactRecord>(r, (res) => ({
+          id: res.id ?? str(attrs(res).id) ?? "",
+          fields: attrs(res),
+        })),
+      );
     }
     case "intent": {
-      const doc = await api.post("/data/v1/intent/enrich", "IntentEnrich", attributes, pageQuery(page));
+      const doc = await api.post(
+        "/data/v1/intent/enrich",
+        "IntentEnrich",
+        attributes,
+        pageQuery(page),
+      );
       return toSearchPage(doc, mapIntentSignal, page);
     }
     case "scoops": {
-      const doc = await api.post("/data/v1/scoops/enrich", "ScoopEnrich", attributes, pageQuery(page));
+      const doc = await api.post(
+        "/data/v1/scoops/enrich",
+        "ScoopEnrich",
+        attributes,
+        pageQuery(page),
+      );
       return toSearchPage(doc, mapScoop, page);
     }
     case "news": {
@@ -1057,9 +1144,9 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
       await this.#approvalQueue.submitAction(id, {
         title: `ZoomInfo: ${summary}`,
         description:
-            `${summary}\n\n**Credit cost:** up to **${worstCaseCredits}** ZoomInfo bulk-data ` +
-            `credit${worstCaseCredits === 1 ? "" : "s"} (fewer if records are already under ` +
-            `management; none for no-match/error results). Charged only on approval.`,
+          `${summary}\n\n**Credit cost:** up to **${worstCaseCredits}** ZoomInfo bulk-data ` +
+          `credit${worstCaseCredits === 1 ? "" : "s"} (fewer if records are already under ` +
+          `management; none for no-match/error results). Charged only on approval.`,
         // Spent credits can't be refunded, so there is no automatic revert.
         implementsRevert: false,
         // No simulation: suspend the agent until the user decides rather than letting it read back
@@ -1087,11 +1174,18 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
         "filter[subCategory]": filters?.subCategory,
         "filter[vendor]": filters?.vendor,
       });
-      const doc = await this.#call(api => api.get(`/data/v1/lookup/${encodeURIComponent(fieldName)}`, query));
-      results = asResources(doc).map(r => {
+      const doc = await this.#call((api) =>
+        api.get(`/data/v1/lookup/${encodeURIComponent(fieldName)}`, query),
+      );
+      results = asResources(doc).map((r) => {
         const a = attrs(r);
         const { name, ...rest } = a;
-        return { id: r.id ?? "", type: r.type ?? fieldName, name: str(name), attributes: rest } as LookupValue;
+        return {
+          id: r.id ?? "",
+          type: r.type ?? fieldName,
+          name: str(name),
+          attributes: rest,
+        } as LookupValue;
       });
       this.#cachePut(cacheKey, results);
     }
@@ -1102,14 +1196,21 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
     return results;
   }
 
-  async lookupEnrichFields(entity: EnrichEntity, fieldType: "input" | "output"): Promise<EnrichFieldInfo[]> {
+  async lookupEnrichFields(
+    entity: EnrichEntity,
+    fieldType: "input" | "output",
+  ): Promise<EnrichFieldInfo[]> {
     const cacheKey = `lookupEnrich:${entity}:${fieldType}`;
     let results = this.#cacheGet<EnrichFieldInfo[]>(cacheKey, LOOKUP_CACHE_TTL_MS);
     const fromCache = results !== undefined;
     if (results === undefined) {
-      const doc = await this.#call(api =>
-        api.get("/data/v1/lookup/enrich", { "filter[entity]": entity, "filter[fieldType]": fieldType }));
-      results = asResources(doc).map(r => {
+      const doc = await this.#call((api) =>
+        api.get("/data/v1/lookup/enrich", {
+          "filter[entity]": entity,
+          "filter[fieldType]": fieldType,
+        }),
+      );
+      results = asResources(doc).map((r) => {
         const a = attrs(r);
         return {
           fieldName: str(a.fieldName) ?? r.id ?? "",
@@ -1130,10 +1231,19 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
   // -------------------------------------------------------------------------
   // Companies
 
-  async searchCompanies(criteria: CompanySearchCriteria, page?: PageRequest): Promise<SearchPage<CompanyMatch>> {
+  async searchCompanies(
+    criteria: CompanySearchCriteria,
+    page?: PageRequest,
+  ): Promise<SearchPage<CompanyMatch>> {
     assertCompatibleLocation(criteria, "searchCompanies");
-    const doc = await this.#call(api =>
-      api.post("/data/v1/companies/search", "CompanySearch", clean({ ...criteria }), pageQuery(page)));
+    const doc = await this.#call((api) =>
+      api.post(
+        "/data/v1/companies/search",
+        "CompanySearch",
+        clean({ ...criteria }),
+        pageQuery(page),
+      ),
+    );
     const result = toSearchPage(doc, mapCompanyMatch, page);
     await this.#observe(
       "Search ZoomInfo companies",
@@ -1146,7 +1256,9 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
     inputs: CompanyEnrichInput[],
     outputFields: CompanyOutputField[],
   ): Promise<EnrichmentTicket> {
-    const matchCompanyInput = inputs.map(input => clean({ ...input, companyId: idValue(input.companyId) }));
+    const matchCompanyInput = inputs.map((input) =>
+      clean({ ...input, companyId: idValue(input.companyId) }),
+    );
     return this.#submitEnrichment(
       "companies",
       `Enrich ${inputs.length} compan${inputs.length === 1 ? "y" : "ies"} with fields: ` +
@@ -1160,7 +1272,9 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
     inputs: CompanyRefInput[],
     outputFields: CorporateHierarchyOutputField[],
   ): Promise<EnrichmentTicket> {
-    const matchCompanyInput = inputs.map(input => clean({ ...input, companyId: idValue(input.companyId) }));
+    const matchCompanyInput = inputs.map((input) =>
+      clean({ ...input, companyId: idValue(input.companyId) }),
+    );
     return this.#submitEnrichment(
       "corporateHierarchy",
       `Enrich corporate hierarchy for ${inputs.length} compan${inputs.length === 1 ? "y" : "ies"}`,
@@ -1181,12 +1295,16 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
   // -------------------------------------------------------------------------
   // Contacts
 
-  async searchContacts(criteria: ContactSearchCriteria, page?: PageRequest): Promise<SearchPage<ContactMatch>> {
+  async searchContacts(
+    criteria: ContactSearchCriteria,
+    page?: PageRequest,
+  ): Promise<SearchPage<ContactMatch>> {
     const { company, ...contact } = criteria;
     assertCompatibleLocation(company, "searchContacts");
     const attributes = clean({ ...company, ...contact });
-    const doc = await this.#call(api =>
-      api.post("/data/v1/contacts/search", "ContactSearch", attributes, pageQuery(page)));
+    const doc = await this.#call((api) =>
+      api.post("/data/v1/contacts/search", "ContactSearch", attributes, pageQuery(page)),
+    );
     const result = toSearchPage(doc, mapContactMatch, page);
     await this.#observe(
       "Search ZoomInfo contacts",
@@ -1200,11 +1318,13 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
     outputFields: ContactOutputField[],
     requiredFields?: ContactOutputField[],
   ): Promise<EnrichmentTicket> {
-    const matchPersonInput = inputs.map(input => clean({
-      ...input,
-      personId: idValue(input.personId),
-      companyId: idValue(input.companyId),
-    }));
+    const matchPersonInput = inputs.map((input) =>
+      clean({
+        ...input,
+        personId: idValue(input.personId),
+        companyId: idValue(input.companyId),
+      }),
+    );
     return this.#submitEnrichment(
       "contacts",
       `Enrich ${inputs.length} contact${inputs.length === 1 ? "" : "s"} with fields: ` +
@@ -1218,13 +1338,17 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
   // -------------------------------------------------------------------------
   // Intent
 
-  async searchIntent(criteria: IntentSearchCriteria, page?: PageRequest): Promise<SearchPage<IntentSignal>> {
+  async searchIntent(
+    criteria: IntentSearchCriteria,
+    page?: PageRequest,
+  ): Promise<SearchPage<IntentSignal>> {
     const { company, ...intent } = criteria;
     assertNoCompanyIdentity(company, "searchIntent", "enrichIntent");
     assertCompatibleLocation(company, "searchIntent");
     const attributes = clean({ ...company, ...intent });
-    const doc = await this.#call(api =>
-      api.post("/data/v1/intent/search", "IntentSearch", attributes, pageQuery(page)));
+    const doc = await this.#call((api) =>
+      api.post("/data/v1/intent/search", "IntentSearch", attributes, pageQuery(page)),
+    );
     const result = toSearchPage(doc, mapIntentSignal, page);
     await this.#observe(
       "Search ZoomInfo intent signals",
@@ -1251,13 +1375,17 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
   // -------------------------------------------------------------------------
   // Scoops
 
-  async searchScoops(criteria: ScoopSearchCriteria, page?: PageRequest): Promise<SearchPage<Scoop>> {
+  async searchScoops(
+    criteria: ScoopSearchCriteria,
+    page?: PageRequest,
+  ): Promise<SearchPage<Scoop>> {
     const { contact, company, ...scoop } = criteria;
     assertNoCompanyIdentity(company, "searchScoops", "enrichScoops");
     assertCompatibleLocation(company, "searchScoops");
     const attributes = clean({ ...contact, ...company, ...scoop });
-    const doc = await this.#call(api =>
-      api.post("/data/v1/scoops/search", "ScoopSearch", attributes, pageQuery(page)));
+    const doc = await this.#call((api) =>
+      api.post("/data/v1/scoops/search", "ScoopSearch", attributes, pageQuery(page)),
+    );
     const result = toSearchPage(doc, mapScoop, page);
     await this.#observe(
       "Search ZoomInfo scoops",
@@ -1266,10 +1394,7 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
     return result;
   }
 
-  async enrichScoops(
-    criteria: ScoopEnrichCriteria,
-    page?: PageRequest,
-  ): Promise<EnrichmentTicket> {
+  async enrichScoops(criteria: ScoopEnrichCriteria, page?: PageRequest): Promise<EnrichmentTicket> {
     return this.#submitEnrichment(
       "scoops",
       `Fetch scoops for company \`${criteria.companyId}\``,
@@ -1282,9 +1407,13 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
   // -------------------------------------------------------------------------
   // News
 
-  async searchNews(criteria: NewsSearchCriteria, page?: PageRequest): Promise<SearchPage<NewsArticle>> {
-    const doc = await this.#call(api =>
-      api.post("/data/v1/news/search", "NewsSearch", clean({ ...criteria }), pageQuery(page)));
+  async searchNews(
+    criteria: NewsSearchCriteria,
+    page?: PageRequest,
+  ): Promise<SearchPage<NewsArticle>> {
+    const doc = await this.#call((api) =>
+      api.post("/data/v1/news/search", "NewsSearch", clean({ ...criteria }), pageQuery(page)),
+    );
     const result = toSearchPage(doc, mapNewsArticle, page);
     await this.#observe(
       "Search ZoomInfo news",
@@ -1293,10 +1422,7 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
     return result;
   }
 
-  async enrichNews(
-    criteria: NewsEnrichCriteria,
-    page?: PageRequest,
-  ): Promise<EnrichmentTicket> {
+  async enrichNews(criteria: NewsEnrichCriteria, page?: PageRequest): Promise<EnrichmentTicket> {
     return this.#submitEnrichment(
       "news",
       `Fetch news articles for company \`${criteria.companyId}\``,
@@ -1317,9 +1443,10 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
       // The stored result payload is untyped (see StoredEnrichmentOutcome); its shape was produced
       // by performEnrichment for this ticket's kind, so we re-attach the kind discriminant to form a
       // correctly-shaped EnrichmentReady. This cast is the single trust boundary for that fact.
-      outcome = stored.status === "ready"
-        ? ({ status: "ready", kind: ticket.kind, result: stored.result } as EnrichmentOutcome)
-        : stored;
+      outcome =
+        stored.status === "ready"
+          ? ({ status: "ready", kind: ticket.kind, result: stored.result } as EnrichmentOutcome)
+          : stored;
     } else if (store.getPending(ticket.id)) {
       outcome = { status: "pending" };
     } else {
@@ -1345,8 +1472,8 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
       "filter[sameEmployeeRange]": criteria.sameEmployeeRange,
       "page[size]": criteria.limit,
     });
-    const doc = await this.#call(api => api.get("/copilot/v1/companies/lookalikes", query));
-    const results = asResources(doc).map(r => {
+    const doc = await this.#call((api) => api.get("/copilot/v1/companies/lookalikes", query));
+    const results = asResources(doc).map((r) => {
       const a = attrs(r);
       return {
         id: r.id ?? "",
@@ -1359,7 +1486,10 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
         country: str(a.country),
       } satisfies CompanyLookalike;
     });
-    await this.#observe("Find similar ZoomInfo companies", `Returned ${results.length} lookalike compan(ies).`);
+    await this.#observe(
+      "Find similar ZoomInfo companies",
+      `Returned ${results.length} lookalike compan(ies).`,
+    );
     return results;
   }
 
@@ -1369,10 +1499,13 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
       "filter[targetCompanyId]": idValue(criteria.targetCompanyId),
       "page[size]": criteria.limit,
     });
-    const doc = await this.#call(api => api.get("/copilot/v1/contacts/lookalikes", query));
-    const results = asResources(doc).map(r => {
+    const doc = await this.#call((api) => api.get("/copilot/v1/contacts/lookalikes", query));
+    const results = asResources(doc).map((r) => {
       const a = attrs(r);
-      const meta = (r.meta ?? {}) as { referencePersonId?: unknown; referencePersonBrief?: unknown };
+      const meta = (r.meta ?? {}) as {
+        referencePersonId?: unknown;
+        referencePersonBrief?: unknown;
+      };
       return {
         id: r.id ?? "",
         rank: num(a.rank) ?? 0,
@@ -1382,21 +1515,28 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
         referencePersonBrief: str(meta.referencePersonBrief),
       } satisfies ContactLookalike;
     });
-    await this.#observe("Find ZoomInfo contact lookalikes", `Returned ${results.length} lookalike contact(s).`);
+    await this.#observe(
+      "Find ZoomInfo contact lookalikes",
+      `Returned ${results.length} lookalike contact(s).`,
+    );
     return results;
   }
 
-  async getContactRecommendations(criteria: ContactRecommendationsCriteria): Promise<ContactRecommendation[]> {
+  async getContactRecommendations(
+    criteria: ContactRecommendationsCriteria,
+  ): Promise<ContactRecommendation[]> {
     const query: QueryParams = clean({
       "filter[useCaseType]": criteria.useCaseType,
       "filter[ziCompanyId]": idValue(criteria.companyId),
       "page[size]": criteria.limit,
     });
-    const doc = await this.#call(api => api.get("/copilot/v1/contacts/recommendations", query));
-    const results = asResources(doc).map(r => {
+    const doc = await this.#call((api) => api.get("/copilot/v1/contacts/recommendations", query));
+    const results = asResources(doc).map((r) => {
       const a = attrs(r);
       const meta = (r.meta ?? {}) as {
-        sourceType?: unknown; referencePersonId?: unknown; referencePersonBrief?: unknown;
+        sourceType?: unknown;
+        referencePersonId?: unknown;
+        referencePersonBrief?: unknown;
       };
       return {
         id: r.id ?? "",
@@ -1421,8 +1561,9 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
   // Account intelligence
 
   async getAccountSummary(companyId: string): Promise<AccountSummary> {
-    const doc = await this.#call(api =>
-      api.get(`/copilot/v1/companies/${encodeURIComponent(companyId)}/account-summary`));
+    const doc = await this.#call((api) =>
+      api.get(`/copilot/v1/companies/${encodeURIComponent(companyId)}/account-summary`),
+    );
     const resource = firstResource(doc);
     const markdown = str(attrs(resource ?? {}).markdown) ?? "";
     await this.#observe(
@@ -1433,12 +1574,13 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
   }
 
   async askAccountSummary(companyId: string, question: string): Promise<string> {
-    const doc = await this.#call(api =>
+    const doc = await this.#call((api) =>
       api.post(
         `/copilot/v1/companies/${encodeURIComponent(companyId)}/account-summary/actions/ask`,
         "AccountSummaryQuestionRequest",
         { question },
-      ));
+      ),
+    );
     const answer = str(attrs(firstResource(doc) ?? {}).answer) ?? "";
     await this.#observe(
       "Ask ZoomInfo account summary",
@@ -1448,13 +1590,17 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
   }
 
   async getCompanyInsights(criteria: CompanyInsightsCriteria): Promise<CompanyInsights[]> {
-    const ziCompanyIds = criteria.companyIds.map(id => idValue(id));
-    const doc = await this.#call(api =>
-      api.post("/copilot/v1/companies/insights", "CompanyInsightsSearch",
-        clean({ ziCompanyIds, signalTypes: criteria.signalTypes })));
-    const results = asResources(doc).map(r => {
+    const ziCompanyIds = criteria.companyIds.map((id) => idValue(id));
+    const doc = await this.#call((api) =>
+      api.post(
+        "/copilot/v1/companies/insights",
+        "CompanyInsightsSearch",
+        clean({ ziCompanyIds, signalTypes: criteria.signalTypes }),
+      ),
+    );
+    const results = asResources(doc).map((r) => {
       const rawInsights = (attrs(r).insights ?? []) as Record<string, unknown>[];
-      const insights: Insight[] = rawInsights.map(i => ({
+      const insights: Insight[] = rawInsights.map((i) => ({
         id: str(i.id) ?? "",
         ziCompanyId: str(i.ziCompanyId) ?? "",
         signalId: str(i.signalId) ?? "",
@@ -1478,9 +1624,9 @@ class ZoomInfoSessionImpl extends RpcTarget implements ZoomInfoSession {
   // Usage
 
   async getCreditUsage(): Promise<CreditUsage> {
-    const doc = await this.#call(api => api.get("/data/v1/users/usage"));
+    const doc = await this.#call((api) => api.get("/data/v1/users/usage"));
     const usageList = (attrs(firstResource(doc) ?? {}).usage ?? []) as Record<string, unknown>[];
-    const usage: UsageLimit[] = usageList.map(u => ({
+    const usage: UsageLimit[] = usageList.map((u) => ({
       limitType: str(u.limitType) ?? "",
       description: str(u.description),
       totalLimit: num(u.totalLimit),
@@ -1546,18 +1692,18 @@ function mapIntentSignal(resource: JsonApiResource): IntentSignal {
       website: str(company.website),
       hasOtherTopicConsumption: bool(company.hasOtherTopicConsumption),
     },
-    recommendedContacts: recommended.map(c => ({
+    recommendedContacts: recommended.map((c) => ({
       id: str(c.id) ?? "",
       firstName: str(c.firstName),
       lastName: str(c.lastName),
       jobTitle: str(c.jobTitle),
       companyName: str(c.companyName),
-      jobFunctions: ((c.jobFunctions ?? []) as Record<string, unknown>[]).map(f => ({
+      jobFunctions: ((c.jobFunctions ?? []) as Record<string, unknown>[]).map((f) => ({
         name: str(f.name),
         department: str(f.department),
       })),
     })),
-    topSignalLocations: locations.map(l => ({
+    topSignalLocations: locations.map((l) => ({
       city: str(l.city),
       state: str(l.state),
       country: str(l.country),
@@ -1579,15 +1725,15 @@ function mapScoop(resource: JsonApiResource): Scoop {
     link: str(a.link),
     description: str(a.description),
     updateText: str(a.updateText),
-    topics: topics.map(t => ({ id: str(t.id) ?? "", topic: str(t.topic) ?? "" })),
-    types: types.map(t => ({ id: str(t.id) ?? "", type: str(t.type) ?? "" })),
+    topics: topics.map((t) => ({ id: str(t.id) ?? "", topic: str(t.topic) ?? "" })),
+    types: types.map((t) => ({ id: str(t.id) ?? "", type: str(t.type) ?? "" })),
     company: company ? { id: str(company.id) ?? "", name: str(company.name) } : undefined,
-    contacts: contacts.map(c => ({
+    contacts: contacts.map((c) => ({
       id: str(c.id) ?? "",
       firstName: str(c.firstName),
       lastName: str(c.lastName),
       jobTitle: str(c.jobTitle),
-      jobFunction: ((c.jobFunction ?? []) as Record<string, unknown>[]).map(f => ({
+      jobFunction: ((c.jobFunction ?? []) as Record<string, unknown>[]).map((f) => ({
         name: str(f.name),
         department: str(f.department),
       })),
@@ -1606,6 +1752,6 @@ function mapNewsArticle(resource: JsonApiResource): NewsArticle {
     pageDate: str(a.pageDate),
     categories: (a.categories ?? []) as string[],
     description: str(a.description),
-    company: companies.map(c => ({ id: str(c.id) ?? "", name: str(c.name) })),
+    company: companies.map((c) => ({ id: str(c.id) ?? "", name: str(c.name) })),
   };
 }

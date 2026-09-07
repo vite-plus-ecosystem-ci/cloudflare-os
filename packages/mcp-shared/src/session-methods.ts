@@ -15,10 +15,21 @@ import type { ClassifiedTool } from "./tools.js";
  */
 export const RESERVED_METHOD_NAMES: ReadonlySet<string> = new Set([
   // Intercepted or hijacked by the RPC stub itself.
-  "then", "catch", "finally", "dup", "onRpcBroken", "constructor", "toString", "valueOf",
-  "hasOwnProperty", "__proto__", "map",
+  "then",
+  "catch",
+  "finally",
+  "dup",
+  "onRpcBroken",
+  "constructor",
+  "toString",
+  "valueOf",
+  "hasOwnProperty",
+  "__proto__",
+  "map",
   // The session's own methods.
-  "callTool", "getActionResult", "listTools",
+  "callTool",
+  "getActionResult",
+  "listTools",
 ]);
 
 /**
@@ -26,12 +37,14 @@ export const RESERVED_METHOD_NAMES: ReadonlySet<string> = new Set([
  * the name cannot become a usable identifier; servers are free to name tools anything.
  */
 export function toMethodName(wireName: string): string | null {
-  const parts = wireName.split(/[^A-Za-z0-9]+/).filter(part => part.length > 0);
+  const parts = wireName.split(/[^A-Za-z0-9]+/).filter((part) => part.length > 0);
   if (parts.length === 0) return null;
 
   const [first, ...rest] = parts;
-  const name = first[0].toLowerCase() + first.slice(1) +
-    rest.map(part => part[0].toUpperCase() + part.slice(1)).join("");
+  const name =
+    first[0].toLowerCase() +
+    first.slice(1) +
+    rest.map((part) => part[0].toUpperCase() + part.slice(1)).join("");
 
   // A leading digit cannot start an identifier, and a name the agent cannot type in the generated
   // `.d.ts` is not worth having. Such tools remain reachable through `callTool`.
@@ -77,7 +90,7 @@ export function installToolMethods<T extends SessionBase>(Base: T, tools: Classi
 
   for (const [method, wireName] of toolMethodNames(tools)) {
     Object.defineProperty(WithTools.prototype, method, {
-      value: function(this: CallsTools, args?: Record<string, unknown>) {
+      value: function (this: CallsTools, args?: Record<string, unknown>) {
         return this.callTool(wireName, args);
       },
       // Not enumerable, matching how class methods are declared.

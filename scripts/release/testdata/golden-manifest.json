@@ -32,10 +32,7 @@
         }
       ],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage",
-        "nodejs_als"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage", "nodejs_als"],
       "inputs": [
         {
           "kind": "secret",
@@ -53,15 +50,11 @@
       "mainModule": "cloudflare.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "UserAccount"
-          ],
+          "new_sqlite_classes": ["UserAccount"],
           "tag": "v0"
         },
         {
-          "new_sqlite_classes": [
-            "CloudflareObservabilityGatekeeper"
-          ],
+          "new_sqlite_classes": ["CloudflareObservabilityGatekeeper"],
           "tag": "v1"
         }
       ],
@@ -100,9 +93,7 @@
         }
       ],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage"],
       "inputs": [
         {
           "kind": "secret",
@@ -159,10 +150,7 @@
         }
       ],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "nodejs_compat",
-        "allow_irrevocable_stub_storage"
-      ],
+      "compatibilityFlags": ["nodejs_compat", "allow_irrevocable_stub_storage"],
       "inputs": [],
       "installable": true,
       "kind": "gatekeeper",
@@ -204,21 +192,14 @@
     "gatekeeper-email": {
       "bindings": [],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage",
-        "nodejs_als"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage", "nodejs_als"],
       "inputs": [],
       "installable": false,
       "kind": "gatekeeper",
       "mainModule": "email.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "UserAccount",
-            "EmailGatekeeperImpl",
-            "EmailAddress"
-          ],
+          "new_sqlite_classes": ["UserAccount", "EmailGatekeeperImpl", "EmailAddress"],
           "tag": "v0"
         }
       ],
@@ -257,10 +238,7 @@
         }
       ],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage",
-        "nodejs_als"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage", "nodejs_als"],
       "inputs": [
         {
           "consoleUrl": "https://github.com/settings/developers",
@@ -286,10 +264,7 @@
       "mainModule": "github.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "UserAccount",
-            "GitHubGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["UserAccount", "GitHubGatekeeperImpl"],
           "tag": "v0"
         }
       ],
@@ -328,10 +303,7 @@
         }
       ],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage",
-        "nodejs_als"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage", "nodejs_als"],
       "inputs": [
         {
           "consoleUrl": "https://console.cloud.google.com/apis/credentials",
@@ -358,35 +330,23 @@
       "mainModule": "google.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "UserAccount",
-            "GmailGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["UserAccount", "GmailGatekeeperImpl"],
           "tag": "v0"
         },
         {
-          "new_sqlite_classes": [
-            "BigQueryGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["BigQueryGatekeeperImpl"],
           "tag": "v1"
         },
         {
-          "new_sqlite_classes": [
-            "GoogleCalendarGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["GoogleCalendarGatekeeperImpl"],
           "tag": "v2"
         },
         {
-          "new_sqlite_classes": [
-            "GoogleSheetsGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["GoogleSheetsGatekeeperImpl"],
           "tag": "v3"
         },
         {
-          "new_sqlite_classes": [
-            "GoogleDriveGatekeeperImpl",
-            "GoogleDocGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["GoogleDriveGatekeeperImpl", "GoogleDocGatekeeperImpl"],
           "tag": "v4"
         }
       ],
@@ -421,19 +381,14 @@
     "gatekeeper-homeassistant": {
       "bindings": [],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage"],
       "inputs": [],
       "installable": true,
       "kind": "gatekeeper",
       "mainModule": "homeassistant.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "UserAccount",
-            "HomeAssistantGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["UserAccount", "HomeAssistantGatekeeperImpl"],
           "tag": "v0"
         }
       ],
@@ -473,10 +428,7 @@
         }
       ],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage",
-        "nodejs_als"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage", "nodejs_als"],
       "inputs": [
         {
           "kind": "secret",
@@ -494,10 +446,7 @@
       "mainModule": "linear.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "UserAccount",
-            "LinearGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["UserAccount", "LinearGatekeeperImpl"],
           "tag": "v0"
         }
       ],
@@ -525,20 +474,14 @@
     "gatekeeper-mcp": {
       "bindings": [],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage",
-        "global_fetch_strictly_public"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage", "global_fetch_strictly_public"],
       "inputs": [],
       "installable": true,
       "kind": "gatekeeper",
       "mainModule": "mcp.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "McpAccount",
-            "McpGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["McpAccount", "McpGatekeeperImpl"],
           "tag": "v0"
         }
       ],
@@ -568,20 +511,14 @@
     "gatekeeper-mcp-portal": {
       "bindings": [],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage",
-        "global_fetch_strictly_public"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage", "global_fetch_strictly_public"],
       "inputs": [],
       "installable": true,
       "kind": "gatekeeper",
       "mainModule": "mcp-portal.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "McpAccount",
-            "McpGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["McpAccount", "McpGatekeeperImpl"],
           "tag": "v0"
         }
       ],
@@ -622,9 +559,7 @@
         }
       ],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage"],
       "inputs": [
         {
           "consoleUrl": "https://www.notion.so/my-integrations",
@@ -682,20 +617,14 @@
     "gatekeeper-scheduler": {
       "bindings": [],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage",
-        "nodejs_als"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage", "nodejs_als"],
       "inputs": [],
       "installable": true,
       "kind": "gatekeeper",
       "mainModule": "scheduler.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "ScheduleDriver",
-            "SchedulerGatekeeper"
-          ],
+          "new_sqlite_classes": ["ScheduleDriver", "SchedulerGatekeeper"],
           "tag": "v1"
         }
       ],
@@ -736,9 +665,7 @@
         }
       ],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage"],
       "inputs": [
         {
           "consoleUrl": "https://api.slack.com/apps",
@@ -804,9 +731,7 @@
         }
       ],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage"],
       "inputs": [
         {
           "kind": "secret",
@@ -824,10 +749,7 @@
       "mainModule": "spotify.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "UserAccount",
-            "SpotifyGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["UserAccount", "SpotifyGatekeeperImpl"],
           "tag": "v0"
         }
       ],
@@ -866,10 +788,7 @@
         }
       ],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage",
-        "nodejs_als"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage", "nodejs_als"],
       "inputs": [
         {
           "kind": "secret",
@@ -887,10 +806,7 @@
       "mainModule": "supabase.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "UserAccount",
-            "SupabaseGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["UserAccount", "SupabaseGatekeeperImpl"],
           "tag": "v0"
         }
       ],
@@ -929,9 +845,7 @@
         }
       ],
       "compatibilityDate": "2026-09-04",
-      "compatibilityFlags": [
-        "allow_irrevocable_stub_storage"
-      ],
+      "compatibilityFlags": ["allow_irrevocable_stub_storage"],
       "inputs": [
         {
           "kind": "secret",
@@ -949,10 +863,7 @@
       "mainModule": "zoominfo.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "UserAccount",
-            "ZoomInfoGatekeeperImpl"
-          ],
+          "new_sqlite_classes": ["UserAccount", "ZoomInfoGatekeeperImpl"],
           "tag": "v0"
         }
       ],
@@ -1097,22 +1008,15 @@
       "mainModule": "server.js",
       "migrations": [
         {
-          "new_sqlite_classes": [
-            "UserDurableObject",
-            "OverseerDurableObject"
-          ],
+          "new_sqlite_classes": ["UserDurableObject", "OverseerDurableObject"],
           "tag": "v0"
         },
         {
-          "new_sqlite_classes": [
-            "AdminSettings"
-          ],
+          "new_sqlite_classes": ["AdminSettings"],
           "tag": "v1"
         },
         {
-          "new_sqlite_classes": [
-            "PendingLogin"
-          ],
+          "new_sqlite_classes": ["PendingLogin"],
           "tag": "v2"
         }
       ],

@@ -59,7 +59,7 @@ export function looksLikePortal(
   bounds: { truncated: boolean; cap: number },
 ): boolean {
   if (bounds.truncated || tools.length >= bounds.cap) return true;
-  return tools.some(tool => tool.name === PORTAL_LIST_SERVERS_TOOL);
+  return tools.some((tool) => tool.name === PORTAL_LIST_SERVERS_TOOL);
 }
 
 // The upstream server id a portal tool name belongs to, or null if it carries no prefix. Split on
@@ -145,7 +145,11 @@ function parseServerLines(text: string): {
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trimStart();
     const first = trimmed[0];
-    const entryLike = first === "-" || first === "*" || first === "+" || first === "\u2022" ||
+    const entryLike =
+      first === "-" ||
+      first === "*" ||
+      first === "+" ||
+      first === "\u2022" ||
       /^\d+[.)]\s/.test(trimmed);
     const server = parseServerLine(line);
     if (!server) {
@@ -203,14 +207,15 @@ export type PortalServerListing = {
  * Typed by what it reads rather than as `McpToolCallResult`, which a result satisfies: this is an
  * untrusted reply and every field is re-checked here, so the loose type is the honest one.
  */
-export function parsePortalServers(
-  result: { structuredContent?: unknown; content?: unknown },
-): PortalServerListing {
+export function parsePortalServers(result: {
+  structuredContent?: unknown;
+  content?: unknown;
+}): PortalServerListing {
   const structured = parseStructured(result.structuredContent);
   if (structured?.complete) return structured;
 
   const combinedText = (Array.isArray(result.content) ? result.content : [])
-    .flatMap(block => {
+    .flatMap((block) => {
       const { type, text: blockText } = (block ?? {}) as { type?: unknown; text?: unknown };
       return type === "text" && typeof blockText === "string" ? [blockText] : [];
     })
@@ -227,9 +232,10 @@ export function parsePortalServers(
  * are the authority, so reported empty servers are dropped.
  */
 export function reconcilePortalServers(
-  reported: PortalServer[], tools: Pick<McpTool, "name">[],
+  reported: PortalServer[],
+  tools: Pick<McpTool, "name">[],
 ): PortalServer[] {
-  const byId = new Map(reported.map(server => [server.id, server]));
+  const byId = new Map(reported.map((server) => [server.id, server]));
   const ids = new Set<string>();
   for (const tool of tools) {
     if (isPortalNativeTool(tool.name)) continue;

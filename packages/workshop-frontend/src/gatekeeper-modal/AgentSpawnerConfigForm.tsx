@@ -1,7 +1,7 @@
-import { Checkbox, Select, type PortalContainer } from '@cloudflare/kumo'
-import { AiChatAuthorInfo, WorkpieceId, validateBindingName } from '@gadgets/workshop-shared/api'
-import { WorkshopInput } from '../components/WorkshopControls'
-import { ConnectionConfigField } from './ConnectionConfigField'
+import { Checkbox, Select, type PortalContainer } from "@cloudflare/kumo";
+import { AiChatAuthorInfo, WorkpieceId, validateBindingName } from "@gadgets/workshop-shared/api";
+import { WorkshopInput } from "../components/WorkshopControls";
+import { ConnectionConfigField } from "./ConnectionConfigField";
 
 /**
  * One prospective entry of AgentSpawnerConfig.env: a workpiece the spawned agents may use, and
@@ -11,16 +11,16 @@ import { ConnectionConfigField } from './ConnectionConfigField'
  */
 export interface SpawnerEnvRow {
   /** The workpiece the entry points at. */
-  target: WorkpieceId
+  target: WorkpieceId;
 
   /** Display name of the target, e.g. the connected resource's title. */
-  targetTitle: string
+  targetTitle: string;
 
   /** Name the spawned agents will see the target under (`env.NAME`). */
-  name: string
+  name: string;
 
   /** Whether the entry is included in the spawner's env at all. */
-  enabled: boolean
+  enabled: boolean;
 }
 
 /**
@@ -28,41 +28,41 @@ export interface SpawnerEnvRow {
  * enabled rows matter: a disabled row is simply not part of the env.
  */
 export function validateSpawnerEnv(rows: SpawnerEnvRow[]): string | null {
-  const seen = new Set<string>()
+  const seen = new Set<string>();
   for (const row of rows) {
-    if (!row.enabled) continue
+    if (!row.enabled) continue;
     try {
-      validateBindingName(row.name)
+      validateBindingName(row.name);
     } catch (err) {
-      return err instanceof Error ? err.message : String(err)
+      return err instanceof Error ? err.message : String(err);
     }
     if (seen.has(row.name)) {
-      return `Two bindings are both named "${row.name}".`
+      return `Two bindings are both named "${row.name}".`;
     }
-    seen.add(row.name)
+    seen.add(row.name);
   }
-  return null
+  return null;
 }
 
 /** Converts the rows into the AgentSpawnerConfig.env map. Assumes validateSpawnerEnv() passed. */
 export function spawnerEnvFromRows(rows: SpawnerEnvRow[]): Record<string, WorkpieceId> {
-  const env: Record<string, WorkpieceId> = {}
+  const env: Record<string, WorkpieceId> = {};
   for (const row of rows) {
-    if (row.enabled) env[row.name] = row.target
+    if (row.enabled) env[row.name] = row.target;
   }
-  return env
+  return env;
 }
 
 export interface AgentSpawnerConfigFormProps {
-  availableModels: AiChatAuthorInfo[]
-  displayName: string
-  modelId: string | null
-  env: SpawnerEnvRow[]
-  envError: string | null
-  onDisplayNameChange: (value: string) => void
-  onModelIdChange: (id: string | null) => void
-  onEnvChange: (env: SpawnerEnvRow[]) => void
-  selectContainer?: PortalContainer
+  availableModels: AiChatAuthorInfo[];
+  displayName: string;
+  modelId: string | null;
+  env: SpawnerEnvRow[];
+  envError: string | null;
+  onDisplayNameChange: (value: string) => void;
+  onModelIdChange: (id: string | null) => void;
+  onEnvChange: (env: SpawnerEnvRow[]) => void;
+  selectContainer?: PortalContainer;
 }
 
 export function AgentSpawnerConfigForm({
@@ -77,8 +77,8 @@ export function AgentSpawnerConfigForm({
   selectContainer,
 }: AgentSpawnerConfigFormProps) {
   const updateRow = (index: number, updates: Partial<SpawnerEnvRow>) => {
-    onEnvChange(env.map((row, i) => (i === index ? { ...row, ...updates } : row)))
-  }
+    onEnvChange(env.map((row, i) => (i === index ? { ...row, ...updates } : row)));
+  };
 
   return (
     <section className="grid gap-4">
@@ -95,10 +95,7 @@ export function AgentSpawnerConfigForm({
         />
       </ConnectionConfigField>
 
-      <ConnectionConfigField
-        label="Model"
-        description="Choose the model spawned agents will use."
-      >
+      <ConnectionConfigField label="Model" description="Choose the model spawned agents will use.">
         <Select
           aria-label="Agent model"
           className="w-full text-sm [&_button]:!h-9"
@@ -107,14 +104,12 @@ export function AgentSpawnerConfigForm({
           value={modelId}
           onValueChange={(v) => onModelIdChange(v as string | null)}
           renderValue={(id) => {
-            if (id === null) return 'None (no agent)'
-            return availableModels.find((m) => m.id === id)?.name ?? String(id)
+            if (id === null) return "None (no agent)";
+            return availableModels.find((m) => m.id === id)?.name ?? String(id);
           }}
         >
-          <Select.Option value={null as any}>
-            None (no agent)
-          </Select.Option>
-          {availableModels.map(model => (
+          <Select.Option value={null as any}>None (no agent)</Select.Option>
+          {availableModels.map((model) => (
             <Select.Option key={model.id} value={model.id}>
               {model.name}
             </Select.Option>
@@ -164,5 +159,5 @@ export function AgentSpawnerConfigForm({
         )}
       </ConnectionConfigField>
     </section>
-  )
+  );
 }

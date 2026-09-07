@@ -25,11 +25,12 @@ import type {
 import { isTransientRpcError } from "../../../rpcErrors";
 import { slashCommandTokenKey } from "./slash-commands/slashCommandInput";
 import {
-  ComposerMirror, composerTextareaClass, type ComposerMirrorHandle, type MirrorToken,
+  ComposerMirror,
+  composerTextareaClass,
+  type ComposerMirrorHandle,
+  type MirrorToken,
 } from "./inline-items/ComposerMirror";
-import {
-  snapCaretOutOfRanges, type ComposerRange,
-} from "../../../components/chat/composer-tokens";
+import { snapCaretOutOfRanges, type ComposerRange } from "../../../components/chat/composer-tokens";
 import CapsuleOverlay from "../../../CapsuleOverlay";
 import type { SelectableItem } from "../../../ResourcePicker";
 import GatekeeperModal from "../../../GatekeeperModal";
@@ -208,7 +209,7 @@ export const ChatComposer = ({
   // different command token (see `syncPickerCaret`): the mirror owns the caret the user sees,
   // so ordinary caret movement doesn't have to re-render the composer.
   const [cursorPosition, setCursorPosition] = useState(0);
-  const pickerCaretRef = useRef<{key: string | null; text: string}>({key: null, text: ""});
+  const pickerCaretRef = useRef<{ key: string | null; text: string }>({ key: null, text: "" });
   const { authenticatedApi } = useAuthenticatedApi();
   const vendorBranding = useVendorBranding(authenticatedApi);
   const selectedSlashCommandRef = useRef(selectedSlashCommand);
@@ -272,11 +273,7 @@ export const ChatComposer = ({
     },
     onError: (message) => toasts.add({ title: message, variant: "error" }),
   });
-  const {
-    resizeTextarea,
-    syncMirrorScroll,
-    urlLineOffset,
-  } = useComposerEditorLayout({
+  const { resizeTextarea, syncMirrorScroll, urlLineOffset } = useComposerEditorLayout({
     textareaRef: composerTextareaRef,
     wrapperRef,
     mirrorRef,
@@ -361,9 +358,9 @@ export const ChatComposer = ({
   const currentTokenRanges = (): ComposerRange[] => {
     const command = selectedSlashCommandRef.current;
     return [
-      ...capsulesRef.current.map(({start, length}) => ({start, length})),
-      ...(command ? [{start: command.start, length: command.length}] : []),
-      ...formatTokensRef.current.map(({start, length}) => ({start, length})),
+      ...capsulesRef.current.map(({ start, length }) => ({ start, length })),
+      ...(command ? [{ start: command.start, length: command.length }] : []),
+      ...formatTokensRef.current.map(({ start, length }) => ({ start, length })),
     ];
   };
 
@@ -373,7 +370,7 @@ export const ChatComposer = ({
     const text = inputValueRef.current;
     const key = slashCommandTokenKey(text, position);
     if (key !== pickerCaretRef.current.key || text !== pickerCaretRef.current.text) {
-      pickerCaretRef.current = {key, text};
+      pickerCaretRef.current = { key, text };
       setCursorPosition(position);
     }
   };
@@ -405,11 +402,16 @@ export const ChatComposer = ({
 
   // Hit-tests the pointer against the mirror's token spans, which lay out identically to the
   // textarea's text.
-  const tokenAtPoint = (clientX: number, clientY: number):
-      {start: number; edge: number} | null => {
+  const tokenAtPoint = (
+    clientX: number,
+    clientY: number,
+  ): { start: number; edge: number } | null => {
     // Hit-testing forces layout, so avoid it in the common case with no tokens.
-    if (capsulesRef.current.length === 0 && !selectedSlashCommandRef.current
-        && formatTokensRef.current.length === 0) {
+    if (
+      capsulesRef.current.length === 0 &&
+      !selectedSlashCommandRef.current &&
+      formatTokensRef.current.length === 0
+    ) {
       return null;
     }
     return mirrorRef.current?.tokenAtPoint(clientX, clientY) ?? null;
@@ -417,20 +419,26 @@ export const ChatComposer = ({
 
   // Completing a command leaves the `/name` text in place (only its color changes) and parks the
   // caret past it so the next keystroke doesn't grow the token.
-  const applySlashCommandSelection = useCallback((
-      choice: SlashCommandChoice, tokenStart: number, tokenEnd: number) => {
-    recordDraftEdit();
-    const commandText = `/${choice.name}`;
-    const transition = resolveComposerSlashCommand(
-      currentComposerDocument(), choice, tokenStart, tokenEnd, commandText,
-    );
-    commitComposerDocument(transition.document);
-    requestAnimationFrame(() => {
-      composerTextareaRef.current?.focus();
-      moveCaret(transition.caret);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const applySlashCommandSelection = useCallback(
+    (choice: SlashCommandChoice, tokenStart: number, tokenEnd: number) => {
+      recordDraftEdit();
+      const commandText = `/${choice.name}`;
+      const transition = resolveComposerSlashCommand(
+        currentComposerDocument(),
+        choice,
+        tokenStart,
+        tokenEnd,
+        commandText,
+      );
+      commitComposerDocument(transition.document);
+      requestAnimationFrame(() => {
+        composerTextareaRef.current?.focus();
+        moveCaret(transition.caret);
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [],
+  );
 
   // Keeps the resolved command anchored to its text when text is inserted or removed before it.
   const slashCommandPicker = useSlashCommandPicker({
@@ -456,8 +464,12 @@ export const ChatComposer = ({
     const readyAttachments = attachmentsSnapshot
       .filter((attachment) => attachment.uploadState === "ready" && attachment.ref)
       .map((attachment) => attachment.ref!);
-    const hasUploadingAttachment = attachmentsSnapshot.some((attachment) => attachment.uploadState === "uploading");
-    const hasFailedAttachment = attachmentsSnapshot.some((attachment) => attachment.uploadState === "error");
+    const hasUploadingAttachment = attachmentsSnapshot.some(
+      (attachment) => attachment.uploadState === "uploading",
+    );
+    const hasFailedAttachment = attachmentsSnapshot.some(
+      (attachment) => attachment.uploadState === "error",
+    );
 
     if (!inputValue.trim() && !selectedSlashCommand && readyAttachments.length === 0) return;
     if (hasUploadingAttachment) {
@@ -482,16 +494,25 @@ export const ChatComposer = ({
         hasAttachments: readyAttachments.length > 0,
       });
       if (!submissionResult.ok) {
-        toasts.add({ title: "Slash commands cannot include resources or attachments", variant: "error" });
+        toasts.add({
+          title: "Slash commands cannot include resources or attachments",
+          variant: "error",
+        });
         return;
       }
-      const { message, capsules: capsuleSpecifiers, formats: formatRefs } =
-        submissionResult.submission;
+      const {
+        message,
+        capsules: capsuleSpecifiers,
+        formats: formatRefs,
+      } = submissionResult.submission;
 
-      await onSend(message, selectedModel,
-          capsuleSpecifiers,
-          readyAttachments.length ? readyAttachments : undefined,
-          formatRefs);
+      await onSend(
+        message,
+        selectedModel,
+        capsuleSpecifiers,
+        readyAttachments.length ? readyAttachments : undefined,
+        formatRefs,
+      );
       clearSentAttachments(attachmentsSnapshot);
       if (!completeDraftSend(draftSend)) return;
       replaceComposerDocument({ text: "", capsules: [], formats: [], command: null });
@@ -538,9 +559,7 @@ export const ChatComposer = ({
   };
 
   const handleInputChange = (newValue: string, editCursorPos?: number) => {
-    const transition = applyComposerTextEdit(
-      currentComposerDocument(), newValue, editCursorPos,
-    );
+    const transition = applyComposerTextEdit(currentComposerDocument(), newValue, editCursorPos);
     if (transition.rejected) {
       const textarea = composerTextareaRef.current;
       if (textarea) {
@@ -595,7 +614,10 @@ export const ChatComposer = ({
     const value = inputValueRef.current;
     // The menu takes focus, but the textarea keeps its last selection; falling back to the end is
     // right for the case where it was never focused at all.
-    const caret = Math.min(composerTextareaRef.current?.selectionStart ?? value.length, value.length);
+    const caret = Math.min(
+      composerTextareaRef.current?.selectionStart ?? value.length,
+      value.length,
+    );
     const at = snapCaretOutOfRanges(caret, currentTokenRanges(), "nearest");
     const transition = insertComposerFormat(
       currentComposerDocument(),
@@ -614,32 +636,40 @@ export const ChatComposer = ({
 
   // What the mirror paints as objects rather than text. Memoized because the composer re-renders for
   // plenty of reasons that leave the text alone (attachments, agent activity, menus).
-  const mirrorTokens = useMemo<MirrorToken[]>(() => [
-    ...capsules.map(({start, length, vendorId}) => ({
-      kind: "capsule" as const,
-      start,
-      length,
-      // Painted into the em space the token starts with, so it costs no layout.
-      logoUrl: inputValue.startsWith(CAPSULE_LOGO_SLOT, start) && vendorId
-        ? vendorBranding.get(vendorId)?.logoUrl
-        : undefined,
-    })),
-    ...(selectedSlashCommand ? [{
-      kind: "command" as const,
-      start: selectedSlashCommand.start,
-      length: selectedSlashCommand.length,
-      label: selectedSlashCommand.choice.name,
-      description: selectedSlashCommand.choice.description,
-      providerLabel: selectedSlashCommand.choice.providerLabel,
-      resourceLabel: selectedSlashCommand.choice.resourceLabel,
-    }] : []),
-    ...formatTokens.map(({start, length, logo}) => ({
-      kind: "capsule" as const,
-      start,
-      length,
-      logoUrl: inputValue.startsWith(CAPSULE_LOGO_SLOT, start) ? logo : undefined,
-    })),
-  ], [capsules, formatTokens, inputValue, selectedSlashCommand, vendorBranding]);
+  const mirrorTokens = useMemo<MirrorToken[]>(
+    () => [
+      ...capsules.map(({ start, length, vendorId }) => ({
+        kind: "capsule" as const,
+        start,
+        length,
+        // Painted into the em space the token starts with, so it costs no layout.
+        logoUrl:
+          inputValue.startsWith(CAPSULE_LOGO_SLOT, start) && vendorId
+            ? vendorBranding.get(vendorId)?.logoUrl
+            : undefined,
+      })),
+      ...(selectedSlashCommand
+        ? [
+            {
+              kind: "command" as const,
+              start: selectedSlashCommand.start,
+              length: selectedSlashCommand.length,
+              label: selectedSlashCommand.choice.name,
+              description: selectedSlashCommand.choice.description,
+              providerLabel: selectedSlashCommand.choice.providerLabel,
+              resourceLabel: selectedSlashCommand.choice.resourceLabel,
+            },
+          ]
+        : []),
+      ...formatTokens.map(({ start, length, logo }) => ({
+        kind: "capsule" as const,
+        start,
+        length,
+        logoUrl: inputValue.startsWith(CAPSULE_LOGO_SLOT, start) ? logo : undefined,
+      })),
+    ],
+    [capsules, formatTokens, inputValue, selectedSlashCommand, vendorBranding],
+  );
 
   const hasReadyAttachment = pendingAttachments.some(
     (attachment) => attachment.uploadState === "ready" && attachment.ref,
@@ -647,9 +677,13 @@ export const ChatComposer = ({
   const hasUnreadyAttachment = pendingAttachments.some(
     (attachment) => attachment.uploadState !== "ready",
   );
-  const canSend = !isSending && !isAgentActive && !isBlocked &&
+  const canSend =
+    !isSending &&
+    !isAgentActive &&
+    !isBlocked &&
     (inputValue.trim().length > 0 || selectedSlashCommand !== null || hasReadyAttachment) &&
-    !hasUnreadyAttachment && !isCreatingResource;
+    !hasUnreadyAttachment &&
+    !isCreatingResource;
   return (
     // isolation: isolate contains z-indexes used inside the composer (the
     // captured-log floating chip with z-10, the textarea/mirror with z-[1])
@@ -687,9 +721,15 @@ export const ChatComposer = ({
         onDrop={handleAttachmentDrop}
       >
         {isAttachmentDragActive && (
-          <div className={`themed-inset-outline pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-2xl border-2 border-dashed p-4 backdrop-blur-[1px] transition-[opacity,transform] duration-150 ease-out ${canAttachMore ? "border-kumo-brand/55 bg-kumo-brand/10" : "border-kumo-warning/60 bg-kumo-warning/10"}`}>
-            <div className={`themed-floating-shadow flex items-center gap-2 rounded-full border bg-kumo-base/90 px-3 py-2 text-[13px] font-medium leading-4 tracking-[-0.2px] text-kumo-default ${canAttachMore ? "border-kumo-brand/25" : "border-kumo-warning/30"}`}>
-              <span className={`grid h-7 w-7 place-items-center rounded-full ${canAttachMore ? "bg-kumo-brand/12 text-kumo-brand" : "bg-kumo-warning/15 text-kumo-warning"}`}>
+          <div
+            className={`themed-inset-outline pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-2xl border-2 border-dashed p-4 backdrop-blur-[1px] transition-[opacity,transform] duration-150 ease-out ${canAttachMore ? "border-kumo-brand/55 bg-kumo-brand/10" : "border-kumo-warning/60 bg-kumo-warning/10"}`}
+          >
+            <div
+              className={`themed-floating-shadow flex items-center gap-2 rounded-full border bg-kumo-base/90 px-3 py-2 text-[13px] font-medium leading-4 tracking-[-0.2px] text-kumo-default ${canAttachMore ? "border-kumo-brand/25" : "border-kumo-warning/30"}`}
+            >
+              <span
+                className={`grid h-7 w-7 place-items-center rounded-full ${canAttachMore ? "bg-kumo-brand/12 text-kumo-brand" : "bg-kumo-warning/15 text-kumo-warning"}`}
+              >
                 <FileIcon size={16} weight="duotone" />
               </span>
               {canAttachMore ? "Drop files to attach" : "Messages are limited to 5 attachments"}
@@ -819,27 +859,44 @@ export const ChatComposer = ({
                   }
                   return;
                 }
-                if (slashCommandPicker.open && e.key === "Tab" &&
-                    slashCommandPicker.selectable && slashCommandPicker.activeChoice) {
+                if (
+                  slashCommandPicker.open &&
+                  e.key === "Tab" &&
+                  slashCommandPicker.selectable &&
+                  slashCommandPicker.activeChoice
+                ) {
                   e.preventDefault();
                   slashCommandPicker.select(slashCommandPicker.activeChoice);
                   return;
                 }
-                if (slashCommandPicker.open && slashCommandPicker.selectable && slashCommandPicker.choices.length > 0 &&
-                    (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                if (
+                  slashCommandPicker.open &&
+                  slashCommandPicker.selectable &&
+                  slashCommandPicker.choices.length > 0 &&
+                  (e.key === "ArrowDown" || e.key === "ArrowUp")
+                ) {
                   e.preventDefault();
                   const direction = e.key === "ArrowDown" ? 1 : -1;
-                  slashCommandPicker.setIndex((current) =>
-                    (current + direction + slashCommandPicker.choices.length) % slashCommandPicker.choices.length);
+                  slashCommandPicker.setIndex(
+                    (current) =>
+                      (current + direction + slashCommandPicker.choices.length) %
+                      slashCommandPicker.choices.length,
+                  );
                   return;
                 }
                 // Delete a whole capsule or command rather than eating into it.
-                if ((e.key === "Backspace" || e.key === "Delete") &&
-                    !e.shiftKey && !e.metaKey && !e.altKey && !e.ctrlKey &&
-                    e.currentTarget.selectionStart === e.currentTarget.selectionEnd) {
+                if (
+                  (e.key === "Backspace" || e.key === "Delete") &&
+                  !e.shiftKey &&
+                  !e.metaKey &&
+                  !e.altKey &&
+                  !e.ctrlKey &&
+                  e.currentTarget.selectionStart === e.currentTarget.selectionEnd
+                ) {
                   const caret = e.currentTarget.selectionStart;
-                  const range = currentTokenRanges().find(({start, length}) =>
-                    e.key === "Backspace" ? caret === start + length : caret === start);
+                  const range = currentTokenRanges().find(({ start, length }) =>
+                    e.key === "Backspace" ? caret === start + length : caret === start,
+                  );
                   if (range) {
                     e.preventDefault();
                     removeTokenAt(range);
@@ -847,13 +904,21 @@ export const ChatComposer = ({
                   }
                 }
                 // Step over a whole capsule or command rather than through its characters.
-                if ((e.key === "ArrowLeft" || e.key === "ArrowRight") &&
-                    !e.shiftKey && !e.metaKey && !e.altKey && !e.ctrlKey &&
-                    e.currentTarget.selectionStart === e.currentTarget.selectionEnd) {
+                if (
+                  (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
+                  !e.shiftKey &&
+                  !e.metaKey &&
+                  !e.altKey &&
+                  !e.ctrlKey &&
+                  e.currentTarget.selectionStart === e.currentTarget.selectionEnd
+                ) {
                   const direction = e.key === "ArrowRight" ? 1 : -1;
                   const target = e.currentTarget.selectionStart + direction;
                   const snapped = snapCaretOutOfRanges(
-                      target, currentTokenRanges(), direction > 0 ? "right" : "left");
+                    target,
+                    currentTokenRanges(),
+                    direction > 0 ? "right" : "left",
+                  );
                   if (snapped !== target) {
                     e.preventDefault();
                     moveCaret(snapped);
@@ -912,89 +977,89 @@ export const ChatComposer = ({
               onAddConnection={handleAttachOpen}
               onSelectSkill={selectSkillFromAddMenu}
             />
-            {(canChooseFormat || onToggleThinkingTraces) && <DropdownMenu>
-              <DropdownMenu.Trigger
-                render={
-                  <button
-                    type="button"
-                    className="group flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-lg text-kumo-inactive transition-[background-color,color,transform] duration-150 ease-out hover:bg-kumo-tint hover:text-kumo-subtle focus-visible:bg-kumo-tint focus-visible:text-kumo-subtle focus-visible:outline-none active:scale-[0.96] data-[popup-open]:bg-kumo-tint data-[popup-open]:text-kumo-subtle sm:h-8 sm:w-8"
-                    aria-label="More chat options"
-                  >
-                    <DotsThree size={18} weight="bold" />
-                  </button>
-                }
-              />
-              <DropdownMenu.Content collisionPadding={16} className="themed-floating-shadow-lg !z-[1100] !min-w-[170px] rounded-2xl border border-kumo-line/70 bg-kumo-base p-1">
-                {/* The deployment's standard formats. Picking one drops its name into the message at
+            {(canChooseFormat || onToggleThinkingTraces) && (
+              <DropdownMenu>
+                <DropdownMenu.Trigger
+                  render={
+                    <button
+                      type="button"
+                      className="group flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-lg text-kumo-inactive transition-[background-color,color,transform] duration-150 ease-out hover:bg-kumo-tint hover:text-kumo-subtle focus-visible:bg-kumo-tint focus-visible:text-kumo-subtle focus-visible:outline-none active:scale-[0.96] data-[popup-open]:bg-kumo-tint data-[popup-open]:text-kumo-subtle sm:h-8 sm:w-8"
+                      aria-label="More chat options"
+                    >
+                      <DotsThree size={18} weight="bold" />
+                    </button>
+                  }
+                />
+                <DropdownMenu.Content
+                  collisionPadding={16}
+                  className="themed-floating-shadow-lg !z-[1100] !min-w-[170px] rounded-2xl border border-kumo-line/70 bg-kumo-base p-1"
+                >
+                  {/* The deployment's standard formats. Picking one drops its name into the message at
                     the caret; the agent is told what to build from it. */}
-                {canChooseFormat && (
-                  <ComposerFormatMenuItems
-                    onSelect={(format) => void chooseFormat(format)}
-                    showTrailingSeparator={onToggleThinkingTraces !== undefined}
-                  />
-                )}
-                {onToggleThinkingTraces && (
-                  <DropdownMenu.Item
-                    onClick={onToggleThinkingTraces}
-                    className="!h-auto rounded-xl !px-2 !py-1.5 text-[12px] leading-4 font-normal tracking-[-0.15px] text-kumo-subtle transition-colors data-highlighted:bg-kumo-tint/70 data-highlighted:text-kumo-default"
-                  >
-                    <span className="mr-2 inline-flex h-4 w-4 items-center justify-center text-kumo-inactive">
-                      <Brain size={14} />
-                    </span>
-                    <span className="flex-1">
-                      {showThinkingTraces ? "Hide thinking" : "Show thinking"}
-                    </span>
-                  </DropdownMenu.Item>
-                )}
-              </DropdownMenu.Content>
-            </DropdownMenu>}
+                  {canChooseFormat && (
+                    <ComposerFormatMenuItems
+                      onSelect={(format) => void chooseFormat(format)}
+                      showTrailingSeparator={onToggleThinkingTraces !== undefined}
+                    />
+                  )}
+                  {onToggleThinkingTraces && (
+                    <DropdownMenu.Item
+                      onClick={onToggleThinkingTraces}
+                      className="!h-auto rounded-xl !px-2 !py-1.5 text-[12px] leading-4 font-normal tracking-[-0.15px] text-kumo-subtle transition-colors data-highlighted:bg-kumo-tint/70 data-highlighted:text-kumo-default"
+                    >
+                      <span className="mr-2 inline-flex h-4 w-4 items-center justify-center text-kumo-inactive">
+                        <Brain size={14} />
+                      </span>
+                      <span className="flex-1">
+                        {showThinkingTraces ? "Hide thinking" : "Show thinking"}
+                      </span>
+                    </DropdownMenu.Item>
+                  )}
+                </DropdownMenu.Content>
+              </DropdownMenu>
+            )}
           </div>
 
           {/* Right actions */}
           <div className="ml-auto flex min-w-0 flex-shrink items-center gap-1.5">
-              <ComposerModelSelector
-                models={models}
-                selectedModel={selectedModel}
-                onModelChange={onModelChange}
-              />
-              {isAgentActive && onStop ? (
-                <WorkshopIconButton
-                  onClick={onStop}
-                  tone="primary"
-                  className="!h-10 !w-10 sm:!h-8 sm:!w-8"
-                  aria-label="Stop agent"
+            <ComposerModelSelector
+              models={models}
+              selectedModel={selectedModel}
+              onModelChange={onModelChange}
+            />
+            {isAgentActive && onStop ? (
+              <WorkshopIconButton
+                onClick={onStop}
+                tone="primary"
+                className="!h-10 !w-10 sm:!h-8 sm:!w-8"
+                aria-label="Stop agent"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="5" y="5" width="14" height="14" rx="2" />
+                </svg>
+              </WorkshopIconButton>
+            ) : (
+              <WorkshopIconButton
+                onClick={submitMessage}
+                disabled={!canSend}
+                tone="primary"
+                className="!h-10 !w-10 disabled:cursor-not-allowed disabled:opacity-30 sm:!h-8 sm:!w-8"
+                aria-label="Send message"
+              >
+                {/* Arrow-up icon */}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <rect x="5" y="5" width="14" height="14" rx="2" />
-                  </svg>
-                </WorkshopIconButton>
-              ) : (
-                <WorkshopIconButton
-                  onClick={submitMessage}
-                  disabled={!canSend}
-                  tone="primary"
-                  className="!h-10 !w-10 disabled:cursor-not-allowed disabled:opacity-30 sm:!h-8 sm:!w-8"
-                  aria-label="Send message"
-                >
-                  {/* Arrow-up icon */}
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <line x1="12" y1="19" x2="12" y2="5" />
-                    <polyline points="5 12 12 5 19 12" />
-                  </svg>
-                </WorkshopIconButton>
-              )}
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="5 12 12 5 19 12" />
+                </svg>
+              </WorkshopIconButton>
+            )}
           </div>
         </div>
       </div>

@@ -141,9 +141,9 @@ export type JsonSchema = {
 export type McpToolCallResult = CallToolResult;
 
 /** Server identity and capabilities reported by `initialize`. */
-export type McpServerInfo = Partial<Pick<
-  InitializeResult, "protocolVersion" | "serverInfo" | "instructions" | "capabilities"
->>;
+export type McpServerInfo = Partial<
+  Pick<InitializeResult, "protocolVersion" | "serverInfo" | "instructions" | "capabilities">
+>;
 
 /** Thrown when the server demands OAuth. Carries the RFC 9728 resource-metadata URL if advertised. */
 export class McpAuthRequiredError extends Error {
@@ -220,8 +220,9 @@ export function callMayHaveTakenEffect(err: unknown): boolean {
 // Parses the `resource_metadata` parameter out of a `WWW-Authenticate: Bearer ...` header.
 function parseResourceMetadataUrl(wwwAuthenticate: string | null): string | null {
   if (!wwwAuthenticate) return null;
-  const match = /resource_metadata\s*=\s*"([^"]+)"/i.exec(wwwAuthenticate)
-    ?? /resource_metadata\s*=\s*([^\s,]+)/i.exec(wwwAuthenticate);
+  const match =
+    /resource_metadata\s*=\s*"([^"]+)"/i.exec(wwwAuthenticate) ??
+    /resource_metadata\s*=\s*([^\s,]+)/i.exec(wwwAuthenticate);
   return match ? match[1] : null;
 }
 
@@ -265,9 +266,10 @@ async function readSseResponse(
       if (!boundary) return undefined;
       const block = buffered.slice(0, boundary.index);
       buffered = buffered.slice(boundary.index + boundary[0].length);
-      const data = block.split(/\r\n|\r|\n/)
-        .filter(line => line.startsWith("data:"))
-        .map(line => line.slice(5).trimStart())
+      const data = block
+        .split(/\r\n|\r|\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
         .join("\n");
       if (!data) continue;
       try {
@@ -287,13 +289,15 @@ async function readSseResponse(
         const parsed = consume();
         if (parsed) return { parsed, bytes: total };
         throw new McpProtocolError(
-          "MCP server's event stream contained no response to the request.");
+          "MCP server's event stream contained no response to the request.",
+        );
       }
       total += value.byteLength;
       if (total > MAX_RESPONSE_BYTES) {
         await reader.cancel().catch(() => undefined);
         throw new McpProtocolError(
-          `MCP server's event stream exceeded ${MAX_RESPONSE_BYTES} bytes.`);
+          `MCP server's event stream exceeded ${MAX_RESPONSE_BYTES} bytes.`,
+        );
       }
       buffered += decoder.decode(value, { stream: true });
       const parsed = consume();
@@ -323,25 +327,27 @@ function clampText(value: unknown, max: number): string | undefined {
 function clampAnnotations(
   annotations: McpToolAnnotations | undefined,
 ): McpToolAnnotations | undefined {
-  return annotations && {
-    readOnlyHint: typeof annotations.readOnlyHint === "boolean"
-      ? annotations.readOnlyHint : undefined,
-    destructiveHint: typeof annotations.destructiveHint === "boolean"
-      ? annotations.destructiveHint : undefined,
-    idempotentHint: typeof annotations.idempotentHint === "boolean"
-      ? annotations.idempotentHint : undefined,
-    openWorldHint: typeof annotations.openWorldHint === "boolean"
-      ? annotations.openWorldHint : undefined,
-  };
+  return (
+    annotations && {
+      readOnlyHint:
+        typeof annotations.readOnlyHint === "boolean" ? annotations.readOnlyHint : undefined,
+      destructiveHint:
+        typeof annotations.destructiveHint === "boolean" ? annotations.destructiveHint : undefined,
+      idempotentHint:
+        typeof annotations.idempotentHint === "boolean" ? annotations.idempotentHint : undefined,
+      openWorldHint:
+        typeof annotations.openWorldHint === "boolean" ? annotations.openWorldHint : undefined,
+    }
+  );
 }
 
 /** Reduces one untrusted wire tool to the bounded fields this gatekeeper understands. */
 export function clampToolDefinition(tool: McpWireTool | McpTool): McpTool {
-  const schema = tool.inputSchema && typeof tool.inputSchema === "object"
-    ? tool.inputSchema as JsonSchema
-    : undefined;
-  const oversized = schema !== undefined &&
-    JSON.stringify(schema).length > MAX_TOOL_SCHEMA_CHARS;
+  const schema =
+    tool.inputSchema && typeof tool.inputSchema === "object"
+      ? (tool.inputSchema as JsonSchema)
+      : undefined;
+  const oversized = schema !== undefined && JSON.stringify(schema).length > MAX_TOOL_SCHEMA_CHARS;
   return {
     // Pick known fields rather than spreading an untrusted JSON object. Unknown extensions are not
     // used anywhere, and retaining one would let it bypass every per-field cap before caching.
@@ -394,9 +400,10 @@ export class McpClient {
     this.#endpoint = endpoint;
     this.#getAuthorization = getAuthorization;
     this.sessionId = sessionId ?? null;
-    this.#fetchOptions = fetchOptions.timeoutMs !== undefined && fetchOptions.deadline === undefined
-      ? { ...fetchOptions, deadline: Date.now() + fetchOptions.timeoutMs }
-      : fetchOptions;
+    this.#fetchOptions =
+      fetchOptions.timeoutMs !== undefined && fetchOptions.deadline === undefined
+        ? { ...fetchOptions, deadline: Date.now() + fetchOptions.timeoutMs }
+        : fetchOptions;
   }
 
   // The credential most recently sent, kept only so it can be recognised if it comes back. See
@@ -406,7 +413,7 @@ export class McpClient {
   async #headers(method: string): Promise<Headers> {
     const headers = new Headers({
       "Content-Type": "application/json",
-      "Accept": "application/json, text/event-stream",
+      Accept: "application/json, text/event-stream",
       "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
     });
     const authorization = await this.#getAuthorization(method);
@@ -419,21 +426,25 @@ export class McpClient {
   async #post(body: unknown): Promise<Response> {
     let headers: Headers;
     try {
-      const method = typeof body === "object" && body !== null && "method" in body
-        ? String((body as { method: unknown }).method)
-        : "unknown";
+      const method =
+        typeof body === "object" && body !== null && "method" in body
+          ? String((body as { method: unknown }).method)
+          : "unknown";
       headers = await this.#headers(method);
     } catch (err) {
-      throw new McpCallNotDispatchedError(
-        err instanceof Error ? err.message : String(err), err);
+      throw new McpCallNotDispatchedError(err instanceof Error ? err.message : String(err), err);
     }
     let response: Response;
     try {
-      response = await guardedFetch(this.#endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      }, this.#fetchOptions);
+      response = await guardedFetch(
+        this.#endpoint,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+        },
+        this.#fetchOptions,
+      );
     } catch (err) {
       if (err instanceof FetchNotStartedError) {
         throw new McpCallNotDispatchedError(err.message, err);
@@ -448,13 +459,16 @@ export class McpClient {
       await response.body?.cancel().catch(() => undefined);
       throw new McpAuthRequiredError(
         "The MCP server requires authorization.",
-        parseResourceMetadataUrl(response.headers.get("WWW-Authenticate")));
+        parseResourceMetadataUrl(response.headers.get("WWW-Authenticate")),
+      );
     }
     if (response.status === 403) {
       await response.body?.cancel().catch(() => undefined);
       throw new McpProtocolError(
         "The MCP server refused this request. The connected account may not have access to it.",
-        undefined, "declined");
+        undefined,
+        "declined",
+      );
     }
     if (response.status === 404 && this.sessionId) {
       await response.body?.cancel().catch(() => undefined);
@@ -475,8 +489,7 @@ export class McpClient {
 
     if (!response.ok) {
       await response.body?.cancel().catch(() => undefined);
-      throw new McpProtocolError(
-        `MCP server returned HTTP ${response.status} for "${method}".`);
+      throw new McpProtocolError(`MCP server returned HTTP ${response.status} for "${method}".`);
     }
 
     const sessionId = response.headers.get("Mcp-Session-Id");
@@ -498,7 +511,8 @@ export class McpClient {
       } catch (err) {
         throw new McpProtocolError(
           `MCP server's response to "${method}" was too large to read: ` +
-          `${err instanceof Error ? err.message : String(err)}`);
+            `${err instanceof Error ? err.message : String(err)}`,
+        );
       }
       responseBytes = encoder.encode(bodyText).byteLength;
       parsed = extractResponse(bodyText, id);
@@ -507,7 +521,9 @@ export class McpClient {
     if (parsed.error) {
       throw new McpProtocolError(
         `MCP server rejected "${method}": ${this.#quoteServerText(parsed.error.message)}`,
-        parsed.error.code, method === "tools/call" ? "unknown" : "declined");
+        parsed.error.code,
+        method === "tools/call" ? "unknown" : "declined",
+      );
     }
     return { result: parsed.result as T, responseBytes };
   }
@@ -552,10 +568,14 @@ export class McpClient {
   /** Best-effort termination for a transport session this client no longer owns. */
   async closeSession(): Promise<void> {
     if (!this.sessionId) return;
-    const response = await guardedFetch(this.#endpoint, {
-      method: "DELETE",
-      headers: await this.#headers("DELETE"),
-    }, this.#fetchOptions);
+    const response = await guardedFetch(
+      this.#endpoint,
+      {
+        method: "DELETE",
+        headers: await this.#headers("DELETE"),
+      },
+      this.#fetchOptions,
+    );
     await response.body?.cancel();
     this.sessionId = null;
   }
@@ -586,24 +606,28 @@ export class McpClient {
   /** Finds one exact tool without reading pages after the match. */
   async findTool(name: string): Promise<McpTool | undefined> {
     if (!isValidToolName(name)) return undefined;
-    return (await this.#list({
-      maxTools: 1,
-      include: tool => tool.name === name,
-      project: clampToolDefinition,
-      stopWhenFull: true,
-      requireCompleteScan: true,
-    })).tools[0];
+    return (
+      await this.#list({
+        maxTools: 1,
+        include: (tool) => tool.name === name,
+        project: clampToolDefinition,
+        stopWhenFull: true,
+        requireCompleteScan: true,
+      })
+    ).tools[0];
   }
 
   /** Collects at most `maxTools` bounded matching summaries without scanning later pages. */
   async listMatchingToolSummaries(maxTools: number, include: McpToolFilter): Promise<McpTool[]> {
-    return (await this.#list({
-      maxTools,
-      include,
-      project: clampToolSummary,
-      stopWhenFull: true,
-      requireCompleteScan: true,
-    })).tools;
+    return (
+      await this.#list({
+        maxTools,
+        include,
+        project: clampToolSummary,
+        stopWhenFull: true,
+        requireCompleteScan: true,
+      })
+    ).tools;
   }
 
   // The shared listing loop. `project` decides how much of each tool is retained, and therefore how
@@ -629,14 +653,19 @@ export class McpClient {
     const scanLimit = (): { tools: T[]; truncated: boolean } => {
       if (requireCompleteScan) {
         throw new McpProtocolError(
-          "MCP tool discovery exceeded its scan budget.", undefined, "declined");
+          "MCP tool discovery exceeded its scan budget.",
+          undefined,
+          "declined",
+        );
       }
       return { tools, truncated: true };
     };
 
     for (let page = 0; page < MAX_TOOL_PAGES; page++) {
       const measured = await this.#callMeasured<{ tools?: McpWireTool[]; nextCursor?: string }>(
-        "tools/list", cursor === undefined ? {} : { cursor });
+        "tools/list",
+        cursor === undefined ? {} : { cursor },
+      );
       const body = measured.result;
       scannedBytes += measured.responseBytes;
       if (scannedBytes > MAX_SCANNED_TOOL_BYTES) return scanLimit();

@@ -10,7 +10,7 @@ export class FakeKv implements ObserverKv {
 
   get<T>(key: string): T | undefined {
     let value = this.entries.get(key);
-    return value === undefined ? undefined : structuredClone(value) as T;
+    return value === undefined ? undefined : (structuredClone(value) as T);
   }
   put<T>(key: string, value: T): void {
     this.entries.set(key, structuredClone(value));

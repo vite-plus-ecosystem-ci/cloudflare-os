@@ -58,7 +58,8 @@ export interface ObserverStrategy {
 function cannotWithhold(): never {
   throw new Error(
     "This binding's strategy shares every read with admitted observers; use a baseline scope, " +
-    "or track observed sets to withhold a read.");
+      "or track observed sets to withhold a read.",
+  );
 }
 
 /**
@@ -68,7 +69,9 @@ function cannotWithhold(): never {
  */
 export function privateObservers(message: string): ObserverStrategy {
   return {
-    addObserver: async () => { throw new Error(message); },
+    addObserver: async () => {
+      throw new Error(message);
+    },
     removeObserver: async () => {},
     // Vacuously owner-only: no observer is ever admitted, so there is nobody to exclude.
     prepareWithheld: () => NOTHING_TO_RESOLVE,
@@ -94,7 +97,7 @@ export function aclObservers<V>(options: {
     addObserver: async (_id, user) => {
       // Only `true` admits, as in C: a malformed answer from a hand-written oracle denies rather
       // than admits, and the two strategies must not disagree on what counts as access.
-      if (await options.hasAccess(asVerifier<V>(user)) !== true) {
+      if ((await options.hasAccess(asVerifier<V>(user))) !== true) {
         throw new Error(options.denyMessage ?? OBSERVER_DENIED);
       }
     },
@@ -112,8 +115,8 @@ export function trackedSetObservers<V>(options: ObserverTrackerOptions<V>): Obse
   const tracker = new ObserverTracker<V>(options);
   return {
     addObserver: (id, user) => tracker.addObserver(id, asVerifier<V>(user)),
-    removeObserver: async id => tracker.removeObserver(id),
-    prepare: setIds => tracker.prepareObservation(setIds),
+    removeObserver: async (id) => tracker.removeObserver(id),
+    prepare: (setIds) => tracker.prepareObservation(setIds),
     observerIds: () => tracker.observerIds(),
     prepareWithheld: () => tracker.prepareWithheld(),
   };
@@ -209,7 +212,8 @@ export class ObservationGate implements Disposable {
     const exclude = check.excludeObservers;
     try {
       await this.#queue.authorizeObservation(
-        exclude?.length ? { ...input, excludeObservers: exclude } : input);
+        exclude?.length ? { ...input, excludeObservers: exclude } : input,
+      );
     } catch (error) {
       check.discard?.();
       throw error;
@@ -232,7 +236,8 @@ export class ObservationGate implements Disposable {
         if (scope.ids.length === 0) {
           throw new Error(
             'An observation scope of kind "sets" needs at least one set id; use ' +
-            '{ kind: "baseline" } for a read the admission baseline covers.');
+              '{ kind: "baseline" } for a read the admission baseline covers.',
+          );
         }
         return (await this.#strategy.prepare?.(scope.ids)) ?? NOTHING_TO_RESOLVE;
     }

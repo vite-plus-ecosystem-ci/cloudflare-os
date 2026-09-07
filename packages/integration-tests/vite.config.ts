@@ -3,18 +3,18 @@ import {
   withTestTimeout,
   VITEST_TOOL_SCRATCH_EXCLUSIONS,
   WRANGLER_RUNTIME_SCRATCH_EXCLUSIONS,
-} from '@gadgets/scripts/vitest-task'
+} from "@gadgets/scripts/vitest-task";
 
 export default {
   run: {
     tasks: {
       /** Builds the fixture and orders both validated Workers before test files start. */
-      'build:test-gatekeeper': {
+      "build:test-gatekeeper": {
         command: withTestTimeout(
-          'capnweb-validate build --cwd fixtures/gatekeeper-test --out .wrangler/validate',
+          "capnweb-validate build --cwd fixtures/gatekeeper-test --out .wrangler/validate",
         ),
         cache: false,
-        dependsOn: ['@gadgets/workshop-backend#build:integration-worker'],
+        dependsOn: ["@gadgets/workshop-backend#build:integration-worker"],
       },
       /**
        * The one suite that keeps `.wrangler/validate` in its fingerprint instead of excluding it.
@@ -34,12 +34,12 @@ export default {
        * does write: `tmp/` (per-boot bundles) and `state/` (local DO/KV storage).
        */
       test: {
-        ...vitestTaskWithExclusions('vitest run', [
+        ...vitestTaskWithExclusions("vitest run", [
           ...VITEST_TOOL_SCRATCH_EXCLUSIONS,
           ...WRANGLER_RUNTIME_SCRATCH_EXCLUSIONS,
         ]),
-        dependsOn: ['build:test-gatekeeper'],
+        dependsOn: ["build:test-gatekeeper"],
       },
     },
   },
-}
+};

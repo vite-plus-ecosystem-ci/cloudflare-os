@@ -38,8 +38,8 @@ refusal rather than an admission.
 
 ### What a Worker binding trusts, and what it re-checks
 
-The scope filter is prepended to every query, but a filter the provider *accepted* is not evidence it
-*applied* it — three separate behaviours here return wrong-but-plausible data with no error. So events
+The scope filter is prepended to every query, but a filter the provider _accepted_ is not evidence it
+_applied_ it — three separate behaviours here return wrong-but-plausible data with no error. So events
 are re-filtered on the way out, and a single foreign event is treated as proof the filter was dropped:
 the provider's `count` is withheld (it would be a count of the whole account's matching telemetry) and
 the event is logged at `error`. `statistics` is kept, because it describes what our query cost rather
@@ -51,7 +51,7 @@ guaranteed outage would be the worse trade.
 
 `calculate()` is the exception, and knowingly so: an aggregate cannot be un-mixed, so there is no
 second line of defence to add. It rests entirely on the injected filter. The fix that would work —
-grouping by `$metadata.service` and keeping this binding's own group, whose value *is* the correctly
+grouping by `$metadata.service` and keeping this binding's own group, whose value _is_ the correctly
 scoped answer even for a median — changes `limit` and `orderBy` semantics for every caller, so it is a
 follow-up rather than a footnote.
 
@@ -89,14 +89,14 @@ that scope; identity comes from the `/user` API (`user-details.read`).
 
 ### Why an error's text never reaches the log
 
-`summarizeFilter` deliberately keeps filter *values* out of the audit trail — they are caller text.
+`summarizeFilter` deliberately keeps filter _values_ out of the audit trail — they are caller text.
 But a provider error message can quote that same value straight back, so logging the message would
 readmit through the error path exactly what the audit path excludes. `CloudflareObservabilityApiError`
 therefore carries Cloudflare's numeric `codes` alongside the message: the request log names the
 codes, and the message travels only to the caller who caused it.
 
 The codes are not the discriminator, though — Cloudflare can return a message with no numeric code
-at all, so the error records separately whether the message is *its* or *ours*, and only ours is
+at all, so the error records separately whether the message is _its_ or _ours_, and only ours is
 logged. A provider failure carrying no codes is therefore logged as a bare status, which is the
 fail-closed answer: the status still says what happened without quoting anyone's filter back.
 

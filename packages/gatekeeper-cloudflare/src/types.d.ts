@@ -50,9 +50,20 @@ export type CloudflareObservabilityTimeframe = {
 
 /** A comparison operation supported by Workers Observability filters. */
 export type CloudflareObservabilityFilterOperation =
-  | "includes" | "not_includes" | "starts_with" | "regex"
-  | "exists" | "is_null" | "in" | "not_in"
-  | "eq" | "neq" | "gt" | "gte" | "lt" | "lte";
+  | "includes"
+  | "not_includes"
+  | "starts_with"
+  | "regex"
+  | "exists"
+  | "is_null"
+  | "in"
+  | "not_in"
+  | "eq"
+  | "neq"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte";
 
 /**
  * A recursive filter expression. Discover exact field names and types with `listKeys()` rather than
@@ -73,28 +84,30 @@ export type CloudflareObservabilityFilterOperation =
  *   ],
  * }
  */
-export type CloudflareObservabilityFilter = {
-  /** Discriminator for one field comparison. */
-  kind: "filter";
-  /**
-   * Exact indexed field name returned by `listKeys()`.
-   *
-   * Note that your own structured log fields are indexed under their bare name, even though
-   * `listEvents()` returns them nested under `source`: a field logged as `{event: "x"}` is filtered
-   * as `event`. `source.event` is accepted as an alias for convenience, but `listKeys()` reports the
-   * indexed name and is the reliable source.
-   */
-  key: string;
-  operation: CloudflareObservabilityFilterOperation;
-  /** Must match the type reported by `listKeys()`. */
-  type: CloudflareObservabilityValueType;
-  value?: string | number | boolean;
-} | {
-  /** Discriminator for a logical combination of filters. */
-  kind: "group";
-  filterCombination: "and" | "or";
-  filters: CloudflareObservabilityFilter[];
-};
+export type CloudflareObservabilityFilter =
+  | {
+      /** Discriminator for one field comparison. */
+      kind: "filter";
+      /**
+       * Exact indexed field name returned by `listKeys()`.
+       *
+       * Note that your own structured log fields are indexed under their bare name, even though
+       * `listEvents()` returns them nested under `source`: a field logged as `{event: "x"}` is filtered
+       * as `event`. `source.event` is accepted as an alias for convenience, but `listKeys()` reports the
+       * indexed name and is the reliable source.
+       */
+      key: string;
+      operation: CloudflareObservabilityFilterOperation;
+      /** Must match the type reported by `listKeys()`. */
+      type: CloudflareObservabilityValueType;
+      value?: string | number | boolean;
+    }
+  | {
+      /** Discriminator for a logical combination of filters. */
+      kind: "group";
+      filterCombination: "and" | "or";
+      filters: CloudflareObservabilityFilter[];
+    };
 
 /** Full-text search applied across event fields; use a structured `filter` for known field values. */
 export type CloudflareObservabilitySearch = {
@@ -352,24 +365,41 @@ export type CloudflareObservabilityTrace = {
  * @example
  * { operator: "p99", key: "$metadata.duration", keyType: "number", alias: "p99Duration" }
  */
-export type CloudflareObservabilityCalculation = {
-  /** Counts matching events and needs no field. */
-  operator: "count";
-  /** Stable result name used by `orderBy` and returned calculation metadata. */
-  alias?: string;
-} | {
-  /** Aggregate function to apply to `key`. */
-  operator:
-    | "uniq" | "max" | "min" | "sum" | "avg" | "median"
-    | "p001" | "p01" | "p05" | "p10" | "p25" | "p75" | "p90"
-    | "p95" | "p99" | "p999" | "stddev" | "variance";
-  /** Indexed field to aggregate. */
-  key: string;
-  /** Indexed type of `key`; use the type returned by `listKeys()`. */
-  keyType: CloudflareObservabilityValueType;
-  /** Stable result name used by `orderBy` and returned calculation metadata. */
-  alias?: string;
-};
+export type CloudflareObservabilityCalculation =
+  | {
+      /** Counts matching events and needs no field. */
+      operator: "count";
+      /** Stable result name used by `orderBy` and returned calculation metadata. */
+      alias?: string;
+    }
+  | {
+      /** Aggregate function to apply to `key`. */
+      operator:
+        | "uniq"
+        | "max"
+        | "min"
+        | "sum"
+        | "avg"
+        | "median"
+        | "p001"
+        | "p01"
+        | "p05"
+        | "p10"
+        | "p25"
+        | "p75"
+        | "p90"
+        | "p95"
+        | "p99"
+        | "p999"
+        | "stddev"
+        | "variance";
+      /** Indexed field to aggregate. */
+      key: string;
+      /** Indexed type of `key`; use the type returned by `listKeys()`. */
+      keyType: CloudflareObservabilityValueType;
+      /** Stable result name used by `orderBy` and returned calculation metadata. */
+      alias?: string;
+    };
 
 /** A field used to group aggregate results; use a field and type discovered with `listKeys()`. */
 export type CloudflareObservabilityGroupBy = {
@@ -460,14 +490,19 @@ export interface CloudflareObservabilitySession {
    * Discover indexed fields and their types for this binding and timeframe. Call this before using
    * an unfamiliar field in `listValues()`, a filter, grouping, or calculation.
    */
-  listKeys(options?: CloudflareObservabilityDiscoveryOptions): Promise<CloudflareObservabilityKey[]>;
+  listKeys(
+    options?: CloudflareObservabilityDiscoveryOptions,
+  ): Promise<CloudflareObservabilityKey[]>;
 
   /**
    * Discover observed values for an indexed field. Pass the exact key and type returned by
    * `listKeys()` and use the result to build a structured filter without guessing values.
    */
-  listValues(key: string, type: CloudflareObservabilityValueType,
-    options?: CloudflareObservabilityDiscoveryOptions): Promise<CloudflareObservabilityValue[]>;
+  listValues(
+    key: string,
+    type: CloudflareObservabilityValueType,
+    options?: CloudflareObservabilityDiscoveryOptions,
+  ): Promise<CloudflareObservabilityValue[]>;
 
   /**
    * List records from Cloudflare's events view. A record may be an invocation/custom log,
@@ -475,29 +510,36 @@ export interface CloudflareObservabilitySession {
    * cursor remains or a page is empty, but treat `events.length` as returned records, not an exact
    * total, whenever `statistics.abrLevel` is greater than 1.
    */
-  listEvents(query?: CloudflareObservabilityEventsQuery): Promise<CloudflareObservabilityEventsPage>;
+  listEvents(
+    query?: CloudflareObservabilityEventsQuery,
+  ): Promise<CloudflareObservabilityEventsPage>;
 
   /**
    * List matching Worker invocations with telemetry grouped by request ID. Prefer this over
    * `listEvents()` when the user asks about requests, executions, or invocation-level failures.
    */
-  listInvocations(query?: CloudflareObservabilityInvocationsQuery):
-    Promise<CloudflareObservabilityInvocationsPage>;
+  listInvocations(
+    query?: CloudflareObservabilityInvocationsQuery,
+  ): Promise<CloudflareObservabilityInvocationsPage>;
 
   /**
    * List account-wide distributed trace summaries. Worker-scoped bindings reject this operation
    * because each summary contains cross-service data; discover trace IDs with `listEvents()` and
    * call `getTrace()` instead.
    */
-  listTraces(query?: CloudflareObservabilityTracesQuery): Promise<CloudflareObservabilityTracesPage>;
+  listTraces(
+    query?: CloudflareObservabilityTracesQuery,
+  ): Promise<CloudflareObservabilityTracesPage>;
 
   /**
    * Retrieve bounded events for one known trace ID within the requested timeframe. Expand the
    * default one-hour timeframe when the trace is older. Throws when no event is found; check
    * `truncated` because very large traces are capped.
    */
-  getTrace(traceId: string, options?: CloudflareObservabilityTraceOptions):
-    Promise<CloudflareObservabilityTrace>;
+  getTrace(
+    traceId: string,
+    options?: CloudflareObservabilityTraceOptions,
+  ): Promise<CloudflareObservabilityTrace>;
 
   /**
    * Calculate aggregate metrics and optional grouped time series over matching telemetry. Discover
@@ -509,6 +551,7 @@ export interface CloudflareObservabilitySession {
    * computed across services could not be un-mixed. Treat a surprisingly large aggregate as a
    * question to raise with the user rather than a fact about the bound Worker.
    */
-  calculate(query: CloudflareObservabilityCalculationQuery):
-    Promise<CloudflareObservabilityCalculationResult>;
+  calculate(
+    query: CloudflareObservabilityCalculationQuery,
+  ): Promise<CloudflareObservabilityCalculationResult>;
 }

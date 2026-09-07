@@ -59,7 +59,7 @@ never both; `runAt()` accepts neither.
   that instant, inclusively. An absolute epoch-millisecond `until` is also accepted. Registration
   rejects a cutoff that precedes the schedule's first occurrence.
 
-The count bounds *due slots*, not successful runs. A slot consumes one count as soon as it becomes
+The count bounds _due slots_, not successful runs. A slot consumes one count as soon as it becomes
 due and takes a `runId`, even if admission or callback delivery then fails; admission failures skip
 the slot without retrying it. Retries reuse the same `runId` and do not consume another count.
 Missed occurrences remain skipped and do not count.

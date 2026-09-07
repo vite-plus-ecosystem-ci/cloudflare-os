@@ -83,8 +83,11 @@ export class KvTtlCache {
     const entryKey = `${CACHE_PREFIX}entry:${key}`;
     const generation = this.#generation();
     const entry = this.#kv.get<CacheEntry<T>>(entryKey);
-    if (entry?.authority === authority && entry.generation === generation
-      && Date.now() - entry.fetchedAt < ttlMs) {
+    if (
+      entry?.authority === authority &&
+      entry.generation === generation &&
+      Date.now() - entry.fetchedAt < ttlMs
+    ) {
       return entry.value;
     }
 
@@ -93,8 +96,12 @@ export class KvTtlCache {
     return this.#loads.run(loadKey, async () => {
       const value = await load();
       if (this.#generation() === generation && this.#authority() === authority) {
-        this.#kv.put<CacheEntry<T>>(entryKey,
-          { value, fetchedAt: Date.now(), generation, authority });
+        this.#kv.put<CacheEntry<T>>(entryKey, {
+          value,
+          fetchedAt: Date.now(),
+          generation,
+          authority,
+        });
       }
       return value;
     });

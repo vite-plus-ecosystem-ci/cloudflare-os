@@ -7,7 +7,10 @@ export class HttpError extends Error {
    * @param status Numeric HTTP status.
    * @param message Error message.
    */
-  constructor(readonly status: number, message: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
     super(message);
     this.name = "HttpError";
   }

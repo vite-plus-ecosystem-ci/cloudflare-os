@@ -14,7 +14,7 @@ const HTML_ESCAPES: Readonly<Record<string, string>> = {
  * @returns Escaped HTML text.
  */
 export function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, char => HTML_ESCAPES[char]!);
+  return value.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]!);
 }
 
 /**
@@ -126,8 +126,10 @@ export const SELF_CLOSING_HTML = `<!DOCTYPE html>
 <body><p>Connected. You can close this window.</p><script>window.close();</script></body></html>`;
 
 /** The page a connect link that has expired or been used already lands on. */
-export const INVALID_LINK_HTML =
-  errorPageHtml("This link has expired", "Start the connection again.");
+export const INVALID_LINK_HTML = errorPageHtml(
+  "This link has expired",
+  "Start the connection again.",
+);
 
 /**
  * Renders a connect-flow error page.

@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
-  RESERVED_METHOD_NAMES, installToolMethods, toMethodName, toolMethodNames,
+  RESERVED_METHOD_NAMES,
+  installToolMethods,
+  toMethodName,
+  toolMethodNames,
 } from "../src/session-methods.js";
 import type { ClassifiedTool } from "../src/tools.js";
 
@@ -20,8 +23,12 @@ class Base {
     this.calls.push([name, args]);
     return `called:${name}`;
   }
-  getActionResult(_id: number) { return "result"; }
-  listTools() { return []; }
+  getActionResult(_id: number) {
+    return "result";
+  }
+  listTools() {
+    return [];
+  }
 }
 
 describe("toMethodName", () => {
@@ -47,8 +54,18 @@ describe("toolMethodNames", () => {
   it("skips names the RPC layer cannot deliver", () => {
     // Measured against a real Cap'n Web session: each of these is intercepted by the stub or resolves
     // to something other than the target's method. A generated method would look present and misbehave.
-    for (const name of ["then", "catch", "finally", "dup", "onRpcBroken", "constructor", "toString",
-                        "valueOf", "hasOwnProperty", "map"]) {
+    for (const name of [
+      "then",
+      "catch",
+      "finally",
+      "dup",
+      "onRpcBroken",
+      "constructor",
+      "toString",
+      "valueOf",
+      "hasOwnProperty",
+      "map",
+    ]) {
       expect(toolMethodNames([tool(name)]).size, name).toBe(0);
     }
   });
@@ -68,9 +85,13 @@ describe("toolMethodNames", () => {
   });
 
   it("preserves delegates that predate progressive discovery", () => {
-    expect([...toolMethodNames([
-      tool("search_tools"), tool("describe_tool"), tool("call_discovered_tool"),
-    ])]).toEqual([
+    expect([
+      ...toolMethodNames([
+        tool("search_tools"),
+        tool("describe_tool"),
+        tool("call_discovered_tool"),
+      ]),
+    ]).toEqual([
       ["searchTools", "search_tools"],
       ["describeTool", "describe_tool"],
       ["callDiscoveredTool", "call_discovered_tool"],
@@ -83,7 +104,8 @@ describe("toolMethodNames", () => {
   });
 
   it("keeps every reserved name in the exported set, so the two cannot drift", () => {
-    for (const name of ["then", "map", "callTool"]) expect(RESERVED_METHOD_NAMES.has(name)).toBe(true);
+    for (const name of ["then", "map", "callTool"])
+      expect(RESERVED_METHOD_NAMES.has(name)).toBe(true);
   });
 });
 

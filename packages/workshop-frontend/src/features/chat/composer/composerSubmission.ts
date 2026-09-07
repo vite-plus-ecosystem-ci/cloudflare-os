@@ -38,7 +38,9 @@ export const buildComposerSubmission = ({
   let adjustedCapsules = capsules;
   if (formats.length > 0) {
     for (const format of [...formats].toSorted((a, b) => b.start - a.start)) {
-      messageText = messageText.slice(0, format.start) + format.noun +
+      messageText =
+        messageText.slice(0, format.start) +
+        format.noun +
         messageText.slice(format.start + format.length);
     }
     adjustedCapsules = capsules.map((capsule) => {
@@ -79,7 +81,9 @@ export const buildComposerSubmission = ({
     for (const [index, capsule] of sortedCapsules.entries()) {
       const placeholder = `[${index}]`;
       const adjustedStart = capsule.start + cumulativeShift;
-      processedMessage = processedMessage.slice(0, adjustedStart) + placeholder +
+      processedMessage =
+        processedMessage.slice(0, adjustedStart) +
+        placeholder +
         processedMessage.slice(adjustedStart + capsule.length);
       capsuleSpecifiers.push({
         position: adjustedStart,

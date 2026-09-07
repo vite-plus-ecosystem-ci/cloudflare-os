@@ -1,6 +1,10 @@
 import { DurableObject, RpcStub, RpcTarget } from "cloudflare:workers";
 import type {
-  ActionDescription, ApprovalQueue, GitCache, HookController, HookDescription,
+  ActionDescription,
+  ApprovalQueue,
+  GitCache,
+  HookController,
+  HookDescription,
   ObservationDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
 import { TestGitCache } from "./test-git-cache";
@@ -54,9 +58,9 @@ export class TestHooks extends DurableObject<Env> {
     let queue = new TestApprovalQueue();
     {
       using approvalQueue = new RpcStub<ApprovalQueue>(queue);
-      using session = await this.#gatekeeper(facetName).startSession(
+      using session = (await this.#gatekeeper(facetName).startSession(
         approvalQueue as unknown as ApprovalQueue,
-      ) as GoogleDocSession & Disposable;
+      )) as GoogleDocSession & Disposable;
       await session.appendText(markdown);
     }
     if (queue.actionId === undefined) throw new Error("Action was not submitted");
@@ -66,9 +70,9 @@ export class TestHooks extends DurableObject<Env> {
   /** The `lastModified` a metadata read reports, as epoch milliseconds. */
   async readMetadata(facetName: string): Promise<number> {
     using approvalQueue = new RpcStub<ApprovalQueue>(new TestApprovalQueue());
-    using session = await this.#gatekeeper(facetName).startSession(
+    using session = (await this.#gatekeeper(facetName).startSession(
       approvalQueue as unknown as ApprovalQueue,
-    ) as GoogleDocSession & Disposable;
+    )) as GoogleDocSession & Disposable;
     let metadata = await session.getMetadata();
     return metadata.lastModified.valueOf();
   }
@@ -76,9 +80,9 @@ export class TestHooks extends DurableObject<Env> {
   /** The simulated document content a read reports. */
   async readContent(facetName: string): Promise<string> {
     using approvalQueue = new RpcStub<ApprovalQueue>(new TestApprovalQueue());
-    using session = await this.#gatekeeper(facetName).startSession(
+    using session = (await this.#gatekeeper(facetName).startSession(
       approvalQueue as unknown as ApprovalQueue,
-    ) as GoogleDocSession & Disposable;
+    )) as GoogleDocSession & Disposable;
     let content = await session.getContent();
     return content;
   }

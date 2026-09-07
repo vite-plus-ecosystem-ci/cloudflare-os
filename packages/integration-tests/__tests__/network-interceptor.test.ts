@@ -4,7 +4,7 @@
 // These cases stay serial because they replace globalThis.fetch inside one file process. Vitest's
 // default fork pool gives each parallel test file its own process and global state.
 
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it } from "vite-plus/test";
 import { NetworkInterceptor, type Handler } from "../src/network-interceptor.js";
 
 const realFetch = globalThis.fetch;
@@ -38,8 +38,14 @@ it("passes loopback traffic through to the real fetch untouched", async () => {
 
 it("asks handlers in order and takes the first non-null answer", async () => {
   const asked: string[] = [];
-  const declines: Handler = url => { asked.push(`declines ${url.host}`); return null; };
-  const answers: Handler = url => { asked.push(`answers ${url.host}`); return new Response("two"); };
+  const declines: Handler = (url) => {
+    asked.push(`declines ${url.host}`);
+    return null;
+  };
+  const answers: Handler = (url) => {
+    asked.push(`answers ${url.host}`);
+    return new Response("two");
+  };
   new NetworkInterceptor({ handlers: [declines, answers, neverAsked] }).install();
 
   const res = await fetch("https://vendor.test/api");
@@ -49,7 +55,10 @@ it("asks handlers in order and takes the first non-null answer", async () => {
 });
 
 it("passes an explicitly allowed external request to the real fetch", async () => {
-  const interceptor = new NetworkInterceptor({ handlers: [], allow: url => url.hostname === "model.test" });
+  const interceptor = new NetworkInterceptor({
+    handlers: [],
+    allow: (url) => url.hostname === "model.test",
+  });
   interceptor.install();
 
   const response = await fetch("https://model.test/chat");
@@ -62,7 +71,9 @@ it("supports a handler that parks until the test provides an answer", async () =
   // Load-bearing for the CF Access transfer mock: the Worker starts polling before the test knows
   // what to serve, so a handler must be able to wait (see the Handler type's doc comment).
   let serve!: (body: string) => void;
-  const parked = new Promise<string>(resolve => { serve = resolve; });
+  const parked = new Promise<string>((resolve) => {
+    serve = resolve;
+  });
   new NetworkInterceptor({ handlers: [async () => new Response(await parked)] }).install();
 
   const pending = fetch("https://vendor.test/poll");
@@ -80,7 +91,9 @@ it("hands handlers the method and headers from any fetch input form", async () =
 
   await fetch("https://a.test/", { method: "post", headers: { authorization: "one" } });
   await fetch(new URL("https://b.test/"));
-  await fetch(new Request("https://c.test/", { method: "PUT", headers: { authorization: "three" } }));
+  await fetch(
+    new Request("https://c.test/", { method: "PUT", headers: { authorization: "three" } }),
+  );
   expect(seen).toEqual([
     "POST https://a.test/ auth=one",
     "GET https://b.test/ auth=null",
@@ -93,7 +106,8 @@ it("throws on an unmatched request and records it", async () => {
   interceptor.install();
 
   await expect(fetch("https://escaped.test/x")).rejects.toThrow(
-    "Unmocked outbound request: GET https://escaped.test/x");
+    "Unmocked outbound request: GET https://escaped.test/x",
+  );
   expect(interceptor.getUnmockedCalls()).toEqual(["GET https://escaped.test/x"]);
   expect(fetchedByReal).toEqual([]);
 

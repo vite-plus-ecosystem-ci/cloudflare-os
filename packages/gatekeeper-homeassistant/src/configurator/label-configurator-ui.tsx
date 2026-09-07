@@ -16,16 +16,24 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return <Section>
-      <Field label="Label" description="Choose a Home Assistant label. The binding grants access to every entity carrying this label.">
-        <Autocomplete
-          name="labelId"
-          value={values.labelId}
-          placeholder="Search labels..."
-          loadOptions={query => ui.listLabels(query)}
-          onChange={labelId => setValues({ labelId })}
-        />
-      </Field>
-    </Section>;
+    return (
+      <Section>
+        <Field
+          label="Label"
+          description="Choose a Home Assistant label. The binding grants access to every entity carrying this label."
+        >
+          <Autocomplete
+            name="labelId"
+            value={values.labelId}
+            placeholder="Search labels..."
+            loadOptions={(query) => ui.listLabels(query)}
+            onChange={(labelId) => setValues({ labelId })}
+          />
+        </Field>
+      </Section>
+    );
   },
-} satisfies ConfiguratorUISpec<HomeAssistantLabelConfiguratorRpc, HomeAssistantLabelConfiguratorValues>;
+} satisfies ConfiguratorUISpec<
+  HomeAssistantLabelConfiguratorRpc,
+  HomeAssistantLabelConfiguratorValues
+>;

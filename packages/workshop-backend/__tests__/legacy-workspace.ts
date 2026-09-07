@@ -5,11 +5,14 @@
 // storage) and by the DO-level integration tests (git-migration-do.test.ts, over a real
 // Durable Object's storage).
 
-import { expect } from "vitest";
+import { expect } from "vite-plus/test";
 import * as Y from "yjs";
 import { keyString } from "@gadgets/typed-storage";
 import type {
-  AiChatAuthorInfo, AiChatMessage, ChatCodeBase, WorkpieceId,
+  AiChatAuthorInfo,
+  AiChatMessage,
+  ChatCodeBase,
+  WorkpieceId,
 } from "@gadgets/workshop-shared/api";
 import { applyCodeChange, type CodeContent } from "@gadgets/workshop-shared/code-change";
 import { makeMockStorage } from "./mock-storage";
@@ -54,8 +57,8 @@ export class LegacyWorkspace {
     this.#doc.on("updateV2", handler);
     this.#doc.transact(() => fn(this.#doc));
     this.#doc.off("updateV2", handler);
-    let update = captured.length > 0
-        ? Y.mergeUpdatesV2(captured) : Y.encodeStateAsUpdateV2(new Y.Doc());
+    let update =
+      captured.length > 0 ? Y.mergeUpdatesV2(captured) : Y.encodeStateAsUpdateV2(new Y.Doc());
     this.#updates.push(update);
     let version = ++this.#version;
     this.storage.code.put({ version, timestamp: new Date(timestampMs), update });
@@ -77,19 +80,30 @@ export class LegacyWorkspace {
     return doc;
   }
 
-  addGadget(id: number, bindingName: string,
-            pending?: { chatId: number, sequence?: number }): void {
+  addGadget(
+    id: number,
+    bindingName: string,
+    pending?: { chatId: number; sequence?: number },
+  ): void {
     // Legacy pre-v4 rows deliberately lack the `type` discriminant (the 3→4 migration stamps
     // it), so this bypasses the current record type.
     this.storage.gadgets.put({
-      id, title: bindingName, created: new Date(T0), bindingName, bindings: {},
+      id,
+      title: bindingName,
+      created: new Date(T0),
+      bindingName,
+      bindings: {},
       ...(pending !== undefined ? { pending } : {}),
     } as GadgetRecord);
   }
 
   addChat(id: number): void {
-    this.storage.chatMeta.put(
-        { id, title: "Chat", started: new Date(T0), lastActive: new Date(T0 + id) });
+    this.storage.chatMeta.put({
+      id,
+      title: "Chat",
+      started: new Date(T0),
+      lastActive: new Date(T0 + id),
+    });
   }
 
   addMessage(chatId: number, author: AiChatAuthorInfo, body: object): number {
@@ -101,7 +115,11 @@ export class LegacyWorkspace {
     // Yjs `update`) are exactly what the migration consumes, so this deliberately bypasses the
     // current wire type.
     this.storage.chats.put({
-      chatId, sequence, timestamp: new Date(T0 + ++this.#timestamp), author, ...body,
+      chatId,
+      sequence,
+      timestamp: new Date(T0 + ++this.#timestamp),
+      author,
+      ...body,
     } as AiChatMessage);
     return sequence;
   }
@@ -109,7 +127,10 @@ export class LegacyWorkspace {
   /** Records a legacy live draft (see ChatDraftUpdateRecord in overseer.ts). */
   addDraft(chatId: number, update: Uint8Array): void {
     this.storage.chatDraftUpdates.put({
-      chatId, timestamp: new Date(T0 + ++this.#timestamp), author: USER, update,
+      chatId,
+      timestamp: new Date(T0 + ++this.#timestamp),
+      author: USER,
+      update,
     });
   }
 
@@ -129,16 +150,20 @@ export class LegacyWorkspace {
         defaultGadgetId = id;
         // A legacy row, like addGadget's (the migration host predates the v4 type stamp).
         this.storage.gadgets.put({
-          id, title: "Workspace", created: new Date(T0), bindingName: "GADGET", bindings: {},
+          id,
+          title: "Workspace",
+          created: new Date(T0),
+          bindingName: "GADGET",
+          bindings: {},
         } as GadgetRecord);
         return id;
       },
-      gadgetRootName: (id) => id === defaultGadgetId ? "" : `${id}`,
+      gadgetRootName: (id) => (id === defaultGadgetId ? "" : `${id}`),
       getActiveChatCompaction: (chatId) => {
         let compactedTo = this.storage.chatMeta.get(chatId)?.compactedTo;
-        return compactedTo === undefined ? undefined
-            : this.storage.chatCompactions.get(
-                `${keyString(chatId)}.${keyString(compactedTo)}`);
+        return compactedTo === undefined
+          ? undefined
+          : this.storage.chatCompactions.get(`${keyString(chatId)}.${keyString(compactedTo)}`);
       },
       // The shared counter keeps conversion timestamps unique against every message's (the
       // chats collection's byTimestamp index is unique), like the real getChatTimestamp().
@@ -147,8 +172,9 @@ export class LegacyWorkspace {
   }
 
   mergeMessages(chatId: number): Extract<AiChatMessage, { type: "merge" }>[] {
-    return [...this.storage.chats.list({ prefix: `${keyString(chatId)}.` })]
-        .filter(msg => msg.type === "merge");
+    return [...this.storage.chats.list({ prefix: `${keyString(chatId)}.` })].filter(
+      (msg) => msg.type === "merge",
+    );
   }
 
   messages(chatId: number): AiChatMessage[] {
@@ -157,7 +183,8 @@ export class LegacyWorkspace {
 
   conversionMessage(chatId: number): Extract<AiChatMessage, { type: "changes" }> {
     let found = this.messages(chatId).filter(
-        msg => msg.type === "changes" && msg.conversionBoundary);
+      (msg) => msg.type === "changes" && msg.conversionBoundary,
+    );
     expect(found).toHaveLength(1);
     return found[0] as Extract<AiChatMessage, { type: "changes" }>;
   }
@@ -214,10 +241,13 @@ export function readDocFiles(doc: Y.Doc, rootName: string): Map<string, string> 
  * update log rather than against the migration's own doc.
  */
 export async function expectHeadsMatchDoc(
-    storage: Pick<OverseerStorage, "gadgets">, gitStore: GitStore, doc: Y.Doc,
-    defaultGadgetId?: WorkpieceId): Promise<void> {
+  storage: Pick<OverseerStorage, "gadgets">,
+  gitStore: GitStore,
+  doc: Y.Doc,
+  defaultGadgetId?: WorkpieceId,
+): Promise<void> {
   for (let record of storage.gadgets.list()) {
-    let gadget = record as GadgetRecord;  // legacy workspaces hold only gadgets
+    let gadget = record as GadgetRecord; // legacy workspaces hold only gadgets
     if (gadget.pending !== undefined) {
       expect(gadget.commitId).toBeUndefined();
       continue;

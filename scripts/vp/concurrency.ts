@@ -69,8 +69,10 @@ export const VP_RUN_CONCURRENCY_LIMIT = "VP_RUN_CONCURRENCY_LIMIT";
  * setting meant for the workspace should not depend on where the command was typed. Three hops:
  * scripts/vp → scripts → repo root.
  */
-export const ROOT_ENV_FILE =
-    join(dirname(dirname(dirname(fileURLToPath(import.meta.url)))), ".env");
+export const ROOT_ENV_FILE = join(
+  dirname(dirname(dirname(fileURLToPath(import.meta.url)))),
+  ".env",
+);
 
 /**
  * `VP_RUN_CONCURRENCY_LIMIT` as spelled in `envFile`, or `null` when the file is absent or does not
@@ -172,7 +174,10 @@ function selfCgroupPaths(procSelfCgroup: string): { v2: string; v1: string } {
 // break its space-separated format. Applied in a single regex pass, so an escaped backslash cannot
 // be re-read as the start of another escape.
 const MOUNTINFO_ESCAPES: Record<string, string> = {
-  "040": " ", "011": "\t", "012": "\n", "134": "\\",
+  "040": " ",
+  "011": "\t",
+  "012": "\n",
+  "134": "\\",
 };
 
 function unescapeMountPoint(field: string): string {
@@ -237,7 +242,7 @@ export function cgroupMounts(mountInfo: string = PROC_SELF_MOUNTINFO): {
 function withAncestors(path: string): string[] {
   const paths = ["/"];
   let current = "";
-  for (const segment of path.split("/").filter(part => part.length > 0)) {
+  for (const segment of path.split("/").filter((part) => part.length > 0)) {
     current += `/${segment}`;
     paths.push(current);
   }
@@ -260,7 +265,9 @@ function withAncestors(path: string): string[] {
  */
 export function cgroupMemoryLimitBytes(probe: CgroupProbe = {}): number | null {
   const {
-    root = CGROUP_ROOT, procSelfCgroup = PROC_SELF_CGROUP, mountInfo = PROC_SELF_MOUNTINFO,
+    root = CGROUP_ROOT,
+    procSelfCgroup = PROC_SELF_CGROUP,
+    mountInfo = PROC_SELF_MOUNTINFO,
     platform = process.platform,
   } = probe;
   // Nothing else has cgroups, and this keeps macOS and Windows at zero syscalls.
@@ -272,8 +279,8 @@ export function cgroupMemoryLimitBytes(probe: CgroupProbe = {}): number | null {
 
   const paths = selfCgroupPaths(procSelfCgroup);
   const files = [
-    ...withAncestors(paths.v2).map(path => join(v2Root, path, "memory.max")),
-    ...withAncestors(paths.v1).map(path => join(v1MemoryRoot, path, "memory.limit_in_bytes")),
+    ...withAncestors(paths.v2).map((path) => join(v2Root, path, "memory.max")),
+    ...withAncestors(paths.v1).map((path) => join(v1MemoryRoot, path, "memory.limit_in_bytes")),
   ];
 
   let limit: number | null = null;
@@ -296,8 +303,8 @@ function isCeiling(value: number | null): value is number {
 /** The smaller of the two finite ceilings; `hostBytes` alone when there is no cgroup limit. */
 export function effectiveMemoryBytes(hostBytes: number, cgroupLimitBytes: number | null): number {
   return isCeiling(hostBytes) && isCeiling(cgroupLimitBytes)
-      ? Math.min(hostBytes, cgroupLimitBytes)
-      : hostBytes;
+    ? Math.min(hostBytes, cgroupLimitBytes)
+    : hostBytes;
 }
 
 /** The machine facts, measured. */
@@ -316,7 +323,9 @@ export function measureMachine(): Machine {
  * the failure it replaces was a value that looked set and silently was not.
  */
 export function concurrencyEnv(
-  env: NodeJS.ProcessEnv, machine: Machine, envFileValue: string | null = null,
+  env: NodeJS.ProcessEnv,
+  machine: Machine,
+  envFileValue: string | null = null,
 ): { env: NodeJS.ProcessEnv; note: string | null } {
   if (env[VP_RUN_CONCURRENCY_LIMIT] !== undefined) return { env: { ...env }, note: null };
 
@@ -334,7 +343,8 @@ export function concurrencyEnv(
   const memory = machine.cgroupLimited ? `${gib} GiB cgroup limit` : `${gib} GiB`;
   return {
     env: { ...env, [VP_RUN_CONCURRENCY_LIMIT]: String(limit) },
-    note: `vp run: concurrency ${limit} (${machine.cpus} cpus, ${memory}) -- ` +
+    note:
+      `vp run: concurrency ${limit} (${machine.cpus} cpus, ${memory}) -- ` +
       `set ${VP_RUN_CONCURRENCY_LIMIT} in the environment or the repo-root .env to override`,
   };
 }
@@ -352,9 +362,12 @@ export function concurrencyEnv(
  * exactly the silent mismatch this module exists to prevent. So it errs towards silence.
  */
 export function overridesConcurrency(args: readonly string[]): boolean {
-  return args.some(arg =>
-      arg === "--concurrency-limit" || arg.startsWith("--concurrency-limit=") ||
-      arg === "--parallel");
+  return args.some(
+    (arg) =>
+      arg === "--concurrency-limit" ||
+      arg.startsWith("--concurrency-limit=") ||
+      arg === "--parallel",
+  );
 }
 
 /**
@@ -374,15 +387,18 @@ export function overridesConcurrency(args: readonly string[]): boolean {
  * either. `concurrentRuns <= 1` returns a copy of `env` unchanged.
  */
 export function splitConcurrencyLimit(
-  env: NodeJS.ProcessEnv, concurrentRuns: number,
+  env: NodeJS.ProcessEnv,
+  concurrentRuns: number,
 ): NodeJS.ProcessEnv {
   if (concurrentRuns <= 1) return { ...env };
 
   const total = Number(env[VP_RUN_CONCURRENCY_LIMIT]);
   if (!Number.isInteger(total) || total < 1) return { ...env };
 
-  const perRun =
-      Math.min(total, Math.max(VP_DEFAULT_CONCURRENCY_LIMIT, Math.floor(total / concurrentRuns)));
+  const perRun = Math.min(
+    total,
+    Math.max(VP_DEFAULT_CONCURRENCY_LIMIT, Math.floor(total / concurrentRuns)),
+  );
   return { ...env, [VP_RUN_CONCURRENCY_LIMIT]: String(perRun) };
 }
 
@@ -419,9 +435,11 @@ export interface VpRunEnvOptions {
  * The note names the *undivided* number, since that is the machine's budget and what the user would
  * set to override it; with `concurrentRuns > 1` each child then gets its share of it.
  */
-export function vpRunEnv(
-  { vpArgs = [], concurrentRuns = 1, env = process.env }: VpRunEnvOptions = {},
-): NodeJS.ProcessEnv {
+export function vpRunEnv({
+  vpArgs = [],
+  concurrentRuns = 1,
+  env = process.env,
+}: VpRunEnvOptions = {}): NodeJS.ProcessEnv {
   const result = concurrencyEnv(env, measureMachine(), envFileConcurrencyLimit());
   if (result.note && !overridesConcurrency(vpArgs)) console.error(result.note);
   return splitConcurrencyLimit(result.env, concurrentRuns);

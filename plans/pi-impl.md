@@ -1,10 +1,10 @@
 # Migrating from the Vercel AI SDK to pi-ai + pi-agent-core: implementation playbook
 
-*Companion to `plans/pi.md` (feasibility). This is a direct implementation guide for a coding
+_Companion to `plans/pi.md` (feasibility). This is a direct implementation guide for a coding
 agent: all design decisions are made; implement the whole thing in one pass. The project is in
 early alpha — minor behavioral regressions are acceptable and will be fixed as discovered. Do
 not build parallel/intermediate implementations, compatibility shims for the old path, or
-elaborate test harnesses.*
+elaborate test harnesses._
 
 **Reference materials:** `@earendil-works/pi-ai` and `@earendil-works/pi-agent-core`
 (0.83.0, exact-pinned) are already installed in `packages/workshop-backend`. The installed
@@ -90,8 +90,8 @@ These are settled; do not re-litigate during implementation.
   suspension. Only its error-classification `catch` and the `getModel` call change.
 - Replay **logic** in `runAgent`: merge/revert status pass, version locks,
   `pendingReplayEdits`, crashed-turn re-adoption (creations/binding additions), binding
-  accumulation, `PARAMS_n` allocation, revert elision, `changeIdMap`. Only the *shapes
-  pushed into the model context* change.
+  accumulation, `PARAMS_n` allocation, revert elision, `changeIdMap`. Only the _shapes
+  pushed into the model context_ change.
 - Compaction policy (`agent-compaction.ts` boundary/checkpoint logic) — only projection
   types and the summarization call change.
 - `CodePreviewManager`, `ExecuteCodeStreamManager`, `streaming-json-parser.ts`.
@@ -152,14 +152,17 @@ line numbers; locate by symbol name.)
 pi streams never reject; adapt to throwing callers once:
 
 ```ts
-export type ModelHandle = { /* §4.2 */ };
-export async function completeText(handle: ModelHandle, args: {
-  systemPrompt?: string;
-  prompt?: string;               // convenience: wraps into a single user message
-  messages?: Message[];
-  maxTokens?: number;
-  signal?: AbortSignal;
-}): Promise<string>;
+export type ModelHandle = {/* §4.2 */};
+export async function completeText(
+  handle: ModelHandle,
+  args: {
+    systemPrompt?: string;
+    prompt?: string; // convenience: wraps into a single user message
+    messages?: Message[];
+    maxTokens?: number;
+    signal?: AbortSignal;
+  },
+): Promise<string>;
 ```
 
 Implementation: `handle.stream(handle.model, context, options).result()`; if
@@ -179,16 +182,20 @@ Keep that outer shape; the handle absorbs the log route:
 
 ```ts
 export type ModelHandle = {
-  model: Model<Api>;     // pi model descriptor
-  stream: StreamFn;      // (model, context, options) => AssistantMessageEventStream
-                         // closes over routing/auth; merges per-API options; never throws
-  aiGatewayLogRoute?: AiGatewayLogRoute;  // for cost accounting; replaces
-                                          // getModelWithLogRoute's second return + the
-                                          // aiGatewayLogRoute parameter of runAgent
+  model: Model<Api>; // pi model descriptor
+  stream: StreamFn; // (model, context, options) => AssistantMessageEventStream
+  // closes over routing/auth; merges per-API options; never throws
+  aiGatewayLogRoute?: AiGatewayLogRoute; // for cost accounting; replaces
+  // getModelWithLogRoute's second return + the
+  // aiGatewayLogRoute parameter of runAgent
   // plus whatever mechanism surfaces the last response's cf-aig-log-id and HTTP status
 };
-export function getModel(env, config: AiModelConfig, initiator: AiChatAuthorInfo,
-                         options: ModelRoutingOptions = {}): ModelHandle;
+export function getModel(
+  env,
+  config: AiModelConfig,
+  initiator: AiChatAuthorInfo,
+  options: ModelRoutingOptions = {},
+): ModelHandle;
 ```
 
 Keep `buildMetadata` / `GatewayMetadataContext` / the structured `GatewayMetadata`
@@ -214,10 +221,10 @@ Key implementation facts (verified; see §9):
   and set whatever keeps requests stateless with encrypted reasoning); Workers AI models
   get `sendSessionAffinityHeaders: true` and honor `WORKERS_AI_OUTPUT_LIMIT`.
 - **Routing modes** (same three as today, § markers refer to current code):
-  - *Direct* (`getModelDirect`): baseUrl = provider default or `config.apiUrl`;
+  - _Direct_ (`getModelDirect`): baseUrl = provider default or `config.apiUrl`;
     `apiKey = config.apiToken`. Ollama: baseUrl = `config.apiUrl` + `/v1`, bearer header
     only when `apiToken` non-empty (as today).
-  - *Platform AI Gateway* (`getModelViaGateway`): baseUrl per upstream —
+  - _Platform AI Gateway_ (`getModelViaGateway`): baseUrl per upstream —
     `https://gateway.ai.cloudflare.com/v1/{accountId}/{gateway}/anthropic` (api
     anthropic-messages), `.../openai` (openai-responses), `.../google-ai-studio`
     (google-generative-ai; pi's own gateway catalog skips google but the passthrough path +
@@ -233,7 +240,7 @@ Key implementation facts (verified; see §9):
     requests only. `aiGatewayLogRoute`: always the token variant
     `{gateway, accountId, apiToken}` (the binding variant is never produced under pi);
     none for the direct-REST Workers AI path.
-  - *BYOK* (`getModelViaUserGateway`): baseUrl
+  - _BYOK_ (`getModelViaUserGateway`): baseUrl
     `https://gateway.ai.cloudflare.com/v1/{userAccountId}/default/compat`, compound
     `{UNIFIED_BILLING_PROVIDER_PATH[provider]}/{model}` id, openai-completions api,
     `cf-aig-authorization: Bearer <user token>`, same metadata header;
@@ -268,16 +275,16 @@ otherwise.
 
 **Replay (agent.ts:1159–1844):** keep all logic; change pushed shapes:
 
-| Today | pi |
-|---|---|
-| two `{role:"system"}` slots | none in the array — build `Context.systemPrompt` from the two strings at the end (keep `modelMessageSources`' slot entries or drop them; adjust compaction projection accordingly) |
-| `{role:"user", content}` | `{role:"user", content, timestamp}` (`UserMessage`; timestamp from the chat record) |
-| user parts array (text/image/file) | `(TextContent \| ImageContent)[]`; images become `{type:"image", data: base64, mimeType}` (pi wants base64 strings — encode); text-like attachments stay inlined text as today; **any other type → text marker** `[Attached file <name> (<mime>) omitted — this file type is no longer supported]` |
-| `{role:"assistant", content}` + `ToolCallPart`s | `AssistantMessage` with `content: [{type:"text",text}, ...{type:"toolCall", id, name, arguments}]` — use a helper `makeReplayAssistantMessage(content, timestamp)` filling required bookkeeping fields (`api`/`provider`/`model` from the handle, zero `usage`, `stopReason:"stop"`) |
-| `{role:"tool", content:[tool-result]}` | `ToolResultMessage {role:"toolResult", toolCallId, toolName, content:[{type:"text",text}], isError, timestamp}` |
-| output `{type:"text"\|"json", value}` | text content; JSON via `JSON.stringify(value)` — define one helper used by replay so live results (§ tools below) and replayed results produce identical text |
-| output `{type:"error-text"}` | text content + `isError: true` |
-| checkpoint summary user message | same, as `UserMessage` |
+| Today                                           | pi                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| two `{role:"system"}` slots                     | none in the array — build `Context.systemPrompt` from the two strings at the end (keep `modelMessageSources`' slot entries or drop them; adjust compaction projection accordingly)                                                                                                                 |
+| `{role:"user", content}`                        | `{role:"user", content, timestamp}` (`UserMessage`; timestamp from the chat record)                                                                                                                                                                                                                |
+| user parts array (text/image/file)              | `(TextContent \| ImageContent)[]`; images become `{type:"image", data: base64, mimeType}` (pi wants base64 strings — encode); text-like attachments stay inlined text as today; **any other type → text marker** `[Attached file <name> (<mime>) omitted — this file type is no longer supported]` |
+| `{role:"assistant", content}` + `ToolCallPart`s | `AssistantMessage` with `content: [{type:"text",text}, ...{type:"toolCall", id, name, arguments}]` — use a helper `makeReplayAssistantMessage(content, timestamp)` filling required bookkeeping fields (`api`/`provider`/`model` from the handle, zero `usage`, `stopReason:"stop"`)               |
+| `{role:"tool", content:[tool-result]}`          | `ToolResultMessage {role:"toolResult", toolCallId, toolName, content:[{type:"text",text}], isError, timestamp}`                                                                                                                                                                                    |
+| output `{type:"text"\|"json", value}`           | text content; JSON via `JSON.stringify(value)` — define one helper used by replay so live results (§ tools below) and replayed results produce identical text                                                                                                                                      |
+| output `{type:"error-text"}`                    | text content + `isError: true`                                                                                                                                                                                                                                                                     |
+| checkpoint summary user message                 | same, as `UserMessage`                                                                                                                                                                                                                                                                             |
 
 The empty-message skip (Anthropic rejects empties, agent.ts:1294) stays.
 
@@ -295,7 +302,7 @@ joined `slot0 + "\n\n" + slot1` into `systemPrompt` instead of occupying array s
   should see (for JSON results, the same helper as replay) and `details` replaces
   `toolCallNotes` — carry `observedCodeVersion`, recorded `output`
   (webFetch/setGadgetBinding/createGadget/listBlueprints/etc.), and on failure set
-  `details` via the existing try/catch pattern *before* rethrowing. Since a thrown error
+  `details` via the existing try/catch pattern _before_ rethrowing. Since a thrown error
   loses `details` in pi's conversion, keep notes for the error path in a local
   `toolCallNotes`-like map (only for errors; success data rides `details`). Alternatively
   return an explicit error result — but pi marks `isError` only for thrown errors, so
@@ -310,15 +317,23 @@ joined `slot0 + "\n\n" + slot1` into `systemPrompt` instead of occupying array s
 ```ts
 let context: AgentContext = { systemPrompt, messages, tools };
 let turnCount = 0;
-let newMessages = await runAgentLoopContinue(context, {
-  model: handle.model,
-  convertToLlm: (msgs) => msgs as Message[],
-  toolExecution: "sequential",
-  maxTokens: maxOutputTokens,
-  shouldStopAfterTurn: () =>
-      ++turnCount >= 30 || connectionRequested || awaitingActionDecision ||
+let newMessages = await runAgentLoopContinue(
+  context,
+  {
+    model: handle.model,
+    convertToLlm: (msgs) => msgs as Message[],
+    toolExecution: "sequential",
+    maxTokens: maxOutputTokens,
+    shouldStopAfterTurn: () =>
+      ++turnCount >= 30 ||
+      connectionRequested ||
+      awaitingActionDecision ||
       (callbackInitiated && hooks.activeAgentCallbackCount(chatId) === 0),
-}, emit, abortSignal, handle.stream);
+  },
+  emit,
+  abortSignal,
+  handle.stream,
+);
 ```
 
 (Exact signature/order per pi source — verify. If `runAgentLoopContinue` rejects our
@@ -340,7 +355,7 @@ guarantees — fall back to `agentLoop` with the tail split out.)
   - Run `consumeCapturedActions` (latching `awaitingActionDecision`) and
     `consumeCapturedConnectionRequests` exactly as today (agent.ts:2846–2863).
   - `hooks.addChatMessages(chatId, author, msgs, usage.totalTokens,
-    capturedAiGatewayLogId, handle.aiGatewayLogRoute)` — the hook already takes the route
+capturedAiGatewayLogId, handle.aiGatewayLogRoute)` — the hook already takes the route
     (see `AgentHooks.addChatMessages`); the log id comes from the handle's `onResponse`
     capture instead of `response.headers`.
   - Reset per-step streaming state (`executeCodeStreamManager.clear()` etc.).
@@ -355,13 +370,13 @@ lastResponseStatus)` (§4.5).
 **Client stream fan-out** (replacing the `onChunk` switch, agent.ts:2745–2794), driven by
 `message_update.assistantMessageEvent`:
 
-| pi event | action |
-|---|---|
-| `text_delta` | `emitStreamEvent({type:"textDelta", delta})` |
-| `thinking_delta` | `reasoningDelta` |
+| pi event         | action                                                                                                                                                                                                   |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `text_delta`     | `emitStreamEvent({type:"textDelta", delta})`                                                                                                                                                             |
+| `thinking_delta` | `reasoningDelta`                                                                                                                                                                                         |
 | `toolcall_start` | read id/name from `partial.content[contentIndex]`; emit `toolCallStarted`; `codePreviewManager.startToolCall`; `executeCodeStreamManager.startToolCall`; `clearActiveFile` for non-file tools (as today) |
-| `toolcall_delta` | `appendInput(id, delta)` on both managers (raw JSON fragment — same feed as today) |
-| `toolcall_end` | `finishToolCall`; emit `toolCallFinished` — except executeCode, which waits for `tool_execution_end` (as today) |
+| `toolcall_delta` | `appendInput(id, delta)` on both managers (raw JSON fragment — same feed as today)                                                                                                                       |
+| `toolcall_end`   | `finishToolCall`; emit `toolCallFinished` — except executeCode, which waits for `tool_execution_end` (as today)                                                                                          |
 
 This replaces the old "mark previous tool finished when the next starts" workaround; if
 Workers AI via pi turns out to delay `toolcall_end` events, live with it (alpha) and note
@@ -491,9 +506,9 @@ Verified against the pi source; re-verify signatures in `pi/` before relying on 
 - `Message = UserMessage | AssistantMessage | ToolResultMessage`.
 - `UserMessage {role:"user", content: string | (TextContent|ImageContent)[], timestamp}`.
 - `AssistantMessage {role:"assistant", content: (TextContent|ThinkingContent|ToolCall)[],
-  api, provider, model, usage: Usage, stopReason: StopReason, errorMessage?, timestamp, ...}`.
+api, provider, model, usage: Usage, stopReason: StopReason, errorMessage?, timestamp, ...}`.
 - `ToolResultMessage {role:"toolResult", toolCallId, toolName,
-  content:(TextContent|ImageContent)[], details?, isError, timestamp}`.
+content:(TextContent|ImageContent)[], details?, isError, timestamp}`.
 - `TextContent {type:"text", text}`; `ThinkingContent {type:"thinking", thinking, redacted?}`;
   `ImageContent {type:"image", data /*base64*/, mimeType}`;
   `ToolCall {type:"toolCall", id, name, arguments}`.
@@ -502,17 +517,17 @@ Verified against the pi source; re-verify signatures in `pi/` before relying on 
   events + final messages, never thrown/rejected.
 - `Tool {name, description, parameters: TSchema}` (TypeBox; `Type`, `Static` re-exported).
 - `StreamOptions {temperature?, maxTokens?, signal?, apiKey?, fetch?, headers?
-  (null value suppresses a default header), env? (placeholder substitution, e.g.
-  CLOUDFLARE_ACCOUNT_ID), sessionId?, cacheRetention? ("none"|"short"|"long", default
-  short), onPayload? (may return replacement payload), onResponse? ({status, headers},
-  model), maxRetries?, metadata?, timeoutMs?}`; `SimpleStreamOptions` adds
+(null value suppresses a default header), env? (placeholder substitution, e.g.
+CLOUDFLARE_ACCOUNT_ID), sessionId?, cacheRetention? ("none"|"short"|"long", default
+short), onPayload? (may return replacement payload), onResponse? ({status, headers},
+model), maxRetries?, metadata?, timeoutMs?}`; `SimpleStreamOptions` adds
   `reasoning?: "minimal"|...|"max"`.
 - Streaming events: `start`, `text_start/delta/end`, `thinking_start/delta/end`,
   `toolcall_start/delta/end` (delta = raw JSON fragment; `partial: AssistantMessage` on
   every event), `done {reason, message}`, `error {reason, error: AssistantMessage}`.
   Streams: `for await` + `.result(): Promise<AssistantMessage>`.
 - `Model<TApi> {id, name, api, provider, baseUrl, reasoning, input, cost, contextWindow,
-  maxTokens, compat?}` — plain data; caller-constructed models work; api dispatch only.
+maxTokens, compat?}` — plain data; caller-constructed models work; api dispatch only.
 
 **Cloudflare specifics** (`node_modules/@earendil-works/pi-ai/dist/providers/cloudflare-*.js`, `api/cloudflare.js`):
 
@@ -538,15 +553,15 @@ of the final user-role message (includes tool_result); recomputed per request;
 **pi-agent-core** (`node_modules/@earendil-works/pi-agent-core/dist/`):
 
 - `runAgentLoopContinue(context: AgentContext, config: AgentLoopConfig,
-  emit: AgentEventSink, signal: AbortSignal|undefined, streamFn: StreamFn):
-  Promise<AgentMessage[]>` — context's last message must be user/toolResult; `emit` is
+emit: AgentEventSink, signal: AbortSignal|undefined, streamFn: StreamFn):
+Promise<AgentMessage[]>` — context's last message must be user/toolResult; `emit` is
   awaited at every emission (a durable-persistence barrier).
 - `AgentContext {systemPrompt, messages: AgentMessage[], tools?: AgentTool[]}`;
   `AgentLoopConfig extends SimpleStreamOptions {model, convertToLlm (required),
-  transformContext?, shouldStopAfterTurn?, getSteeringMessages?, getFollowUpMessages?,
-  toolExecution?: "sequential"|"parallel", beforeToolCall?, afterToolCall?, prepareNextTurn?}`.
+transformContext?, shouldStopAfterTurn?, getSteeringMessages?, getFollowUpMessages?,
+toolExecution?: "sequential"|"parallel", beforeToolCall?, afterToolCall?, prepareNextTurn?}`.
 - `AgentTool {name, label, description, parameters: TSchema,
-  execute(toolCallId, params, signal?, onUpdate?): Promise<AgentToolResult>, executionMode?}`;
+execute(toolCallId, params, signal?, onUpdate?): Promise<AgentToolResult>, executionMode?}`;
   `AgentToolResult {content, details, terminate?}`; thrown errors become
   `isError: true` results with the message as text (details lost — hence the error side
   map in §4.3).
@@ -556,4 +571,4 @@ of the final user-role message (includes tool_result); recomputed per request;
 - Per-turn ordering: `turn_end` (awaited) → `prepareNextTurn` → `shouldStopAfterTurn` →
   steering/follow-up polls. Error/aborted stop: `turn_end` then `agent_end`, loop returns.
 - `StreamFn = (model, context, options?: SimpleStreamOptions) => AssistantMessageEventStream
-  | Promise<...>` — must never throw.
+| Promise<...>` — must never throw.

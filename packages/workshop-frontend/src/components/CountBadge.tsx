@@ -1,19 +1,20 @@
 export function CountBadge({
   count,
-  tone = 'tint',
+  tone = "tint",
   max = 9,
-  className = '',
+  className = "",
 }: {
-  count: number
-  tone?: 'solid' | 'tint'
-  max?: number
-  className?: string
+  count: number;
+  tone?: "solid" | "tint";
+  max?: number;
+  className?: string;
 }) {
-  if (count <= 0) return null
+  if (count <= 0) return null;
 
-  const toneClassName = tone === 'solid'
-    ? 'border border-kumo-base bg-kumo-brand text-white'
-    : 'bg-kumo-brand/15 text-kumo-strong'
+  const toneClassName =
+    tone === "solid"
+      ? "border border-kumo-base bg-kumo-brand text-white"
+      : "bg-kumo-brand/15 text-kumo-strong";
 
   return (
     <span
@@ -21,5 +22,5 @@ export function CountBadge({
     >
       {count > max ? `${max}+` : count}
     </span>
-  )
+  );
 }

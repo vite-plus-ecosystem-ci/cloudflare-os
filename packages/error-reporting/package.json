@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test:run": "vitest run"
+    "test:run": "vp test run"
   },
   "devDependencies": {
     "@gadgets/scripts": "workspace:*",

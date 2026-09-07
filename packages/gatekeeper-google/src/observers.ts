@@ -98,12 +98,14 @@ async function mapWithConcurrency<In, Out>(
 ): Promise<Out[]> {
   let results: Out[] = Array.from({ length: items.length });
   let next = 0;
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      let index = next++;
-      results[index] = await fn(items[index]);
-    }
-  }));
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) {
+        let index = next++;
+        results[index] = await fn(items[index]);
+      }
+    }),
+  );
   return results;
 }
 
@@ -158,8 +160,9 @@ export class ObserverTracker<T, V> {
   /** Every set this binding has read or is attempting to read, in storage order. */
   listTracked(): T[] {
     let prefix = this.#options.setPrefix;
-    return [...this.#kv.list<ObservedSetState>({ prefix })]
-        .map(([key]) => this.#options.decode(key.slice(prefix.length)));
+    return [...this.#kv.list<ObservedSetState>({ prefix })].map(([key]) =>
+      this.#options.decode(key.slice(prefix.length)),
+    );
   }
 
   /** Canonical and currently-staged observers, paired with their verifiers. */
@@ -185,7 +188,7 @@ export class ObserverTracker<T, V> {
    */
   async prepareObservation(values: readonly T[]): Promise<ObserverCheck<T>> {
     let seen = new Set<string>();
-    let pendingSets = values.filter(value => {
+    let pendingSets = values.filter((value) => {
       let encoded = this.#options.encode(value);
       if (seen.has(encoded)) return false;
       seen.add(encoded);
@@ -194,12 +197,14 @@ export class ObserverTracker<T, V> {
     if (pendingSets.length === 0) return { pendingSets, commit() {} };
 
     let untracked = pendingSets.filter(
-      value => this.#kv.get<ObservedSetState>(this.#setKey(value)) === undefined);
+      (value) => this.#kv.get<ObservedSetState>(this.#setKey(value)) === undefined,
+    );
     let tracked = this.listTracked().length;
     if (tracked + untracked.length > this.#maxTrackedSets) {
       throw new Error(
         `This binding has read ${tracked} distinct items, the most it can track while remaining ` +
-        "shareable. Bind a narrower scope.");
+          "shareable. Bind a narrower scope.",
+      );
     }
     for (let value of untracked) this.#kv.put(this.#setKey(value), "pending");
 
@@ -207,8 +212,9 @@ export class ObserverTracker<T, V> {
     let denied = new Set<string>();
     if (this.#options.verifyBatch) {
       let verifyBatch = this.#options.verifyBatch;
-      let results = await mapWithConcurrency(
-        observers, this.#concurrency, ([, verifier]) => verifyBatch(verifier, pendingSets));
+      let results = await mapWithConcurrency(observers, this.#concurrency, ([, verifier]) =>
+        verifyBatch(verifier, pendingSets),
+      );
       for (let [index, [id]] of observers.entries()) {
         let result = results[index];
         assertBatchResultLength(result, pendingSets.length);
@@ -218,10 +224,12 @@ export class ObserverTracker<T, V> {
       let hasAccess = this.#options.hasAccess!;
       // One flat queue over (observer, set) pairs: nesting two Promise.alls would multiply out to an
       // unbounded number of concurrent round trips.
-      let pairs = observers.flatMap(
-        ([id, verifier]) => pendingSets.map(value => ({ id, verifier, value })));
-      let access = await mapWithConcurrency(
-        pairs, this.#concurrency, pair => hasAccess(pair.verifier, pair.value));
+      let pairs = observers.flatMap(([id, verifier]) =>
+        pendingSets.map((value) => ({ id, verifier, value })),
+      );
+      let access = await mapWithConcurrency(pairs, this.#concurrency, (pair) =>
+        hasAccess(pair.verifier, pair.value),
+      );
       for (let [index, pair] of pairs.entries()) {
         if (!access[index]) denied.add(pair.id);
       }
@@ -272,7 +280,8 @@ export class ObserverTracker<T, V> {
     try {
       for (;;) {
         let pending = this.listTracked().filter(
-          value => !checked.has(this.#options.encode(value)));
+          (value) => !checked.has(this.#options.encode(value)),
+        );
         if (!needsBaselineCheck && pending.length === 0) {
           this.#assertCurrentAdmission(nonceKey, nonce);
           this.#kv.put(observerKey, verifier);
@@ -309,13 +318,14 @@ export class ObserverTracker<T, V> {
     let checked = new Set<string>();
     for (;;) {
       let tracked = this.listTracked();
-      let pending = tracked.filter(value => !checked.has(this.#options.encode(value)));
+      let pending = tracked.filter((value) => !checked.has(this.#options.encode(value)));
       if (pending.length === 0) {
         if (recordObservers) this.#kv.put(observerKey, verifier);
         return;
       }
-      let access = await mapWithConcurrency(
-        pending, this.#concurrency, value => hasAccess(verifier, value));
+      let access = await mapWithConcurrency(pending, this.#concurrency, (value) =>
+        hasAccess(verifier, value),
+      );
       let deniedIndex = access.indexOf(false);
       if (deniedIndex >= 0) throw new Error(this.#options.deniedMessage(pending[deniedIndex]));
       for (let value of pending) checked.add(this.#options.encode(value));

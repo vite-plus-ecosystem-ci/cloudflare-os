@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { computeReplaceOperations, docToMarkdown } from "../src/markdown-converter";
 import type { Segment } from "../src/markdown-converter";
 import { BULLET_LIST, buildDoc } from "./doc-fixture";
@@ -18,24 +18,32 @@ function docText(runs: string[]): string {
 
 describe("docToMarkdown", () => {
   it("renders headings, inline styles, links and bullets", () => {
-    let snapshot = docToMarkdown(buildDoc([
-      { runs: ["Title\n"], namedStyleType: "HEADING_1" },
-      { runs: ["Sub\n"], namedStyleType: "HEADING_2" },
-      { runs: [
-        "Hello ",
-        { text: "bold", style: { bold: true } },
-        " and ",
-        { text: "it", style: { italic: true } },
-        " and ",
-        { text: "link", style: { link: { url: "https://e.com" } } },
-        ".\n",
-      ] },
-      { runs: ["one\n"], bullet: { listId: "L1", nestingLevel: 0 } },
-      { runs: ["two\n"], bullet: { listId: "L1", nestingLevel: 0 } },
-    ], BULLET_LIST));
+    let snapshot = docToMarkdown(
+      buildDoc(
+        [
+          { runs: ["Title\n"], namedStyleType: "HEADING_1" },
+          { runs: ["Sub\n"], namedStyleType: "HEADING_2" },
+          {
+            runs: [
+              "Hello ",
+              { text: "bold", style: { bold: true } },
+              " and ",
+              { text: "it", style: { italic: true } },
+              " and ",
+              { text: "link", style: { link: { url: "https://e.com" } } },
+              ".\n",
+            ],
+          },
+          { runs: ["one\n"], bullet: { listId: "L1", nestingLevel: 0 } },
+          { runs: ["two\n"], bullet: { listId: "L1", nestingLevel: 0 } },
+        ],
+        BULLET_LIST,
+      ),
+    );
 
     expect(snapshot.markdown).toBe(
-      "# Title\n\n## Sub\n\nHello **bold** and *it* and [link](https://e.com).\n\n- one\n- two\n");
+      "# Title\n\n## Sub\n\nHello **bold** and *it* and [link](https://e.com).\n\n- one\n- two\n",
+    );
   });
 
   it("carries the title, revision and body end index through", () => {
@@ -50,19 +58,26 @@ describe("docToMarkdown", () => {
 // These are what keeps an edit from landing on the wrong characters. A content segment claims a
 // 1:1 mapping between Markdown and document indices, and computeReplaceOperations trusts it.
 describe("source map invariants", () => {
-  let snapshot = docToMarkdown(buildDoc([
-    { runs: ["Title\n"], namedStyleType: "HEADING_1" },
-    { runs: [
-      "Hello ",
-      { text: "bold", style: { bold: true } },
-      " and ",
-      { text: "link", style: { link: { url: "https://e.com" } } },
-      ".\n",
-    ] },
-    { runs: ["one\n"], bullet: { listId: "L1", nestingLevel: 0 } },
-  ], BULLET_LIST));
+  let snapshot = docToMarkdown(
+    buildDoc(
+      [
+        { runs: ["Title\n"], namedStyleType: "HEADING_1" },
+        {
+          runs: [
+            "Hello ",
+            { text: "bold", style: { bold: true } },
+            " and ",
+            { text: "link", style: { link: { url: "https://e.com" } } },
+            ".\n",
+          ],
+        },
+        { runs: ["one\n"], bullet: { listId: "L1", nestingLevel: 0 } },
+      ],
+      BULLET_LIST,
+    ),
+  );
   let text = docText(["Title\n", "Hello ", "bold", " and ", "link", ".\n", "one\n"]);
-  let segments = snapshot.sourceMap.blocks.flatMap(b => b.segments);
+  let segments = snapshot.sourceMap.blocks.flatMap((b) => b.segments);
   let contentSegments = segments.filter(isContent);
 
   it("gives every content segment equal length in both spaces", () => {
@@ -73,8 +88,9 @@ describe("source map invariants", () => {
 
   it("maps every content segment to the same text in both spaces", () => {
     for (let seg of contentSegments) {
-      expect(snapshot.markdown.slice(seg.mdStart, seg.mdEnd))
-        .toBe(text.slice(seg.docStart, seg.docEnd));
+      expect(snapshot.markdown.slice(seg.mdStart, seg.mdEnd)).toBe(
+        text.slice(seg.docStart, seg.docEnd),
+      );
     }
   });
 
@@ -105,16 +121,17 @@ describe("source map invariants", () => {
 });
 
 describe("computeReplaceOperations", () => {
-  let snapshot = docToMarkdown(buildDoc([
-    { runs: ["Title\n"], namedStyleType: "HEADING_1" },
-    { runs: ["Hello ", { text: "bold", style: { bold: true } }, " world.\n"] },
-  ]));
+  let snapshot = docToMarkdown(
+    buildDoc([
+      { runs: ["Title\n"], namedStyleType: "HEADING_1" },
+      { runs: ["Hello ", { text: "bold", style: { bold: true } }, " world.\n"] },
+    ]),
+  );
   let md = snapshot.markdown;
   let replace = (oldText: string, newText: string) => {
     let start = md.indexOf(oldText);
     expect(start).toBeGreaterThanOrEqual(0);
-    return computeReplaceOperations(
-      snapshot.sourceMap, md, start, start + oldText.length, newText);
+    return computeReplaceOperations(snapshot.sourceMap, md, start, start + oldText.length, newText);
   };
 
   it("renders the fixture as expected", () => {

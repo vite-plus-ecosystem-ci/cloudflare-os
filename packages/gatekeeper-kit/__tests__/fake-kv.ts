@@ -22,7 +22,7 @@ export function fakeKv(): FakeKv {
   return {
     get: <T>(key: string) => {
       const stored = values.get(key);
-      return stored === undefined ? undefined : structuredClone(stored) as T;
+      return stored === undefined ? undefined : (structuredClone(stored) as T);
     },
     put: (key, value) => {
       writes.push(key);

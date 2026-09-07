@@ -20,11 +20,12 @@ export const CapturedConsoleLogsPrompt = ({
 
   // Keep the chip neutral and communicate severity with the dot so noisy errors do not paint the
   // entire prompt red.
-  const dotClass = severity === "error"
-    ? "bg-kumo-danger"
-    : severity === "warn"
-      ? "bg-kumo-warning"
-      : "bg-kumo-inactive";
+  const dotClass =
+    severity === "error"
+      ? "bg-kumo-danger"
+      : severity === "warn"
+        ? "bg-kumo-warning"
+        : "bg-kumo-inactive";
   const logKind = severity === "error" ? "error" : severity === "warn" ? "warning" : "log";
 
   return (
@@ -47,7 +48,8 @@ export const CapturedConsoleLogsPrompt = ({
           >
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
             <span className="truncate">
-              Send {count} captured {logKind}{count !== 1 ? "s" : ""} to chat
+              Send {count} captured {logKind}
+              {count !== 1 ? "s" : ""} to chat
             </span>
           </button>
         </Tooltip>

@@ -7,7 +7,7 @@ export type ConfiguratorUIOption = {
   title: string;
   subtitle?: string;
   meta?: string;
-}
+};
 
 /** Data and helper callbacks passed to a configurator UI render function. */
 export type ConfiguratorUIRenderContext<
@@ -22,8 +22,7 @@ export type ConfiguratorUIRenderContext<
    * this helper makes no assumptions about it beyond passing it through to the render function.
    */
   ui: TUI;
-}
-
+};
 
 /** Values and Gatekeeper helpers used to produce the selected resource URL. */
 export type ConfiguratorUIResourceContext<
@@ -32,13 +31,10 @@ export type ConfiguratorUIResourceContext<
 > = {
   values: TValues;
   ui: TUI;
-}
+};
 
 /** Module contract implemented by each sandboxed configurator UI. */
-export type ConfiguratorUISpec<
-  TUI,
-  TValues extends ConfiguratorUIValues = ConfiguratorUIValues,
-> = {
+export type ConfiguratorUISpec<TUI, TValues extends ConfiguratorUIValues = ConfiguratorUIValues> = {
   /** Initial form values shown before the user makes any changes. */
   initial: TValues;
 
@@ -71,7 +67,7 @@ export type ConfiguratorUISpec<
 
   /** Render the configuration UI for the current state. */
   render(context: ConfiguratorUIRenderContext<TUI, TValues>): unknown;
-}
+};
 
 /** Groups related configurator fields. Provided by the sandbox runtime. */
 export function Section(_props: { title?: string | null; children?: unknown }): unknown {

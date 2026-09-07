@@ -25,5 +25,5 @@ declare module "cloudflare:workers" {
   export type RpcStub<T> = T;
 }
 
-declare type Fetcher<T = unknown> = import('capnweb').RpcStub<T>;
+declare type Fetcher<T = unknown> = import("capnweb").RpcStub<T>;
 declare interface DurableObjectClass<T = unknown> {}

@@ -7,7 +7,8 @@ import { obsContext } from "./observability.js";
 const API_BASE = "https://api.cloudflare.com/client/v4";
 
 const logger = obsContext.createLogger({
-  component: "gatekeeper.cloudflare", vendorId: VENDOR_ID,
+  component: "gatekeeper.cloudflare",
+  vendorId: VENDOR_ID,
 });
 
 interface CfResultInfo {
@@ -26,16 +27,18 @@ interface CfEnvelope<T> {
 /** One GET, returning the whole envelope so a paginated caller can read `result_info`. */
 async function cfRequest<T>(token: string, path: string): Promise<CfEnvelope<T> | null> {
   const resp = await fetch(`${API_BASE}${path}`, {
-    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
   if (!resp.ok) {
     logger.error("cf-gatekeeper GET failed", {
       event: "cloudflare.api.get.failed",
-      path, status: resp.status, statusText: resp.statusText,
+      path,
+      status: resp.status,
+      statusText: resp.statusText,
     });
     return null;
   }
-  const data = await resp.json() as CfEnvelope<T>;
+  const data = (await resp.json()) as CfEnvelope<T>;
   if (!data.success || data.result === undefined) return null;
   return data;
 }
@@ -59,7 +62,8 @@ export interface CloudflareIdentity {
  */
 export async function fetchIdentity(token: string): Promise<CloudflareIdentity | null> {
   const r = await cfGet<{ id?: string; email?: string; first_name?: string; last_name?: string }>(
-    token, "/user",
+    token,
+    "/user",
   );
   if (!r || !r.id || !r.email) return null;
   const name = [r.first_name, r.last_name].filter(Boolean).join(" ").trim();
@@ -98,13 +102,14 @@ export async function listAccounts(token: string): Promise<CloudflareAccount[]> 
       per_page: String(ACCOUNTS_PER_PAGE),
     });
     const envelope = await cfRequest<Array<{ id: string; name: string }>>(
-      token, `/accounts?${query}`,
+      token,
+      `/accounts?${query}`,
     );
     // A failed page mid-walk returns what was gathered rather than nothing: a partial account list is
     // more useful than none, and the failure is already logged by `cfRequest`.
     if (!envelope?.result) break;
     const result = envelope.result;
-    accounts.push(...result.map(entry => ({ accountId: entry.id, accountName: entry.name })));
+    accounts.push(...result.map((entry) => ({ accountId: entry.id, accountName: entry.name })));
     // The provider reports the page size it actually used, which may be lower than requested.
     const perPage = envelope.result_info?.per_page ?? ACCOUNTS_PER_PAGE;
     if (result.length < perPage) break;
@@ -113,7 +118,8 @@ export async function listAccounts(token: string): Promise<CloudflareAccount[]> 
     if (page === MAX_ACCOUNT_PAGES) {
       logger.warn("stopped listing Cloudflare accounts at the page cap", {
         event: "cloudflare.accounts.list.truncated",
-        accountsListed: accounts.length, totalCount: total,
+        accountsListed: accounts.length,
+        totalCount: total,
       });
     }
   }

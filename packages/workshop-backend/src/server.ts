@@ -1,13 +1,58 @@
-import { RpcStub, RpcTarget, newHttpBatchRpcResponse, newWebSocketRpcSession, RpcSessionOptions } from "capnweb";
+import {
+  RpcStub,
+  RpcTarget,
+  newHttpBatchRpcResponse,
+  newWebSocketRpcSession,
+  RpcSessionOptions,
+} from "capnweb";
 import { validateRpc } from "capnweb-validate";
 import type { JWTPayload } from "jose";
-import { PublicApi, AuthenticatedApi, Overseer, GadgetMetadataWithTimestamps, AiChatAuthorInfo, AiModelConfig, AiGatewayInfo, AiModelProvider, ConnectedAccountsSubscriber, ConnectedAccountsFilter, GatekeeperVendorFilter, ObserverConfigCallback, BlueprintLibrarySummary, BlueprintPublicInfo, BlueprintUserSummary, BlueprintBindingAssignment, AgentSpawnerConfig, WorkpieceId, BLUEPRINT_SCREENSHOT_PATH_PREFIX, BLUEPRINT_SCREENSHOT_R2_PREFIX, blueprintScreenshotUrl, ServerConfig, CloudflareUsageInfo, CloudflareAccountOption, LoginAttempt, GatekeeperAppInfo, AdminApi, GatekeeperVendorInfo, OutputFormatOffer, ListOutputsResult, createOpenGadgetError, getOpenGadgetErrorCode, OPEN_GADGET_ERROR_CODES, AUTH_ERROR_CODES, createAuthError } from '@gadgets/workshop-shared/api';
+import {
+  PublicApi,
+  AuthenticatedApi,
+  Overseer,
+  GadgetMetadataWithTimestamps,
+  AiChatAuthorInfo,
+  AiModelConfig,
+  AiGatewayInfo,
+  AiModelProvider,
+  ConnectedAccountsSubscriber,
+  ConnectedAccountsFilter,
+  GatekeeperVendorFilter,
+  ObserverConfigCallback,
+  BlueprintLibrarySummary,
+  BlueprintPublicInfo,
+  BlueprintUserSummary,
+  BlueprintBindingAssignment,
+  AgentSpawnerConfig,
+  WorkpieceId,
+  BLUEPRINT_SCREENSHOT_PATH_PREFIX,
+  BLUEPRINT_SCREENSHOT_R2_PREFIX,
+  blueprintScreenshotUrl,
+  ServerConfig,
+  CloudflareUsageInfo,
+  CloudflareAccountOption,
+  LoginAttempt,
+  GatekeeperAppInfo,
+  AdminApi,
+  GatekeeperVendorInfo,
+  OutputFormatOffer,
+  ListOutputsResult,
+  createOpenGadgetError,
+  getOpenGadgetErrorCode,
+  OPEN_GADGET_ERROR_CODES,
+  AUTH_ERROR_CODES,
+  createAuthError,
+} from "@gadgets/workshop-shared/api";
 import type { UiFeatureFlags } from "@gadgets/workshop-shared/feature-flags";
 import { getServerConfig } from "./deployment-config.js";
 import { isPasswordAuthEnabled, getAuthGatekeeperAllowlist } from "./auth/config.js";
 import { getAuthVendorBinding } from "./auth/auth-vendors.js";
 import { getUsageInfo } from "./ai-gateway-billing/limits/usage-checker.js";
-import { listConnectedAccounts, selectAccount } from "./ai-gateway-billing/cloudflare/connection-service.js";
+import {
+  listConnectedAccounts,
+  selectAccount,
+} from "./ai-gateway-billing/cloudflare/connection-service.js";
 import { PendingLogin, LoginConnectCallbackImpl } from "./auth/login-flow.js";
 import { deploymentOutputForBlueprint, listFormatOffers, readAdminConfig } from "./admin-config.js";
 
@@ -17,9 +62,32 @@ import { GatekeeperUiFrame } from "@gadgets/workshop-shared/gatekeeper";
 import { LanguageModelGatekeeper } from "./ai-models";
 import { getAiGatewayConfig } from "./ai-gateway.js";
 import { AdminSettings, AdminApiImpl } from "./admin-settings.js";
-import { BlueprintKvRecord, buildBlueprintArchiveStream, sanitizeBlueprintOutput, listFeaturedBlueprintsFromKv, parseBlueprintArchive, randomBlueprintId, readBlueprintContent, readBlueprintKvRecord } from "./blueprint-archive.js";
-import { GatekeeperConnectCallbackImpl, normalizeUsername, UserDurableObject, CLOUDFLARE_VENDOR_ID } from "./user";
-import { OverseerDurableObject, GatekeeperLoopback, CodeModeTailLoopback, AgentSpawnerGatekeeper, GatekeeperHookLoopback, GadgetTailLoopback, AgentSelfLoopback, TransientStubLoopback } from "./overseer";
+import {
+  BlueprintKvRecord,
+  buildBlueprintArchiveStream,
+  sanitizeBlueprintOutput,
+  listFeaturedBlueprintsFromKv,
+  parseBlueprintArchive,
+  randomBlueprintId,
+  readBlueprintContent,
+  readBlueprintKvRecord,
+} from "./blueprint-archive.js";
+import {
+  GatekeeperConnectCallbackImpl,
+  normalizeUsername,
+  UserDurableObject,
+  CLOUDFLARE_VENDOR_ID,
+} from "./user";
+import {
+  OverseerDurableObject,
+  GatekeeperLoopback,
+  CodeModeTailLoopback,
+  AgentSpawnerGatekeeper,
+  GatekeeperHookLoopback,
+  GadgetTailLoopback,
+  AgentSelfLoopback,
+  TransientStubLoopback,
+} from "./overseer";
 import { ExternalMessageGateway } from "./external-message-gateway";
 import { RpcStub as NativeRpcStub } from "cloudflare:workers";
 import { recordAnalytics } from "./analytics";
@@ -36,7 +104,10 @@ const logger = createWorkshopLogger("workshop.server");
 // fetch handler), so later requests skip the call. The DO holds the real answer.
 let formatBlueprintInstallStarted = false;
 
-function publicBlueprintInfo(id: string, metadata: BlueprintPublicInfo['metadata']): BlueprintPublicInfo {
+function publicBlueprintInfo(
+  id: string,
+  metadata: BlueprintPublicInfo["metadata"],
+): BlueprintPublicInfo {
   return {
     id,
     metadata,
@@ -54,9 +125,16 @@ export { AdminSettings };
 export { UserDurableObject, GatekeeperConnectCallbackImpl };
 
 // Re-export entrypoint types from overseer.ts.
-export { OverseerDurableObject, GatekeeperLoopback, GatekeeperHookLoopback,
-    CodeModeTailLoopback, AgentSpawnerGatekeeper, GadgetTailLoopback,
-    AgentSelfLoopback, TransientStubLoopback };
+export {
+  OverseerDurableObject,
+  GatekeeperLoopback,
+  GatekeeperHookLoopback,
+  CodeModeTailLoopback,
+  AgentSpawnerGatekeeper,
+  GadgetTailLoopback,
+  AgentSelfLoopback,
+  TransientStubLoopback,
+};
 
 // Re-export service-binding entrypoint for external channel integrations.
 export { ExternalMessageGateway };
@@ -64,19 +142,22 @@ export { ExternalMessageGateway };
 // Declare optional environment variables here since they may be omitted from wrangler.jsonc.
 type Env = Cloudflare.Env & {
   // Set these if using Cloudflare Access for authentication, otherwise username/password is used.
-  CF_ACCESS_AUD?: string,  // audience
-  CF_ACCESS_ISS?: string,  // team URL, i.e. https://<team>.cloudflareaccess.com
+  CF_ACCESS_AUD?: string; // audience
+  CF_ACCESS_ISS?: string; // team URL, i.e. https://<team>.cloudflareaccess.com
   DEV?: boolean;
   FLAGS?: Flagship;
-}
+};
 
 // =======================================================================================
 
 @validateRpc()
 class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
-  constructor(private ctx: ExecutionContext, private env: Env,
-      userId: DurableObjectId,
-      private abortSession: (reason: Error) => void) {
+  constructor(
+    private ctx: ExecutionContext,
+    private env: Env,
+    userId: DurableObjectId,
+    private abortSession: (reason: Error) => void,
+  ) {
     super();
 
     this.#userId = userId;
@@ -176,8 +257,8 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
         throw new Error("Avatar too large (max 100 KB)");
       }
       // Verify the data starts with a known image magic-byte header.
-      let isJpeg = data[0] === 0xFF && data[1] === 0xD8 && data[2] === 0xFF;
-      let isPng = data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47;
+      let isJpeg = data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
+      let isPng = data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47;
       if (!isJpeg && !isPng) {
         throw new Error("Avatar must be a JPEG or PNG image");
       }
@@ -213,9 +294,11 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
     return resolveUiFeatureFlags(this.env, this.#userId.name!);
   }
 
-  async #openGadgetInternal(id: string, shareKey?: string,
-                            configureObservers?: RpcStub<ObserverConfigCallback>)
-      : Promise<NativeRpcStub<Overseer>> {
+  async #openGadgetInternal(
+    id: string,
+    shareKey?: string,
+    configureObservers?: RpcStub<ObserverConfigCallback>,
+  ): Promise<NativeRpcStub<Overseer>> {
     let userId = this.#userId.toString();
     let profileId = this.#userId.name!;
     let overseerId;
@@ -248,7 +331,7 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
         // workers runtime.
         this.abortSession(new Error(`lost connection to workspace DO (gadget ${id})`));
       }
-    }
+    };
 
     let result;
     try {
@@ -272,9 +355,11 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
     return result;
   }
 
-  async openGadget(id: string, shareKey?: string,
-                   configureObservers?: RpcStub<ObserverConfigCallback>)
-      : Promise<RpcStub<Overseer>> {
+  async openGadget(
+    id: string,
+    shareKey?: string,
+    configureObservers?: RpcStub<ObserverConfigCallback>,
+  ): Promise<RpcStub<Overseer>> {
     // @ts-expect-error Cap'n Web RPC stubs and native RPC stubs are compatible but the type
     //     system doesn't know this.
     return this.#openGadgetInternal(id, shareKey, configureObservers);
@@ -307,18 +392,21 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
   async listOutputFormats(): Promise<OutputFormatOffer[]> {
     let offers = await listFormatOffers(this.env, await readAdminConfig(this.env));
     // Neither the agent's hint nor the binding details are part of what a user is offered here.
-    return offers.map(({agentHint: _agentHint, bindings: _bindings, ...offer}) => offer);
+    return offers.map(({ agentHint: _agentHint, bindings: _bindings, ...offer }) => offer);
   }
 
   listGatekeeperVendors(filter?: GatekeeperVendorFilter): Promise<GatekeeperVendorInfo[]> {
     return retryOnDoReset(() => this.#user.listGatekeeperVendors(filter));
   }
 
-  connectAccount(vendorId: string, resourceUrlPatterns?: string[]): Promise<{url: string}> {
+  connectAccount(vendorId: string, resourceUrlPatterns?: string[]): Promise<{ url: string }> {
     return this.#user.connectAccount(vendorId, resourceUrlPatterns);
   }
 
-  ensureAccountResources(accountId: number, resourceUrlPatterns: string[]): Promise<{url?: string}> {
+  ensureAccountResources(
+    accountId: number,
+    resourceUrlPatterns: string[],
+  ): Promise<{ url?: string }> {
     return this.#user.ensureAccountResources(accountId, resourceUrlPatterns);
   }
 
@@ -331,8 +419,9 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
   }
 
   subscribeConnectedAccounts(
-      subscriber: RpcStub<ConnectedAccountsSubscriber>, filter?: ConnectedAccountsFilter)
-      : Promise<RpcStub<{}>> {
+    subscriber: RpcStub<ConnectedAccountsSubscriber>,
+    filter?: ConnectedAccountsFilter,
+  ): Promise<RpcStub<{}>> {
     return this.#user.subscribeConnectedAccounts(subscriber, filter);
   }
 
@@ -340,13 +429,11 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
     return this.#user.disconnectAccount(accountId);
   }
 
-  reconnectAccount(accountId: number): Promise<{url: string}> {
+  reconnectAccount(accountId: number): Promise<{ url: string }> {
     return this.#user.reconnectAccount(accountId);
   }
 
-  startResourceConfigurator(
-      accountId: number,
-      resourceUrlPattern: string) {
+  startResourceConfigurator(accountId: number, resourceUrlPattern: string) {
     return this.#user.startResourceConfigurator(accountId, resourceUrlPattern);
   }
 
@@ -375,8 +462,9 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
   }
 
   async listFeaturedBlueprints(): Promise<BlueprintPublicInfo[]> {
-    return (await listFeaturedBlueprintsFromKv(this.env)).map(
-        blueprint => publicBlueprintInfo(blueprint.id, blueprint.metadata));
+    return (await listFeaturedBlueprintsFromKv(this.env)).map((blueprint) =>
+      publicBlueprintInfo(blueprint.id, blueprint.metadata),
+    );
   }
 
   async addBlueprintToLibrary(blueprintId: string): Promise<void> {
@@ -432,7 +520,7 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
 
   async newGadgetFromBlueprint(
     blueprintId: string,
-    bindings: Record<string, BlueprintBindingAssignment>
+    bindings: Record<string, BlueprintBindingAssignment>,
   ): Promise<RpcStub<Overseer>> {
     // 1. Read blueprint from KV.
     let kvRecord = await readBlueprintKvRecord(this.env, blueprintId);
@@ -449,9 +537,15 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
 
     // 4. Initialize from blueprint code.
     let overseerDo = this.overseers.get(this.overseers.idFromString(id));
-    await overseerDo.initializeFromBlueprint(codeBytes, kvRecord.metadata.title,
-        deploymentOutputForBlueprint(await readAdminConfig(this.env), blueprintId,
-            sanitizeBlueprintOutput(kvRecord.metadata.output)));
+    await overseerDo.initializeFromBlueprint(
+      codeBytes,
+      kvRecord.metadata.title,
+      deploymentOutputForBlueprint(
+        await readAdminConfig(this.env),
+        blueprintId,
+        sanitizeBlueprintOutput(kvRecord.metadata.output),
+      ),
+    );
 
     // 5. Create gatekeepers from assignments and bind them into the workspace's (only) gadget.
     let metadata = await overseerResult.getMetadata();
@@ -475,30 +569,32 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
         throw new Error(`Unknown binding name: ${bindingName}`);
       }
 
-      gkPromises.push((async () => {
-        let gk;
-        if (assignment.type === "gatekeeper") {
-          gk = await overseerResult.newGatekeeper(assignment.accountId, assignment.resourceUrl);
-          if (!gk) {
-            throw new Error(`Failed to create gatekeeper for binding "${bindingName}".`);
+      gkPromises.push(
+        (async () => {
+          let gk;
+          if (assignment.type === "gatekeeper") {
+            gk = await overseerResult.newGatekeeper(assignment.accountId, assignment.resourceUrl);
+            if (!gk) {
+              throw new Error(`Failed to create gatekeeper for binding "${bindingName}".`);
+            }
+          } else if (assignment.type === "aiModel") {
+            gk = await overseerResult.newAiModelGatekeeper(assignment.modelId);
+          } else {
+            return; // agent spawners are created in phase two
           }
-        } else if (assignment.type === "aiModel") {
-          gk = await overseerResult.newAiModelGatekeeper(assignment.modelId);
-        } else {
-          return;  // agent spawners are created in phase two
-        }
-        try {
-          let id = await gk.getId();
-          createdIds.set(bindingName, id);
-          // A spawnerOnly binding exists purely to feed some spawner's env; it is not bound
-          // into the gadget itself.
-          if (!blueprintBinding.spawnerOnly) {
-            await gadget.bind(bindingName, id);
+          try {
+            let id = await gk.getId();
+            createdIds.set(bindingName, id);
+            // A spawnerOnly binding exists purely to feed some spawner's env; it is not bound
+            // into the gadget itself.
+            if (!blueprintBinding.spawnerOnly) {
+              await gadget.bind(bindingName, id);
+            }
+          } finally {
+            gk[Symbol.dispose]();
           }
-        } finally {
-          gk[Symbol.dispose]();
-        }
-      })());
+        })(),
+      );
     }
 
     await Promise.all(gkPromises);
@@ -520,8 +616,10 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
         } else {
           let id = createdIds.get(target.name);
           if (id === undefined) {
-            throw new Error(`Agent spawner binding "${bindingName}" references binding ` +
-                `"${target.name}", which was not assigned.`);
+            throw new Error(
+              `Agent spawner binding "${bindingName}" references binding ` +
+                `"${target.name}", which was not assigned.`,
+            );
           }
           env[envName] = id;
         }
@@ -564,20 +662,23 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
     // appear in the nav even before the user opens a gadget — in a single round trip.
     let accounts = await this.#user.listProvidedAccounts();
     return accounts
-        .filter((account: (typeof accounts)[number]) => account.description.providesUi)
-        .map((account: (typeof accounts)[number]) => ({
-          id: account.vendorId,
-          title: account.description.providesUi!.title,
-          icon: account.description.providesUi!.icon,
-        }));
+      .filter((account: (typeof accounts)[number]) => account.description.providesUi)
+      .map((account: (typeof accounts)[number]) => ({
+        id: account.vendorId,
+        title: account.description.providesUi!.title,
+        icon: account.description.providesUi!.icon,
+      }));
   }
 
   async getGatekeeperApp(id: string): Promise<GatekeeperUiFrame | null> {
     // Self-sufficient: listProvidedAccounts provisions auto-provisioned accounts first (idempotent),
     // so a direct URL load of /gatekeepers/$id works without racing the Header's listGatekeeperApps.
-    let user = this.#user;  // one stub for both calls
+    let user = this.#user; // one stub for both calls
     let accounts = await user.listProvidedAccounts();
-    let app = accounts.find((account: (typeof accounts)[number]) => account.vendorId === id && account.description.providesUi);
+    let app = accounts.find(
+      (account: (typeof accounts)[number]) =>
+        account.vendorId === id && account.description.providesUi,
+    );
     if (!app) return null;
     // isAdmin is supplied fresh per open so admin-gated features reflect the user's current status.
     return user.startAccountAppUi(app.accountId, { isAdmin: this.#isAdmin() });
@@ -602,7 +703,7 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
 
 async function serveBlueprintScreenshot(env: Env, blueprintId: string): Promise<Response> {
   let object = await env.BLUEPRINT_CONTENT.get(`${BLUEPRINT_SCREENSHOT_R2_PREFIX}${blueprintId}`);
-  if (!object) return new Response("Not Found", {status: 404});
+  if (!object) return new Response("Not Found", { status: 404 });
 
   let contentType = object.httpMetadata?.contentType;
   if (contentType !== "image/jpeg" && contentType !== "image/png") {
@@ -636,9 +737,12 @@ class LoginAttemptImpl extends RpcTarget implements LoginAttempt {
 class PublicApiImpl extends RpcTarget implements PublicApi {
   users: DurableObjectNamespace<UserDurableObject>;
 
-  constructor(private ctx: ExecutionContext, private env: Env,
-      private abortSession: (reason: Error) => void,
-      private accessPayload?: JWTPayload) {
+  constructor(
+    private ctx: ExecutionContext,
+    private env: Env,
+    private abortSession: (reason: Error) => void,
+    private accessPayload?: JWTPayload,
+  ) {
     super();
     this.users = this.ctx.exports.UserDurableObject;
   }
@@ -649,7 +753,9 @@ class PublicApiImpl extends RpcTarget implements PublicApi {
     return getServerConfig(this.env);
   }
 
-  async startGatekeeperLogin(vendorId: string): Promise<{ url: string; attempt: RpcStub<LoginAttempt> }> {
+  async startGatekeeperLogin(
+    vendorId: string,
+  ): Promise<{ url: string; attempt: RpcStub<LoginAttempt> }> {
     if (!getAuthGatekeeperAllowlist(this.env).includes(vendorId)) {
       throw new Error(`Sign-in via "${vendorId}" is not enabled on this deployment.`);
     }
@@ -662,15 +768,17 @@ class PublicApiImpl extends RpcTarget implements PublicApi {
     // invocation. The client never sees its id — we hand back an `attempt` stub instead.
     const pendingId = this.ctx.exports.PendingLogin.newUniqueId();
     const pending = this.ctx.exports.PendingLogin.get(pendingId);
-    const callback = this.ctx.exports.LoginConnectCallbackImpl(
-        { props: { pendingId: pendingId.toString(), vendorId } });
+    const callback = this.ctx.exports.LoginConnectCallbackImpl({
+      props: { pendingId: pendingId.toString(), vendorId },
+    });
     // For most providers, sign-in needs only minimal scopes to verify the user's email (the grant is
     // transient); capability scopes are requested later via an explicit connectAccount. Cloudflare is
     // the exception: signing in with Cloudflare also links AI Gateway billing, so it requests and
     // persists the billing-only scope set up front.
-    const options = vendorId === CLOUDFLARE_VENDOR_ID
-      ? { scopes: "full" as const, resourceUrlPatterns: [] }
-      : { scopes: "auth" as const };
+    const options =
+      vendorId === CLOUDFLARE_VENDOR_ID
+        ? { scopes: "full" as const, resourceUrlPatterns: [] }
+        : { scopes: "auth" as const };
     const { url } = await vendor.connectAccount(callback, options);
     // @ts-expect-error Cap'n Web RPC stubs and native RPC targets are compatible but the type
     //     system doesn't know this.
@@ -678,7 +786,7 @@ class PublicApiImpl extends RpcTarget implements PublicApi {
   }
 
   async authenticate(token: string): Promise<AuthenticatedApi> {
-    let split = token.split(':');
+    let split = token.split(":");
     if (split.length !== 2) {
       throw createAuthError(AUTH_ERROR_CODES.invalidSessionToken);
     }
@@ -701,8 +809,9 @@ class PublicApiImpl extends RpcTarget implements PublicApi {
     let email = this.accessPayload.email as string;
     let userId = this.users.idFromName(email);
     let signupsEnabled = (await readAdminConfig(this.env)).signupsEnabled;
-    let accountCreated =
-        await this.users.get(userId).authenticateFromCfAccess(email, signupsEnabled);
+    let accountCreated = await this.users
+      .get(userId)
+      .authenticateFromCfAccess(email, signupsEnabled);
     if (accountCreated) {
       recordAnalytics(this.ctx, this.env, {
         event_name: "account_created",
@@ -741,8 +850,11 @@ class PublicApiImpl extends RpcTarget implements PublicApi {
     return `${username}:${token}`;
   }
 
-  async createAccount(username: string, displayName: string, passwordHash: Uint8Array)
-      : Promise<string | null> {
+  async createAccount(
+    username: string,
+    displayName: string,
+    passwordHash: Uint8Array,
+  ): Promise<string | null> {
     if (this.env.CF_ACCESS_AUD) {
       throw new Error("This deployment requires Cloudflare Access authentication.");
     }
@@ -820,7 +932,9 @@ export default {
       // and the DO is idempotent.
       if (!formatBlueprintInstallStarted) {
         formatBlueprintInstallStarted = true;
-        ctx.waitUntil(ctx.exports.AdminSettings.getByName("").ensureFormatBlueprintsInstalled()
+        ctx.waitUntil(
+          ctx.exports.AdminSettings.getByName("")
+            .ensureFormatBlueprintsInstalled()
             .then((complete: boolean) => {
               // A partial install resolves rather than throwing, and nothing else will call the DO
               // from here, so clearing this is the whole retry: one bad archive would otherwise
@@ -832,9 +946,11 @@ export default {
               // retry costs one comparison once it succeeds.
               formatBlueprintInstallStarted = false;
               logger.warn("failed to install bundled format blueprints", {
-                event: "formats.install.trigger.failed", error: err,
+                event: "formats.install.trigger.failed",
+                error: err,
               });
-            }));
+            }),
+        );
       }
 
       let accessPayload: JWTPayload | undefined;
@@ -863,13 +979,15 @@ export default {
         abortController.abort(reason);
       };
 
-      return await newWorkersRpcResponse(req,
-          new PublicApiImpl(ctx, env, abortSession, accessPayload),
-          { abortSignal: abortController.signal });
+      return await newWorkersRpcResponse(
+        req,
+        new PublicApiImpl(ctx, env, abortSession, accessPayload),
+        { abortSignal: abortController.signal },
+      );
     }
 
-    return new Response("Not Found", {status: 404});
-  }
+    return new Response("Not Found", { status: 404 });
+  },
 } satisfies ExportedHandler<Env>;
 
 // Extend Cap'n Web's RpcSessionOptions with an AbortSignal.
@@ -885,7 +1003,10 @@ type ExtendedRpcSessionOptions = RpcSessionOptions & {
 // Clone of newWorkersRpcResponse() from Cap'n Web, except the `options` has been extended with
 // `abortSignal`.
 async function newWorkersRpcResponse(
-    request: Request, localMain: any, options?: ExtendedRpcSessionOptions) {
+  request: Request,
+  localMain: any,
+  options?: ExtendedRpcSessionOptions,
+) {
   if (request.method === "POST") {
     let response = await newHttpBatchRpcResponse(request, localMain, options);
     // Since we're exposing the same API over WebSocket, too, and WebSocket always allows
@@ -902,14 +1023,17 @@ async function newWorkersRpcResponse(
 }
 
 function newWorkersWebSocketRpcResponse(
-    request: Request, localMain?: any, options?: ExtendedRpcSessionOptions): Response {
+  request: Request,
+  localMain?: any,
+  options?: ExtendedRpcSessionOptions,
+): Response {
   if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
     return new Response("This endpoint only accepts WebSocket requests.", { status: 400 });
   }
 
   let pair = new WebSocketPair();
   let server = pair[0];
-  server.accept()
+  server.accept();
   let stub = newWebSocketRpcSession(server, localMain, options);
 
   // -- ADDED FOR GADGETS --

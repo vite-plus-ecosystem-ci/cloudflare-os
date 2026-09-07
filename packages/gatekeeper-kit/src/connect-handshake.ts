@@ -28,8 +28,9 @@ const RESERVED_KEYS = ["value", "expiresAt", "stage"] as const;
 export type NonceExtra = { [K in (typeof RESERVED_KEYS)[number]]?: never };
 
 /** A stored nonce and optional provider-owned state for one connect attempt. */
-export type StoredNonce<Extra extends object = Record<never, never>> = TimedNonce &
-  { stage: ConnectStage } & Extra;
+export type StoredNonce<Extra extends object = Record<never, never>> = TimedNonce & {
+  stage: ConnectStage;
+} & Extra;
 
 function rejectReservedKeys(extra: object): void {
   for (const key of RESERVED_KEYS) {

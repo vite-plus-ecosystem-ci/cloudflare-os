@@ -1,5 +1,5 @@
 import { abortAllDurableObjects, env } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 type BatchRequest = {
   createNamedRange?: { name: string };
@@ -23,8 +23,10 @@ class DocsModel {
   readonly #held = new Map<BatchKind, { reach: () => void; released: Promise<void> }>();
 
   install(): void {
-    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request, init?: RequestInit) =>
-      this.fetch(input, init)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL | Request, init?: RequestInit) => this.fetch(input, init)),
+    );
   }
 
   addMarker(name: string, id: string): void {
@@ -44,8 +46,12 @@ class DocsModel {
   hold(kind: BatchKind): { reached: Promise<void>; release: () => void } {
     let reach!: () => void;
     let release!: () => void;
-    let reached = new Promise<void>(resolve => { reach = resolve; });
-    let released = new Promise<void>(resolve => { release = resolve; });
+    let reached = new Promise<void>((resolve) => {
+      reach = resolve;
+    });
+    let released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     this.#held.set(kind, { reach, released });
     return { reached, release };
   }
@@ -73,8 +79,10 @@ class DocsModel {
       this.cleanupFailures--;
       throw new Error("cleanup failed");
     }
-    if (body.writeControl?.requiredRevisionId &&
-        body.writeControl.requiredRevisionId !== `revision-${this.#revision}`) {
+    if (
+      body.writeControl?.requiredRevisionId &&
+      body.writeControl.requiredRevisionId !== `revision-${this.#revision}`
+    ) {
       return Response.json({ error: { code: 400, message: "revision mismatch" } }, { status: 400 });
     }
 
@@ -93,8 +101,8 @@ class DocsModel {
         hasContent = true;
         if (request.insertText) {
           let offset = request.insertText.location.index - 1;
-          this.content = this.content.slice(0, offset) + request.insertText.text +
-            this.content.slice(offset);
+          this.content =
+            this.content.slice(0, offset) + request.insertText.text + this.content.slice(offset);
         }
         replies.push({});
       }
@@ -136,26 +144,33 @@ class DocsModel {
       documentId: "doc-1",
       title: "Test document",
       revisionId: `revision-${this.#revision}`,
-      tabs: [{
-        documentTab: {
-          body: {
-            content: [{
-              startIndex: 1,
-              endIndex: text.length + 1,
-              paragraph: {
-                elements: [{
-                  startIndex: 1, endIndex: text.length + 1,
-                  textRun: { content: text, textStyle: {} },
-                }],
-                paragraphStyle: { namedStyleType: "NORMAL_TEXT" },
-              },
-            }],
+      tabs: [
+        {
+          documentTab: {
+            body: {
+              content: [
+                {
+                  startIndex: 1,
+                  endIndex: text.length + 1,
+                  paragraph: {
+                    elements: [
+                      {
+                        startIndex: 1,
+                        endIndex: text.length + 1,
+                        textRun: { content: text, textStyle: {} },
+                      },
+                    ],
+                    paragraphStyle: { namedStyleType: "NORMAL_TEXT" },
+                  },
+                },
+              ],
+            },
+            lists: {},
+            namedRanges: grouped,
           },
-          lists: {},
-          namedRanges: grouped,
+          childTabs: [],
         },
-        childTabs: [],
-      }],
+      ],
     };
   }
 }
@@ -246,9 +261,7 @@ describe("Google Doc write receipts", () => {
     docs.install();
     let actionId = await hooks().submitAppend("duplicates", "first");
 
-    expect(await hooks().applyAction("duplicates", actionId)).toMatch(
-      /multiple write markers/,
-    );
+    expect(await hooks().applyAction("duplicates", actionId)).toMatch(/multiple write markers/);
     expect(docs.contentBatches).toBe(0);
 
     docs.clearMarkers();
@@ -311,8 +324,7 @@ describe("Google Doc write receipts", () => {
     docs.ambiguousContentResponses = 1;
     docs.install();
     let actionId = await hooks().submitAppend("lost-response", "first");
-    expect(await hooks().applyAction("lost-response", actionId))
-      .toMatch(/content response lost/);
+    expect(await hooks().applyAction("lost-response", actionId)).toMatch(/content response lost/);
     expect(docs.markers.size).toBe(1);
 
     // Past the snapshot TTL, so the next read refetches the document -- which holds the append

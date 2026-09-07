@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { KvTtlCache, type AuthoritySource, type CacheKv } from "../src/cache";
 import { CredentialSource } from "../src/credentials";
 import { fakeKv } from "./fake-kv";
@@ -61,10 +61,12 @@ describe("KvTtlCache", () => {
 
     authority = undefined;
     // A stored entry is not served, and every caller loads for itself.
-    expect(await cache.cached("project", 60_000, async () => "unpartitioned 1"))
-      .toBe("unpartitioned 1");
-    expect(await cache.cached("project", 60_000, async () => "unpartitioned 2"))
-      .toBe("unpartitioned 2");
+    expect(await cache.cached("project", 60_000, async () => "unpartitioned 1")).toBe(
+      "unpartitioned 1",
+    );
+    expect(await cache.cached("project", 60_000, async () => "unpartitioned 2")).toBe(
+      "unpartitioned 2",
+    );
 
     // Nothing was stored either: back under a known authority, its own entry still stands.
     authority = "a";
@@ -184,8 +186,9 @@ describe("KvTtlCache.partitionedBy", () => {
     expect(load).toHaveBeenCalledOnce();
 
     authority = undefined;
-    expect(await cache.cached("project", 60_000, async () => "unpartitioned"))
-      .toBe("unpartitioned");
+    expect(await cache.cached("project", 60_000, async () => "unpartitioned")).toBe(
+      "unpartitioned",
+    );
 
     authority = "gen-b";
     expect(await cache.cached("project", 60_000, async () => "from b")).toBe("from b");
@@ -195,11 +198,14 @@ describe("KvTtlCache.partitionedBy", () => {
     const account = { identity: "id-a", generation: "gen-a" };
     const source = new CredentialSource<{ token: string }>({
       account: () => ({
-        getCredentials: async () =>
-          ({ creds: { token: "live" }, identity: account.identity, generation: account.generation }),
+        getCredentials: async () => ({
+          creds: { token: "live" },
+          identity: account.identity,
+          generation: account.generation,
+        }),
         noteCredentialsExpired: async () => {},
       }),
-      isAuthError: error => error instanceof Error && error.message === "401",
+      isAuthError: (error) => error instanceof Error && error.message === "401",
       expiredMessage: "Reconnect the account.",
     });
     return { source, account };
@@ -217,10 +223,14 @@ describe("KvTtlCache.partitionedBy", () => {
     expect(load).toHaveBeenCalledOnce();
 
     // A reported expiry drops the partition: the cache bypasses rather than serves the dead grant.
-    await expect(source.run(async () => { throw new Error("401"); }))
-      .rejects.toThrow("Reconnect the account.");
-    expect(await cache.cached("project", 60_000, async () => "unpartitioned"))
-      .toBe("unpartitioned");
+    await expect(
+      source.run(async () => {
+        throw new Error("401");
+      }),
+    ).rejects.toThrow("Reconnect the account.");
+    expect(await cache.cached("project", 60_000, async () => "unpartitioned")).toBe(
+      "unpartitioned",
+    );
 
     // The account rotates on reconnect; the next fetch moves the cache to the new partition, so
     // the old principal's entries are misses.
@@ -236,8 +246,11 @@ describe("KvTtlCache.partitionedBy", () => {
 
     await source.get();
     expect(await cache.cached("project", 60_000, async () => "from a")).toBe("from a");
-    await expect(source.run(async () => { throw new Error("401"); }))
-      .rejects.toThrow("Reconnect the account.");
+    await expect(
+      source.run(async () => {
+        throw new Error("401");
+      }),
+    ).rejects.toThrow("Reconnect the account.");
 
     // The account keeps the grant until reconnect, so the refetch returns the same identity;
     // adopting its generation would let hit-only paths serve the dead partition unchecked.

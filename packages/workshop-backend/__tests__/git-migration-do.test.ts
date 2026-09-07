@@ -15,13 +15,19 @@
 // The version-3 action-index backfill and the version-4 workpiece-type stamp ride the same
 // constructor trigger, so their tests live here too.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { abortAllDurableObjects, runInDurableObject } from "cloudflare:test";
 import type { OverseerDurableObject } from "../src/overseer.js";
 import { HISTORY_COMMIT_GAP_MS } from "../src/git-migration";
 import {
-  LegacyWorkspace, MINUTE, T0, USER, expectHeadsMatchDoc, readDocFiles, setFile,
+  LegacyWorkspace,
+  MINUTE,
+  T0,
+  USER,
+  expectHeadsMatchDoc,
+  readDocFiles,
+  setFile,
 } from "./legacy-workspace";
 import { makePreIndexActionStorage, putAction } from "./fixtures.js";
 
@@ -48,9 +54,11 @@ async function inOverseer(name: string, fn: (impl: any) => Promise<void>): Promi
 // The returned LegacyWorkspace lives in test scope, so its in-memory update log (docAt) survives
 // the DO abort and serves as the post-migration oracle.
 async function seedLegacyWorkspace(
-    name: string, build: (ws: LegacyWorkspace, impl: any) => void): Promise<LegacyWorkspace> {
+  name: string,
+  build: (ws: LegacyWorkspace, impl: any) => void,
+): Promise<LegacyWorkspace> {
   let ws!: LegacyWorkspace;
-  await inOverseer(name, async impl => {
+  await inOverseer(name, async (impl) => {
     // Pins the seeding recipe's precondition: a fresh TEST_OVERSEER DO writes *nothing* at
     // construction (#migrateStorage returns immediately at version 0 with no ownerId). If a
     // future constructor change starts initializing fresh DOs, this fails loudly and the
@@ -68,22 +76,21 @@ async function seedLegacyWorkspace(
 }
 
 describe("git-storage migration via the Overseer constructor", () => {
-  it("migrates a single-gadget workspace, preserving content across the batching gap",
-      async () => {
+  it("migrates a single-gadget workspace, preserving content across the batching gap", async () => {
     let ws = await seedLegacyWorkspace("git-migration-single", (ws, impl) => {
       ws.addGadget(1, "APP");
-      impl.storage.defaultGadgetId.put(1);  // the default gadget's legacy files root is ""
+      impl.storage.defaultGadgetId.put(1); // the default gadget's legacy files root is ""
 
       // A burst of edits (within a minute of the constructor's empty v1, so that v1 doesn't
       // become its own commit point), then non-code versions, then an edit across the one-hour
       // batching boundary.
-      ws.edit(T0 + 1 * MINUTE, doc => setFile(doc, "", "app.js", "hello\n"));            // v2
-      ws.edit(T0 + 2 * MINUTE, doc => setFile(doc, "", "util.js", "util one\n"));        // v3
-      ws.skipVersions(2);                                                                // v4-v5
-      ws.edit(T0 + 2 * MINUTE + HISTORY_COMMIT_GAP_MS, doc => {
+      ws.edit(T0 + 1 * MINUTE, (doc) => setFile(doc, "", "app.js", "hello\n")); // v2
+      ws.edit(T0 + 2 * MINUTE, (doc) => setFile(doc, "", "util.js", "util one\n")); // v3
+      ws.skipVersions(2); // v4-v5
+      ws.edit(T0 + 2 * MINUTE + HISTORY_COMMIT_GAP_MS, (doc) => {
         setFile(doc, "", "app.js", "hello\nworld\n");
         setFile(doc, "", "util.js", "util two\n");
-      });                                                                                // v6
+      }); // v6
 
       // A pending action written through an index-less view of the same storage, simulating a
       // record that predates the pendingByGatekeeper declaration. The version-3 step (chained
@@ -93,13 +100,14 @@ describe("git-storage migration via the Overseer constructor", () => {
 
     await abortAllDurableObjects();
 
-    await inOverseer("git-migration-single", async impl => {
+    await inOverseer("git-migration-single", async (impl) => {
       // The constructor's blockConcurrencyWhile completed before this event was delivered,
       // running the whole migration ladder: git storage (2), the action indexes (3), then the
       // workpiece-type stamp (4).
       expect(impl.storage.version.get()).toBe(4);
-      expect([...impl.storage.actions.pendingByGatekeeper.list()].map((r: any) => r.id))
-          .toEqual([1]);
+      expect([...impl.storage.actions.pendingByGatekeeper.list()].map((r: any) => r.id)).toEqual([
+        1,
+      ]);
       // The type stamp (3→4) covered the row the git migration wrote.
       expect(impl.storage.gadgets.get(1)!.type).toBe("gadget");
 
@@ -114,44 +122,46 @@ describe("git-storage migration via the Overseer constructor", () => {
       expect(log[1].parents).toEqual([log[2].oid]);
       expect(log[2].parents).toEqual([]);
       expect(await impl.gitStore.readCommitFiles(log[2].oid)).toEqual(new Map());
-      expect(await impl.gitStore.readCommitFiles(log[1].oid)).toEqual(new Map([
-        ["app.js", "hello\n"],
-        ["util.js", "util one\n"],
-      ]));
+      expect(await impl.gitStore.readCommitFiles(log[1].oid)).toEqual(
+        new Map([
+          ["app.js", "hello\n"],
+          ["util.js", "util one\n"],
+        ]),
+      );
       for (let entry of log) {
         expect(entry.author).toEqual(FALLBACK_OWNER);
       }
     });
   });
 
-  it("migrates a multi-gadget workspace with per-gadget heads and unpolluted chains",
-      async () => {
+  it("migrates a multi-gadget workspace with per-gadget heads and unpolluted chains", async () => {
     let ws = await seedLegacyWorkspace("git-migration-multi", (ws, impl) => {
-      ws.addGadget(1, "APP");   // default gadget: legacy files root ""
-      ws.addGadget(2, "LEFT");  // root "2"
+      ws.addGadget(1, "APP"); // default gadget: legacy files root ""
+      ws.addGadget(2, "LEFT"); // root "2"
       ws.addGadget(3, "RIGHT"); // root "3"
       impl.storage.defaultGadgetId.put(1);
       ws.addChat(1);
 
-      ws.edit(T0 + 1 * MINUTE, doc => setFile(doc, "", "app.js", "a one\n"));            // v2
+      ws.edit(T0 + 1 * MINUTE, (doc) => setFile(doc, "", "app.js", "a one\n")); // v2
       ws.addMessage(1, USER, { type: "merge", mergeThrough: 0, version: 2 });
       // One version touching two gadgets' roots at once.
-      ws.edit(T0 + 2 * MINUTE, doc => {
+      ws.edit(T0 + 2 * MINUTE, (doc) => {
         setFile(doc, "", "app.js", "a two\n");
         setFile(doc, "2", "left.js", "l one\n");
-      });                                                                                // v3
+      }); // v3
       ws.addMessage(1, USER, { type: "merge", mergeThrough: 1, version: 3 });
       // A gap-spanning burst on gadget 3 alone: v4-v6 batch to one commit, v7 is its own.
-      ws.edit(T0 + 3 * MINUTE, doc => setFile(doc, "3", "right.js", "r one\n"));         // v4
-      ws.edit(T0 + 4 * MINUTE, doc => setFile(doc, "3", "extra.js", "r extra\n"));       // v5
-      ws.edit(T0 + 5 * MINUTE, doc => setFile(doc, "3", "right.js", "r two\n"));         // v6
-      ws.edit(T0 + 5 * MINUTE + HISTORY_COMMIT_GAP_MS,
-          doc => setFile(doc, "3", "right.js", "r three\n"));                            // v7
+      ws.edit(T0 + 3 * MINUTE, (doc) => setFile(doc, "3", "right.js", "r one\n")); // v4
+      ws.edit(T0 + 4 * MINUTE, (doc) => setFile(doc, "3", "extra.js", "r extra\n")); // v5
+      ws.edit(T0 + 5 * MINUTE, (doc) => setFile(doc, "3", "right.js", "r two\n")); // v6
+      ws.edit(T0 + 5 * MINUTE + HISTORY_COMMIT_GAP_MS, (doc) =>
+        setFile(doc, "3", "right.js", "r three\n"),
+      ); // v7
     });
 
     await abortAllDurableObjects();
 
-    await inOverseer("git-migration-multi", async impl => {
+    await inOverseer("git-migration-multi", async (impl) => {
       expect(impl.storage.version.get()).toBe(4);
 
       // Every gadget's head equals its own root's content in an independent replay of the log.
@@ -160,28 +170,31 @@ describe("git-storage migration via the Overseer constructor", () => {
       // Non-pollution: each chain is the empty root plus that gadget's own commit points,
       // regardless of the others' activity, and carries only its own filenames.
       let logOf = async (gadgetId: number) =>
-          await impl.gitStore.readCommitLog(impl.storage.gadgets.get(gadgetId)!.commitId!);
+        await impl.gitStore.readCommitLog(impl.storage.gadgets.get(gadgetId)!.commitId!);
       let appLog = await logOf(1);
       let leftLog = await logOf(2);
       let rightLog = await logOf(3);
-      expect(appLog.length).toBe(3);    // empty root + merge points v2 and v3
-      expect(leftLog.length).toBe(2);   // empty root + merge point v3
-      expect(rightLog.length).toBe(3);  // empty root + pre-gap batch (v6) + final (v7)
+      expect(appLog.length).toBe(3); // empty root + merge points v2 and v3
+      expect(leftLog.length).toBe(2); // empty root + merge point v3
+      expect(rightLog.length).toBe(3); // empty root + pre-gap batch (v6) + final (v7)
 
-      expect(await impl.gitStore.readCommitFiles(appLog[1].oid))
-          .toEqual(new Map([["app.js", "a one\n"]]));
-      expect(await impl.gitStore.readCommitFiles(leftLog[0].oid))
-          .toEqual(new Map([["left.js", "l one\n"]]));
+      expect(await impl.gitStore.readCommitFiles(appLog[1].oid)).toEqual(
+        new Map([["app.js", "a one\n"]]),
+      );
+      expect(await impl.gitStore.readCommitFiles(leftLog[0].oid)).toEqual(
+        new Map([["left.js", "l one\n"]]),
+      );
       // Gadget 3's intermediate commit is the batch's end state, checked against the replay.
-      expect(await impl.gitStore.readCommitFiles(rightLog[1].oid))
-          .toEqual(readDocFiles(ws.docAt(6), "3"));
+      expect(await impl.gitStore.readCommitFiles(rightLog[1].oid)).toEqual(
+        readDocFiles(ws.docAt(6), "3"),
+      );
     });
   });
 });
 
 describe("action-index backfills via the Overseer constructor", () => {
   it("backfills a version-2 workspace's indexes and stamps version 3", async () => {
-    await inOverseer("pending-index-v2", async impl => {
+    await inOverseer("pending-index-v2", async (impl) => {
       expect(impl.storage.version.get()).toBe(0);
       // Seed through an index-less view of the same real storage, simulating records written
       // before the action indexes were declared (their entries only exist for writes made after
@@ -196,19 +209,23 @@ describe("action-index backfills via the Overseer constructor", () => {
 
     await abortAllDurableObjects();
 
-    await inOverseer("pending-index-v2", async impl => {
+    await inOverseer("pending-index-v2", async (impl) => {
       expect(impl.storage.version.get()).toBe(4);
       // The pending index sees exactly the pendings (grouped by gatekeeper, so 1 before 3 here).
-      expect([...impl.storage.actions.pendingByGatekeeper.list()].map((r: any) => r.id))
-          .toEqual([1, 3]);
+      expect([...impl.storage.actions.pendingByGatekeeper.list()].map((r: any) => r.id)).toEqual([
+        1, 3,
+      ]);
       // The history-filter index serves every key over the seeded records.
-      expect([...impl.storage.actions.byHistoryFilter.get("action")].map((r: any) => r.id))
-          .toEqual([1, 2, 3]);
-      expect([...impl.storage.actions.byHistoryFilter.get("pending")].map((r: any) => r.id))
-          .toEqual([1, 3]);
+      expect([...impl.storage.actions.byHistoryFilter.get("action")].map((r: any) => r.id)).toEqual(
+        [1, 2, 3],
+      );
+      expect(
+        [...impl.storage.actions.byHistoryFilter.get("pending")].map((r: any) => r.id),
+      ).toEqual([1, 3]);
       // The last-changed index covers the whole log, in change-time order.
-      expect([...impl.storage.actions.byLastChanged.list()].map((r: any) => r.id))
-          .toEqual([1, 2, 3]);
+      expect([...impl.storage.actions.byLastChanged.list()].map((r: any) => r.id)).toEqual([
+        1, 2, 3,
+      ]);
 
       // Resolving a backfilled record must not throw on the index updates -- the failure mode
       // that makes these backfills mandatory rather than an optimization.
@@ -216,12 +233,15 @@ describe("action-index backfills via the Overseer constructor", () => {
       record.state = "approved";
       record.appliedAt = new Date();
       impl.storage.actions.put(record);
-      expect([...impl.storage.actions.pendingByGatekeeper.list()].map((r: any) => r.id))
-          .toEqual([3]);
-      expect([...impl.storage.actions.byHistoryFilter.get("pending")].map((r: any) => r.id))
-          .toEqual([3]);
-      expect([...impl.storage.actions.byLastChanged.list()].map((r: any) => r.id))
-          .toEqual([2, 3, 1]);
+      expect([...impl.storage.actions.pendingByGatekeeper.list()].map((r: any) => r.id)).toEqual([
+        3,
+      ]);
+      expect(
+        [...impl.storage.actions.byHistoryFilter.get("pending")].map((r: any) => r.id),
+      ).toEqual([3]);
+      expect([...impl.storage.actions.byLastChanged.list()].map((r: any) => r.id)).toEqual([
+        2, 3, 1,
+      ]);
     });
   });
 });

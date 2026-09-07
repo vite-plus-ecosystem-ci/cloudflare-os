@@ -22,7 +22,9 @@ export {
 /** Log fields owned by this module. */
 type ErrorReportingLogFields = { failureSite?: string };
 
-const logger = createLogger<ErrorReportingLogFields>({ component: "backend-utils.error-reporting" });
+const logger = createLogger<ErrorReportingLogFields>({
+  component: "backend-utils.error-reporting",
+});
 
 /** Native Workers RPC capability implemented by the private Reporter Worker. */
 export interface ErrorReporter extends WorkerEntrypoint<unknown, ErrorReporterProps> {
@@ -42,9 +44,14 @@ type Scalar = string | number | boolean | null;
 
 /** Builds a bounded error event without traversing arbitrary thrown objects. */
 function createErrorEvent(
-    failureSite: string, caught: unknown, options?: ErrorReportOptions): ErrorEventV1 {
+  failureSite: string,
+  caught: unknown,
+  options?: ErrorReportOptions,
+): ErrorEventV1 {
   let truncated = false;
-  const mark = () => { truncated = true; };
+  const mark = () => {
+    truncated = true;
+  };
   const exception = serializeException(caught);
   if (exception.truncated) mark();
   const correlation = normalizeCorrelation(options?.correlation, mark);
@@ -85,26 +92,37 @@ function createErrorEvent(
  * augment it inline when the capture site has additional fields.
  */
 export function reportIssue(
-    failureSite: string,
-    caught: unknown,
-    options?: ErrorReportOptions): void {
+  failureSite: string,
+  caught: unknown,
+  options?: ErrorReportOptions,
+): void {
   try {
     if (!env.ERROR_REPORTER) return;
     const event = createErrorEvent(failureSite, caught, options);
     const dispatch = env.ERROR_REPORTER.report(event);
-    waitUntil(dispatch.catch((error) =>
-      logger.debug("error report dispatch failed",
-        { event: "error_report.dispatch.failed", failureSite, error })));
+    waitUntil(
+      dispatch.catch((error) =>
+        logger.debug("error report dispatch failed", {
+          event: "error_report.dispatch.failed",
+          failureSite,
+          error,
+        }),
+      ),
+    );
   } catch (error) {
     // Reporting must never disturb the caller; record the setup failure and move on.
-    logger.debug("error report setup failed",
-      { event: "error_report.setup.failed", failureSite, error });
+    logger.debug("error report setup failed", {
+      event: "error_report.setup.failed",
+      failureSite,
+      error,
+    });
   }
 }
 
 function normalizeCorrelation(
-    correlation: ErrorReportOptions["correlation"],
-    mark: () => void): ErrorEventV1["correlation"] | undefined {
+  correlation: ErrorReportOptions["correlation"],
+  mark: () => void,
+): ErrorEventV1["correlation"] | undefined {
   if (!correlation) return undefined;
   const rayId = boundOptionalString(correlation.rayId, mark);
   const requestId = boundOptionalString(correlation.requestId, mark);
@@ -116,8 +134,9 @@ function normalizeCorrelation(
 }
 
 function normalizeHttp(
-    http: ErrorReportOptions["http"],
-    mark: () => void): ErrorEventV1["http"] | undefined {
+  http: ErrorReportOptions["http"],
+  mark: () => void,
+): ErrorEventV1["http"] | undefined {
   if (!http) return undefined;
   const method = boundOptionalString(http.method, mark);
   const routeTemplate = boundOptionalString(http.routeTemplate, mark);
@@ -134,8 +153,9 @@ function normalizeHttp(
 }
 
 function normalizeAttributes(
-    attributes: ErrorReportOptions["attributes"],
-    mark: () => void): ErrorEventV1["attributes"] | undefined {
+  attributes: ErrorReportOptions["attributes"],
+  mark: () => void,
+): ErrorEventV1["attributes"] | undefined {
   if (!attributes) return undefined;
   const output = Object.create(null) as Record<string, Scalar>;
   let count = 0;
@@ -154,19 +174,19 @@ function normalizeAttributes(
       mark();
       continue;
     }
-    output[key] = typeof value === "string"
-      ? boundString(value, MAX_STRING_CHARS, mark)
-      : value;
+    output[key] = typeof value === "string" ? boundString(value, MAX_STRING_CHARS, mark) : value;
     count++;
   }
   return count ? { ...output } : undefined;
 }
 
 function isScalar(value: unknown): value is Scalar {
-  return value === null
-    || typeof value === "string"
-    || typeof value === "number"
-    || typeof value === "boolean";
+  return (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
 }
 
 function boundOptionalString(value: string | undefined, mark: () => void): string | undefined {

@@ -13,9 +13,10 @@ export const ComposerModelSelector = ({
   selectedModel,
   onModelChange,
 }: ComposerModelSelectorProps) => {
-  const selectedModelLabel = selectedModel == null
-    ? "No agent"
-    : models.find((model) => model.id === selectedModel)?.name ?? selectedModel;
+  const selectedModelLabel =
+    selectedModel == null
+      ? "No agent"
+      : (models.find((model) => model.id === selectedModel)?.name ?? selectedModel);
 
   return (
     <DropdownMenu>
@@ -46,11 +47,7 @@ export const ComposerModelSelector = ({
             >
               <span className="min-w-0 flex-1 truncate">{model.name}</span>
               {active && (
-                <Check
-                  size={12}
-                  weight="bold"
-                  className="ml-3 flex-shrink-0 text-kumo-inactive"
-                />
+                <Check size={12} weight="bold" className="ml-3 flex-shrink-0 text-kumo-inactive" />
               )}
             </DropdownMenu.Item>
           );
@@ -62,11 +59,7 @@ export const ComposerModelSelector = ({
         >
           <span className="min-w-0 flex-1 truncate">No agent</span>
           {selectedModel == null && (
-            <Check
-              size={12}
-              weight="bold"
-              className="ml-3 flex-shrink-0 text-kumo-inactive"
-            />
+            <Check size={12} weight="bold" className="ml-3 flex-shrink-0 text-kumo-inactive" />
           )}
         </DropdownMenu.Item>
       </DropdownMenu.Content>

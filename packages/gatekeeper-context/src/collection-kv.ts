@@ -21,7 +21,7 @@ function parsePublicCollections(raw: string): ContextCollectionSummary[] {
 
 /** The public collections for a domain (readable by every user in that domain). */
 export async function listPublicCollectionsFromKv(
-  env: Pick<Cloudflare.Env, 'CONTEXT_COLLECTIONS'>,
+  env: Pick<Cloudflare.Env, "CONTEXT_COLLECTIONS">,
   domain: string,
 ): Promise<ContextCollectionSummary[]> {
   let raw = await env.CONTEXT_COLLECTIONS.get(publicCollectionsKvKey(domain));

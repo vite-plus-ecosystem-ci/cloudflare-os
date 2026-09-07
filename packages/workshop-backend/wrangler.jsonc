@@ -4,7 +4,7 @@
   "main": ".wrangler/validate/src/server.ts",
   "build": {
     "command": "pnpm run build:worker",
-    "watch_dir": "src"
+    "watch_dir": "src",
   },
   "compatibility_date": "2026-09-04",
 
@@ -28,13 +28,13 @@
     // The pi-ai inference layer wraps the official provider SDKs (@anthropic-ai/sdk, openai,
     // @google/genai), which need Node compatibility. Puppeteer (used for Gadget PDF exports)
     // also requires Node compatibility. Otherwise, we'd only need nodejs_als.
-    "nodejs_compat"
+    "nodejs_compat",
   ],
 
   // Wrangler will launch a Chrome instance locally to emulate the Browser Run API during
   // local development. Add "remote": true to use a remote browser running on Cloudflare instead.
   "browser": {
-    "binding": "BROWSER"
+    "binding": "BROWSER",
   },
 
   // Gatekeeper service bindings and the Workers AI binding are dynamically
@@ -44,18 +44,18 @@
   "migrations": [
     {
       "tag": "v0",
-      "new_sqlite_classes": [ "UserDurableObject", "OverseerDurableObject" ]
+      "new_sqlite_classes": ["UserDurableObject", "OverseerDurableObject"],
     },
     {
       "tag": "v1",
-      "new_sqlite_classes": [ "AdminSettings" ]
+      "new_sqlite_classes": ["AdminSettings"],
     },
     {
       // Sign-in via authentication gatekeepers: a short-lived PendingLogin DO bridges each gatekeeper
       // login back to the waiting browser.
       "tag": "v2",
-      "new_sqlite_classes": [ "PendingLogin" ]
-    }
+      "new_sqlite_classes": ["PendingLogin"],
+    },
   ],
 
   // All DO classes (UserDurableObject, OverseerDurableObject, AdminSettings, PendingLogin, ...) are
@@ -63,23 +63,23 @@
   "kv_namespaces": [
     {
       "binding": "BLUEPRINTS",
-      "preview_id": "gadgets-blueprint-metadata"
+      "preview_id": "gadgets-blueprint-metadata",
     },
     {
       "binding": "AVATARS",
-      "preview_id": "gadgets-avatars"
-    }
+      "preview_id": "gadgets-avatars",
+    },
   ],
   "r2_buckets": [
     {
       "binding": "BLUEPRINT_CONTENT",
-      "bucket_name": "gadgets-blueprint-content"
-    }
+      "bucket_name": "gadgets-blueprint-content",
+    },
   ],
   "worker_loaders": [
     {
-      "binding": "LOADER"
-    }
+      "binding": "LOADER",
+    },
   ],
 
   // When deploying to prod, you may want to bundle the frontend as assets on the backend, like so.
@@ -96,7 +96,6 @@
     "logs": { "invocation_logs": false },
     // Traces are free during the beta; spans bill against the Logs quota from 2026-10-01,
     // so revisit the sampling rate before then.
-    "traces": { "enabled": true, "head_sampling_rate": 0.5 }
-  }
-
+    "traces": { "enabled": true, "head_sampling_rate": 0.5 },
+  },
 }

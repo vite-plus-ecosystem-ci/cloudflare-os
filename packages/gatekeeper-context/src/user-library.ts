@@ -3,7 +3,9 @@
 import { DurableObject } from "cloudflare:workers";
 import { createTypedStorage, collection } from "@gadgets/typed-storage";
 import {
-  ContextCollectionSummary, ContextCollectionVisibility, OwnedCollectionRecord,
+  ContextCollectionSummary,
+  ContextCollectionVisibility,
+  OwnedCollectionRecord,
 } from "./context-types.js";
 import { listPublicCollectionsFromKv } from "./collection-kv.js";
 
@@ -64,7 +66,7 @@ export class UserLibraryDurableObject extends DurableObject<Cloudflare.Env> {
   }
 
   listOwnedCollections(): OwnedCollectionRecord[] {
-    let result = [...this.storage.ownedCollections.list()].map(r => ({
+    let result = [...this.storage.ownedCollections.list()].map((r) => ({
       id: r.id,
       title: r.title,
       description: r.description,

@@ -49,7 +49,7 @@ export function useSlashCommandChoice(
   source: OverseerSource,
   id: SlashCommandId | undefined,
 ): SlashCommandChoice | undefined {
-  const [resolved, setResolved] = useState<{key: string; choice?: SlashCommandChoice}>();
+  const [resolved, setResolved] = useState<{ key: string; choice?: SlashCommandChoice }>();
   const key = id && slashCommandKey(id);
 
   useEffect(() => {
@@ -58,7 +58,10 @@ export function useSlashCommandChoice(
     loadSlashCommandCatalog(source)
       .then((catalog) => {
         if (cancelled) return;
-        setResolved({key, choice: catalog.find((entry) => slashCommandKey(entry.selection) === key)});
+        setResolved({
+          key,
+          choice: catalog.find((entry) => slashCommandKey(entry.selection) === key),
+        });
       })
       .catch(() => {
         // A description the user can only reach by hovering isn't worth reporting a failure over.

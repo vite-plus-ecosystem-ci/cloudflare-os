@@ -11,9 +11,7 @@
 // Env:
 //   VITE_BACKEND_HOST=localhost:9000  Also pass --port 9000 to wrangler dev.
 
-import {
-  existsSync, readFileSync, writeFileSync, readdirSync, statSync,
-} from "node:fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { spawn, type ChildProcess } from "node:child_process";
 import { connect } from "node:net";
 import { constants } from "node:os";
@@ -53,8 +51,10 @@ function loadDevVars(): void {
     const key = line.slice(0, eq).trim();
     let value = line.slice(eq + 1).trim();
     // Strip surrounding single or double quotes.
-    if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.slice(1, -1);
     }
     if (process.env[key] === undefined) process.env[key] = value;
@@ -73,7 +73,9 @@ let backendHost: string;
 let wranglerPort: string | null;
 try {
   ({ backendHost, wranglerPort } = getDevServerConfig(
-      process.argv.slice(2), process.env.VITE_BACKEND_HOST));
+    process.argv.slice(2),
+    process.env.VITE_BACKEND_HOST,
+  ));
 } catch (err) {
   console.error((err as Error).message);
   process.exit(1);
@@ -85,15 +87,15 @@ try {
 function findGatekeepers(parentDir: string): Gatekeeper[] {
   try {
     return readdirSync(parentDir)
-        .filter(name => name.startsWith("gatekeeper-"))
-        .filter(name => {
-      try {
-        return statSync(join(parentDir, name, "wrangler.jsonc")).isFile();
-      } catch {
-        return false;
-      }
-    })
-        .map(name => ({ name, dir: join(parentDir, name) }));
+      .filter((name) => name.startsWith("gatekeeper-"))
+      .filter((name) => {
+        try {
+          return statSync(join(parentDir, name, "wrangler.jsonc")).isFile();
+        } catch {
+          return false;
+        }
+      })
+      .map((name) => ({ name, dir: join(parentDir, name) }));
   } catch {
     return [];
   }
@@ -119,7 +121,7 @@ let wranglerChild: ChildProcess | null = null;
 
 // Resolve once something accepts a TCP connection on `port`, or once `timeoutMs` has elapsed.
 function waitForPort(port: number, timeoutMs: number): Promise<void> {
-  return new Promise<void>(resolve => {
+  return new Promise<void>((resolve) => {
     const deadline = Date.now() + timeoutMs;
     const attempt = () => {
       const socket = connect({ port, host: "127.0.0.1" });
@@ -169,9 +171,11 @@ process.on("exit", stopDevWatchers);
 async function stopDevWatchersDeep(): Promise<void> {
   stoppingDevWatchers = true;
   deferredWatchers.length = 0;
-  await Promise.all(devWatchers
-      .filter(watcher => watcher.exitCode === null && watcher.signalCode === null)
-      .map(watcher => watcher.pid ? killProcessTree(watcher.pid).catch(() => {}) : null));
+  await Promise.all(
+    devWatchers
+      .filter((watcher) => watcher.exitCode === null && watcher.signalCode === null)
+      .map((watcher) => (watcher.pid ? killProcessTree(watcher.pid).catch(() => {}) : null)),
+  );
 }
 
 // The single in-flight teardown of each kind. Both shutdown paths join these promises rather than
@@ -270,19 +274,26 @@ let stoppingPreflightBuilds = false;
 // callers: process.exit() would cut the tree walk short.
 async function stopPreflightBuilds(): Promise<void> {
   stoppingPreflightBuilds = true;
-  await Promise.all([...preflightBuilds].map(child =>
-      child.pid ? killProcessTree(child.pid).catch(() => {}) : null));
+  await Promise.all(
+    [...preflightBuilds].map((child) =>
+      child.pid ? killProcessTree(child.pid).catch(() => {}) : null,
+    ),
+  );
 }
 
 // Run a one-shot build to completion. A promise rather than execFileSync so the pre-flight builds
 // can overlap.
 function runBuild(
-  label: string, command: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv,
+  label: string,
+  command: string,
+  args: string[],
+  cwd: string,
+  env?: NodeJS.ProcessEnv,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, { stdio: "inherit", cwd, env });
     preflightBuilds.add(child);
-    child.on("error", error => {
+    child.on("error", (error) => {
       preflightBuilds.delete(child);
       reject(error);
     });
@@ -332,7 +343,8 @@ try {
       WORKSHOP_BACKEND_DIR,
     ),
     ...VP_PREFLIGHT_BUILDS.map(({ label, args }) =>
-        runBuild(label, ...pnpmCommand(args), ROOT, vpEnv)),
+      runBuild(label, ...pnpmCommand(args), ROOT, vpEnv),
+    ),
   ]);
 } catch (err) {
   // The SIGTERM handler killing the builds also lands here, as the rejection of whichever build
@@ -356,11 +368,12 @@ for (const gk of gatekeepers) {
   // watcher. Skipping it would leave that edit sitting unbuilt until the next save, while Wrangler,
   // which sees the same edit through `watch_dir: src`, restarted the worker as if it had landed.
   if (existsSync(join(gk.dir, "src", "configurator"))) {
-    spawnDevWatcher(
-      `configurator UI watcher for ${gk.name}`,
-      process.execPath,
-      [join(SCRIPTS_DIR, "build-gatekeeper-configurator.ts"), gk.dir, "--watch", "--quiet"],
-    );
+    spawnDevWatcher(`configurator UI watcher for ${gk.name}`, process.execPath, [
+      join(SCRIPTS_DIR, "build-gatekeeper-configurator.ts"),
+      gk.dir,
+      "--watch",
+      "--quiet",
+    ]);
   }
 
   // Single-file app UI (Vite bundle written to src/generated/app.txt by build-app.mjs).
@@ -371,11 +384,12 @@ for (const gk of gatekeepers) {
   // -- the pre-flight already wrote the `app.txt` they will produce -- and Vite reads the disk when
   // it finally starts, so an edit made while the server was coming up is still picked up.
   if (existsSync(join(gk.dir, "build-app.mjs"))) {
-    deferredWatchers.push(() => spawnDevWatcher(
-      `app UI watcher for ${gk.name}`,
-      process.execPath,
-      [join(gk.dir, "build-app.mjs"), "--watch"],
-    ));
+    deferredWatchers.push(() =>
+      spawnDevWatcher(`app UI watcher for ${gk.name}`, process.execPath, [
+        join(gk.dir, "build-app.mjs"),
+        "--watch",
+      ]),
+    );
   }
 }
 
@@ -423,7 +437,8 @@ function withoutPnpmIndirection(pkgDir: string, command: string, depth = 0): str
   return command.replaceAll(/\bpnpm exec ([\w@/.-]+)/g, (original, bin) => {
     const entry = resolveBinEntry(pkgDir, bin);
     return entry && shellSafe(process.execPath) && shellSafe(entry)
-        ? `"${process.execPath}" "${entry}"` : original;
+      ? `"${process.execPath}" "${entry}"`
+      : original;
   });
 }
 
@@ -468,7 +483,10 @@ function devBuildConfig(build: WranglerBuild | undefined, pkgDir: string): Wrang
 const SHARED_GATEKEEPER_CREDS: Record<string, { id: string; secret: string }> = {
   "gatekeeper-github": { id: "GITHUB_CLIENT_ID", secret: "GITHUB_CLIENT_SECRET" },
   "gatekeeper-google": { id: "GOOGLE_CLIENT_ID", secret: "GOOGLE_CLIENT_SECRET" },
-  "gatekeeper-cloudflare": { id: "CLOUDFLARE_OAUTH_CLIENT_ID", secret: "CLOUDFLARE_OAUTH_CLIENT_SECRET" },
+  "gatekeeper-cloudflare": {
+    id: "CLOUDFLARE_OAUTH_CLIENT_ID",
+    secret: "CLOUDFLARE_OAUTH_CLIENT_SECRET",
+  },
   "gatekeeper-supabase": { id: "SUPABASE_CLIENT_ID", secret: "SUPABASE_CLIENT_SECRET" },
   "gatekeeper-notion": { id: "NOTION_CLIENT_ID", secret: "NOTION_CLIENT_SECRET" },
   "gatekeeper-zoominfo": { id: "ZOOMINFO_CLIENT_ID", secret: "ZOOMINFO_CLIENT_SECRET" },
@@ -487,8 +505,13 @@ const SHARED_GATEKEEPER_CREDS: Record<string, { id: string; secret: string }> = 
 // `CLIENT_SECRET` already does, via SHARED_GATEKEEPER_CREDS above.
 const PASSTHROUGH_GATEKEEPER_VARS: Record<string, string[]> = {
   "gatekeeper-mcp-portal": [
-    "MCP_PORTAL_URL", "MCP_PORTAL_NAME", "MCP_PORTAL_AUTH", "MCP_PORTAL_TOKEN",
-    "MCP_PORTAL_TRUST_ANNOTATIONS", "MCP_PORTAL_HIDDEN_SERVER_IDS", "MCP_ALLOW_INSECURE",
+    "MCP_PORTAL_URL",
+    "MCP_PORTAL_NAME",
+    "MCP_PORTAL_AUTH",
+    "MCP_PORTAL_TOKEN",
+    "MCP_PORTAL_TRUST_ANNOTATIONS",
+    "MCP_PORTAL_HIDDEN_SERVER_IDS",
+    "MCP_ALLOW_INSECURE",
   ],
   "gatekeeper-mcp": ["MCP_ALLOW_INSECURE"],
 };
@@ -503,7 +526,8 @@ for (const gk of gatekeepers) {
   const shared = SHARED_GATEKEEPER_CREDS[gk.name];
   if (shared && process.env[shared.id] && process.env[shared.secret]) {
     if (config.vars.CLIENT_ID === undefined) config.vars.CLIENT_ID = process.env[shared.id];
-    if (config.vars.CLIENT_SECRET === undefined) config.vars.CLIENT_SECRET = process.env[shared.secret];
+    if (config.vars.CLIENT_SECRET === undefined)
+      config.vars.CLIENT_SECRET = process.env[shared.secret];
   }
 
   // The shell wins over the committed default, so `MCP_ALLOW_INSECURE=true` can override the
@@ -538,16 +562,23 @@ for (const gk of gatekeepers) {
   //   ENABLE_CLOUDFLARE_LIMITS=true DAILY_LLM_CALL_LIMIT=1 pnpm dev-server
   // without editing any config files.
   const OPTIONAL_FEATURE_VARS = [
-    "DISABLE_PASSWORD_AUTH", "AUTH_GATEKEEPERS", "ENABLE_CLOUDFLARE_LIMITS", "PUBLIC_BASE_URL",
-    "DAILY_LLM_CALL_LIMIT", "MINIMUM_CLOUDFLARE_BALANCE",
+    "DISABLE_PASSWORD_AUTH",
+    "AUTH_GATEKEEPERS",
+    "ENABLE_CLOUDFLARE_LIMITS",
+    "PUBLIC_BASE_URL",
+    "DAILY_LLM_CALL_LIMIT",
+    "MINIMUM_CLOUDFLARE_BALANCE",
     // Platform AI Gateway — makes the cross-provider model catalog available. CF_AI_GATEWAY
     // always needs CF_AI_GATEWAY_ACCOUNT_ID plus one transport: the WORKERS_AI binding
     // (start with --use-workers-ai-binding; CF_AI_GATEWAY_USE_BINDING=false opts out, e.g.
     // when the gateway lives in a different account than the dev binding) or
     // CF_AI_GATEWAY_API_TOKEN over HTTPS. The google provider can't ride the binding and
     // needs the token even when the binding is present.
-    "CF_AI_GATEWAY", "CF_AI_GATEWAY_PROVIDERS", "CF_AI_GATEWAY_ACCOUNT_ID",
-    "CF_AI_GATEWAY_API_TOKEN", "CF_AI_GATEWAY_USE_BINDING",
+    "CF_AI_GATEWAY",
+    "CF_AI_GATEWAY_PROVIDERS",
+    "CF_AI_GATEWAY_ACCOUNT_ID",
+    "CF_AI_GATEWAY_API_TOKEN",
+    "CF_AI_GATEWAY_USE_BINDING",
   ];
   // OAuth app credentials (GOOGLE_/GITHUB_/CLOUDFLARE_OAUTH_*) are NOT passed to the backend anymore;
   // they are injected into the gatekeeper Workers (see SHARED_GATEKEEPER_CREDS below).
@@ -599,16 +630,17 @@ for (const gk of gatekeepers) {
 const configs = [
   "wrangler.dev.jsonc",
   join("packages", "workshop-backend", "wrangler.dev.jsonc"),
-  ...gatekeepers.map(gk => join(gk.dir, "wrangler.dev.jsonc")),
+  ...gatekeepers.map((gk) => join(gk.dir, "wrangler.dev.jsonc")),
 ];
 
-const args = configs.flatMap(c => ["-c", c]);
+const args = configs.flatMap((c) => ["-c", c]);
 if (wranglerPort) {
   args.push("--port", wranglerPort);
 } else {
   console.warn(
-      "VITE_BACKEND_HOST did not include a port, so run-dev-server.ts could not derive " +
-      "a Wrangler --port override.");
+    "VITE_BACKEND_HOST did not include a port, so run-dev-server.ts could not derive " +
+      "a Wrangler --port override.",
+  );
 }
 console.log(`\nStarting: wrangler dev ${args.join(" ")}\n`);
 
@@ -623,7 +655,7 @@ const [wranglerCommand, wranglerArgv]: [string, string[]] = wranglerEntry
 // this process group with the terminal attached, so Ctrl-C reaches it as before.
 wranglerChild = spawn(wranglerCommand, wranglerArgv, { stdio: "inherit", cwd: ROOT });
 
-wranglerChild.on("error", err => {
+wranglerChild.on("error", (err) => {
   console.error(`wrangler dev could not be started: ${err.message}`);
   process.exit(1);
 });
@@ -641,7 +673,7 @@ wranglerChild.on("exit", async (code, signal) => {
   await stopDevWatchersDeepOnce();
   // The output was already shown via stdio: "inherit". A signal-initiated shutdown reports the
   // initiating signal's status; only when Wrangler died on its own is its status propagated.
-  process.exit(shutdownExitCode ?? (signal ? 128 + (constants.signals[signal] ?? 0) : code ?? 1));
+  process.exit(shutdownExitCode ?? (signal ? 128 + (constants.signals[signal] ?? 0) : (code ?? 1)));
 });
 
 // Poll the socket rather than parsing stdout for "Ready on", which would mean giving up

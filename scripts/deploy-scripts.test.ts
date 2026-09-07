@@ -5,8 +5,8 @@ import { describe, it } from "node:test";
 
 // Every `deploy` script in the workspace, so a new package is covered without being listed here.
 const deployScripts = readdirSync("packages", { withFileTypes: true })
-  .filter(entry => entry.isDirectory())
-  .flatMap(entry => {
+  .filter((entry) => entry.isDirectory())
+  .flatMap((entry) => {
     const manifestPath = join("packages", entry.name, "package.json");
     let manifest;
     try {
@@ -44,7 +44,8 @@ describe("deploy scripts", () => {
       assert.ok(
         command.includes("--no-cache"),
         `${name} (${path}) runs a vp task while deploying without --no-cache: ${command}\n` +
-          "Deploys must not replay a cached artifact -- add --no-cache.");
+          "Deploys must not replay a cached artifact -- add --no-cache.",
+      );
     }
   });
 
@@ -57,7 +58,8 @@ describe("deploy scripts", () => {
         assert.ok(
           !command.includes(builder),
           `${name} (${path}) invokes ${builder} directly while deploying: ${command}\n` +
-            "Run the task that declares its env instead (vp run --no-cache <task>).");
+            "Run the task that declares its env instead (vp run --no-cache <task>).",
+        );
       }
     }
   });

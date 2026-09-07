@@ -23,23 +23,34 @@
 import { DurableObject, RpcTarget, WorkerEntrypoint, type RpcStub } from "cloudflare:workers";
 import { skipRpcValidation, validateRpc } from "capnweb-validate";
 import type {
-  AccountDescription, ActionKind, ApprovalQueue, Gatekeeper, GatekeeperConnectCallback,
-  GatekeeperUser, GatekeeperUserVerifier, ResourceDescription, ResourceConfiguratorFrame,
-  SupportedResource, VendorDescription,
+  AccountDescription,
+  ActionKind,
+  ApprovalQueue,
+  Gatekeeper,
+  GatekeeperConnectCallback,
+  GatekeeperUser,
+  GatekeeperUserVerifier,
+  ResourceDescription,
+  ResourceConfiguratorFrame,
+  SupportedResource,
+  VendorDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
 import type {
-  ChatGatewayRpcTarget, GadgetResponse,
+  ChatGatewayRpcTarget,
+  GadgetResponse,
 } from "@gadgets/workshop-shared/external-message-gateway";
 
 // Nothing but classes and the default handler may be exported from a Worker entry module: workerd
 // treats every named export as an entrypoint and rejects anything that isn't one.
 const VENDOR_HOST = "gadgets-test.example";
 
-const SUPPORTED_RESOURCES: SupportedResource[] = [{
-  urlPattern: `https://${VENDOR_HOST}/things/*`,
-  title: "Test Thing",
-  description: "A resource that exists only so tests can bind something.",
-}];
+const SUPPORTED_RESOURCES: SupportedResource[] = [
+  {
+    urlPattern: `https://${VENDOR_HOST}/things/*`,
+    title: "Test Thing",
+    description: "A resource that exists only so tests can bind something.",
+  },
+];
 
 const TYPES_CODE = `
 /** A stand-in resource whose reads and writes are deterministic and audited. */
@@ -92,9 +103,10 @@ export class TestControl extends DurableObject<Cloudflare.Env> {
   getVerifyOutcome(label: string, resourceUrl?: string): VerifyOutcome {
     // A resource-specific outcome wins over a label-wide one. Default to admitting: a
     // collaborator's first open has to be able to succeed.
-    return this.ctx.storage.kv.get<VerifyOutcome>(outcomeKey(label, resourceUrl))
-        ?? this.ctx.storage.kv.get<VerifyOutcome>(outcomeKey(label))
-        ?? { allow: true };
+    return (
+      this.ctx.storage.kv.get<VerifyOutcome>(outcomeKey(label, resourceUrl)) ??
+      this.ctx.storage.kv.get<VerifyOutcome>(outcomeKey(label)) ?? { allow: true }
+    );
   }
 
   recordObserverEvent(event: ObserverEvent): void {
@@ -105,8 +117,9 @@ export class TestControl extends DurableObject<Cloudflare.Env> {
 
   /** Filtered here rather than in the test: tests run concurrently against one shared log. */
   getObserverEvents(resourceUrl: string): ObserverEvent[] {
-    return (this.ctx.storage.kv.get<ObserverEvent[]>("observer-events") ?? [])
-        .filter(e => e.resourceUrl === resourceUrl);
+    return (this.ctx.storage.kv.get<ObserverEvent[]>("observer-events") ?? []).filter(
+      (e) => e.resourceUrl === resourceUrl,
+    );
   }
 
   recordAmbientVerification(label: string): void {
@@ -119,11 +132,13 @@ export class TestControl extends DurableObject<Cloudflare.Env> {
   }
 
   getActionState(label: string): TestActionState {
-    return this.ctx.storage.kv.get<TestActionState>(`actions:${label}`) ?? {
-      nextId: 1,
-      pending: [],
-      applyCount: 0,
-    };
+    return (
+      this.ctx.storage.kv.get<TestActionState>(`actions:${label}`) ?? {
+        nextId: 1,
+        pending: [],
+        applyCount: 0,
+      }
+    );
   }
 
   stageAction(label: string, value: number): number {
@@ -136,15 +151,15 @@ export class TestControl extends DurableObject<Cloudflare.Env> {
 
   discardAction(label: string, id: number): void {
     const state = this.getActionState(label);
-    state.pending = state.pending.filter(action => action.id !== id);
+    state.pending = state.pending.filter((action) => action.id !== id);
     this.ctx.storage.kv.put(`actions:${label}`, state);
   }
 
   applyAction(label: string, id: number): void {
     const state = this.getActionState(label);
-    const action = state.pending.find(candidate => candidate.id === id);
+    const action = state.pending.find((candidate) => candidate.id === id);
     if (action === undefined) throw new Error(`Unknown pending test action ${id}`);
-    state.pending = state.pending.filter(candidate => candidate.id !== id);
+    state.pending = state.pending.filter((candidate) => candidate.id !== id);
     state.value = action.value;
     state.applyCount++;
     this.ctx.storage.kv.put(`actions:${label}`, state);
@@ -209,7 +224,9 @@ export class GatekeeperVendor extends WorkerEntrypoint<Cloudflare.Env> {
 
 @validateRpc()
 export class TestAccount
-    extends WorkerEntrypoint<Cloudflare.Env, AccountProps> implements GatekeeperUser {
+  extends WorkerEntrypoint<Cloudflare.Env, AccountProps>
+  implements GatekeeperUser
+{
   async describe(): Promise<AccountDescription> {
     return {
       displayName: this.ctx.props.label.split("@")[0],
@@ -288,7 +305,9 @@ export interface TestVerifierApi extends GatekeeperUserVerifier {
 
 @validateRpc()
 export class TestVerifier
-    extends WorkerEntrypoint<Cloudflare.Env, AccountProps> implements TestVerifierApi {
+  extends WorkerEntrypoint<Cloudflare.Env, AccountProps>
+  implements TestVerifierApi
+{
   async identify(): Promise<string> {
     return this.ctx.props.label;
   }
@@ -308,9 +327,10 @@ class TestSessionTarget extends RpcTarget implements TestSession {
   private readonly approvalQueue: RpcStub<ApprovalQueue>;
 
   constructor(
-      approvalQueue: RpcStub<ApprovalQueue>,
-      private readonly state: DurableObjectStub<TestControl>,
-      private readonly label: string) {
+    approvalQueue: RpcStub<ApprovalQueue>,
+    private readonly state: DurableObjectStub<TestControl>,
+    private readonly label: string,
+  ) {
     super();
     this.approvalQueue = approvalQueue.dup();
   }
@@ -341,7 +361,7 @@ class TestSessionTarget extends RpcTarget implements TestSession {
   }
 
   async writeValues(values: number[]): Promise<number[]> {
-    return Promise.all(values.map(value => this.writeValue(value)));
+    return Promise.all(values.map((value) => this.writeValue(value)));
   }
 
   [Symbol.dispose](): void {
@@ -351,7 +371,9 @@ class TestSessionTarget extends RpcTarget implements TestSession {
 
 @validateRpc()
 export class TestGatekeeper
-    extends DurableObject<Cloudflare.Env, BindingProps> implements Gatekeeper<TestSession> {
+  extends DurableObject<Cloudflare.Env, BindingProps>
+  implements Gatekeeper<TestSession>
+{
   async describe(): Promise<ResourceDescription> {
     if (this.ctx.props.ambient) {
       return {
@@ -382,8 +404,7 @@ export class TestGatekeeper
   }
 
   async startSession(approvalQueue: RpcStub<ApprovalQueue>): Promise<TestSession> {
-    return new TestSessionTarget(
-        approvalQueue, control(this.ctx.exports), this.ctx.props.label);
+    return new TestSessionTarget(approvalQueue, control(this.ctx.exports), this.ctx.props.label);
   }
 
   /**
@@ -408,8 +429,11 @@ export class TestGatekeeper
 
   async removeObserver(id: string): Promise<void> {
     this.ctx.storage.kv.delete(`observer:${id}`);
-    await control(this.ctx.exports).recordObserverEvent(
-        { resourceUrl: this.ctx.props.resourceUrl, type: "remove", id });
+    await control(this.ctx.exports).recordObserverEvent({
+      resourceUrl: this.ctx.props.resourceUrl,
+      type: "remove",
+      id,
+    });
   }
 
   async applyAction(action: number): Promise<void> {
@@ -505,7 +529,9 @@ export default {
     if (url.pathname === "/control/ambient-verification-count" && req.method === "POST") {
       const { label } = body as Record<string, unknown>;
       if (!isNonEmptyString(label)) return badRequest("`label` must be a non-empty string");
-      return Response.json({ count: await control(ctx.exports).getAmbientVerificationCount(label) });
+      return Response.json({
+        count: await control(ctx.exports).getAmbientVerificationCount(label),
+      });
     }
 
     if (url.pathname === "/control/action-state" && req.method === "POST") {
@@ -524,8 +550,14 @@ export default {
     // Body: {"callerEmail", "gadgetKey", "chatKey", "messageKey", "gadgetTitle", "prompt"}
     // -> SubmitExternalMessageResult
     if (url.pathname === "/control/submit-external-message" && req.method === "POST") {
-      const fields =
-          ["callerEmail", "gadgetKey", "chatKey", "messageKey", "gadgetTitle", "prompt"] as const;
+      const fields = [
+        "callerEmail",
+        "gadgetKey",
+        "chatKey",
+        "messageKey",
+        "gadgetTitle",
+        "prompt",
+      ] as const;
       const input = {} as Record<(typeof fields)[number], string>;
       for (const field of fields) {
         const value = (body as Record<string, unknown>)[field];
@@ -535,9 +567,13 @@ export default {
       // The instance becomes a stub when it crosses the RPC boundary; the parameter type can only
       // name the stub side of that.
       const chatGatewayRpcTarget =
-          new DevNullChatGateway() as unknown as RpcStub<ChatGatewayRpcTarget>;
-      return Response.json(await env.WORKSHOP_EXTERNAL_MESSAGES.submitExternalMessage(
-          { ...input, chatGatewayRpcTarget }));
+        new DevNullChatGateway() as unknown as RpcStub<ChatGatewayRpcTarget>;
+      return Response.json(
+        await env.WORKSHOP_EXTERNAL_MESSAGES.submitExternalMessage({
+          ...input,
+          chatGatewayRpcTarget,
+        }),
+      );
     }
 
     // Map an external gadgetKey to the Overseer id the gateway targets -- the DO named
@@ -547,8 +583,9 @@ export default {
     if (url.pathname === "/control/external-gadget-id" && req.method === "POST") {
       const { gadgetKey } = body as Record<string, unknown>;
       if (!isNonEmptyString(gadgetKey)) return badRequest("`gadgetKey` must be a non-empty string");
-      return Response.json(
-          { gadgetId: env.WORKSHOP_OVERSEER.idFromName(`test:${gadgetKey}`).toString() });
+      return Response.json({
+        gadgetId: env.WORKSHOP_OVERSEER.idFromName(`test:${gadgetKey}`).toString(),
+      });
     }
 
     // Make this Worker issue a subrequest, so a test can prove that Worker-originated fetches really

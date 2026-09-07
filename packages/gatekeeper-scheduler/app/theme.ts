@@ -1,7 +1,4 @@
-import {
-  applyAccentColor,
-  type GatekeeperAppTheme,
-} from "@gadgets/workshop-shared/theme";
+import { applyAccentColor, type GatekeeperAppTheme } from "@gadgets/workshop-shared/theme";
 
 export type ResolvedThemeMode = "light" | "dark";
 

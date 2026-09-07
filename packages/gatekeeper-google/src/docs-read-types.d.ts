@@ -5,7 +5,7 @@ export type DocMetadata = {
 
   /** When the document was last modified. */
   lastModified: Date;
-}
+};
 
 /** Read-only access to one native Google Doc. */
 export interface GoogleDocReadSession {

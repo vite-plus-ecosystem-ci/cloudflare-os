@@ -1,25 +1,25 @@
 import { isTextLikeAttachmentMimeType } from "@gadgets/workshop-shared/api";
-import type { AiModelConfig, AiModelProvider, ChatAttachmentUpload } from "@gadgets/workshop-shared/api";
+import type {
+  AiModelConfig,
+  AiModelProvider,
+  ChatAttachmentUpload,
+} from "@gadgets/workshop-shared/api";
 import { PDF_MIME_TYPE } from "./chat-attachment-pdf";
 
 // Bounds attachment storage and the bytes replayed into model requests.
 const MAX_CHAT_ATTACHMENT_BYTES = 1024 * 1024;
 
 const IMAGE_SIGNATURES = new Map<string, readonly (number | null)[]>([
-  ["image/jpeg", [0xFF, 0xD8, 0xFF]],
-  ["image/png", [0x89, 0x50, 0x4E, 0x47]],
-  ["image/webp", [
-    0x52, 0x49, 0x46, 0x46,
-    null, null, null, null,
-    0x57, 0x45, 0x42, 0x50,
-  ]],
+  ["image/jpeg", [0xff, 0xd8, 0xff]],
+  ["image/png", [0x89, 0x50, 0x4e, 0x47]],
+  ["image/webp", [0x52, 0x49, 0x46, 0x46, null, null, null, null, 0x57, 0x45, 0x42, 0x50]],
 ]);
 
 // Magic-number prefixes checked at upload. Like the image signatures, the PDF one ("%PDF-")
 // only stops mislabeled uploads at the door; nothing here parses the content.
 const CONTENT_SIGNATURES = new Map<string, readonly (number | null)[]>([
   ...IMAGE_SIGNATURES,
-  [PDF_MIME_TYPE, [0x25, 0x50, 0x44, 0x46, 0x2D]],
+  [PDF_MIME_TYPE, [0x25, 0x50, 0x44, 0x46, 0x2d]],
 ]);
 
 const isTextOrImageMime = (mimeType: string) =>
@@ -47,7 +47,10 @@ function sanitizeChatAttachmentMimeType(mimeType: string | undefined): string {
 
 function sanitizeChatAttachmentName(name: string | undefined): string | undefined {
   if (!name) return undefined;
-  let result = name.replace(/[\r\n]/g, " ").slice(0, 255).trim();
+  let result = name
+    .replace(/[\r\n]/g, " ")
+    .slice(0, 255)
+    .trim();
   return result || undefined;
 }
 
@@ -78,7 +81,11 @@ export function validateChatAttachmentUpload(
 ): ChatAttachmentUpload {
   attachment.name = sanitizeChatAttachmentName(attachment.name);
   attachment.mimeType = sanitizeChatAttachmentMimeType(attachment.mimeType);
-  assertChatAttachmentSupportedByProvider(provider, attachment.mimeType, attachment.content.byteLength);
+  assertChatAttachmentSupportedByProvider(
+    provider,
+    attachment.mimeType,
+    attachment.content.byteLength,
+  );
 
   let signature = CONTENT_SIGNATURES.get(attachment.mimeType);
   if (signature) {

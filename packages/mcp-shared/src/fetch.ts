@@ -68,7 +68,8 @@ export const MAX_RESPONSE_BYTES = 1024 * 1024;
  * than running to completion unread.
  */
 export async function readTextCapped(
-  response: Response, maxBytes: number = MAX_RESPONSE_BYTES,
+  response: Response,
+  maxBytes: number = MAX_RESPONSE_BYTES,
 ): Promise<string> {
   if (!response.body) return "";
 
@@ -103,8 +104,7 @@ export async function readTextCapped(
 export function sdkFetch(options: FetchOptions = {}): FetchLike {
   const operationOptions: FetchOptions = {
     ...options,
-    deadline: options.deadline
-      ?? Date.now() + (options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
+    deadline: options.deadline ?? Date.now() + (options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS),
   };
   return async (url, init) => {
     const response = await guardedFetch(String(url), init ?? {}, operationOptions);
@@ -140,7 +140,9 @@ export function isAllowedUrl(url: string, options: FetchOptions = {}): boolean {
  * itself, which every caller already treats as a failure.
  */
 export async function guardedFetch(
-  url: string, init: RequestInit, options: FetchOptions = {},
+  url: string,
+  init: RequestInit,
+  options: FetchOptions = {},
 ): Promise<Response> {
   if (!isAllowedUrl(url, options)) {
     throw new FetchNotStartedError(`Refusing to contact ${hostForMessage(url)}.`);
@@ -153,9 +155,10 @@ export async function guardedFetch(
   const origin = new URL(url).origin;
   let signal = init.signal ?? undefined;
   if (options.deadline !== undefined || options.timeoutMs !== undefined) {
-    const remaining = options.deadline === undefined
-      ? options.timeoutMs!
-      : Math.max(0, options.deadline - Date.now());
+    const remaining =
+      options.deadline === undefined
+        ? options.timeoutMs!
+        : Math.max(0, options.deadline - Date.now());
     if (remaining === 0) throw new FetchNotStartedError("The outbound operation timed out.");
     const timeout = AbortSignal.timeout(remaining);
     signal = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -163,7 +166,12 @@ export async function guardedFetch(
 
   for (let hop = 0; ; hop++) {
     const response = await fetch(current, {
-      ...init, method, body, headers, redirect: "manual", signal,
+      ...init,
+      method,
+      body,
+      headers,
+      redirect: "manual",
+      signal,
     });
     if (!REDIRECT_STATUSES.has(response.status)) return response;
 
@@ -174,8 +182,8 @@ export async function guardedFetch(
     if (!isAllowedUrl(next, options)) return response;
 
     const crossOrigin = new URL(next).origin !== origin;
-    const becomesGet = response.status === 303
-      || (response.status < 307 && method !== "GET" && method !== "HEAD");
+    const becomesGet =
+      response.status === 303 || (response.status < 307 && method !== "GET" && method !== "HEAD");
 
     // A 307/308 preserves the request method and body. Following one across origins from an OAuth
     // token endpoint would hand its authorization code, PKCE verifier, refresh token, and client id

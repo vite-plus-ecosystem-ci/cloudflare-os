@@ -128,7 +128,9 @@
 
 .gadgets-diff-surface .gadgets-deleted-code-zone {
   background: var(--gd-del-bg);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
   font-size: 13px;
   line-height: 20px;
   color: var(--gd-fg);

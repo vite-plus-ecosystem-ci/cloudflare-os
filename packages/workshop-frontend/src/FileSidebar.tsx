@@ -1,33 +1,33 @@
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
-import { Dialog, DropdownMenu, useKumoToastManager } from '@cloudflare/kumo'
-import { DotsThree, DownloadSimple, Pencil, Plus, Trash, X } from '@phosphor-icons/react'
-import DeleteConfirmationDialog from './components/DeleteConfirmationDialog'
-import { WorkshopButton, WorkshopIconButton, WorkshopInput } from './components/WorkshopControls'
-import { isImeComposing } from './keyboardEvent'
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { Dialog, DropdownMenu, useKumoToastManager } from "@cloudflare/kumo";
+import { DotsThree, DownloadSimple, Pencil, Plus, Trash, X } from "@phosphor-icons/react";
+import DeleteConfirmationDialog from "./components/DeleteConfirmationDialog";
+import { WorkshopButton, WorkshopIconButton, WorkshopInput } from "./components/WorkshopControls";
+import { isImeComposing } from "./keyboardEvent";
 
 interface FileSidebarProps {
-  files: string[]
-  activeFile: string | null
-  streamingActiveFile?: string | null
-  dirtyFiles: Set<string>
-  changedFiles?: Set<string>  // Files with proposed changes (for diff mode)
-  fileChangeStatuses?: Map<string, FileChangeStatus>
-  isDiffMode?: boolean         // Whether we're in diff mode
-  editLocked?: boolean
-  onFileSelect: (filename: string) => void
-  onFileCreate: (filename: string) => void
-  onFileDelete: (filename: string) => void
-  onFileRename: (oldName: string, newName: string) => void
-  onFileDownload: (filename: string) => void
-  className?: string
-  onRequestClose?: () => void
-  ref?: Ref<FileSidebarHandle>
+  files: string[];
+  activeFile: string | null;
+  streamingActiveFile?: string | null;
+  dirtyFiles: Set<string>;
+  changedFiles?: Set<string>; // Files with proposed changes (for diff mode)
+  fileChangeStatuses?: Map<string, FileChangeStatus>;
+  isDiffMode?: boolean; // Whether we're in diff mode
+  editLocked?: boolean;
+  onFileSelect: (filename: string) => void;
+  onFileCreate: (filename: string) => void;
+  onFileDelete: (filename: string) => void;
+  onFileRename: (oldName: string, newName: string) => void;
+  onFileDownload: (filename: string) => void;
+  className?: string;
+  onRequestClose?: () => void;
+  ref?: Ref<FileSidebarHandle>;
 }
 
-export type FileChangeStatus = 'added' | 'deleted' | 'modified' | 'unchanged'
+export type FileChangeStatus = "added" | "deleted" | "modified" | "unchanged";
 
 export interface FileSidebarHandle {
-  openCreateModal: () => void
+  openCreateModal: () => void;
 }
 
 export default function FileSidebar({
@@ -44,82 +44,88 @@ export default function FileSidebar({
   onFileDelete,
   onFileRename,
   onFileDownload,
-  className = '',
+  className = "",
   onRequestClose,
   ref,
 }: FileSidebarProps) {
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [deletingFile, setDeletingFile] = useState<string | null>(null)
-  const [newFileName, setNewFileName] = useState('')
-  const [renamingFile, setRenamingFile] = useState<string | null>(null)
-  const createInputRef = useRef<HTMLInputElement | null>(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingFile, setDeletingFile] = useState<string | null>(null);
+  const [newFileName, setNewFileName] = useState("");
+  const [renamingFile, setRenamingFile] = useState<string | null>(null);
+  const createInputRef = useRef<HTMLInputElement | null>(null);
 
-  useImperativeHandle(ref, () => ({
-    openCreateModal: () => setIsCreateModalOpen(true),
-  }), [])
+  useImperativeHandle(
+    ref,
+    () => ({
+      openCreateModal: () => setIsCreateModalOpen(true),
+    }),
+    [],
+  );
 
-  const toasts = useKumoToastManager()
+  const toasts = useKumoToastManager();
 
   const handleCreateFile = () => {
     if (!newFileName.trim()) {
-      toasts.add({ title: 'Filename cannot be empty', variant: 'error' })
-      return
+      toasts.add({ title: "Filename cannot be empty", variant: "error" });
+      return;
     }
 
     if (files.includes(newFileName.trim())) {
-      toasts.add({ title: 'A file with this name already exists', variant: 'error' })
-      return
+      toasts.add({ title: "A file with this name already exists", variant: "error" });
+      return;
     }
 
-    onFileCreate(newFileName.trim())
-    setNewFileName('')
-    setIsCreateModalOpen(false)
-  }
+    onFileCreate(newFileName.trim());
+    setNewFileName("");
+    setIsCreateModalOpen(false);
+  };
 
   const startRename = (filename: string) => {
-    setRenamingFile(filename)
-  }
+    setRenamingFile(filename);
+  };
 
   const cancelRename = () => {
-    setRenamingFile(null)
-  }
+    setRenamingFile(null);
+  };
 
   const commitRename = (filename: string, nextName: string) => {
-    const trimmed = nextName.trim()
+    const trimmed = nextName.trim();
     if (!trimmed || trimmed === filename) {
-      setRenamingFile(null)
-      return
+      setRenamingFile(null);
+      return;
     }
 
     if (files.includes(trimmed)) {
-      toasts.add({ title: 'A file with this name already exists', variant: 'error' })
-      return
+      toasts.add({ title: "A file with this name already exists", variant: "error" });
+      return;
     }
 
-    onFileRename(filename, trimmed)
-    setRenamingFile(null)
-  }
+    onFileRename(filename, trimmed);
+    setRenamingFile(null);
+  };
 
   const startDelete = (filename: string) => {
     if (files.length <= 1) {
-      toasts.add({ title: 'Cannot delete the last remaining file', variant: 'error' })
-      return
+      toasts.add({ title: "Cannot delete the last remaining file", variant: "error" });
+      return;
     }
-    setDeletingFile(filename)
-    setIsDeleteModalOpen(true)
-  }
+    setDeletingFile(filename);
+    setIsDeleteModalOpen(true);
+  };
 
   const confirmDelete = () => {
     if (deletingFile) {
-      onFileDelete(deletingFile)
+      onFileDelete(deletingFile);
     }
-    setDeletingFile(null)
-    setIsDeleteModalOpen(false)
-  }
+    setDeletingFile(null);
+    setIsDeleteModalOpen(false);
+  };
 
   return (
-    <div className={`flex h-full w-[244px] flex-col border-r border-kumo-line bg-kumo-base ${className}`}>
+    <div
+      className={`flex h-full w-[244px] flex-col border-r border-kumo-line bg-kumo-base ${className}`}
+    >
       <div className="flex h-9 shrink-0 items-center justify-between gap-2 px-3 pt-3 pb-2">
         <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-kumo-inactive">
           Files
@@ -147,16 +153,16 @@ export default function FileSidebar({
       </div>
 
       <div className="flex-1 overflow-auto px-2 pb-3">
-        {files.map(filename => {
-          const isDirty = dirtyFiles.has(filename)
-          const changeStatus = fileChangeStatuses?.get(filename)
+        {files.map((filename) => {
+          const isDirty = dirtyFiles.has(filename);
+          const changeStatus = fileChangeStatuses?.get(filename);
           const hasChanges = changeStatus
-            ? changeStatus !== 'unchanged'
-            : changedFiles?.has(filename) || false
-          const isUnchanged = isDiffMode && !hasChanges
-          const isActive = activeFile === filename
-          const isStreamingActive = streamingActiveFile === filename
-          const dotClass = getStatusDotClass(changeStatus, isDirty)
+            ? changeStatus !== "unchanged"
+            : changedFiles?.has(filename) || false;
+          const isUnchanged = isDiffMode && !hasChanges;
+          const isActive = activeFile === filename;
+          const isStreamingActive = streamingActiveFile === filename;
+          const dotClass = getStatusDotClass(changeStatus, isDirty);
 
           return (
             <FileRow
@@ -172,16 +178,16 @@ export default function FileSidebar({
               isRenaming={renamingFile === filename}
               onSelect={() => onFileSelect(filename)}
               onRename={() => {
-                startRename(filename)
+                startRename(filename);
               }}
               onDelete={() => {
-                startDelete(filename)
+                startDelete(filename);
               }}
               onDownload={() => onFileDownload(filename)}
               onRenameSubmit={(nextName) => commitRename(filename, nextName)}
               onRenameCancel={cancelRename}
             />
-          )
+          );
         })}
       </div>
 
@@ -189,8 +195,8 @@ export default function FileSidebar({
         open={isCreateModalOpen}
         onOpenChange={(o) => {
           if (!o) {
-            setIsCreateModalOpen(false)
-            setNewFileName('')
+            setIsCreateModalOpen(false);
+            setNewFileName("");
           }
         }}
       >
@@ -209,11 +215,7 @@ export default function FileSidebar({
             </div>
             <Dialog.Close
               render={(props) => (
-                <WorkshopIconButton
-                  {...props}
-                  className="!h-7 !w-7"
-                  aria-label="Close"
-                >
+                <WorkshopIconButton {...props} className="!h-7 !w-7" aria-label="Close">
                   <X size={16} />
                 </WorkshopIconButton>
               )}
@@ -229,10 +231,10 @@ export default function FileSidebar({
               value={newFileName}
               onChange={(e) => setNewFileName(e.target.value)}
               onKeyDown={(e) => {
-                if (isImeComposing(e)) return
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  handleCreateFile()
+                if (isImeComposing(e)) return;
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleCreateFile();
                 }
               }}
               spellCheck={false}
@@ -245,10 +247,7 @@ export default function FileSidebar({
           <div className="flex items-center justify-end gap-2 border-t border-kumo-line bg-kumo-base px-5 py-3">
             <Dialog.Close
               render={(props) => (
-                <WorkshopButton
-                  {...props}
-                  className="!h-9"
-                >
+                <WorkshopButton {...props} className="!h-9">
                   Cancel
                 </WorkshopButton>
               )}
@@ -268,34 +267,39 @@ export default function FileSidebar({
         open={isDeleteModalOpen}
         onOpenChange={(o) => {
           if (!o) {
-            setIsDeleteModalOpen(false)
-            setDeletingFile(null)
+            setIsDeleteModalOpen(false);
+            setDeletingFile(null);
           }
         }}
         title="Delete file?"
-        description={<>This removes <span className="font-mono text-kumo-default">{deletingFile}</span> from the gadget. You can&apos;t undo this.</>}
+        description={
+          <>
+            This removes <span className="font-mono text-kumo-default">{deletingFile}</span> from
+            the gadget. You can&apos;t undo this.
+          </>
+        }
         onConfirm={confirmDelete}
       />
     </div>
-  )
+  );
 }
 
 interface FileRowProps {
-  filename: string
-  isActive: boolean
-  isUnchanged: boolean
-  isStreamingActive: boolean
-  changeStatus?: FileChangeStatus
-  dotClass: string | null
-  showDot: boolean
-  editLocked: boolean
-  isRenaming: boolean
-  onSelect: () => void
-  onRename: () => void
-  onDelete: () => void
-  onDownload: () => void
-  onRenameSubmit: (nextName: string) => void
-  onRenameCancel: () => void
+  filename: string;
+  isActive: boolean;
+  isUnchanged: boolean;
+  isStreamingActive: boolean;
+  changeStatus?: FileChangeStatus;
+  dotClass: string | null;
+  showDot: boolean;
+  editLocked: boolean;
+  isRenaming: boolean;
+  onSelect: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+  onDownload: () => void;
+  onRenameSubmit: (nextName: string) => void;
+  onRenameCancel: () => void;
 }
 
 function FileRow({
@@ -315,46 +319,46 @@ function FileRow({
   onRenameSubmit,
   onRenameCancel,
 }: FileRowProps) {
-  const inputRef = useRef<HTMLInputElement | null>(null)
-  const [renameValue, setRenameValue] = useState(filename)
-  const isDeleted = changeStatus === 'deleted'
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [renameValue, setRenameValue] = useState(filename);
+  const isDeleted = changeStatus === "deleted";
 
   useEffect(() => {
-    if (!isRenaming) return
-    setRenameValue(filename)
+    if (!isRenaming) return;
+    setRenameValue(filename);
     const id = window.setTimeout(() => {
-      const input = inputRef.current
-      if (!input) return
-      input.focus()
-      const dotIndex = filename.lastIndexOf('.')
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus();
+      const dotIndex = filename.lastIndexOf(".");
       if (dotIndex > 0) {
-        input.setSelectionRange(0, dotIndex)
+        input.setSelectionRange(0, dotIndex);
       } else {
-        input.select()
+        input.select();
       }
-    }, 0)
-    return () => window.clearTimeout(id)
-  }, [isRenaming, filename])
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [isRenaming, filename]);
 
   return (
     <div
       className={[
-        'group relative mb-[2px] flex h-10 items-center gap-2 rounded-md px-2 text-[14px] leading-5 transition-[background-color,box-shadow,color,opacity] duration-150 ease-out md:h-7 md:text-[13px] md:leading-[18px]',
+        "group relative mb-[2px] flex h-10 items-center gap-2 rounded-md px-2 text-[14px] leading-5 transition-[background-color,box-shadow,color,opacity] duration-150 ease-out md:h-7 md:text-[13px] md:leading-[18px]",
         isRenaming
-          ? 'bg-kumo-base ring-1 ring-kumo-ring/40'
+          ? "bg-kumo-base ring-1 ring-kumo-ring/40"
           : isActive
-            ? 'file-row-active cursor-pointer bg-kumo-recessed text-kumo-default font-medium'
-            : 'cursor-pointer text-kumo-default hover:bg-kumo-tint',
-        isUnchanged && !isRenaming ? 'opacity-50' : '',
-      ].join(' ')}
+            ? "file-row-active cursor-pointer bg-kumo-recessed text-kumo-default font-medium"
+            : "cursor-pointer text-kumo-default hover:bg-kumo-tint",
+        isUnchanged && !isRenaming ? "opacity-50" : "",
+      ].join(" ")}
       onClick={isRenaming ? undefined : onSelect}
     >
       <span
         aria-hidden="true"
         className={[
-          'h-1.5 w-1.5 shrink-0 rounded-full',
-          showDot && dotClass ? dotClass : 'bg-transparent',
-        ].join(' ')}
+          "h-1.5 w-1.5 shrink-0 rounded-full",
+          showDot && dotClass ? dotClass : "bg-transparent",
+        ].join(" ")}
       />
 
       {isRenaming ? (
@@ -364,20 +368,20 @@ function FileRow({
           onChange={(event) => setRenameValue(event.target.value)}
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => {
-            if (isImeComposing(event)) return
-            if (event.key === 'Enter') {
-              event.preventDefault()
-              onRenameSubmit(renameValue)
-            } else if (event.key === 'Escape') {
-              event.preventDefault()
-              onRenameCancel()
+            if (isImeComposing(event)) return;
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onRenameSubmit(renameValue);
+            } else if (event.key === "Escape") {
+              event.preventDefault();
+              onRenameCancel();
             }
           }}
           onBlur={() => {
-            if (renameValue.trim() === '' || renameValue.trim() === filename) {
-              onRenameCancel()
+            if (renameValue.trim() === "" || renameValue.trim() === filename) {
+              onRenameCancel();
             } else {
-              onRenameSubmit(renameValue)
+              onRenameSubmit(renameValue);
             }
           }}
           spellCheck={false}
@@ -390,10 +394,10 @@ function FileRow({
         <button
           type="button"
           className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 self-stretch bg-transparent p-0 text-left text-[13px] leading-[18px] tracking-[-0.2px] text-inherit outline-none focus-visible:ring-2 focus-visible:ring-kumo-ring focus-visible:ring-offset-1 focus-visible:ring-offset-kumo-base"
-          aria-current={isActive ? 'page' : undefined}
+          aria-current={isActive ? "page" : undefined}
           onClick={(event) => {
-            event.stopPropagation()
-            onSelect()
+            event.stopPropagation();
+            onSelect();
           }}
         >
           <span className="min-w-0 flex-1 truncate">{filename}</span>
@@ -410,7 +414,7 @@ function FileRow({
       {!isRenaming && !isDeleted && (
         <DropdownMenu>
           <DropdownMenu.Trigger
-            render={(
+            render={
               <WorkshopIconButton
                 aria-label={`Actions for ${filename}`}
                 onClick={(event) => event.stopPropagation()}
@@ -418,7 +422,7 @@ function FileRow({
               >
                 <DotsThree size={14} weight="bold" />
               </WorkshopIconButton>
-            )}
+            }
           />
           <DropdownMenu.Content
             onClick={(event) => event.stopPropagation()}
@@ -454,14 +458,14 @@ function FileRow({
         </DropdownMenu>
       )}
     </div>
-  )
+  );
 }
 
 function getStatusDotClass(status: FileChangeStatus | undefined, isDirty: boolean): string | null {
-  if (isDirty) return 'bg-kumo-danger'
-  if (status === 'added') return 'bg-kumo-success'
-  if (status === 'deleted') return 'bg-kumo-danger'
-  if (status === 'modified') return 'bg-kumo-warning'
-  if (status === 'unchanged') return null
-  return null
+  if (isDirty) return "bg-kumo-danger";
+  if (status === "added") return "bg-kumo-success";
+  if (status === "deleted") return "bg-kumo-danger";
+  if (status === "modified") return "bg-kumo-warning";
+  if (status === "unchanged") return null;
+  return null;
 }

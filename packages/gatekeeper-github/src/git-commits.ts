@@ -26,7 +26,10 @@ import type {
 } from "./types";
 
 export function actorFromUser(
-  user: { login: string; name?: string | null; html_url: string; avatar_url?: string } | null | undefined,
+  user:
+    | { login: string; name?: string | null; html_url: string; avatar_url?: string }
+    | null
+    | undefined,
 ): GitHubActor | null {
   if (!user) return null;
   return {
@@ -52,7 +55,7 @@ export function normalizeCommitSummary(response: GitHubCommitResponse): GitHubCo
     author: identityFromResponse(response.commit.author),
     committer: identityFromResponse(response.commit.committer),
     authorAccount: actorFromUser(response.author),
-    parents: response.parents.map(parent => parent.sha),
+    parents: response.parents.map((parent) => parent.sha),
     url: response.html_url,
   };
 }
@@ -97,7 +100,10 @@ export function commitIdsOfSummary(summary: GitHubCommitSummary): GitOid[] {
  * The commit ids a pull request summary (or details) carries: its head and base branch shas.
  * A provisional pull request's shas may be empty; `advertiseCommits()` skips those.
  */
-export function commitIdsOfPullSummary(pull: { head: { sha: string }; base: { sha: string } }): GitOid[] {
+export function commitIdsOfPullSummary(pull: {
+  head: { sha: string };
+  base: { sha: string };
+}): GitOid[] {
   return [pull.head.sha, pull.base.sha];
 }
 
@@ -138,7 +144,7 @@ export async function advertiseCommits(
     }
     batch.add(id);
   }
-  await Promise.all([...batch].map(id => advertiser.advertiseCommit(id)));
+  await Promise.all([...batch].map((id) => advertiser.advertiseCommit(id)));
 }
 
 // =======================================================================================
@@ -170,7 +176,7 @@ export function parseGitCommitPayload(payload: Uint8Array, oid: GitOid): ParsedG
   let author: GitHubCommitIdentity = {};
   let committer: GitHubCommitIdentity = {};
   for (const line of headerText.split("\n")) {
-    if (line.startsWith(" ")) continue;  // continuation of a multi-line header (e.g. gpgsig)
+    if (line.startsWith(" ")) continue; // continuation of a multi-line header (e.g. gpgsig)
     const space = line.indexOf(" ");
     const key = space === -1 ? line : line.slice(0, space);
     const value = space === -1 ? "" : line.slice(space + 1);
@@ -194,7 +200,7 @@ export function parseGitCommitPayload(payload: Uint8Array, oid: GitOid): ParsedG
         committer = parseGitIdentity(value);
         break;
       default:
-        break;  // unknown headers are fine
+        break; // unknown headers are fine
     }
   }
   if (tree === undefined) {
@@ -266,7 +272,7 @@ export class CommitAdvertisingCursor<T> implements Cursor<T> {
     if (page !== null) {
       await advertiseCommits(
         this.#advertiser,
-        page.flatMap(item => this.#commitIds(item)),
+        page.flatMap((item) => this.#commitIds(item)),
         this.#advertised,
       );
     }

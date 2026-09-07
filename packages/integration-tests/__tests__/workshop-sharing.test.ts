@@ -1,7 +1,10 @@
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import {
-  getOpenGadgetErrorCode, OPEN_GADGET_ERROR_CODES, type AuthenticatedApi, type Overseer,
+  getOpenGadgetErrorCode,
+  OPEN_GADGET_ERROR_CODES,
+  type AuthenticatedApi,
+  type Overseer,
 } from "@gadgets/workshop-shared/api";
 import { type Harness, startHarness } from "../src/harness.js";
 import { mockChatCompletion } from "../src/mock-model.js";
@@ -37,7 +40,10 @@ function usernames(...prefixes: string[]): string[] {
 }
 
 async function expectOpenDenied(
-    authenticated: RpcStub<AuthenticatedApi>, workspaceId: string, shareKey?: string): Promise<void> {
+  authenticated: RpcStub<AuthenticatedApi>,
+  workspaceId: string,
+  shareKey?: string,
+): Promise<void> {
   let denied: unknown;
   try {
     using _workspace = await authenticated.openGadget(workspaceId, shareKey);
@@ -49,7 +55,9 @@ async function expectOpenDenied(
 }
 
 async function withAuthenticated<T>(
-    username: string, body: (authenticated: RpcStub<AuthenticatedApi>) => Promise<T>): Promise<T> {
+  username: string,
+  body: (authenticated: RpcStub<AuthenticatedApi>) => Promise<T>,
+): Promise<T> {
   using publicApi = connect(requireHarness().url);
   using authenticated = await logIn(publicApi, username);
   const result = await body(authenticated);
@@ -63,10 +71,13 @@ async function activate(workspace: RpcStub<Overseer>): Promise<string> {
 }
 
 async function expectOpenDeniedAfterRestart(
-    username: string, workspaceId: string, shareKey?: string): Promise<void> {
+  username: string,
+  workspaceId: string,
+  shareKey?: string,
+): Promise<void> {
   const result = await waitFor("revoked workspace access after restart", async () => {
     try {
-      return await withAuthenticated(username, async authenticated => {
+      return await withAuthenticated(username, async (authenticated) => {
         try {
           using _workspace = await authenticated.openGadget(workspaceId, shareKey);
         } catch (error) {
@@ -86,7 +97,7 @@ async function expectOpenDeniedAfterRestart(
 async function listShareLinksAfterRestart(username: string, workspaceId: string) {
   return waitFor("owner workspace after revocation restart", async () => {
     try {
-      return await withAuthenticated(username, async authenticated => {
+      return await withAuthenticated(username, async (authenticated) => {
         using workspace = await authenticated.openGadget(workspaceId);
         return workspace.listShareLinks();
       });
@@ -98,7 +109,10 @@ async function listShareLinksAfterRestart(username: string, workspaceId: string)
 
 it.concurrent("grants and revokes a use-only collaborator", async () => {
   const [ownerName, collaboratorName, intruderName] = usernames(
-      "owner", "collaborator", "intruder");
+    "owner",
+    "collaborator",
+    "intruder",
+  );
   if (!ownerName || !collaboratorName || !intruderName) throw new Error("Missing test username");
 
   const { workspaceId, affected } = await (async () => {
@@ -132,11 +146,13 @@ it.concurrent("grants and revokes a use-only collaborator", async () => {
     };
   })();
 
-  expect(affected).toContainEqual(expect.objectContaining({
-    profile: expect.objectContaining({ id: collaboratorName }),
-    oldRole: "use",
-    newRole: null,
-  }));
+  expect(affected).toContainEqual(
+    expect.objectContaining({
+      profile: expect.objectContaining({ id: collaboratorName }),
+      oldRole: "use",
+      newRole: null,
+    }),
+  );
   await expectOpenDeniedAfterRestart(collaboratorName, workspaceId);
 });
 
@@ -156,18 +172,22 @@ it.concurrent("revokes every key and recipient of one share link", async () => {
 
     const shareLink = await workspace.createShareLink("use", "review link");
     const copiedKey = await workspace.newShareLinkKey(shareLink.linkId);
-    expect(await workspace.listShareLinks()).toContainEqual(expect.objectContaining({
-      linkId: shareLink.linkId,
-      note: "review link",
-      role: "use",
-    }));
+    expect(await workspace.listShareLinks()).toContainEqual(
+      expect.objectContaining({
+        linkId: shareLink.linkId,
+        note: "review link",
+        role: "use",
+      }),
+    );
 
     using firstWorkspace = await first.openGadget(id, shareLink.key);
     using secondWorkspace = await second.openGadget(id, copiedKey.key);
     expect(await firstWorkspace.getMetadata()).toMatchObject({ role: "use" });
     expect(await secondWorkspace.getMetadata()).toMatchObject({ role: "use" });
     const preview = await workspace.previewRevokeShareLink(shareLink.linkId);
-    expect(preview.map(user => user.profile.id).toSorted()).toEqual([firstName, secondName].toSorted());
+    expect(preview.map((user) => user.profile.id).toSorted()).toEqual(
+      [firstName, secondName].toSorted(),
+    );
     return {
       workspaceId: id,
       link: shareLink,
@@ -176,7 +196,9 @@ it.concurrent("revokes every key and recipient of one share link", async () => {
     };
   })();
 
-  expect(affected.map(user => user.profile.id).toSorted()).toEqual([firstName, secondName].toSorted());
+  expect(affected.map((user) => user.profile.id).toSorted()).toEqual(
+    [firstName, secondName].toSorted(),
+  );
   await Promise.all([
     expectOpenDeniedAfterRestart(firstName, workspaceId, link.key),
     expectOpenDeniedAfterRestart(secondName, workspaceId, copied.key),

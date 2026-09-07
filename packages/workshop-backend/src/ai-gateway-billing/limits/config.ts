@@ -41,8 +41,8 @@ export function utcDayKey(at: Date = new Date()): string {
 
 /** ISO timestamp of the next UTC midnight after `at` -- when the daily window resets. */
 export function nextUtcMidnightIso(at: Date = new Date()): string {
-  const next = new Date(Date.UTC(
-    at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate() + 1, 0, 0, 0, 0,
-  ));
+  const next = new Date(
+    Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate() + 1, 0, 0, 0, 0),
+  );
   return next.toISOString();
 }

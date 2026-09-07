@@ -33,7 +33,7 @@ export interface Cursor<T> {
 /** A small image used to identify a vendor, account, or resource type in the UI. */
 export type AvatarImage = {
   url: string;
-}
+};
 
 /** Describes a connected GatekeeperVendor, for display purposes. */
 export type VendorDescription = {
@@ -77,7 +77,7 @@ export type VendorDescription = {
    * management UI (see AccountDescription.singleton / .providesUi).
    */
   autoProvisionsAccount?: boolean;
-}
+};
 
 /**
  * Per-open context the Workshop passes to GatekeeperUser.startAppUi(). `isAdmin` is supplied fresh
@@ -85,7 +85,7 @@ export type VendorDescription = {
  */
 export type AppUiContext = {
   isAdmin: boolean;
-}
+};
 
 // The agent catalog is bounded discovery metadata a gatekeeper exposes via
 // Gatekeeper.getAgentCatalog() so the agent can see *what* is reachable through a session (e.g. the
@@ -136,7 +136,7 @@ export const AGENT_CATALOG_MAX_DESCRIPTION_LENGTH = 400;
  */
 export function boundAgentCatalog(entries: AgentCatalogEntry[]): AgentCatalog {
   return {
-    entries: entries.slice(0, AGENT_CATALOG_MAX_ENTRIES).map(entry => ({
+    entries: entries.slice(0, AGENT_CATALOG_MAX_ENTRIES).map((entry) => ({
       id: entry.id.slice(0, AGENT_CATALOG_MAX_ID_LENGTH),
       title: entry.title.slice(0, AGENT_CATALOG_MAX_TITLE_LENGTH),
       description: entry.description.slice(0, AGENT_CATALOG_MAX_DESCRIPTION_LENGTH),
@@ -180,7 +180,7 @@ export type AccountDescription = {
    * surfaces it as a nav entry / page using this title.
    */
   providesUi?: { title: string; icon?: AvatarImage };
-}
+};
 
 /** Describes metadata about a specific instance of a resource. Returned by Gatekeeper.describe(). */
 export type ResourceDescription = {
@@ -228,7 +228,7 @@ export type ResourceDescription = {
    * named by `hookTsType` (which must be one of the exports from `getTypescriptTypes()`).
    */
   hookTsType?: string;
-}
+};
 
 /**
  * Describes a kind of resource that a vendor can provide access to (e.g. "Jira Issue", "Gmail
@@ -255,7 +255,7 @@ export type SupportedResource = {
    * If omitted/false, the resource type is not separately grantable.
    */
   grantable?: boolean;
-}
+};
 
 /** Removes every trailing slash from a string in linear time. */
 export function stripTrailingSlashes(value: string): string {
@@ -279,7 +279,9 @@ export function stripTrailingSlashes(value: string): string {
  * Returns false if URLPattern is unavailable in the current runtime or the pattern is invalid.
  */
 export function matchesResourceUrlPattern(pattern: string, url: string): boolean {
-  const URLPatternCtor = (globalThis as { URLPattern?: new (p: string) => { test(u: string): boolean } }).URLPattern;
+  const URLPatternCtor = (
+    globalThis as { URLPattern?: new (p: string) => { test(u: string): boolean } }
+  ).URLPattern;
   if (!URLPatternCtor) return false;
   let compiled: { test(u: string): boolean };
   try {
@@ -289,8 +291,8 @@ export function matchesResourceUrlPattern(pattern: string, url: string): boolean
   }
   // Try the URL as given plus the trailing-slash-toggled variant, since URLPattern distinguishes
   // them and we don't know which form the pattern expects.
-  const candidates = url.endsWith('/') ? [url, stripTrailingSlashes(url)] : [url, url + '/'];
-  return candidates.some(candidate => {
+  const candidates = url.endsWith("/") ? [url, stripTrailingSlashes(url)] : [url, url + "/"];
+  return candidates.some((candidate) => {
     try {
       return compiled.test(candidate);
     } catch {
@@ -319,20 +321,23 @@ export type ResolveRequestedResourceResult =
  * and the frontend (which pre-seeds from the resolved resource), so the two cannot diverge.
  */
 export function resolveRequestedResource(
-    supportedResources: SupportedResource[],
-    resourceUrl: string | undefined): ResolveRequestedResourceResult {
+  supportedResources: SupportedResource[],
+  resourceUrl: string | undefined,
+): ResolveRequestedResourceResult {
   if (resourceUrl) {
     const matched = supportedResources.find(
-      r => r.urlPattern !== 'https://*' && matchesResourceUrlPattern(r.urlPattern, resourceUrl));
+      (r) => r.urlPattern !== "https://*" && matchesResourceUrlPattern(r.urlPattern, resourceUrl),
+    );
     if (matched) return { ok: true, resource: matched };
   }
-  const catchAll = supportedResources.find(r => r.urlPattern === 'https://*');
+  const catchAll = supportedResources.find((r) => r.urlPattern === "https://*");
   if (catchAll) return { ok: true, resource: catchAll };
   if (supportedResources.length === 1) return { ok: true, resource: supportedResources[0] };
 
-  const available = supportedResources.length > 0
-    ? supportedResources.map(r => `  * ${r.title} — urlPattern: ${r.urlPattern}`).join('\n')
-    : '  (this vendor offers no connectable resources)';
+  const available =
+    supportedResources.length > 0
+      ? supportedResources.map((r) => `  * ${r.title} — urlPattern: ${r.urlPattern}`).join("\n")
+      : "  (this vendor offers no connectable resources)";
   const lead = resourceUrl
     ? `resourceUrl "${resourceUrl}" does not match any resource type this vendor offers, ` +
       `and the vendor has no whole-instance ("https://*") option.`
@@ -340,7 +345,8 @@ export function resolveRequestedResource(
       `option, so a resourceUrl is required to identify which one.`;
   return {
     ok: false,
-    reason: `${lead} Call listConnectableResources to see the patterns, then retry with a ` +
+    reason:
+      `${lead} Call listConnectableResources to see the patterns, then retry with a ` +
       `resourceUrl matching one of:\n${available}`,
   };
 }
@@ -418,7 +424,7 @@ export type GatekeeperUiFrame = {
 
   /** Capability exposed to the iframe for any RPCs needed by the UI. */
   ui: RpcStub<RpcTarget>;
-}
+};
 
 /**
  * Legacy alias for GatekeeperUiFrame: the established return type of startResourceConfigurator,
@@ -477,8 +483,10 @@ export interface GatekeeperVendor extends WorkerEntrypoint {
    * authorization, so a vendor must treat `[]` as "none" rather than falling back to "all" -- doing
    * otherwise would silently over-request access the user was never shown a reason for.
    */
-  connectAccount(callback: Fetcher<GatekeeperConnectCallback>,
-                 options?: GatekeeperConnectOptions): Promise<{url: string}>;
+  connectAccount(
+    callback: Fetcher<GatekeeperConnectCallback>,
+    options?: GatekeeperConnectOptions,
+  ): Promise<{ url: string }>;
 
   /**
    * Get the list of resource types this vendor supports. Each entry describes a category of
@@ -493,7 +501,7 @@ export interface GatekeeperVendor extends WorkerEntrypoint {
    *
    * TODO: How does the Gadget Workshop know when the supported URLs have changed, without polling?
    */
-  getSupportedResources(options?: {userId?: string}): Promise<SupportedResource[]>;
+  getSupportedResources(options?: { userId?: string }): Promise<SupportedResource[]>;
 
   /**
    * Returns TypeScript source code defining all types covering APIs defined by this Gatekeeper.
@@ -597,9 +605,7 @@ export interface GatekeeperUser extends WorkerEntrypoint {
    * Get the UI used to choose a specific resource.
    * `resourceUrlPattern` is the `urlPattern` associated with the supported resource.
    */
-  startResourceConfigurator(
-    resourceUrlPattern: string,
-  ): Promise<ResourceConfiguratorFrame>;
+  startResourceConfigurator(resourceUrlPattern: string): Promise<ResourceConfiguratorFrame>;
 
   /**
    * Revoke this account connection. The GatekeeperUser, and all Gatekeepers created through it,
@@ -617,7 +623,7 @@ export interface GatekeeperUser extends WorkerEntrypoint {
    * SECURITY: As with connectAccount(), the returned URL must include a cryptographic nonce to
    * prevent replay attacks.
    */
-  reconnect(): Promise<{url: string}>;
+  reconnect(): Promise<{ url: string }>;
 
   /**
    * For vendors that advertise `providesAuth`, returns the account's email address for use as the
@@ -640,7 +646,7 @@ export interface GatekeeperUser extends WorkerEntrypoint {
    *
    * SECURITY: As with connectAccount(), any returned URL must include a cryptographic nonce.
    */
-  ensureResources(resourceUrlPatterns: string[]): Promise<{url?: string}>;
+  ensureResources(resourceUrlPatterns: string[]): Promise<{ url?: string }>;
 
   // ---------------------------------------------------------------------------
   // Singleton / management-UI capabilities. Present only on accounts created by
@@ -747,9 +753,7 @@ export interface Gatekeeper<Session> extends DurableObject {
    * null when there is no catalog. Return the entries the agent most needs first and pass them
    * through `boundAgentCatalog()`, since both that clamp and the Workshop's drop from the tail.
    */
-  getAgentCatalog?(
-    authorizer: RpcStub<ObservationAuthorizer>,
-  ): Promise<AgentCatalog | null>;
+  getAgentCatalog?(authorizer: RpcStub<ObservationAuthorizer>): Promise<AgentCatalog | null>;
 
   /**
    * Informs the gatekeeper that a new user is being added to the Gadget with the potential to see
@@ -866,7 +870,7 @@ export interface Gatekeeper<Session> extends DurableObject {
    * the session may be in a state that is difficult to roll back without confusing the Gadget.
    * The Overseer will take care of the restart, possibly after rejecting other actions.
    */
-  rejectAction(action: number): Promise<void | {restart?: boolean}>;
+  rejectAction(action: number): Promise<void | { restart?: boolean }>;
 
   /**
    * Attempts to revert an action that was already applied.
@@ -888,8 +892,9 @@ export interface Gatekeeper<Session> extends DurableObject {
    *
    * `restart` has the same meaning as for `rejectAction()`.
    */
-  revertAction(action: number):
-      Promise<void | {message?: string, canRetry?: boolean, restart?: boolean}>;
+  revertAction(
+    action: number,
+  ): Promise<void | { message?: string; canRetry?: boolean; restart?: boolean }>;
 }
 
 export interface ObservationAuthorizer extends RpcTarget {
@@ -1093,8 +1098,10 @@ export interface ApprovalQueue extends ObservationAuthorizer {
    * again. The params themselves also have to be persistable.
    */
   bindHook<Hook extends RpcTarget>(
-        controller: Fetcher<HookController<Hook>>, callback: RpcStub<Hook>,
-        description: HookDescription): Promise<void>;
+    controller: Fetcher<HookController<Hook>>,
+    callback: RpcStub<Hook>,
+    description: HookDescription,
+  ): Promise<void>;
 }
 
 export type ObservationDescription = {
@@ -1156,7 +1163,7 @@ export type ObservationDescription = {
    * the observation.
    */
   excludeObservers?: string[];
-}
+};
 
 /**
  * A stable, machine-readable tag for an action paired with its human-readable display name; the two
@@ -1284,7 +1291,7 @@ export type ActionDescription = {
    * approval rules and the future policy engine key on; `actionKind.label` is shown in the UI.
    */
   actionKind?: ActionKind;
-}
+};
 
 /**
  * Describes a registered hook, for display purposes (e.g. so the user can see what hooks are
@@ -1293,7 +1300,7 @@ export type ActionDescription = {
 export type HookDescription = {
   title: string;
   description: string;
-}
+};
 
 /**
  * Identifies where a hook delivers its events, for display and navigation by a gatekeeper that
@@ -1312,7 +1319,7 @@ export type HookTargetMetadata = {
    * workspace's current default gadget.
    */
   gadgetId?: number;
-}
+};
 
 /**
  * Object passed to `ApprovalQueue.bindHook()`, providing the overseer with callbacks to enable
@@ -1353,7 +1360,7 @@ export interface HookInitiator<Hook extends RpcTarget> extends WorkerEntrypoint 
    * observation. Some hooks may even pass callbacks or interpret the return value in a way that
    * causes side effects, which should be registered as actions.
    */
-  startHook(): Promise<{callback: RpcStub<Hook>, approvalQueue: RpcStub<ApprovalQueue>}>;
+  startHook(): Promise<{ callback: RpcStub<Hook>; approvalQueue: RpcStub<ApprovalQueue> }>;
 }
 
 /**
@@ -1425,7 +1432,10 @@ export interface GitCache extends RpcTarget {
    * related objects up front rather than faulting once per `get()`. When omitted, the pull
    * requests exactly this object, with its type taken from recorded metadata.
    */
-  get(id: GitOid, hints?: GitPullHints): Promise<{type: GitObjectType, content: Uint8Array} | null>;
+  get(
+    id: GitOid,
+    hints?: GitPullHints,
+  ): Promise<{ type: GitObjectType; content: Uint8Array } | null>;
 
   /** Return whether the given object exists, under the same scoped view as `get()`. */
   has(id: GitOid): Promise<boolean>;
@@ -1434,7 +1444,7 @@ export interface GitCache extends RpcTarget {
    * Return the type and byte size of the given object, or null, under the same scoped view as
    * `get()`.
    */
-  stat(id: GitOid): Promise<{type: GitObjectType, size: number} | null>;
+  stat(id: GitOid): Promise<{ type: GitObjectType; size: number } | null>;
 
   /**
    * Add an object to cache. Returns the computed oid.
@@ -1532,8 +1542,8 @@ export type GitPullHints = {
    */
   commitHistory:
     | { kind: "full" }
-    | { kind: "depth", depth: number }
-    | { kind: "since", since: Date };
+    | { kind: "depth"; depth: number }
+    | { kind: "since"; since: Date };
 
   /**
    * Omit blobs of at least this size. 0 = do not fetch blobs at all.
@@ -1556,4 +1566,4 @@ export type GitPullHints = {
    * See `filterBlobSize` for combining the two filters.
    */
   filterTreeDepth?: number;
-}
+};
