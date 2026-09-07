@@ -23,7 +23,7 @@ const encoder = new TextEncoder();
  * @returns Lowercase hexadecimal.
  */
 export function hexEncode(bytes: Uint8Array): string {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return [...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
 /** @returns A cryptographically random connect nonce. */

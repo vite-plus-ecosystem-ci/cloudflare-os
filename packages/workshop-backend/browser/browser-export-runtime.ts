@@ -43,12 +43,12 @@ class AsyncMessageQueue {
     if (message !== undefined) {
       return Promise.resolve(message);
     }
-    return new Promise((resolve) => this.#receivers.push(resolve));
+    return new Promise(resolve => this.#receivers.push(resolve));
   }
 }
 
 const fromWorker = new AsyncMessageQueue();
-globalThis.__workshopExportSendToBrowser = (message) => fromWorker.push(message);
+globalThis.__workshopExportSendToBrowser = message => fromWorker.push(message);
 const toWorker = new AsyncMessageQueue();
 globalThis.__workshopExportReceiveFromBrowser = () => toWorker.next();
 

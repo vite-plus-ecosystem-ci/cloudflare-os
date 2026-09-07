@@ -231,20 +231,18 @@ function recurringNextFire(schedule: ScheduleProgress, now: number): number | un
   return nextFire !== undefined && withinLimit(schedule, nextFire) ? nextFire : undefined;
 }
 
-function copyProgress({
-  workspaceId,
-  scheduleId,
-  spec,
-  occurrences,
-  occurrenceCount,
-}: ScheduleProgress): ScheduleProgress {
+function copyProgress(
+  { workspaceId, scheduleId, spec, occurrences, occurrenceCount }: ScheduleProgress,
+): ScheduleProgress {
   return { workspaceId, scheduleId, spec, occurrences, occurrenceCount };
 }
 
 function withinLimit(schedule: ScheduleProgress, nextFire: number): boolean {
   const limit = schedule.occurrences;
   if (!limit) return true;
-  return "count" in limit ? (schedule.occurrenceCount ?? 0) < limit.count : nextFire <= limit.until;
+  return "count" in limit
+    ? (schedule.occurrenceCount ?? 0) < limit.count
+    : nextFire <= limit.until;
 }
 
 function checkedAdd(left: number, right: number): number {

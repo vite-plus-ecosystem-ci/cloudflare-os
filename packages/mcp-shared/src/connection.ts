@@ -14,7 +14,8 @@ import {
   McpSessionExpiredError,
   type McpToolFilter,
   type ToolCatalog,
-} from "./client.js";
+}
+  from "./client.js";
 import { fetchOptions, type InsecureEnv } from "./fetch.js";
 import { MAX_TOOLS_PER_SERVER } from "./tools.js";
 
@@ -76,7 +77,10 @@ export function clientName(env: ConnectionEnv): string {
 
 function notDispatched(err: unknown): McpCallNotDispatchedError {
   if (err instanceof McpCallNotDispatchedError) return err;
-  return new McpCallNotDispatchedError(err instanceof Error ? err.message : String(err), err);
+  return new McpCallNotDispatchedError(
+    err instanceof Error ? err.message : String(err),
+    err,
+  );
 }
 
 /** Runs `fn` against an initialized client for `endpoint`, using the account's credentials. */
@@ -97,34 +101,25 @@ export async function withClient<T>(
   }
   const { authorization, sessionId, generation } = connection;
   const client = new McpClient(
-    endpoint,
-    async (method) => {
+    endpoint, async method => {
       if (method === "tools/call") {
         await account.assertConnectionCurrent(endpoint, generation);
       }
       return authorization;
-    },
-    sessionId,
-    {
+    }, sessionId, {
       ...fetchOptions(env),
       deadline: options.deadline,
-    },
-  );
+    });
   let persistedSessionId = sessionId;
 
   const persistSession = async (): Promise<void> => {
     if (client.sessionId === persistedSessionId) return;
     const accepted = await account.setMcpSessionId(
-      endpoint,
-      generation,
-      persistedSessionId,
-      client.sessionId,
-    );
+      endpoint, generation, persistedSessionId, client.sessionId);
     if (!accepted) {
       await client.closeSession().catch(() => undefined);
       throw new McpCallNotDispatchedError(
-        "Another request replaced this MCP transport session. Try again.",
-      );
+        "Another request replaced this MCP transport session. Try again.");
     }
     persistedSessionId = client.sessionId;
   };
@@ -137,8 +132,7 @@ export async function withClient<T>(
   const rejectCredentials = async (err: McpAuthRequiredError): Promise<never> => {
     const rejected = new Error(
       "The MCP server rejected this connection's credentials. Please reconnect the account.",
-      { cause: err },
-    );
+      { cause: err });
     let cause: unknown = rejected;
     try {
       await account.noteCredentialsExpired(endpoint, generation);
@@ -204,11 +198,6 @@ export async function fetchTools(
   include?: McpToolFilter,
   options?: WithClientOptions,
 ): Promise<ToolCatalog> {
-  return withClient(
-    env,
-    account,
-    endpoint,
-    (client) => client.listTools(MAX_TOOLS_PER_SERVER, include),
-    options,
-  );
+  return withClient(env, account, endpoint,
+    client => client.listTools(MAX_TOOLS_PER_SERVER, include), options);
 }

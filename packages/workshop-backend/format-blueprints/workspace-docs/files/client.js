@@ -356,33 +356,23 @@ const ICONS = {
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H9"/>',
   redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H15"/>',
   bold: '<path d="M6 4h7a4 4 0 0 1 0 8H6z"/><path d="M6 12h8a4 4 0 0 1 0 8H6z"/>',
-  italic:
-    '<line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/>',
+  italic: '<line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/>',
   underline: '<path d="M6 3v7a6 6 0 0 0 12 0V3"/><line x1="4" y1="21" x2="20" y2="21"/>',
-  strike:
-    '<path d="M16 4H9a3 3 0 0 0-2.83 4"/><path d="M14 12a4 4 0 0 1 0 8H6"/><line x1="4" y1="12" x2="20" y2="12"/>',
+  strike: '<path d="M16 4H9a3 3 0 0 0-2.83 4"/><path d="M14 12a4 4 0 0 1 0 8H6"/><line x1="4" y1="12" x2="20" y2="12"/>',
   textcolor: '<path d="M4 20h16"/><path d="M7 16l5-12 5 12"/><path d="M9 11h6"/>',
   highlight: '<path d="M9 11l-4 4v3h3l4-4"/><path d="M13 7l4 4"/><path d="M11 9l5-5 4 4-5 5z"/>',
-  alignLeft:
-    '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/>',
-  alignCenter:
-    '<line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/>',
-  alignRight:
-    '<line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="6" y1="18" x2="20" y2="18"/>',
-  alignJustify:
-    '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>',
+  alignLeft: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/>',
+  alignCenter: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/>',
+  alignRight: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="6" y1="18" x2="20" y2="18"/>',
+  alignJustify: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>',
   ul: '<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/>',
   ol: '<line x1="10" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="18" x2="20" y2="18"/><path d="M4 10V5L2.7 6" stroke-width="1.5"/><path d="M3 14.5c.4-.6 2-.6 2 .5s-2 1.4-2 2.5h2.2" stroke-width="1.5"/>',
-  outdent:
-    '<line x1="20" y1="6" x2="4" y2="6"/><line x1="20" y1="18" x2="4" y2="18"/><line x1="20" y1="12" x2="11" y2="12"/><polyline points="7 9 4 12 7 15"/>',
-  indent:
-    '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/><line x1="13" y1="12" x2="20" y2="12"/><polyline points="6 9 9 12 6 15"/>',
+  outdent: '<line x1="20" y1="6" x2="4" y2="6"/><line x1="20" y1="18" x2="4" y2="18"/><line x1="20" y1="12" x2="11" y2="12"/><polyline points="7 9 4 12 7 15"/>',
+  indent: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/><line x1="13" y1="12" x2="20" y2="12"/><polyline points="6 9 9 12 6 15"/>',
   link: '<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>',
   hr: '<line x1="4" y1="12" x2="20" y2="12"/>',
-  clear:
-    '<path d="M4 7V5h12v2"/><path d="M9 5l-2 14"/><line x1="14" y1="13" x2="20" y2="19"/><line x1="20" y1="13" x2="14" y2="19"/>',
-  image:
-    '<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="8.5" cy="9.5" r="1.4"/><path d="M20 15l-4.5-4.5L7 19"/><path d="M13 19l-3.2-3.2"/>',
+  clear: '<path d="M4 7V5h12v2"/><path d="M9 5l-2 14"/><line x1="14" y1="13" x2="20" y2="19"/><line x1="20" y1="13" x2="14" y2="19"/>',
+  image: '<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="8.5" cy="9.5" r="1.4"/><path d="M20 15l-4.5-4.5L7 19"/><path d="M13 19l-3.2-3.2"/>',
 };
 
 // --- DOM helpers -----------------------------------------------------------
@@ -403,11 +393,7 @@ function el(tag, props = {}, children = []) {
 // --- Build UI --------------------------------------------------------------
 const editor = el("div", { class: "doc-page", contenteditable: "true", spellcheck: "true" });
 
-const titleInput = el("input", {
-  class: "title-input",
-  value: "Untitled document",
-  "aria-label": "Document title",
-});
+const titleInput = el("input", { class: "title-input", value: "Untitled document", "aria-label": "Document title" });
 const statusDot = el("span", { class: "dot saved" });
 const statusText = el("span", {}, "Saved");
 
@@ -440,26 +426,21 @@ function customSelect({ className, title, options, value, onChange }) {
   let current;
   const labelSpan = el("span", { class: "cs-label" });
   const btn = el("button", { type: "button", class: "cselect " + (className || ""), title }, [
-    labelSpan,
-    el("span", { class: "cs-chev", html: chevSvg }),
+    labelSpan, el("span", { class: "cs-chev", html: chevSvg }),
   ]);
   const menu = el("div", { class: "cmenu" });
   const items = options.map((o) => {
     const item = el("div", { class: "cmenu-item", "data-value": String(o.value) }, o.label);
     if (o.style) item.style.cssText += o.style;
     item.addEventListener("mousedown", (e) => e.preventDefault());
-    item.addEventListener("click", () => {
-      closeMenu();
-      setValue(o.value);
-      onChange(o.value);
-    });
+    item.addEventListener("click", () => { closeMenu(); setValue(o.value); onChange(o.value); });
     menu.appendChild(item);
     return item;
   });
   let open = false;
 
   function setValue(v) {
-    if (v === current) return; // skip redundant DOM work on hot path
+    if (v === current) return;          // skip redundant DOM work on hot path
     current = v;
     const opt = options.find((o) => o.value === v) || options[0];
     labelSpan.textContent = opt ? opt.label : "";
@@ -471,34 +452,19 @@ function customSelect({ className, title, options, value, onChange }) {
     menu.style.top = Math.round(r.bottom + 4) + "px";
     menu.style.minWidth = Math.round(r.width) + "px";
     document.body.appendChild(menu);
-    open = true;
-    btn.classList.add("open");
+    open = true; btn.classList.add("open");
   }
   function closeMenu() {
     if (menu.parentNode) menu.parentNode.removeChild(menu);
-    open = false;
-    btn.classList.remove("open");
+    open = false; btn.classList.remove("open");
   }
-  btn.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    savedRange = getRange();
-  });
-  btn.addEventListener("click", () => {
-    open ? closeMenu() : openMenu();
-  });
+  btn.addEventListener("mousedown", (e) => { e.preventDefault(); savedRange = getRange(); });
+  btn.addEventListener("click", () => { open ? closeMenu() : openMenu(); });
   document.addEventListener("mousedown", (e) => {
     if (open && !menu.contains(e.target) && !btn.contains(e.target)) closeMenu();
   });
-  window.addEventListener(
-    "scroll",
-    () => {
-      if (open) closeMenu();
-    },
-    true,
-  );
-  window.addEventListener("resize", () => {
-    if (open) closeMenu();
-  });
+  window.addEventListener("scroll", () => { if (open) closeMenu(); }, true);
+  window.addEventListener("resize", () => { if (open) closeMenu(); });
 
   setValue(value);
   return { el: btn, setValue, getValue: () => current };
@@ -506,8 +472,7 @@ function customSelect({ className, title, options, value, onChange }) {
 
 // Style selector
 const styleSel = customSelect({
-  className: "style-sel",
-  title: "Paragraph style",
+  className: "style-sel", title: "Paragraph style",
   options: [
     { value: "P", label: "Normal text" },
     { value: "TITLE", label: "Title" },
@@ -536,8 +501,7 @@ const styleSel = customSelect({
 
 // Font family
 const fontSel = customSelect({
-  className: "font-sel",
-  title: "Font",
+  className: "font-sel", title: "Font",
   options: [
     ["Sans serif", "ui-sans-serif, system-ui, Inter, sans-serif"],
     ["Serif", "Georgia, 'Times New Roman', serif"],
@@ -557,12 +521,8 @@ const fontSel = customSelect({
 
 // Font size
 const sizeSel = customSelect({
-  className: "size-sel",
-  title: "Font size",
-  options: [11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 40, 48].map((s) => ({
-    value: s,
-    label: String(s),
-  })),
+  className: "size-sel", title: "Font size",
+  options: [11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 40, 48].map((s) => ({ value: s, label: String(s) })),
   value: 16,
   onChange: (value) => {
     restoreRange();
@@ -605,10 +565,7 @@ function colorBtn(name, title, command, defaultColor) {
     bar,
     input,
   ]);
-  btn.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    savedRange = getRange();
-  });
+  btn.addEventListener("mousedown", (e) => { e.preventDefault(); savedRange = getRange(); });
   input.addEventListener("input", () => {
     bar.style.background = input.value;
     restoreRange();
@@ -638,12 +595,7 @@ alignBtns.left = segBtn("alignLeft", "Align left", "justifyLeft");
 alignBtns.center = segBtn("alignCenter", "Align center", "justifyCenter");
 alignBtns.right = segBtn("alignRight", "Align right", "justifyRight");
 alignBtns.justify = segBtn("alignJustify", "Justify", "justifyFull");
-const alignSegment = el("div", { class: "segment" }, [
-  alignBtns.left,
-  alignBtns.center,
-  alignBtns.right,
-  alignBtns.justify,
-]);
+const alignSegment = el("div", { class: "segment" }, [alignBtns.left, alignBtns.center, alignBtns.right, alignBtns.justify]);
 
 const ulBtn = cmdBtn("ul", "Bulleted list", "insertUnorderedList");
 const olBtn = cmdBtn("ol", "Numbered list", "insertOrderedList");
@@ -651,11 +603,7 @@ const outdentBtn = cmdBtn("outdent", "Decrease indent", "outdent");
 const indentBtn = cmdBtn("indent", "Increase indent", "indent");
 
 const linkBtn = iconBtn("link", "Insert link", () => insertLink());
-const imageInput = el("input", {
-  type: "file",
-  accept: "image/png,image/jpeg,image/webp,image/gif",
-  multiple: "true",
-});
+const imageInput = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif", multiple: "true" });
 imageInput.style.display = "none";
 document.body.appendChild(imageInput);
 const imageBtn = iconBtn("image", "Insert image", () => {
@@ -675,20 +623,12 @@ const clearBtn = iconBtn("clear", "Clear formatting", () => {
   scheduleSave();
 });
 
-const undoBtn = iconBtn("undo", "Undo (Ctrl+Z)", () => {
-  document.execCommand("undo");
-  editor.focus();
-  scheduleSave();
-});
-const redoBtn = iconBtn("redo", "Redo (Ctrl+Y)", () => {
-  document.execCommand("redo");
-  editor.focus();
-  scheduleSave();
-});
+const undoBtn = iconBtn("undo", "Undo (Ctrl+Z)", () => { document.execCommand("undo"); editor.focus(); scheduleSave(); });
+const redoBtn = iconBtn("redo", "Redo (Ctrl+Y)", () => { document.execCommand("redo"); editor.focus(); scheduleSave(); });
 
 const toolbar = el("div", { class: "toolbar" }, [
-  group(null, [undoBtn, redoBtn], true), // always
-  group(null, [styleSel.el]), // always
+  group(null, [undoBtn, redoBtn], true),     // always
+  group(null, [styleSel.el]),                 // always
   group("p2", [fontSel.el, sizeSel.el]),
   group(null, [boldBtn, italicBtn, underlineBtn, strikeBtn]), // always
   group("p2", [textColorBtn, highlightBtn]),
@@ -707,8 +647,7 @@ document.body.appendChild(app);
 let savedRange = null;
 function getRange() {
   const sel = window.getSelection();
-  if (sel && sel.rangeCount && editor.contains(sel.anchorNode))
-    return sel.getRangeAt(0).cloneRange();
+  if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) return sel.getRangeAt(0).cloneRange();
   return null;
 }
 function restoreRange() {
@@ -722,8 +661,7 @@ function currentBlock() {
   if (!sel || !sel.rangeCount) return null;
   let node = sel.anchorNode;
   while (node && node !== editor) {
-    if (node.nodeType === 1 && /^(P|H1|H2|H3|H4|BLOCKQUOTE|PRE|LI|DIV)$/.test(node.tagName))
-      return node;
+    if (node.nodeType === 1 && /^(P|H1|H2|H3|H4|BLOCKQUOTE|PRE|LI|DIV)$/.test(node.tagName)) return node;
     node = node.parentNode;
   }
   return null;
@@ -756,10 +694,7 @@ function normalizeHref(url) {
 }
 
 function escapeAttr(s) {
-  return String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;");
+  return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
 // --- Images ---------------------------------------------------------------
@@ -890,9 +825,7 @@ function setCaretFromPoint(x, y) {
 let selectedImage = null;
 let resizingImage = false;
 let draggedImage = null;
-const imageControls = el("div", { class: "image-controls" }, [
-  el("div", { class: "resize-handle" }),
-]);
+const imageControls = el("div", { class: "image-controls" }, [el("div", { class: "resize-handle" })]);
 document.body.appendChild(imageControls);
 const resizeHandle = imageControls.querySelector(".resize-handle");
 
@@ -969,9 +902,7 @@ editor.addEventListener("dragstart", (e) => {
     // defaults expose the image as HTML and our drop sanitizer inserts a copy.
     e.dataTransfer.setData("application/x-doc-image-move", "1");
     e.dataTransfer.setData("text/plain", "");
-    try {
-      e.dataTransfer.setDragImage(img, Math.min(20, img.width / 2), Math.min(20, img.height / 2));
-    } catch (err) {}
+    try { e.dataTransfer.setDragImage(img, Math.min(20, img.width / 2), Math.min(20, img.height / 2)); } catch (err) {}
   }
 });
 
@@ -983,13 +914,7 @@ editor.addEventListener("dragend", () => {
 
 editor.addEventListener("dragover", (e) => {
   const types = Array.from((e.dataTransfer && e.dataTransfer.types) || []);
-  if (
-    draggedImage ||
-    imageFilesFromDataTransfer(e.dataTransfer).length ||
-    types.includes("Files") ||
-    types.includes("text/html") ||
-    types.includes("text/plain")
-  ) {
+  if (draggedImage || imageFilesFromDataTransfer(e.dataTransfer).length || types.includes("Files") || types.includes("text/html") || types.includes("text/plain")) {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = draggedImage ? "move" : "copy";
     editor.classList.add("drop-target");
@@ -1044,16 +969,8 @@ editor.addEventListener("drop", (e) => {
   }
 });
 
-window.addEventListener(
-  "scroll",
-  () => {
-    if (selectedImage) positionImageControls();
-  },
-  true,
-);
-window.addEventListener("resize", () => {
-  if (selectedImage) positionImageControls();
-});
+window.addEventListener("scroll", () => { if (selectedImage) positionImageControls(); }, true);
+window.addEventListener("resize", () => { if (selectedImage) positionImageControls(); });
 
 function sanitizeImageElement(srcImg) {
   const src = srcImg.getAttribute("src") || "";
@@ -1115,30 +1032,20 @@ const linkPopUrl = el("a", { class: "lp-url", target: "_blank", rel: "noopener n
 const linkPopEdit = el("button", { class: "lp-btn" }, "Edit");
 const linkPopRemove = el("button", { class: "lp-btn lp-danger" }, "Remove link");
 const linkPop = el("div", { class: "link-pop" }, [
-  linkPopUrl,
-  el("span", { class: "lp-div" }),
-  linkPopEdit,
-  linkPopRemove,
+  linkPopUrl, el("span", { class: "lp-div" }), linkPopEdit, linkPopRemove,
 ]);
 linkPop.style.display = "none";
 // Don't let clicks inside the popover collapse the editor selection.
-linkPop.addEventListener("mousedown", (e) => {
-  if (e.target !== linkPopUrl) e.preventDefault();
-});
-linkPopEdit.addEventListener("click", () => {
-  if (activeLink) editLink(activeLink);
-});
-linkPopRemove.addEventListener("click", () => {
-  if (activeLink) removeLink(activeLink);
-});
+linkPop.addEventListener("mousedown", (e) => { if (e.target !== linkPopUrl) e.preventDefault(); });
+linkPopEdit.addEventListener("click", () => { if (activeLink) editLink(activeLink); });
+linkPopRemove.addEventListener("click", () => { if (activeLink) removeLink(activeLink); });
 document.body.appendChild(linkPop);
 
 function positionLinkPopover(anchor) {
   const r = anchor.getBoundingClientRect();
   linkPop.style.visibility = "hidden";
   linkPop.style.display = "flex";
-  const pw = linkPop.offsetWidth,
-    ph = linkPop.offsetHeight;
+  const pw = linkPop.offsetWidth, ph = linkPop.offsetHeight;
   let left = Math.round(r.left);
   left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
   let top = Math.round(r.bottom + 6);
@@ -1167,70 +1074,40 @@ function updateLinkPopover() {
   else hideLinkPopover();
 }
 
-window.addEventListener(
-  "scroll",
-  () => {
-    if (activeLink) positionLinkPopover(activeLink);
-  },
-  true,
-);
-window.addEventListener("resize", () => {
-  if (activeLink) positionLinkPopover(activeLink);
-});
+window.addEventListener("scroll", () => { if (activeLink) positionLinkPopover(activeLink); }, true);
+window.addEventListener("resize", () => { if (activeLink) positionLinkPopover(activeLink); });
 
 // Inline prompt (alert/prompt are blocked in the sandbox iframe)
 function promptInline(message, def = "") {
   return new Promise((resolve) => {
     const overlay = el("div", {}, []);
     Object.assign(overlay.style, {
-      position: "fixed",
-      inset: "0",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "rgba(20,20,25,0.35)",
-      backdropFilter: "blur(5px)",
-      zIndex: "1000",
+      position: "fixed", inset: "0", display: "flex", alignItems: "center",
+      justifyContent: "center", background: "rgba(20,20,25,0.35)",
+      backdropFilter: "blur(5px)", zIndex: "1000",
     });
     const input = el("input", { value: def, placeholder: "https://" });
     Object.assign(input.style, {
-      width: "100%",
-      padding: "8px 10px",
-      fontSize: "13.5px",
-      border: "1px solid var(--line-strong)",
-      borderRadius: "6px",
-      background: "var(--bg)",
-      color: "var(--text)",
-      outline: "none",
+      width: "100%", padding: "8px 10px", fontSize: "13.5px",
+      border: "1px solid var(--line-strong)", borderRadius: "6px",
+      background: "var(--bg)", color: "var(--text)", outline: "none",
     });
     const ok = el("button", {}, "Insert");
     const cancel = el("button", {}, "Cancel");
-    for (const b of [ok, cancel])
-      Object.assign(b.style, {
-        padding: "6px 12px",
-        fontSize: "13px",
-        borderRadius: "6px",
-        border: "1px solid var(--line)",
-        background: "var(--surface)",
-        color: "var(--text)",
-        cursor: "pointer",
-      });
-    Object.assign(ok.style, {
-      background: "var(--accent)",
-      color: "#fff",
-      borderColor: "var(--accent)",
+    for (const b of [ok, cancel]) Object.assign(b.style, {
+      padding: "6px 12px", fontSize: "13px", borderRadius: "6px",
+      border: "1px solid var(--line)", background: "var(--surface)",
+      color: "var(--text)", cursor: "pointer",
     });
-    const card = el("div", {}, [el("div", { html: message }), input, el("div", {}, [cancel, ok])]);
+    Object.assign(ok.style, { background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" });
+    const card = el("div", {}, [
+      el("div", { html: message }), input,
+      el("div", {}, [cancel, ok]),
+    ]);
     Object.assign(card.style, {
-      background: "var(--surface)",
-      border: "1px solid var(--line)",
-      borderRadius: "10px",
-      padding: "16px",
-      width: "min(420px, 90vw)",
-      display: "flex",
-      flexDirection: "column",
-      gap: "12px",
-      boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+      background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "10px",
+      padding: "16px", width: "min(420px, 90vw)", display: "flex", flexDirection: "column",
+      gap: "12px", boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
     });
     card.lastChild.style.display = "flex";
     card.lastChild.style.justifyContent = "flex-end";
@@ -1240,15 +1117,10 @@ function promptInline(message, def = "") {
     overlay.appendChild(card);
     document.body.appendChild(overlay);
     input.focus();
-    const done = (val) => {
-      overlay.remove();
-      resolve(val);
-    };
+    const done = (val) => { overlay.remove(); resolve(val); };
     ok.addEventListener("click", () => done(input.value));
     cancel.addEventListener("click", () => done(null));
-    overlay.addEventListener("mousedown", (e) => {
-      if (e.target === overlay) done(null);
-    });
+    overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) done(null); });
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") done(input.value);
       if (e.key === "Escape") done(null);
@@ -1263,11 +1135,7 @@ function promptInline(message, def = "") {
 // rebuild pasted HTML into clean semantic markup so it behaves like text the
 // editor created itself.
 const INLINE_ONLY = ["code", "s", "u", "i", "b"];
-function wrapEl(tag, child) {
-  const e = document.createElement(tag);
-  e.appendChild(child);
-  return e;
-}
+function wrapEl(tag, child) { const e = document.createElement(tag); e.appendChild(child); return e; }
 
 function fmtOf(elem, ctx) {
   const cs = ((elem.getAttribute && elem.getAttribute("style")) || "").toLowerCase();
@@ -1308,21 +1176,7 @@ function wrapInline(text, ctx) {
   return node;
 }
 
-const BLOCK_TAGS = [
-  "P",
-  "H1",
-  "H2",
-  "H3",
-  "H4",
-  "H5",
-  "H6",
-  "BLOCKQUOTE",
-  "PRE",
-  "UL",
-  "OL",
-  "LI",
-  "DIV",
-];
+const BLOCK_TAGS = ["P", "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE", "PRE", "UL", "OL", "LI", "DIV"];
 
 function sanitizePastedHtml(html) {
   const parsed = new DOMParser().parseFromString(html, "text/html");
@@ -1338,7 +1192,8 @@ function sanitizePastedHtml(html) {
         else if (tag === "IMG") {
           const img = sanitizeImageElement(child);
           if (img) target.appendChild(img);
-        } else if (tag === "HR" || tag === "STYLE" || tag === "SCRIPT") return;
+        }
+        else if (tag === "HR" || tag === "STYLE" || tag === "SCRIPT") return;
         else appendInline(child, target, fmtOf(child, ctx));
       }
     });
@@ -1353,9 +1208,8 @@ function sanitizePastedHtml(html) {
         const nested = [];
         child.childNodes.forEach((g) => {
           if (g.nodeType === 1 && (g.tagName === "UL" || g.tagName === "OL")) nested.push(g);
-          else if (g.nodeType === 3) {
-            if (g.textContent) li.appendChild(wrapInline(g.textContent, ctx));
-          } else if (g.nodeType === 1) appendInline(g, li, fmtOf(g, ctx));
+          else if (g.nodeType === 3) { if (g.textContent) li.appendChild(wrapInline(g.textContent, ctx)); }
+          else if (g.nodeType === 1) appendInline(g, li, fmtOf(g, ctx));
         });
         nested.forEach((n) => li.appendChild(processList(n, ctx)));
         list.appendChild(li);
@@ -1379,10 +1233,7 @@ function sanitizePastedHtml(html) {
       if (node.nodeType !== 1) return;
       const tag = node.tagName;
       if (tag === "STYLE" || tag === "SCRIPT" || tag === "META" || tag === "BR") return;
-      if (tag === "HR") {
-        result.appendChild(document.createElement("hr"));
-        return;
-      }
+      if (tag === "HR") { result.appendChild(document.createElement("hr")); return; }
       if (tag === "IMG") {
         const img = sanitizeImageElement(node);
         if (img) {
@@ -1392,10 +1243,7 @@ function sanitizePastedHtml(html) {
         }
         return;
       }
-      if (tag === "UL" || tag === "OL") {
-        result.appendChild(processList(node, ctx));
-        return;
-      }
+      if (tag === "UL" || tag === "OL") { result.appendChild(processList(node, ctx)); return; }
       if (["P", "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE", "PRE"].includes(tag)) {
         let out = tag.toLowerCase();
         if (out === "h4" || out === "h5" || out === "h6") out = "h3";
@@ -1408,8 +1256,7 @@ function sanitizePastedHtml(html) {
       // otherwise treat its inline content as a paragraph.
       const newCtx = fmtOf(node, ctx);
       const hasBlockChild = Array.from(node.childNodes).some(
-        (c) => c.nodeType === 1 && BLOCK_TAGS.includes(c.tagName),
-      );
+        (c) => c.nodeType === 1 && BLOCK_TAGS.includes(c.tagName));
       if (hasBlockChild) {
         processNodes(Array.from(node.childNodes), newCtx);
       } else {
@@ -1427,6 +1274,7 @@ function sanitizePastedHtml(html) {
 function escapeText(t) {
   return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
 
 editor.addEventListener("paste", (e) => {
   const cb = e.clipboardData;
@@ -1471,9 +1319,7 @@ function refreshToolbarState() {
     let tag = block.tagName;
     if (tag === "LI" || tag === "DIV") tag = "P";
     if (tag === "H1" && block.classList.contains("doc-title")) tag = "TITLE";
-    styleSel.setValue(
-      ["P", "TITLE", "H1", "H2", "H3", "BLOCKQUOTE", "PRE"].includes(tag) ? tag : "P",
-    );
+    styleSel.setValue(["P", "TITLE", "H1", "H2", "H3", "BLOCKQUOTE", "PRE"].includes(tag) ? tag : "P");
   }
 }
 
@@ -1520,12 +1366,10 @@ const acknowledged = new Map(); // id -> {html, version}
 const pendingByBlock = new Map();
 const collaborators = new Map();
 
-let curStatusKind = null,
-  curStatusText = null;
+let curStatusKind = null, curStatusText = null;
 function setStatus(kind, text) {
   if (kind === curStatusKind && text === curStatusText) return;
-  curStatusKind = kind;
-  curStatusText = text;
+  curStatusKind = kind; curStatusText = text;
   statusDot.className = "dot " + kind;
   statusText.textContent = text;
 }
@@ -1535,9 +1379,7 @@ function newBlockId() {
   return "b_" + Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-function blockId(node) {
-  return node?.nodeType === 1 ? node.getAttribute("data-block-id") : null;
-}
+function blockId(node) { return node?.nodeType === 1 ? node.getAttribute("data-block-id") : null; }
 function findBlock(id) {
   return Array.from(editor.children).find((node) => blockId(node) === id) || null;
 }
@@ -1576,12 +1418,8 @@ function normalizeBlocks() {
   if (selectionBlock && !activeBlockId()) {
     const node = findBlock(selectionBlock);
     if (node) {
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      range.collapse(false);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
+      const range = document.createRange(); range.selectNodeContents(node); range.collapse(false);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
     }
   }
 }
@@ -1592,20 +1430,14 @@ function canonicalBlockHtml(node) {
   clone.classList.remove("remote-editing");
   clone.style.removeProperty("--remote-color");
   clone.querySelectorAll(".remote-editing").forEach((child) => {
-    child.classList.remove("remote-editing");
-    child.style.removeProperty("--remote-color");
+    child.classList.remove("remote-editing"); child.style.removeProperty("--remote-color");
   });
-  clone
-    .querySelectorAll(".image-selected")
-    .forEach((image) => image.classList.remove("image-selected"));
+  clone.querySelectorAll(".image-selected").forEach((image) => image.classList.remove("image-selected"));
   return clone.outerHTML;
 }
 function serializeBlocks() {
   normalizeBlocks();
-  return Array.from(editor.children).map((node) => ({
-    id: blockId(node),
-    html: canonicalBlockHtml(node),
-  }));
+  return Array.from(editor.children).map((node) => ({ id: blockId(node), html: canonicalBlockHtml(node) }));
 }
 function parseBlock(block) {
   const tpl = document.createElement("template");
@@ -1624,10 +1456,7 @@ function scheduleSave(delay = 220) {
 
 async function doSave() {
   clearTimeout(saveTimer);
-  if (saveInFlight) {
-    saveAgain = true;
-    return;
-  }
+  if (saveInFlight) { saveAgain = true; return; }
   const blocks = serializeBlocks();
   const currentIds = new Set(blocks.map((b) => b.id));
   const upserts = blocks
@@ -1645,24 +1474,18 @@ async function doSave() {
   saveInFlight = true;
   try {
     const result = await gadget.applyOperation({
-      senderId: clientId,
-      baseRevision: revision,
-      upserts,
-      deletes,
-      order: blocks.map((b) => b.id),
-      title,
+      senderId: clientId, baseRevision: revision, upserts, deletes,
+      order: blocks.map((b) => b.id), title,
     });
     revision = Math.max(revision, result.revision || 0);
-    for (const block of result.upserts || [])
-      acknowledged.set(block.id, { html: block.html, version: block.version });
+    for (const block of result.upserts || []) acknowledged.set(block.id, { html: block.html, version: block.version });
     for (const id of result.deletedIds || []) acknowledged.delete(id);
     acknowledgedTitle = result.title || title;
 
     if (result.conflicts?.length) {
       // Keep the local draft visible, but rebase its next operation on the latest
       // authoritative block version. The next save intentionally preserves mine.
-      for (const block of result.conflicts)
-        acknowledged.set(block.id, { html: block.html, version: block.version });
+      for (const block of result.conflicts) acknowledged.set(block.id, { html: block.html, version: block.version });
       setStatus("synced", "Resolving concurrent edit…");
       saveAgain = true;
     } else {
@@ -1673,8 +1496,7 @@ async function doSave() {
   } finally {
     saveInFlight = false;
     const latest = serializeBlocks();
-    const stillDirty =
-      latest.some((b) => acknowledged.get(b.id)?.html !== b.html) ||
+    const stillDirty = latest.some((b) => acknowledged.get(b.id)?.html !== b.html) ||
       latest.length !== acknowledged.size ||
       (titleInput.value.trim() || "Untitled document") !== acknowledgedTitle;
     if (saveAgain || stillDirty) {
@@ -1692,12 +1514,8 @@ editor.addEventListener("input", () => {
 });
 titleInput.addEventListener("input", scheduleSave);
 
-try {
-  document.execCommand("styleWithCSS", false, true);
-} catch (e) {}
-try {
-  document.execCommand("defaultParagraphSeparator", false, "p");
-} catch (e) {}
+try { document.execCommand("styleWithCSS", false, true); } catch (e) {}
+try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) {}
 
 function applyOrder(order) {
   // Move only nodes that are actually out of place. Re-appending every block
@@ -1726,8 +1544,7 @@ function applyRemoteOperation(event) {
     }
     const old = findBlock(block.id);
     const next = parseBlock(block);
-    if (old) old.replaceWith(next);
-    else editor.appendChild(next);
+    if (old) old.replaceWith(next); else editor.appendChild(next);
   }
   for (const id of event.deletedIds || []) {
     acknowledged.delete(id);
@@ -1738,19 +1555,13 @@ function applyRemoteOperation(event) {
   if (document.activeElement !== titleInput) titleInput.value = event.title || acknowledgedTitle;
   acknowledgedTitle = event.title || acknowledgedTitle;
   applyingRemote = false;
-  setStatus(
-    "synced",
-    activeId && pendingByBlock.has(activeId) ? "Concurrent edit pending" : "Live update",
-  );
-  setTimeout(() => {
-    if (!saveInFlight && !saveTimer) setStatus("saved", "Saved");
-  }, 900);
+  setStatus("synced", activeId && pendingByBlock.has(activeId) ? "Concurrent edit pending" : "Live update");
+  setTimeout(() => { if (!saveInFlight && !saveTimer) setStatus("saved", "Saved"); }, 900);
 }
 
 function applySnapshot(doc) {
   applyingRemote = true;
-  hideLinkPopover();
-  hideImageControls();
+  hideLinkPopover(); hideImageControls();
   revision = doc.revision || 0;
   acknowledged.clear();
   // Server snapshots store IDs alongside HTML; imported/generated HTML is not
@@ -1760,10 +1571,7 @@ function applySnapshot(doc) {
   normalizeBlocks();
   for (const block of doc.blocks || []) {
     const node = findBlock(block.id);
-    acknowledged.set(block.id, {
-      html: node ? canonicalBlockHtml(node) : block.html,
-      version: block.version,
-    });
+    acknowledged.set(block.id, { html: node ? canonicalBlockHtml(node) : block.html, version: block.version });
   }
   titleInput.value = doc.title || "Untitled document";
   acknowledgedTitle = titleInput.value;
@@ -1780,16 +1588,12 @@ function settlePendingBlock(id) {
   const local = findBlock(id);
   const base = acknowledged.get(id);
   const dirty = local && (!base || canonicalBlockHtml(local) !== base.html);
-  if (dirty) {
-    scheduleSave(20);
-    return;
-  }
+  if (dirty) { scheduleSave(20); return; }
   applyingRemote = true;
   if (pending.type === "delete") local?.remove();
   else if (pending.block.version >= (base?.version || 0)) {
     const next = parseBlock(pending.block);
-    if (local) local.replaceWith(next);
-    else editor.appendChild(next);
+    if (local) local.replaceWith(next); else editor.appendChild(next);
   }
   applyingRemote = false;
 }
@@ -1819,9 +1623,7 @@ function textOffsetForPoint(block, node, offset) {
     range.selectNodeContents(block);
     range.setEnd(node, offset);
     return range.toString().length;
-  } catch (e) {
-    return 0;
-  }
+  } catch (e) { return 0; }
 }
 function schedulePresence() {
   clearTimeout(presenceTimer);
@@ -1831,23 +1633,17 @@ function sendPresence() {
   const sel = window.getSelection();
   const anchorBlock = containingBlock(sel?.anchorNode);
   const focusBlock = containingBlock(sel?.focusNode);
-  gadget
-    .updatePresence({
-      clientId,
-      name: collaboratorName,
-      color: collaboratorColor,
-      anchorBlockId: blockId(anchorBlock),
-      anchorOffset: textOffsetForPoint(anchorBlock, sel?.anchorNode, sel?.anchorOffset || 0),
-      focusBlockId: blockId(focusBlock),
-      focusOffset: textOffsetForPoint(focusBlock, sel?.focusNode, sel?.focusOffset || 0),
-    })
-    .catch(() => {});
+  gadget.updatePresence({
+    clientId, name: collaboratorName, color: collaboratorColor,
+    anchorBlockId: blockId(anchorBlock),
+    anchorOffset: textOffsetForPoint(anchorBlock, sel?.anchorNode, sel?.anchorOffset || 0),
+    focusBlockId: blockId(focusBlock),
+    focusOffset: textOffsetForPoint(focusBlock, sel?.focusNode, sel?.focusOffset || 0),
+  }).catch(() => {});
 }
 function domPointAtTextOffset(block, requestedOffset) {
   const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-  let remaining = Math.max(0, requestedOffset || 0),
-    text = null,
-    last = null;
+  let remaining = Math.max(0, requestedOffset || 0), text = null, last = null;
   while ((text = walker.nextNode())) {
     last = text;
     if (remaining <= text.data.length) return { node: text, offset: remaining };
@@ -1859,8 +1655,7 @@ function domPointAtTextOffset(block, requestedOffset) {
 function caretRectAtPoint(block, point) {
   try {
     const range = document.createRange();
-    range.setStart(point.node, point.offset);
-    range.collapse(true);
+    range.setStart(point.node, point.offset); range.collapse(true);
     const rect = range.getClientRects()[0];
     if (rect) return rect;
   } catch (e) {}
@@ -1874,18 +1669,13 @@ function orderedSelectionRange(person) {
   const anchor = domPointAtTextOffset(anchorBlock, person.anchorOffset);
   const focus = domPointAtTextOffset(focusBlock, person.focusOffset);
   const blockOrder = Array.from(editor.children);
-  const ai = blockOrder.indexOf(anchorBlock),
-    fi = blockOrder.indexOf(focusBlock);
+  const ai = blockOrder.indexOf(anchorBlock), fi = blockOrder.indexOf(focusBlock);
   const anchorFirst = ai < fi || (ai === fi && person.anchorOffset <= person.focusOffset);
   const start = anchorFirst ? anchor : focus;
   const end = anchorFirst ? focus : anchor;
   const range = document.createRange();
-  try {
-    range.setStart(start.node, start.offset);
-    range.setEnd(end.node, end.offset);
-  } catch (e) {
-    return null;
-  }
+  try { range.setStart(start.node, start.offset); range.setEnd(end.node, end.offset); }
+  catch (e) { return null; }
   return { range, focusBlock, focus };
 }
 function renderPresence() {
@@ -1923,16 +1713,8 @@ function applyPresence(event) {
 document.addEventListener("selectionchange", () => {
   if (editor.contains(window.getSelection()?.anchorNode)) schedulePresence();
 });
-window.addEventListener(
-  "scroll",
-  () => {
-    if (collaborators.size) renderPresence();
-  },
-  true,
-);
-window.addEventListener("resize", () => {
-  if (collaborators.size) renderPresence();
-});
+window.addEventListener("scroll", () => { if (collaborators.size) renderPresence(); }, true);
+window.addEventListener("resize", () => { if (collaborators.size) renderPresence(); });
 
 // onRpcBroken and unload delivery can both be delayed by the browser. A small
 // heartbeat makes stationary cursors live, while stale collaborators disappear
@@ -1962,9 +1744,7 @@ class DocCallbacks extends RpcTarget {
     if (event.type === "snapshot") applySnapshot(event.document);
     else applyRemoteOperation(event);
   }
-  presence(event) {
-    applyPresence(event);
-  }
+  presence(event) { applyPresence(event); }
 }
 
 if (isDocumentExport) {
@@ -1976,27 +1756,23 @@ if (isDocumentExport) {
 
 // --- Init ------------------------------------------------------------------
 
-try {
-  let doc = await gadget.subscribe(new DocCallbacks(), {
-    clientId,
-    name: collaboratorName,
-    color: collaboratorColor,
-  });
-  if (!doc.blocks) {
-    // One-time, backwards-compatible conversion of the former HTML snapshot.
-    editor.innerHTML = doc.legacyContent || "";
-    normalizeBlocks();
-    doc = await gadget.initializeBlocks({
-      blocks: serializeBlocks(),
-      title: doc.title,
-      senderId: clientId,
+  try {
+    let doc = await gadget.subscribe(new DocCallbacks(), {
+      clientId, name: collaboratorName, color: collaboratorColor,
     });
+    if (!doc.blocks) {
+      // One-time, backwards-compatible conversion of the former HTML snapshot.
+      editor.innerHTML = doc.legacyContent || "";
+      normalizeBlocks();
+      doc = await gadget.initializeBlocks({
+        blocks: serializeBlocks(), title: doc.title, senderId: clientId,
+      });
+    }
+    applySnapshot(doc);
+    setStatus("saved", "Saved");
+    sendPresence();
+  } catch (e) {
+    console.error(e);
+    setStatus("bad", "Offline");
   }
-  applySnapshot(doc);
-  setStatus("saved", "Saved");
-  sendPresence();
-} catch (e) {
-  console.error(e);
-  setStatus("bad", "Offline");
-}
-refreshToolbarState();
+  refreshToolbarState();

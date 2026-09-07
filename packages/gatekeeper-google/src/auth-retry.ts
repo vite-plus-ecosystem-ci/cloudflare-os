@@ -135,7 +135,7 @@ export async function fetchWithAuthRetry(
     } catch (error) {
       // Network error or timeout: ambiguous, so retry only when the request is safe to replay.
       if (replayable && idempotent && attempt < retries - 1) {
-        await new Promise((resolve) => setTimeout(resolve, backoffDelayMs(attempt, null)));
+        await new Promise(resolve => setTimeout(resolve, backoffDelayMs(attempt, null)));
         attempt++;
         continue;
       }
@@ -168,7 +168,7 @@ export async function fetchWithAuthRetry(
     if (replayable && canRetry(response.status, idempotent) && attempt < retries - 1) {
       let delay = backoffDelayMs(attempt, response.headers.get("Retry-After"));
       await response.body?.cancel();
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await new Promise(resolve => setTimeout(resolve, delay));
       attempt++;
       continue;
     }
@@ -227,10 +227,8 @@ export class AccessTokenCache {
    * `reloadStored` is never satisfiable here: its whole purpose is to find out whether the authority
    * holds something newer than this memo.
    */
-  #satisfies(
-    cached: MintedAccessToken | undefined,
-    opts?: AccessTokenRequest,
-  ): cached is MintedAccessToken {
+  #satisfies(cached: MintedAccessToken | undefined, opts?: AccessTokenRequest)
+      : cached is MintedAccessToken {
     if (!cached) return false;
     if (opts?.reloadStored) return false;
     if (cached.expires.valueOf() <= Date.now() + this.#skewMs) return false;

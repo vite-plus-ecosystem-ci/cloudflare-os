@@ -72,9 +72,8 @@ function rewriteMainModule(text: string): string {
 function stripProjectHeader(text: string): string {
   const begin = text.indexOf("// Begin runtime types");
   if (begin < 0) return text;
-  const workerd =
-    text.match(/\/\/ Runtime types generated with workerd@[^\n]+/)?.[0] ??
-    "// Runtime types generated with workerd";
+  const workerd = text.match(/\/\/ Runtime types generated with workerd@[^\n]+/)?.[0]
+    ?? "// Runtime types generated with workerd";
   return `/* eslint-disable */\n${workerd}\n${text.slice(begin)}`;
 }
 
@@ -88,9 +87,7 @@ function ensureRestoreExport(text: string): string {
   // `declare module \'cloudflare:workers\'`).
   const marker = /export const tracing: Tracing;\n\}/;
   if (!marker.test(text)) {
-    throw new Error(
-      "could not find CloudflareWorkersModule closing (tracing export) to patch restore",
-    );
+    throw new Error("could not find CloudflareWorkersModule closing (tracing export) to patch restore");
   }
   return text.replace(marker, `export const tracing: Tracing;${RESTORE_PATCH}}`);
 }
@@ -109,10 +106,8 @@ async function postprocess(pkgDir: string, text: string): Promise<string> {
   if (await ownsGlobalProps(pkgDir)) {
     next = stripProjectHeader(next);
   }
-  if (
-    pkgDir.endsWith(`${join("packages", "workshop-backend")}`) ||
-    pkgDir.endsWith("workshop-backend")
-  ) {
+  if (pkgDir.endsWith(`${join("packages", "workshop-backend")}`)
+    || pkgDir.endsWith("workshop-backend")) {
     next = ensureRestoreExport(next);
   }
   return next.replace(/[ \t]+$/gm, "");
@@ -139,7 +134,11 @@ async function generateOne(pkgDir: string): Promise<void> {
     const [command, argv]: [string, string[]] = wranglerEntry
       ? [process.execPath, [wranglerEntry, ...args]]
       : pnpmCommand(["exec", "wrangler", ...args]);
-    const result = spawnSync(command, argv, { cwd: pkgDir, encoding: "utf8", env: process.env });
+    const result = spawnSync(
+      command,
+      argv,
+      { cwd: pkgDir, encoding: "utf8", env: process.env },
+    );
     // A failure to spawn leaves `status` null with no output, which the check below would report as
     // a wrangler failure with two blank lines. Surface the real cause instead.
     if (result.error) {
@@ -156,9 +155,7 @@ async function generateOne(pkgDir: string): Promise<void> {
 
     if (checkOnly) {
       if (before === null || before !== next) {
-        throw new Error(
-          `${rel}/worker-configuration.d.ts is out of date (run pnpm types:generate)`,
-        );
+        throw new Error(`${rel}/worker-configuration.d.ts is out of date (run pnpm types:generate)`);
       }
       console.log(`ok  ${rel}`);
       return;

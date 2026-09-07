@@ -95,25 +95,25 @@ type Key = string | number;
 type StorageValue = NonNullable<unknown>;
 
 type IndexFunction<T> =
-  | ((record: T) => string | null)
-  | ((record: T) => string[])
-  | ((record: T) => number | null)
-  | ((record: T) => number[]);
+    | ((record: T) => string | null)
+    | ((record: T) => string[])
+    | ((record: T) => number | null)
+    | ((record: T) => number[]);
 
 type ReturnType<T> = T extends (...args: any) => infer R ? R : never;
 type RemoveArray<T> = T extends Array<infer U> ? U : T;
 
 type UniqueIndexed<T, Indexes> = {
-  [K in keyof Indexes]: UniqueIndex<T, RemoveArray<ReturnType<Indexes[K]>>>;
-};
+  [K in keyof Indexes]: UniqueIndex<T, RemoveArray<ReturnType<Indexes[K]>>>
+}
 
 type NonUniqueIndexed<T, Indexes, PK extends Key = Key> = {
-  [K in keyof Indexes]: NonUniqueIndex<T, RemoveArray<ReturnType<Indexes[K]>>, PK>;
-};
+  [K in keyof Indexes]: NonUniqueIndex<T, RemoveArray<ReturnType<Indexes[K]>>, PK>
+}
 
 export interface Subscriber<T> {
   add(record: T): void;
-  update(oldRecord: T, newRecord: T): void;
+  update(oldRecord :T, newRecord :T): void;
   remove(record: T): void;
 }
 
@@ -132,7 +132,7 @@ export interface Collection<T extends object, PrimaryKey = string> {
 }
 
 export interface SingletonSubscriber<T> {
-  update(value: T): void;
+  update(value :T): void;
 }
 
 export interface Singleton<T> {
@@ -145,7 +145,7 @@ export interface Singleton<T> {
 
 export interface TypedStorage {
   transaction<T>(callback: () => T): T;
-}
+};
 
 type ValidPrimaryKeys<T> = {
   [K in keyof T]: T[K] extends Key ? K : never;
@@ -154,57 +154,59 @@ type ValidPrimaryKeys<T> = {
 type PrimaryKeySpec<T> = ValidPrimaryKeys<T> | ((record: T) => Key);
 
 type PrimaryKeyType<T, K extends PrimaryKeySpec<T>> =
-  K extends ValidPrimaryKeys<T> ? T[K] : K extends (record: T) => Key ? ReturnType<K> : never;
+    K extends ValidPrimaryKeys<T> ? T[K]
+  : K extends ((record: T) => Key) ? ReturnType<K>
+  : never;
 
 interface CollectionSchemaBrand {
-  __COLLECTION_SCHEMA_BRAND: never;
+  "__COLLECTION_SCHEMA_BRAND": never;
 }
 
 // TODO: Add singleton values.
 interface CollectionSchema<
-  T extends object,
-  PrimaryKey extends PrimaryKeySpec<T>,
-  UniqueIndexes,
-  NonUniqueIndexes,
-> extends CollectionSchemaBrand {
+      T extends object,
+      PrimaryKey extends PrimaryKeySpec<T>,
+      UniqueIndexes,
+      NonUniqueIndexes
+    > extends CollectionSchemaBrand {
   primaryKey: PrimaryKey;
   uniqueIndexes?: UniqueIndexes;
   nonUniqueIndexes?: NonUniqueIndexes;
 }
 
 export function collection<T extends object>() {
-  return function <PrimaryKey extends PrimaryKeySpec<T>, UniqueIndexes, NonUniqueIndexes>(options: {
-    primaryKey: PrimaryKey;
-    uniqueIndexes?: UniqueIndexes;
-    nonUniqueIndexes?: NonUniqueIndexes;
-  }): CollectionSchema<T, PrimaryKey, UniqueIndexes, NonUniqueIndexes> {
-    return options as CollectionSchemaBrand & typeof options;
-  };
+  return function<PrimaryKey extends PrimaryKeySpec<T>,
+                  UniqueIndexes,
+                  NonUniqueIndexes>(
+      options: {
+        primaryKey: PrimaryKey,
+        uniqueIndexes?: UniqueIndexes,
+        nonUniqueIndexes?: NonUniqueIndexes,
+      })
+      : CollectionSchema<T, PrimaryKey, UniqueIndexes, NonUniqueIndexes> {
+    return options as (CollectionSchemaBrand & typeof options);
+  }
 }
 
 // =======================================================================================
 
-type CollectionImpl<
-  T extends object,
-  PrimaryKey extends PrimaryKeySpec<T>,
-  UniqueIndexes,
-  NonUniqueIndexes,
-> = Collection<T, PrimaryKeyType<T, PrimaryKey>> &
-  UniqueIndexed<T, UniqueIndexes> &
-  NonUniqueIndexed<T, NonUniqueIndexes, PrimaryKeyType<T, PrimaryKey> & Key>;
+type CollectionImpl<T extends object,
+                    PrimaryKey extends PrimaryKeySpec<T>,
+                    UniqueIndexes,
+                    NonUniqueIndexes> =
+    & Collection<T, PrimaryKeyType<T, PrimaryKey>>
+    & UniqueIndexed<T, UniqueIndexes>
+    & NonUniqueIndexed<T, NonUniqueIndexes, PrimaryKeyType<T, PrimaryKey> & Key>;
 
-type TypedStorageImpl<Collections, Singletons> = TypedStorage & {
-  [K in keyof Collections]: Collections[K] extends CollectionSchema<
-    infer T,
-    infer P,
-    infer U,
-    infer N
-  >
-    ? CollectionImpl<T, P, U, N>
-    : never;
-} & {
-  [K in keyof Singletons]: Singleton<Singletons[K]>;
-};
+type TypedStorageImpl<Collections, Singletons> = TypedStorage
+  & {
+    [K in keyof Collections]: Collections[K] extends
+        CollectionSchema<infer T, infer P, infer U, infer N>
+            ? CollectionImpl<T, P, U, N> : never
+  }
+  & {
+    [K in keyof Singletons]: Singleton<Singletons[K]>;
+  };
 
 export function keyString(key: Key): string {
   if (typeof key === "string") {
@@ -316,7 +318,7 @@ class KvPrefixedView<T extends StorageValue> {
    */
   deleteAll(): void {
     for (let prefix of [`${this.#name}.`, `${this.#name}:`]) {
-      for (let [key, _] of this.#kv.list({ prefix })) {
+      for (let [key, _] of this.#kv.list({prefix})) {
         this.#kv.delete(key);
       }
     }
@@ -331,15 +333,15 @@ class KvPrefixedView<T extends StorageValue> {
 }
 
 function createCollection<
-  T extends object,
-  PrimaryKey extends PrimaryKeySpec<T>,
-  UniqueIndexes,
-  NonUniqueIndexes,
->(
-  storage: DurableObjectStorage,
-  name: string,
-  schema: CollectionSchema<T, PrimaryKey, UniqueIndexes, NonUniqueIndexes>,
-): CollectionImpl<T, PrimaryKey, UniqueIndexes, NonUniqueIndexes> {
+      T extends object,
+      PrimaryKey extends PrimaryKeySpec<T>,
+      UniqueIndexes,
+      NonUniqueIndexes
+    >(
+      storage: DurableObjectStorage,
+      name: string,
+      schema: CollectionSchema<T, PrimaryKey, UniqueIndexes, NonUniqueIndexes>,
+    ): CollectionImpl<T, PrimaryKey, UniqueIndexes, NonUniqueIndexes> {
   let subscribers: Set<Subscriber<T>> = new Set();
 
   let mainKv: KvPrefixedView<T>;
@@ -406,7 +408,7 @@ function createCollection<
     },
     unsubscribe(subscriber: Subscriber<T>): void {
       subscribers.delete(subscriber);
-    },
+    }
   };
 
   let result: any = collection;
@@ -419,12 +421,11 @@ function createCollection<
   // case where the index function returns an array. Returns the subscriber's add(), so callers
   // can also feed pre-existing records into the index (see rebuild()).
   function addIndexSubscriber(
-    idx: IndexFunction<T>,
-    ops: {
-      add(idxKey: Key, pk: Key, type: "Insertion" | "Update"): void;
-      remove(idxKey: Key, pk: Key): void;
-    },
-  ): (record: T) => void {
+      idx: IndexFunction<T>,
+      ops: {
+        add(idxKey: Key, pk: Key, type: "Insertion" | "Update"): void;
+        remove(idxKey: Key, pk: Key): void;
+      }): (record: T) => void {
     let subscriber: Subscriber<T> = {
       add(record: T) {
         let pk = pkForT(record);
@@ -493,7 +494,7 @@ function createCollection<
         } else if (idxKeys !== null) {
           ops.remove(idxKeys, pk);
         }
-      },
+      }
     };
     subscribers.add(subscriber);
     return subscriber.add;
@@ -516,10 +517,9 @@ function createCollection<
       remove(idxKey: Key, pk: Key) {
         if (!idxKv.delete(idxKey)) {
           throw new Error(
-            `Index '${name}.${idxName}' is inconsistent: removed record is not present.`,
-          );
+              `Index '${name}.${idxName}' is inconsistent: removed record is not present.`);
         }
-      },
+      }
     });
 
     let index: UniqueIndex<T, Key> = {
@@ -582,21 +582,20 @@ function createCollection<
         let id = idxKv.get(idxKey);
         if (id === undefined) {
           throw new Error(
-            `Index '${name}.${idxName}' is inconsistent: removed record is not present.`,
-          );
+              `Index '${name}.${idxName}' is inconsistent: removed record is not present.`);
         }
 
         let child = idxKv.getChild(id.toString());
         child.delete(pk);
-        if (Array.from(child.list({ limit: 1 })).length == 0) {
+        if (Array.from(child.list({limit: 1})).length == 0) {
           idxKv.delete(idxKey);
         }
-      },
+      }
     });
 
     let index: NonUniqueIndex<T, Key> = {
       *get(key: Key, options?: ListOptions<Key>): Generator<T, void> {
-        let id = idxKv.get(key);
+        let id = idxKv.get(key)
         if (id === undefined) return;
         let child = idxKv.getChild(id.toString());
         for (let pk of child.listKeys(options)) {
@@ -612,7 +611,7 @@ function createCollection<
           //   it's probably rare to list() on a non-unique index anyway?
           for (let id of Array.from(idxKv.list(options))) {
             let child = idxKv.getChild(id.toString());
-            for (let pk of child.listKeys({ reverse: options.reverse })) {
+            for (let pk of child.listKeys({reverse: options.reverse})) {
               if (!seen.has(pk)) {
                 seen.add(pk);
                 yield collection.get(pk)!;
@@ -622,7 +621,7 @@ function createCollection<
         } else {
           for (let id of Array.from(idxKv.list(options))) {
             let child = idxKv.getChild(id.toString());
-            for (let pk of child.listKeys({ reverse: options.reverse })) {
+            for (let pk of child.listKeys({reverse: options.reverse})) {
               yield collection.get(pk)!;
             }
           }
@@ -666,20 +665,18 @@ function createCollection<
   return result;
 }
 
-export function createTypedStorage<
-  Collections extends Record<string, CollectionSchemaBrand>,
-  Singletons,
->(
-  storage: DurableObjectStorage,
-  schema: {
-    collections?: Collections;
-    singletons?: Singletons;
-  },
-): TypedStorageImpl<Collections, Singletons> {
+export function createTypedStorage<Collections extends Record<string, CollectionSchemaBrand>,
+                                   Singletons>(
+    storage: DurableObjectStorage,
+    schema: {
+      collections?: Collections;
+      singletons?: Singletons;
+    })
+    : TypedStorageImpl<Collections, Singletons> {
   let typedStorage: TypedStorage = {
     transaction<T>(callback: () => T): T {
       return storage.transactionSync(callback);
-    },
+    }
   };
   let result: any = typedStorage;
 

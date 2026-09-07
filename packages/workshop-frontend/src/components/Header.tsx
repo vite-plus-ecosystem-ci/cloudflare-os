@@ -1,47 +1,46 @@
-import { Link } from "@tanstack/react-router";
-import { Hexagon, List, X } from "@phosphor-icons/react";
-import { useOptionalAuthenticatedApi } from "../AuthContext";
-import { useGatekeeperApps } from "../useGatekeeperApps";
-import { useSiteName } from "../ServerConfigContext";
-import { useState, useEffect, useRef } from "react";
-import UserMenu from "./UserMenu";
-import TopBarNotice from "../TopBarNotice";
-import SiteLogo from "./SiteLogo";
+import { Link } from '@tanstack/react-router'
+import { Hexagon, List, X } from '@phosphor-icons/react'
+import { useOptionalAuthenticatedApi } from '../AuthContext'
+import { useGatekeeperApps } from '../useGatekeeperApps'
+import { useSiteName } from '../ServerConfigContext'
+import { useState, useEffect, useRef } from 'react'
+import UserMenu from './UserMenu'
+import TopBarNotice from '../TopBarNotice'
+import SiteLogo from './SiteLogo'
 
 export default function Header() {
-  const auth = useOptionalAuthenticatedApi();
-  const gatekeeperApps = useGatekeeperApps();
-  const siteName = useSiteName();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const auth = useOptionalAuthenticatedApi()
+  const gatekeeperApps = useGatekeeperApps()
+  const siteName = useSiteName()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  const headerRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLElement>(null)
 
   // Click-outside handler to close mobile menu
   useEffect(() => {
-    if (!mobileMenuOpen) return;
+    if (!mobileMenuOpen) return
     const handleClickOutside = (e: MouseEvent) => {
       if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
-        setMobileMenuOpen(false);
+        setMobileMenuOpen(false)
       }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [mobileMenuOpen]);
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [mobileMenuOpen])
 
-  const closeMobileMenu = () => setMobileMenuOpen(false);
+  const closeMobileMenu = () => setMobileMenuOpen(false)
 
-  const navLinkClass = "text-sm px-3 py-1.5 rounded-md transition-colors text-kumo-subtle";
-  const navLinkActiveClass =
-    "text-sm font-medium px-3 py-1.5 rounded-md transition-colors text-kumo-default bg-kumo-tint";
+  const navLinkClass = "text-sm px-3 py-1.5 rounded-md transition-colors text-kumo-subtle"
+  const navLinkActiveClass = "text-sm font-medium px-3 py-1.5 rounded-md transition-colors text-kumo-default bg-kumo-tint"
 
   return (
     <header
       ref={headerRef}
       className="app-header sticky top-0 z-50 backdrop-blur-md border-b border-kumo-line"
       style={{
-        backgroundColor: "color-mix(in srgb, var(--color-kumo-base) 80%, transparent)",
+        backgroundColor: 'color-mix(in srgb, var(--color-kumo-base) 80%, transparent)',
       }}
-    >
+      >
       <div className="relative px-4 sm:px-6 h-14 flex items-center justify-between">
         <TopBarNotice />
         {/* Logo */}
@@ -189,10 +188,7 @@ export default function Header() {
                   </Link>
                 )}
                 <button
-                  onClick={() => {
-                    closeMobileMenu();
-                    auth.logout();
-                  }}
+                  onClick={() => { closeMobileMenu(); auth.logout() }}
                   className="text-left text-sm px-3 py-1.5 rounded-md text-kumo-danger hover:bg-kumo-tint transition-colors"
                 >
                   Sign out
@@ -203,5 +199,5 @@ export default function Header() {
         </div>
       )}
     </header>
-  );
+  )
 }

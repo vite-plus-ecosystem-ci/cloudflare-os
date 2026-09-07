@@ -4,34 +4,27 @@
 import { DurableObject } from "cloudflare:workers";
 import { createTypedStorage, collection } from "@gadgets/typed-storage";
 import {
-  ContextCollectionContent,
-  ContextCollectionMetadata,
-  ContextCollectionVisibility,
-  ContextDocument,
-  ContextDocumentSummary,
-  ContextGitTokenCreateResult,
-  ContextGitTokenList,
-  DEFAULT_DOCUMENT_CONTENT_TYPE,
-  DEFAULT_GIT_BRANCH,
-  MAX_DOCUMENT_BODY_BYTES,
-  contentTypeFromPath,
-  isTextContentType,
-  VENDOR_ID,
+  ContextCollectionContent, ContextCollectionMetadata, ContextCollectionVisibility,
+  ContextDocument, ContextDocumentSummary,
+  ContextGitTokenCreateResult, ContextGitTokenList,
+  DEFAULT_DOCUMENT_CONTENT_TYPE, DEFAULT_GIT_BRANCH, MAX_DOCUMENT_BODY_BYTES,
+  contentTypeFromPath, isTextContentType, VENDOR_ID,
 } from "./context-types.js";
 import { metadataToSummary } from "./collection-kv.js";
 import { domainName } from "./domain.js";
-import { readArtifactRepoDocuments, type ArtifactContextDocument } from "./artifact-sync.js";
-import { isSkillManifestPath, parseSkillManifest, type SkillIndexEntry } from "./agent-skill.js";
+import {
+  readArtifactRepoDocuments, type ArtifactContextDocument,
+} from "./artifact-sync.js";
+import {
+  isSkillManifestPath, parseSkillManifest, type SkillIndexEntry,
+} from "./agent-skill.js";
 import { obsContext } from "./observability.js";
 import {
-  decodeStoredContextBody,
-  encodeStoredContextBody,
-  truncateContextDescription,
+  decodeStoredContextBody, encodeStoredContextBody, truncateContextDescription,
 } from "./context-storage.js";
 
 const logger = obsContext.createLogger({
-  component: "gatekeeper.context",
-  vendorId: VENDOR_ID,
+  component: "gatekeeper.context", vendorId: VENDOR_ID,
 });
 
 const MAX_DOCUMENT_PATH_LENGTH = 1024;
@@ -193,11 +186,7 @@ export class ContextCollectionDurableObject extends DurableObject<Cloudflare.Env
    * Initialize a new collection. Private collections pass an owner; public collections pass "".
    * Rejects re-initialization so a (vanishingly unlikely) id reuse can't clobber existing content.
    */
-  async initialize(
-    metadata: ContextCollectionMetadata,
-    sharingDomain: string,
-    ownerAccountId: string,
-  ): Promise<ContextCollectionMetadata> {
+  async initialize(metadata: ContextCollectionMetadata, sharingDomain: string, ownerAccountId: string): Promise<ContextCollectionMetadata> {
     if (this.getMetadata().id) {
       throw new Error("Collection already exists.");
     }
@@ -225,10 +214,8 @@ export class ContextCollectionDurableObject extends DurableObject<Cloudflare.Env
   }
 
   #parseAgentSkill(record: ContextRecord) {
-    if (
-      !isSkillManifestPath(record.path) ||
-      !isTextContentType(record.contentType ?? DEFAULT_DOCUMENT_CONTENT_TYPE)
-    ) {
+    if (!isSkillManifestPath(record.path) ||
+        !isTextContentType(record.contentType ?? DEFAULT_DOCUMENT_CONTENT_TYPE)) {
       return undefined;
     }
     try {
@@ -314,18 +301,9 @@ export class ContextCollectionDurableObject extends DurableObject<Cloudflare.Env
     let meta = this.getMetadata();
     let changed = false;
 
-    if (options.title !== undefined && options.title !== meta.title) {
-      meta.title = options.title;
-      changed = true;
-    }
-    if (options.description !== undefined && options.description !== meta.description) {
-      meta.description = options.description;
-      changed = true;
-    }
-    if (options.icon !== undefined && options.icon !== meta.icon) {
-      meta.icon = options.icon;
-      changed = true;
-    }
+    if (options.title !== undefined && options.title !== meta.title) { meta.title = options.title; changed = true; }
+    if (options.description !== undefined && options.description !== meta.description) { meta.description = options.description; changed = true; }
+    if (options.icon !== undefined && options.icon !== meta.icon) { meta.icon = options.icon; changed = true; }
     if (options.branch !== undefined) {
       if (meta.content.source !== "git") throw new Error("Collection is not git-based.");
       let branch = options.branch.trim();
@@ -364,7 +342,7 @@ export class ContextCollectionDurableObject extends DurableObject<Cloudflare.Env
         name: record.name,
         description: manifest?.description ?? record.description,
         contentType: record.contentType ?? DEFAULT_DOCUMENT_CONTENT_TYPE,
-        ...(manifest ? { skillName: manifest.name } : {}),
+        ...(manifest ? {skillName: manifest.name} : {}),
         lastUpdated: record.lastUpdated,
       });
     }
@@ -386,33 +364,26 @@ export class ContextCollectionDurableObject extends DurableObject<Cloudflare.Env
       description: manifest?.description ?? record.description,
       contentType,
       body: decodeStoredContextBody(contentType, record.body),
-      ...(manifest ? { skillName: manifest.name } : {}),
+      ...(manifest ? {skillName: manifest.name} : {}),
       lastUpdated: record.lastUpdated,
     };
   }
 
   async putContextDocument(
-    path: string,
-    doc: { description: string; body: string; contentType?: string },
-  ): Promise<void> {
+      path: string,
+      doc: { description: string; body: string; contentType?: string }): Promise<void> {
     this.#assertWebWritable();
     validateDocumentPath(path);
     let contentType = doc.contentType || contentTypeFromPath(path);
     let record = contextRecord({
-      path,
-      name: baseName(path),
-      description: doc.description,
-      contentType,
-      body: doc.body,
+      path, name: baseName(path), description: doc.description, contentType, body: doc.body,
       lastUpdated: new Date(),
     });
-    let byteLength =
-      record.body.byteLength +
-      new TextEncoder().encode(JSON.stringify({ ...record, body: "" })).byteLength;
+    let byteLength = record.body.byteLength + new TextEncoder().encode(
+      JSON.stringify({ ...record, body: "" }),
+    ).byteLength;
     if (byteLength > MAX_DOCUMENT_BODY_BYTES) {
-      throw new Error(
-        `Document is too large (${byteLength} bytes; max ${MAX_DOCUMENT_BODY_BYTES}).`,
-      );
+      throw new Error(`Document is too large (${byteLength} bytes; max ${MAX_DOCUMENT_BODY_BYTES}).`);
     }
 
     this.storage.transaction(() => {
@@ -471,7 +442,7 @@ export class ContextCollectionDurableObject extends DurableObject<Cloudflare.Env
 
     if (moves.length === 0) throw new Error(`Nothing to move at: ${from}`);
 
-    let movedFrom = new Set(moves.map((m) => m.record.path));
+    let movedFrom = new Set(moves.map(m => m.record.path));
     for (let m of moves) {
       if (!movedFrom.has(m.newPath) && this.storage.documents.get(m.newPath)) {
         throw new Error(`Destination already exists: ${m.newPath}`);
@@ -484,10 +455,9 @@ export class ContextCollectionDurableObject extends DurableObject<Cloudflare.Env
       }
       for (let m of moves) {
         // Update the file name and content type for the new path.
-        let contentType =
-          extOf(m.record.path) !== extOf(m.newPath)
-            ? contentTypeFromPath(m.newPath)
-            : m.record.contentType;
+        let contentType = extOf(m.record.path) !== extOf(m.newPath)
+          ? contentTypeFromPath(m.newPath)
+          : m.record.contentType;
         let record: ContextRecord = {
           ...m.record,
           path: m.newPath,
@@ -534,8 +504,8 @@ export class ContextCollectionDurableObject extends DurableObject<Cloudflare.Env
         // User-created tokens for mirror setup are always write tokens. This DO
         // mints its own read tokens for cloning the repo into memory which we
         // don't want to expose the user.
-        .filter((token) => token.scope === "write" && token.state === "active")
-        .map((token) => ({
+        .filter(token => token.scope === "write" && token.state === "active")
+        .map(token => ({
           id: token.id,
           expiresAt: token.expiresAt,
         })),
@@ -621,12 +591,7 @@ export class ContextCollectionDurableObject extends DurableObject<Cloudflare.Env
     const meta = this.getMetadata();
     if (meta.content.source !== "git") throw new Error("Collection is not git-based.");
     const result = await readArtifactRepoDocuments(
-      this.#artifacts(),
-      meta.id,
-      meta.content.remote,
-      meta.content.branch,
-      meta.content.commit,
-    );
+        this.#artifacts(), meta.id, meta.content.remote, meta.content.branch, meta.content.commit);
     if (!result.changed) {
       // Nothing changed, just bump the refresh timestamp.
       const latestMeta = this.getMetadata();
@@ -649,27 +614,13 @@ export class ContextCollectionDurableObject extends DurableObject<Cloudflare.Env
   // --- Search ---
 
   /** Linear scan over one collection. Replace with an index if collection size makes it matter. */
-  async search(
-    query: string,
-    limit: number = 20,
-  ): Promise<
-    { path: string; name: string; description: string; snippet?: string; score: number }[]
-  > {
+  async search(query: string, limit: number = 20): Promise<{ path: string; name: string; description: string; snippet?: string; score: number }[]> {
     if (this.#isGitBased()) this.#startBackgroundArtifactRefresh();
 
-    let tokens = query
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((t) => t.length > 0);
+    let tokens = query.toLowerCase().split(/\s+/).filter(t => t.length > 0);
     if (tokens.length === 0) return [];
 
-    let results: {
-      path: string;
-      name: string;
-      description: string;
-      snippet?: string;
-      score: number;
-    }[] = [];
+    let results: { path: string; name: string; description: string; snippet?: string; score: number }[] = [];
 
     for (let record of this.storage.documents.list()) {
       let score = 0;
@@ -692,20 +643,13 @@ export class ContextCollectionDurableObject extends DurableObject<Cloudflare.Env
           if (!snippet) {
             let start = Math.max(0, bodyIdx - 40);
             let end = Math.min(body.length, bodyIdx + token.length + 80);
-            snippet =
-              (start > 0 ? "..." : "") + body.slice(start, end) + (end < body.length ? "..." : "");
+            snippet = (start > 0 ? "..." : "") + body.slice(start, end) + (end < body.length ? "..." : "");
           }
         }
       }
 
       if (score > 0) {
-        results.push({
-          path: record.path,
-          name: record.name,
-          description: record.description,
-          snippet,
-          score,
-        });
+        results.push({ path: record.path, name: record.name, description: record.description, snippet, score });
       }
     }
 

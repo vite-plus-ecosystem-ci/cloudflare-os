@@ -20,11 +20,7 @@ type TokenSplice = {
  * The separators stay outside the returned range, so the highlight hugs the token's own text.
  */
 export function spliceComposerToken(
-  value: string,
-  start: number,
-  end: number,
-  token: string,
-): TokenSplice {
+    value: string, start: number, end: number, token: string): TokenSplice {
   let before = value.slice(0, start);
   let after = value.slice(end);
   let lead = before && !/\s$/.test(before) ? " " : "";
@@ -68,10 +64,7 @@ type CaretBias = "left" | "right" | "nearest";
  * its edges, are returned unchanged.
  */
 export function snapCaretOutOfRanges(
-  position: number,
-  ranges: readonly ComposerRange[],
-  bias: CaretBias,
-): number {
+    position: number, ranges: readonly ComposerRange[], bias: CaretBias): number {
   for (let range of ranges) {
     let end = range.start + range.length;
     if (position <= range.start || position >= end) continue;

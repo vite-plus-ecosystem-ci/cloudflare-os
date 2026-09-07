@@ -71,8 +71,7 @@ async function getUsableAccessToken(userStub: UserStub): Promise<string | null> 
  * caller can derive BYOK routing without re-reading. Never throws; returns a safe default.
  */
 export async function resolveConnection(
-  _env: Cloudflare.Env,
-  userStub: UserStub,
+  _env: Cloudflare.Env, userStub: UserStub,
 ): Promise<ResolvedConnection> {
   try {
     // Dispose the connected-account stub at the end of this call (it's a returned RPC stub, not an
@@ -126,8 +125,7 @@ export async function resolveConnection(
 
 /** Public-safe connection status for display and the usage decision (drops the access token). */
 export async function getConnectionStatus(
-  env: Cloudflare.Env,
-  userStub: UserStub,
+  env: Cloudflare.Env, userStub: UserStub,
 ): Promise<CloudflareConnectionStatus> {
   return (await resolveConnection(env, userStub)).status;
 }
@@ -136,10 +134,7 @@ export async function getConnectionStatus(
  * Force-refresh the cached credit balance from Cloudflare, bypassing the TTL. Best effort. Call
  * after a BYOK inference so the next billing decision reflects the spend just incurred.
  */
-export async function refreshCachedBalance(
-  _env: Cloudflare.Env,
-  userStub: UserStub,
-): Promise<void> {
+export async function refreshCachedBalance(_env: Cloudflare.Env, userStub: UserStub): Promise<void> {
   try {
     const token = await getUsableAccessToken(userStub);
     if (!token) return;
@@ -155,8 +150,7 @@ export async function refreshCachedBalance(
 
 /** List the Cloudflare accounts the connected grant can access. Empty if not connected/usable. */
 export async function listConnectedAccounts(
-  _env: Cloudflare.Env,
-  userStub: UserStub,
+  _env: Cloudflare.Env, userStub: UserStub,
 ): Promise<CloudflareAccountOption[]> {
   try {
     const token = await getUsableAccessToken(userStub);
@@ -169,14 +163,12 @@ export async function listConnectedAccounts(
 
 /** Select which Cloudflare account to bill. Validates it's accessible by the connected grant. */
 export async function selectAccount(
-  _env: Cloudflare.Env,
-  userStub: UserStub,
-  accountId: string,
+  _env: Cloudflare.Env, userStub: UserStub, accountId: string,
 ): Promise<void> {
   const token = await getUsableAccessToken(userStub);
   if (!token) throw new Error("No usable Cloudflare connection.");
   const accounts = await listAccounts(token);
-  const found = accounts.find((a) => a.accountId === accountId);
+  const found = accounts.find(a => a.accountId === accountId);
   if (!found) throw new Error("That Cloudflare account was not found in the connected grant.");
   await userStub.setCloudflareAccountSelection(found.accountId, found.accountName);
 }

@@ -32,7 +32,10 @@ export function persistentScopesForResources(resourceUrlPatterns?: string[]): st
  * Minimal scopes for sign-in only: a refresh token + the /user identity read. Used in "auth" mode
  * (the resulting grant is transient).
  */
-export const AUTH_SCOPES = ["offline_access", "user-details.read"];
+export const AUTH_SCOPES = [
+  "offline_access",
+  "user-details.read",
+];
 
 export interface CloudflareOAuthConfig {
   clientId: string;
@@ -47,9 +50,7 @@ export interface CloudflareOAuthConfig {
  * endpoint. Returns null if the client credentials aren't configured.
  */
 export function getOAuthConfig(
-  clientId: string | undefined,
-  clientSecret: string | undefined,
-  baseUrl: string,
+  clientId: string | undefined, clientSecret: string | undefined, baseUrl: string,
 ): CloudflareOAuthConfig | null {
   if (!clientId || !clientSecret) return null;
   return {
@@ -63,10 +64,7 @@ export function getOAuthConfig(
 
 function b64urlEncode(bytes: ArrayBuffer | Uint8Array): string {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  return btoa(String.fromCharCode(...arr))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return btoa(String.fromCharCode(...arr)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 /** Generate a PKCE verifier and its S256 challenge. */
@@ -77,10 +75,7 @@ export async function generatePkce(): Promise<{ verifier: string; challenge: str
 }
 
 export function buildAuthorizeUrl(
-  config: CloudflareOAuthConfig,
-  state: string,
-  challenge: string,
-  scopes: string[],
+  config: CloudflareOAuthConfig, state: string, challenge: string, scopes: string[],
 ): string {
   const url = new URL(config.authUrl);
   url.searchParams.set("response_type", "code");
@@ -115,42 +110,30 @@ function basicAuth(config: CloudflareOAuthConfig): string {
 
 /** Exchange an authorization code (with its PKCE verifier) for tokens. */
 export async function exchangeCode(
-  config: CloudflareOAuthConfig,
-  code: string,
-  verifier: string,
+  config: CloudflareOAuthConfig, code: string, verifier: string,
 ): Promise<TokenResponse | null> {
-  return redeem(
-    config,
-    new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: config.redirectUri,
-      code_verifier: verifier,
-    }),
-  );
+  return redeem(config, new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: config.redirectUri,
+    code_verifier: verifier,
+  }));
 }
 
 /** Refresh an access token using a refresh token. */
 export async function refreshTokens(
-  config: CloudflareOAuthConfig,
-  refreshToken: string,
+  config: CloudflareOAuthConfig, refreshToken: string,
 ): Promise<TokenResponse | null> {
-  return redeem(
-    config,
-    new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
-  );
+  return redeem(config, new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }));
 }
 
-async function redeem(
-  config: CloudflareOAuthConfig,
-  body: URLSearchParams,
-): Promise<TokenResponse | null> {
+async function redeem(config: CloudflareOAuthConfig, body: URLSearchParams): Promise<TokenResponse | null> {
   const resp = await fetch(config.tokenUrl, {
     method: "POST",
     headers: {
-      Authorization: basicAuth(config),
+      "Authorization": basicAuth(config),
       "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
+      "Accept": "application/json",
     },
     body,
   });
@@ -158,7 +141,7 @@ async function redeem(
     resp.body?.cancel();
     return null;
   }
-  const data = (await resp.json()) as RawTokenResponse;
+  const data = await resp.json() as RawTokenResponse;
   if (!data.access_token) return null;
   return {
     accessToken: data.access_token,

@@ -61,66 +61,42 @@ export type CreatePullRequestActionData = {
 };
 
 type TestExports = {
-  GitHubGatekeeperImpl(options: {
-    props: GatekeeperProps;
-  }): DurableObjectClass<GitHubGatekeeperImpl>;
+  GitHubGatekeeperImpl(options: { props: GatekeeperProps }):
+    DurableObjectClass<GitHubGatekeeperImpl>;
 };
 
 // The facet methods TestHooks forwards to, spelled structurally: workers-types' `Fetcher<T>`
 // return-type inference collapses several of these returns to `never` (its `Serializable`
 // heuristic gives up on them), while the runtime objects are exactly the production ones.
 type GatekeeperFacet = {
-  preparePush(
-    branch: string,
-    commitId: string,
-    force: boolean,
-    cache: RpcStub<GitCache>,
-  ): Promise<PushActionData | null>;
-  prepareCreatePullRequest(
-    options: GitHubCreatePullRequestOptions,
-  ): Promise<CreatePullRequestActionData>;
+  preparePush(branch: string, commitId: string, force: boolean, cache: RpcStub<GitCache>)
+    : Promise<PushActionData | null>;
+  prepareCreatePullRequest(options: GitHubCreatePullRequestOptions)
+    : Promise<CreatePullRequestActionData>;
   submitActionForApproval(
-    queue: unknown,
-    action: PushActionData | CreatePullRequestActionData,
-    description: ActionDescription,
-  ): Promise<void>;
+    queue: unknown, action: PushActionData | CreatePullRequestActionData,
+    description: ActionDescription): Promise<void>;
   applyAction(actionId: number, cache: RpcStub<GitCache>): Promise<void>;
   rejectAction(actionId: number): Promise<undefined | { restart?: boolean }>;
   revertAction(actionId: number): Promise<undefined | { message?: string; canRetry?: boolean }>;
-  listBranches(
-    filter: undefined,
-    pageSize: number,
-  ): Promise<{ next(): Promise<GitHubBranchSummary[] | null> }>;
+  listBranches(filter: undefined, pageSize: number)
+    : Promise<{ next(): Promise<GitHubBranchSummary[] | null> }>;
   isSimulatedCommitId(commitId: string): Promise<boolean>;
-  getCommit(
-    ref: string | undefined,
-    cache?: RpcStub<GitCache>,
-  ): Promise<{ details: GitHubCommitDetails; fromCache: boolean }>;
-  resolveRef(
-    ref: string | undefined,
-    cache?: RpcStub<GitCache>,
-  ): Promise<{ id: string; fromCache: boolean }>;
+  getCommit(ref: string | undefined, cache?: RpcStub<GitCache>)
+    : Promise<{ details: GitHubCommitDetails, fromCache: boolean }>;
+  resolveRef(ref: string | undefined, cache?: RpcStub<GitCache>)
+    : Promise<{ id: string, fromCache: boolean }>;
   repoMetadata(): Promise<GitHubRepoMetadata>;
   openPullRequest(id: string, cache?: RpcStub<GitCache>): Promise<GitHubPullRequestDetails>;
   pullMergeBase(id: string, cache?: RpcStub<GitCache>): Promise<string>;
-  pullDiff(
-    id: string,
-    pageSize: number,
-    cache?: RpcStub<GitCache>,
-  ): Promise<{
-    revision: GitHubPullRequestRevision;
-    files: { next(): Promise<GitHubPullRequestDiffFile[] | null> };
+  pullDiff(id: string, pageSize: number, cache?: RpcStub<GitCache>): Promise<{
+    revision: GitHubPullRequestRevision,
+    files: { next(): Promise<GitHubPullRequestDiffFile[] | null> },
   }>;
-  pullCommits(
-    id: string,
-    pageSize: number,
-    cache?: RpcStub<GitCache>,
-  ): Promise<{ next(): Promise<GitHubCommitSummary[] | null> }>;
-  listCommits(
-    filter: GitHubCommitFilter | undefined,
-    pageSize: number,
-    cache?: RpcStub<GitCache>,
-  ): Promise<{ next(): Promise<GitHubCommitSummary[] | null> }>;
+  pullCommits(id: string, pageSize: number, cache?: RpcStub<GitCache>)
+    : Promise<{ next(): Promise<GitHubCommitSummary[] | null> }>;
+  listCommits(filter: GitHubCommitFilter | undefined, pageSize: number, cache?: RpcStub<GitCache>)
+    : Promise<{ next(): Promise<GitHubCommitSummary[] | null> }>;
 };
 
 async function drain<T>(cursor: { next(): Promise<T[] | null> }): Promise<T[]> {
@@ -159,76 +135,52 @@ export class TestHooks extends DurableObject<Cloudflare.Env> {
   }
 
   async preparePush(
-    facetName: string,
-    props: GatekeeperProps,
-    branch: string,
-    commitId: string,
-    force: boolean,
-    cache: RpcStub<GitCache>,
+    facetName: string, props: GatekeeperProps,
+    branch: string, commitId: string, force: boolean, cache: RpcStub<GitCache>,
   ): Promise<Outcome<PushActionData | null>> {
     return await outcome(() =>
-      this.#gatekeeper(facetName, props).preparePush(branch, commitId, force, cache),
-    );
+      this.#gatekeeper(facetName, props).preparePush(branch, commitId, force, cache));
   }
 
   async submitPush(
-    facetName: string,
-    props: GatekeeperProps,
-    queue: unknown,
-    action: PushActionData,
-    description: ActionDescription,
+    facetName: string, props: GatekeeperProps,
+    queue: unknown, action: PushActionData, description: ActionDescription,
   ): Promise<Outcome<void>> {
     return await outcome(() =>
-      this.#gatekeeper(facetName, props).submitActionForApproval(queue, action, description),
-    );
+      this.#gatekeeper(facetName, props).submitActionForApproval(queue, action, description));
   }
 
   async prepareCreatePullRequest(
-    facetName: string,
-    props: GatekeeperProps,
-    options: GitHubCreatePullRequestOptions,
+    facetName: string, props: GatekeeperProps, options: GitHubCreatePullRequestOptions,
   ): Promise<Outcome<CreatePullRequestActionData>> {
     return await outcome(() =>
-      this.#gatekeeper(facetName, props).prepareCreatePullRequest(options),
-    );
+      this.#gatekeeper(facetName, props).prepareCreatePullRequest(options));
   }
 
   async submitCreatePullRequest(
-    facetName: string,
-    props: GatekeeperProps,
-    queue: unknown,
-    action: CreatePullRequestActionData,
-    description: ActionDescription,
+    facetName: string, props: GatekeeperProps,
+    queue: unknown, action: CreatePullRequestActionData, description: ActionDescription,
   ): Promise<Outcome<void>> {
     return await outcome(() =>
-      this.#gatekeeper(facetName, props).submitActionForApproval(queue, action, description),
-    );
+      this.#gatekeeper(facetName, props).submitActionForApproval(queue, action, description));
   }
 
   async rejectAction(
-    facetName: string,
-    props: GatekeeperProps,
-    actionId: number,
+    facetName: string, props: GatekeeperProps, actionId: number,
   ): Promise<Outcome<undefined | { restart?: boolean }>> {
     return await outcome(() => this.#gatekeeper(facetName, props).rejectAction(actionId));
   }
 
   async openPullRequest(
-    facetName: string,
-    props: GatekeeperProps,
-    id: string,
-    cache?: RpcStub<GitCache>,
+    facetName: string, props: GatekeeperProps, id: string, cache?: RpcStub<GitCache>,
   ): Promise<Outcome<GitHubPullRequestDetails>> {
     return await outcome(() => this.#gatekeeper(facetName, props).openPullRequest(id, cache));
   }
 
   /** `pullDiff` with the file cursor drained inside the DO (cursor stubs cannot ride back). */
   async pullDiffAll(
-    facetName: string,
-    props: GatekeeperProps,
-    id: string,
-    cache?: RpcStub<GitCache>,
-  ): Promise<Outcome<{ revision: GitHubPullRequestRevision; files: GitHubPullRequestDiffFile[] }>> {
+    facetName: string, props: GatekeeperProps, id: string, cache?: RpcStub<GitCache>,
+  ): Promise<Outcome<{ revision: GitHubPullRequestRevision, files: GitHubPullRequestDiffFile[] }>> {
     return await outcome(async () => {
       const diff = await this.#gatekeeper(facetName, props).pullDiff(id, 20, cache);
       return { revision: diff.revision, files: await drain(diff.files) };
@@ -237,23 +189,16 @@ export class TestHooks extends DurableObject<Cloudflare.Env> {
 
   /** `pullCommits`, drained. */
   async pullCommitsAll(
-    facetName: string,
-    props: GatekeeperProps,
-    id: string,
-    cache?: RpcStub<GitCache>,
+    facetName: string, props: GatekeeperProps, id: string, cache?: RpcStub<GitCache>,
   ): Promise<Outcome<GitHubCommitSummary[]>> {
-    return await outcome(
-      async () => await drain(await this.#gatekeeper(facetName, props).pullCommits(id, 50, cache)),
-    );
+    return await outcome(async () =>
+      await drain(await this.#gatekeeper(facetName, props).pullCommits(id, 50, cache)));
   }
 
   /** The first page of the repo-level `listCommits`. */
   async listCommitsFirstPage(
-    facetName: string,
-    props: GatekeeperProps,
-    filter: GitHubCommitFilter | undefined,
-    pageSize: number,
-    cache?: RpcStub<GitCache>,
+    facetName: string, props: GatekeeperProps,
+    filter: GitHubCommitFilter | undefined, pageSize: number, cache?: RpcStub<GitCache>,
   ): Promise<Outcome<GitHubCommitSummary[] | null>> {
     return await outcome(async () => {
       const cursor = await this.#gatekeeper(facetName, props).listCommits(filter, pageSize, cache);
@@ -262,27 +207,20 @@ export class TestHooks extends DurableObject<Cloudflare.Env> {
   }
 
   async applyAction(
-    facetName: string,
-    props: GatekeeperProps,
-    actionId: number,
-    cache: RpcStub<GitCache>,
+    facetName: string, props: GatekeeperProps, actionId: number, cache: RpcStub<GitCache>,
   ): Promise<Outcome<void>> {
     return await outcome(() => this.#gatekeeper(facetName, props).applyAction(actionId, cache));
   }
 
   async revertAction(
-    facetName: string,
-    props: GatekeeperProps,
-    actionId: number,
+    facetName: string, props: GatekeeperProps, actionId: number,
   ): Promise<Outcome<undefined | { message?: string; canRetry?: boolean }>> {
     return await outcome(() => this.#gatekeeper(facetName, props).revertAction(actionId));
   }
 
   /** The first page of `listBranches`, drained inside the DO (cursor stubs cannot ride back). */
   async listBranchesFirstPage(
-    facetName: string,
-    props: GatekeeperProps,
-    pageSize: number,
+    facetName: string, props: GatekeeperProps, pageSize: number,
   ): Promise<Outcome<GitHubBranchSummary[] | null>> {
     return await outcome(async () => {
       const cursor = await this.#gatekeeper(facetName, props).listBranches(undefined, pageSize);
@@ -295,10 +233,7 @@ export class TestHooks extends DurableObject<Cloudflare.Env> {
    * built first, `actionId` is rejected, and only then is the first page drained.
    */
   async listBranchesFirstPageAfterReject(
-    facetName: string,
-    props: GatekeeperProps,
-    pageSize: number,
-    actionId: number,
+    facetName: string, props: GatekeeperProps, pageSize: number, actionId: number,
   ): Promise<Outcome<GitHubBranchSummary[] | null>> {
     return await outcome(async () => {
       const gatekeeper = this.#gatekeeper(facetName, props);
@@ -314,15 +249,10 @@ export class TestHooks extends DurableObject<Cloudflare.Env> {
    * already buffered ahead of the first page when the rejection landed.
    */
   async listBranchesPagedRejectBetween(
-    facetName: string,
-    props: GatekeeperProps,
-    actionId: number,
-  ): Promise<
-    Outcome<{
-      first: GitHubBranchSummary[] | null;
-      second: GitHubBranchSummary[] | null;
-    }>
-  > {
+    facetName: string, props: GatekeeperProps, actionId: number,
+  ): Promise<Outcome<{
+    first: GitHubBranchSummary[] | null, second: GitHubBranchSummary[] | null,
+  }>> {
     return await outcome(async () => {
       const gatekeeper = this.#gatekeeper(facetName, props);
       const cursor = await gatekeeper.listBranches(undefined, 1);
@@ -334,43 +264,31 @@ export class TestHooks extends DurableObject<Cloudflare.Env> {
   }
 
   async isSimulatedCommitId(
-    facetName: string,
-    props: GatekeeperProps,
-    commitId: string,
+    facetName: string, props: GatekeeperProps, commitId: string,
   ): Promise<Outcome<boolean>> {
     return await outcome(() => this.#gatekeeper(facetName, props).isSimulatedCommitId(commitId));
   }
 
   async getCommit(
-    facetName: string,
-    props: GatekeeperProps,
-    ref: string | undefined,
-    cache?: RpcStub<GitCache>,
-  ): Promise<Outcome<{ details: GitHubCommitDetails; fromCache: boolean }>> {
+    facetName: string, props: GatekeeperProps, ref: string | undefined, cache?: RpcStub<GitCache>,
+  ): Promise<Outcome<{ details: GitHubCommitDetails, fromCache: boolean }>> {
     return await outcome(() => this.#gatekeeper(facetName, props).getCommit(ref, cache));
   }
 
   async resolveRef(
-    facetName: string,
-    props: GatekeeperProps,
-    ref: string | undefined,
-    cache?: RpcStub<GitCache>,
-  ): Promise<Outcome<{ id: string; fromCache: boolean }>> {
+    facetName: string, props: GatekeeperProps, ref: string | undefined, cache?: RpcStub<GitCache>,
+  ): Promise<Outcome<{ id: string, fromCache: boolean }>> {
     return await outcome(() => this.#gatekeeper(facetName, props).resolveRef(ref, cache));
   }
 
   async repoMetadata(
-    facetName: string,
-    props: GatekeeperProps,
+    facetName: string, props: GatekeeperProps,
   ): Promise<Outcome<GitHubRepoMetadata>> {
     return await outcome(() => this.#gatekeeper(facetName, props).repoMetadata());
   }
 
   async pullMergeBase(
-    facetName: string,
-    props: GatekeeperProps,
-    id: string,
-    cache?: RpcStub<GitCache>,
+    facetName: string, props: GatekeeperProps, id: string, cache?: RpcStub<GitCache>,
   ): Promise<Outcome<string>> {
     return await outcome(() => this.#gatekeeper(facetName, props).pullMergeBase(id, cache));
   }

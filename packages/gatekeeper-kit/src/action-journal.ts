@@ -105,12 +105,9 @@ export class ActionJournal<A> {
     // Only ports pass these, and a silent overlap corrupts the keyspace: a counter under the record
     // prefix is scanned as a record, and a record prefix under the retained one un-tiers the scan.
     if (!this.#prefix) throw new Error("recordPrefix must not be empty.");
-    if (
-      this.#nextIdKey.startsWith(this.#prefix) ||
-      this.#prefix.startsWith(this.#nextIdKey) ||
-      this.#nextIdKey.startsWith(this.#retainedPrefix) ||
-      this.#nextIdKey === this.#appliedIdsKey
-    ) {
+    if (this.#nextIdKey.startsWith(this.#prefix) || this.#prefix.startsWith(this.#nextIdKey)
+      || this.#nextIdKey.startsWith(this.#retainedPrefix)
+      || this.#nextIdKey === this.#appliedIdsKey) {
       throw new Error(`nextIdKey "${this.#nextIdKey}" overlaps a record prefix.`);
     }
     if (this.#retainedPrefix.startsWith(this.#prefix)) {
@@ -129,15 +126,10 @@ export class ActionJournal<A> {
     // Occupancy or retired-id memory at this id means the counter is behind -- a port pointed
     // `nextIdKey` at a last-issued counter. Raw reads, not `get`: a legacy row `upgradeRecord`
     // cannot convert still occupies the id, and staging over it would corrupt a live or settled id.
-    if (
-      this.#kv.get(this.#pendingKey(id)) !== undefined ||
-      this.#kv.get(this.#retainedKey(id)) !== undefined ||
-      this.wasApplied(id)
-    ) {
-      throw new Error(
-        `Action ${id} was already issued; ` +
-          `"${this.#nextIdKey}" must hold the next unused id, not the last issued one.`,
-      );
+    if (this.#kv.get(this.#pendingKey(id)) !== undefined
+      || this.#kv.get(this.#retainedKey(id)) !== undefined || this.wasApplied(id)) {
+      throw new Error(`Action ${id} was already issued; `
+        + `"${this.#nextIdKey}" must hold the next unused id, not the last issued one.`);
     }
     this.#kv.put(this.#nextIdKey, id + 1);
     this.#write(this.#pendingKey(id), { state: "staged", action });
@@ -176,8 +168,9 @@ export class ActionJournal<A> {
   markFailed(id: number, error: string): void {
     const record = this.#transitionable(id, ["staged", "pending", "claimed"]);
     if (record) {
-      const reason =
-        error.length > MAX_FAILURE_REASON ? `${error.slice(0, MAX_FAILURE_REASON)}\u2026` : error;
+      const reason = error.length > MAX_FAILURE_REASON
+        ? `${error.slice(0, MAX_FAILURE_REASON)}\u2026`
+        : error;
       this.#write(this.#pendingKey(id), { state: "failed", action: record.action, error: reason });
     }
   }
@@ -306,8 +299,7 @@ export class ActionJournal<A> {
     }
     if (unresolved >= this.#maxPending) {
       throw new Error(
-        "Too many pending actions; approve or reject some in the approval queue first.",
-      );
+        "Too many pending actions; approve or reject some in the approval queue first.");
     }
 
     // Staged first whatever their age: one is plumbing a submission left behind, while a `failed`

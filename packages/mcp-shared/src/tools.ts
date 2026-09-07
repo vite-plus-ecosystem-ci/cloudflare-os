@@ -74,11 +74,10 @@ export function classifyTool(tool: McpTool, trust: ServerTrust): ClassifiedTool 
   const annotations = tool.annotations ?? {};
   const readOnly = isDeclaredReadOnly(tool);
 
-  const autoApprovable =
-    !readOnly &&
-    trust === "vetted" &&
-    annotations.destructiveHint === false &&
-    annotations.idempotentHint === true;
+  const autoApprovable = !readOnly
+    && trust === "vetted"
+    && annotations.destructiveHint === false
+    && annotations.idempotentHint === true;
 
   return {
     tool,
@@ -117,10 +116,7 @@ export function toolSummary(entry: ClassifiedTool): McpToolSummary {
  * connectors using the same binding id from sharing pre-approvals.
  */
 export function actionKindFor(scopeTag: string, toolName: string): ActionKind {
-  return {
-    tag: `${encodeURIComponent(scopeTag)}:${encodeURIComponent(toolName)}`,
-    label: toolName,
-  };
+  return { tag: `${encodeURIComponent(scopeTag)}:${encodeURIComponent(toolName)}`, label: toolName };
 }
 
 // One annotation as a fingerprint character. Tri-state, so that a server starting or stopping making
@@ -147,7 +143,7 @@ function policyClaims(tool: McpTool): string {
  */
 export async function catalogRevision(tools: McpTool[]): Promise<string> {
   const canonical = tools
-    .map((tool) => `${tool.name}\u0000${policyClaims(tool)}`)
+    .map(tool => `${tool.name}\u0000${policyClaims(tool)}`)
     .toSorted()
     .join("\u0001");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
@@ -155,11 +151,13 @@ export async function catalogRevision(tools: McpTool[]): Promise<string> {
 }
 
 /** Flattens tool content into the shape a Gadget sees. */
-export function toCallResult(result: McpToolCallResult): Extract<McpCallResult, { status: "ok" }> {
+export function toCallResult(
+  result: McpToolCallResult,
+): Extract<McpCallResult, { status: "ok" }> {
   const content = (result.content ?? []) as McpContentBlock[];
   const text = content
     .filter((block): block is { type: "text"; text: string } => block.type === "text")
-    .map((block) => block.text)
+    .map(block => block.text)
     .join("\n");
   return {
     status: "ok",
@@ -192,10 +190,7 @@ function quoteUntrusted(text: string, max: number): string {
     .replace(/^[ \t]*[#>]+[ \t]*/gm, "")
     .trim();
   const clipped = cleaned.length > max ? `${cleaned.slice(0, max)}\u2026` : cleaned;
-  return clipped
-    .split("\n")
-    .map((line) => `> ${line}`)
-    .join("\n");
+  return clipped.split("\n").map(line => `> ${line}`).join("\n");
 }
 
 /**
@@ -217,10 +212,7 @@ const MAX_INLINE_TEXT = 120;
  * Exported for observation records quoting agent-chosen text such as search queries.
  */
 export function plainInline(text: string, max = MAX_INLINE_TEXT): string {
-  const cleaned = text
-    .replace(/[`*_[\]()#>|]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const cleaned = text.replace(/[`*_[\]()#>|]/g, "").replace(/\s+/g, " ").trim();
   const clipped = cleaned.length > max ? `${cleaned.slice(0, max)}\u2026` : cleaned;
   return clipped || "(unnamed)";
 }
@@ -247,14 +239,13 @@ export function describeCall(args: {
     rendered = `${rendered.slice(0, MAX_ARGUMENTS)}\n... (truncated)`;
   }
 
-  const provenance =
-    args.mode === "read"
-      ? args.classifiedBy === "server-annotation"
-        ? "The server declares this tool read-only, so it runs without approval. That claim comes " +
-          "from the server itself."
-        : "Treated as read-only by this deployment."
-      : "Treated as an action because the server did not declare it read-only. Nothing has been " +
-        "sent yet.";
+  const provenance = args.mode === "read"
+    ? args.classifiedBy === "server-annotation"
+      ? "The server declares this tool read-only, so it runs without approval. That claim comes " +
+        "from the server itself."
+      : "Treated as read-only by this deployment."
+    : "Treated as an action because the server did not declare it read-only. Nothing has been " +
+      "sent yet.";
 
   const description = [
     `**${plainInline(args.serverName)}** \u2192 ${codeSpan(args.tool.name)}`,

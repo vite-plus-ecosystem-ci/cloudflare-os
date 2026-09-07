@@ -24,18 +24,16 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return (
-      <Section>
-        <Field label="Team" description="Search the teams in your workspace.">
-          <Autocomplete
-            name="teamKey"
-            value={values.teamKey}
-            placeholder="Search teams..."
-            loadOptions={(query) => ui.listTeams(query)}
-            onChange={(teamKey) => setValues({ teamKey })}
-          />
-        </Field>
-      </Section>
-    );
+    return <Section>
+      <Field label="Team" description="Search the teams in your workspace.">
+        <Autocomplete
+          name="teamKey"
+          value={values.teamKey}
+          placeholder="Search teams..."
+          loadOptions={query => ui.listTeams(query)}
+          onChange={teamKey => setValues({ teamKey })}
+        />
+      </Field>
+    </Section>;
   },
 } satisfies ConfiguratorUISpec<LinearTeamConfiguratorRpc, LinearTeamConfiguratorValues>;

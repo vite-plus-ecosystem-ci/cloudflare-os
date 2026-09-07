@@ -33,7 +33,12 @@ function asArray(value: string | string[] | undefined): string[] {
 function entityFriendlyName(entityId: string, registry: RegistrySnapshot): string {
   const reg = registry.entities.find((e: any) => e.entity_id === entityId);
   const state = registry.states.get(entityId);
-  return reg?.name ?? reg?.original_name ?? state?.attributes?.friendly_name ?? entityId;
+  return (
+    reg?.name ??
+    reg?.original_name ??
+    state?.attributes?.friendly_name ??
+    entityId
+  );
 }
 
 function areaName(areaId: string, registry: RegistrySnapshot): string {
@@ -174,7 +179,9 @@ function describeCallService(
     if (target.device_id) {
       const ids = asArray(target.device_id);
       parts.push(
-        ids.length === 1 ? `device "${deviceName(ids[0], registry)}"` : `${ids.length} devices`,
+        ids.length === 1
+          ? `device "${deviceName(ids[0], registry)}"`
+          : `${ids.length} devices`,
       );
     }
     if (target.area_id) {
@@ -556,10 +563,7 @@ export async function applyRevertForEntity(
 
 // Pick attributes that are useful to restore when reverting a turn_off back to on (or vice
 // versa). Returns undefined if no special attrs apply (caller will pass undefined data).
-function restorableOnAttrs(
-  attrs: Record<string, unknown>,
-  domain: string,
-): Record<string, unknown> | undefined {
+function restorableOnAttrs(attrs: Record<string, unknown>, domain: string): Record<string, unknown> | undefined {
   if (domain !== "light") return undefined;
   const out: Record<string, unknown> = {};
   if (attrs.brightness != null) out.brightness = attrs.brightness;

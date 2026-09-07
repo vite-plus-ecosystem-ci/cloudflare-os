@@ -56,8 +56,8 @@ export class Gadget extends DurableObject {
       // blank revision-1 shell before an agent seeds generated content. Treat
       // only that exact shell as replaceable; later empty documents may be an
       // intentional user edit and are never overwritten by initialization.
-      const isBlankBootstrap =
-        current.revision === 1 && current.title === DEFAULT_TITLE && current.blocks.length === 0;
+      const isBlankBootstrap = current.revision === 1 &&
+        current.title === DEFAULT_TITLE && current.blocks.length === 0;
       const hasSeedContent = cleanBlocks.length > 0 || cleanTitle !== DEFAULT_TITLE;
       if (!isBlankBootstrap || !hasSeedContent) return current;
     }
@@ -151,34 +151,21 @@ export class Gadget extends DurableObject {
     const order = [];
     const seen = new Set();
     for (const id of requestedOrder) {
-      if (byId.has(id) && !seen.has(id)) {
-        order.push(id);
-        seen.add(id);
-      }
+      if (byId.has(id) && !seen.has(id)) { order.push(id); seen.add(id); }
     }
     for (const block of doc.blocks) {
-      if (byId.has(block.id) && !seen.has(block.id)) {
-        order.push(block.id);
-        seen.add(block.id);
-      }
+      if (byId.has(block.id) && !seen.has(block.id)) { order.push(block.id); seen.add(block.id); }
     }
     for (const id of byId.keys()) {
       if (!seen.has(id)) order.push(id);
     }
 
     const titleChanged = typeof operation.title === "string" && operation.title !== doc.title;
-    const changed =
-      accepted.length ||
-      deletedIds.length ||
-      titleChanged ||
+    const changed = accepted.length || deletedIds.length || titleChanged ||
       order.join("\n") !== doc.blocks.map((b) => b.id).join("\n");
 
     if (!changed) {
-      return {
-        status: conflicts.length ? "conflict" : "unchanged",
-        revision: doc.revision,
-        conflicts,
-      };
+      return { status: conflicts.length ? "conflict" : "unchanged", revision: doc.revision, conflicts };
     }
 
     doc = {
@@ -225,23 +212,11 @@ export class Gadget extends DurableObject {
       // Seed the newcomer with collaborators who were already connected.
       for (const person of existing) {
         try {
-          await dup.presence({
-            type: "join",
-            clientId: person.clientId,
-            name: person.name,
-            color: person.color,
-            blockId: null,
-          });
-        } catch (e) {
-          break;
-        }
+          await dup.presence({ type: "join", clientId: person.clientId, name: person.name, color: person.color, blockId: null });
+        } catch (e) { break; }
       }
       await this.broadcastPresence({
-        type: "join",
-        clientId: info.clientId,
-        name: info.name,
-        color: info.color,
-        blockId: null,
+        type: "join", clientId: info.clientId, name: info.name, color: info.color, blockId: null,
       });
     });
     return this.loadDocument();
@@ -321,22 +296,11 @@ function sanitizeBlocks(blocks) {
   return result;
 }
 
+
 const DOC_EXPORT_FORMATS = [
-  {
-    id: "markdown",
-    label: "Markdown",
-    mode: "server",
-    contentType: "text/markdown",
-    fileExtension: ".md",
-  },
+  { id: "markdown", label: "Markdown", mode: "server", contentType: "text/markdown", fileExtension: ".md" },
   { id: "html", label: "HTML", mode: "browser", contentType: "text/html", fileExtension: ".html" },
-  {
-    id: "pdf",
-    label: "PDF",
-    mode: "browser",
-    contentType: "application/pdf",
-    fileExtension: ".pdf",
-  },
+  { id: "pdf", label: "PDF", mode: "browser", contentType: "application/pdf", fileExtension: ".pdf" },
 ];
 
 export class ExportHandler extends WorkerEntrypoint {
@@ -381,134 +345,57 @@ function htmlToMarkdown(html) {
 
     if (closing) {
       switch (tag) {
-        case "h1":
-        case "h2":
-        case "h3":
-        case "h4":
-        case "h5":
-        case "h6":
-        case "p":
-        case "div":
+        case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
+        case "p": case "div":
           markdown += "\n\n";
           break;
         case "blockquote": {
           const start = blockquotes.pop();
-          const content = markdown
-            .slice(start)
-            .trim()
-            .replace(/\n{3,}/g, "\n\n");
+          const content = markdown.slice(start).trim().replace(/\n{3,}/g, "\n\n");
           const quoted = content
-            ? content
-                .split("\n")
-                .map((line) => (line ? "> " + line : ">"))
-                .join("\n")
+            ? content.split("\n").map((line) => line ? "> " + line : ">").join("\n")
             : ">";
           markdown = markdown.slice(0, start) + quoted + "\n\n";
           break;
         }
-        case "strong":
-        case "b":
-          markdown += "**";
-          break;
-        case "em":
-        case "i":
-          markdown += "*";
-          break;
-        case "s":
-        case "strike":
-        case "del":
-          markdown += "~~";
-          break;
-        case "code":
-          if (!inPre) markdown += "\x60";
-          break;
-        case "pre":
-          markdown += "\n\x60\x60\x60\n\n";
-          inPre = false;
-          break;
-        case "a":
-          markdown += "](" + (links.pop() || "") + ")";
-          break;
-        case "li":
-          if (!markdown.endsWith("\n")) markdown += "\n";
-          break;
-        case "ul":
-        case "ol":
-          lists.pop();
-          break;
-        case "td":
-        case "th":
-          markdown += "\t";
-          break;
-        case "tr":
-          markdown += "\n";
-          break;
+        case "strong": case "b": markdown += "**"; break;
+        case "em": case "i": markdown += "*"; break;
+        case "s": case "strike": case "del": markdown += "~~"; break;
+        case "code": if (!inPre) markdown += "\x60"; break;
+        case "pre": markdown += "\n\x60\x60\x60\n\n"; inPre = false; break;
+        case "a": markdown += "](" + (links.pop() || "") + ")"; break;
+        case "li": if (!markdown.endsWith("\n")) markdown += "\n"; break;
+        case "ul": case "ol": lists.pop(); break;
+        case "td": case "th": markdown += "\t"; break;
+        case "tr": markdown += "\n"; break;
       }
       continue;
     }
 
     switch (tag) {
-      case "h1":
-      case "h2":
-      case "h3":
-      case "h4":
-      case "h5":
-      case "h6":
+      case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
         markdown += "\n\n" + "#".repeat(Number(tag[1])) + " ";
         break;
-      case "p":
-      case "div":
-        markdown += "\n\n";
-        break;
-      case "br":
-        markdown += "  \n";
-        break;
-      case "strong":
-      case "b":
-        markdown += "**";
-        break;
-      case "em":
-      case "i":
-        markdown += "*";
-        break;
-      case "s":
-      case "strike":
-      case "del":
-        markdown += "~~";
-        break;
-      case "code":
-        if (!inPre) markdown += "\x60";
-        break;
-      case "pre":
-        markdown += "\n\n\x60\x60\x60\n";
-        inPre = true;
-        break;
-      case "blockquote":
-        markdown += "\n\n";
-        blockquotes.push(markdown.length);
-        break;
-      case "hr":
-        markdown += "\n\n---\n\n";
-        break;
-      case "ul":
-        lists.push({ type: "ul", count: 0 });
-        break;
-      case "ol":
-        lists.push({ type: "ol", count: 0 });
-        break;
+      case "p": case "div": markdown += "\n\n"; break;
+      case "br": markdown += "  \n"; break;
+      case "strong": case "b": markdown += "**"; break;
+      case "em": case "i": markdown += "*"; break;
+      case "s": case "strike": case "del": markdown += "~~"; break;
+      case "code": if (!inPre) markdown += "\x60"; break;
+      case "pre": markdown += "\n\n\x60\x60\x60\n"; inPre = true; break;
+      case "blockquote": markdown += "\n\n"; blockquotes.push(markdown.length); break;
+      case "hr": markdown += "\n\n---\n\n"; break;
+      case "ul": lists.push({ type: "ul", count: 0 }); break;
+      case "ol": lists.push({ type: "ol", count: 0 }); break;
       case "li": {
         const list = lists.at(-1) || { type: "ul", count: 0 };
         list.count += 1;
-        markdown +=
-          (markdown.endsWith("\n") ? "" : "\n") +
+        markdown += (markdown.endsWith("\n") ? "" : "\n") +
           "  ".repeat(Math.max(0, lists.length - 1)) +
           (list.type === "ol" ? list.count + ". " : "- ");
         break;
       }
-      case "a":
-        links.push(readHtmlAttribute(attributes, "href"));
-        markdown += "[";
-        break;
+      case "a": links.push(readHtmlAttribute(attributes, "href")); markdown += "["; break;
       case "img": {
         const alt = readHtmlAttribute(attributes, "alt").replace(/[\\[\]]/g, "\\$&");
         markdown += "![" + alt + "](" + readHtmlAttribute(attributes, "src") + ")";
@@ -527,7 +414,7 @@ function htmlToMarkdown(html) {
 function readHtmlAttribute(source, name) {
   const pattern = new RegExp(name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", "i");
   const match = pattern.exec(source);
-  return decodeHtml(match ? (match[1] ?? match[2] ?? match[3] ?? "") : "");
+  return decodeHtml(match ? match[1] ?? match[2] ?? match[3] ?? "" : "");
 }
 
 function decodeHtml(value) {
@@ -535,6 +422,6 @@ function decodeHtml(value) {
     const lower = entity.toLowerCase();
     if (lower.startsWith("#x")) return String.fromCodePoint(Number.parseInt(lower.slice(2), 16));
     if (lower.startsWith("#")) return String.fromCodePoint(Number.parseInt(lower.slice(1), 10));
-    return { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " }[lower];
+    return { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " }[lower];
   });
 }

@@ -193,7 +193,6 @@ This means the redirect URI in your OAuth credentials doesn't match what the app
 ### "access_denied" error
 
 Common causes:
-
 - **You're not a test user**: While the app is in Testing mode, only users listed in the OAuth consent screen's Test Users can authenticate. Add your email there.
 - **You denied consent**: Try again and click "Allow" on Google's consent screen.
 

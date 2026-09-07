@@ -4,29 +4,23 @@
 import { RpcTarget } from "capnweb";
 import { validateRpc } from "capnweb-validate";
 import {
-  ContextApi,
-  ContextCollectionContent,
-  ContextCollectionMetadata,
-  ContextCollectionVisibility,
-  ContextDocument,
-  ContextDocumentSummary,
-  ContextGitTokenCreateResult,
-  ContextGitTokenList,
-  DEFAULT_GIT_BRANCH,
-  EnabledCollectionInfo,
+  ContextApi, ContextCollectionContent, ContextCollectionMetadata, ContextCollectionVisibility,
+  ContextDocument, ContextDocumentSummary, ContextGitTokenCreateResult, ContextGitTokenList,
+  DEFAULT_GIT_BRANCH, EnabledCollectionInfo,
 } from "./context-types.js";
 import type { ContextCollectionDurableObject } from "./context-collection.js";
 import type { UserLibraryDurableObject } from "./user-library.js";
 import type { LibraryRegistryDurableObject } from "./registry-do.js";
-import { listPublicCollectionsFromKv, metadataToSummary } from "./collection-kv.js";
+import {
+  listPublicCollectionsFromKv, metadataToSummary,
+} from "./collection-kv.js";
 import { domainName } from "./domain.js";
 
 /** Collections visible to this account's agents. */
 export async function loadEnabledContextCollections(
-  env: Pick<Cloudflare.Env, "CONTEXT_COLLECTIONS">,
-  domain: string,
-  userLibrary: DurableObjectStub<UserLibraryDurableObject>,
-): Promise<EnabledCollectionInfo[]> {
+    env: Pick<Cloudflare.Env, "CONTEXT_COLLECTIONS">,
+    domain: string,
+    userLibrary: DurableObjectStub<UserLibraryDurableObject>): Promise<EnabledCollectionInfo[]> {
   let [owned, publicCollections] = await Promise.all([
     userLibrary.listOwnedCollections(),
     listPublicCollectionsFromKv(env, domain),
@@ -79,9 +73,7 @@ export class ContextApiImpl extends RpcTarget implements ContextApi {
   }
 
   #userLib() {
-    return this.userLibraries.get(
-      this.userLibraries.idFromName(domainName(this.domain, this.accountId)),
-    );
+    return this.userLibraries.get(this.userLibraries.idFromName(domainName(this.domain, this.accountId)));
   }
 
   #registry() {
@@ -156,18 +148,13 @@ export class ContextApiImpl extends RpcTarget implements ContextApi {
       created: new Date(),
       lastUpdated: new Date(),
       documentCount: 0,
-      content:
-        source === "git"
-          ? { source, remote: "", branch: DEFAULT_GIT_BRANCH, lastRefreshedAt: new Date() }
-          : { source },
+      content: source === "git"
+        ? { source, remote: "", branch: DEFAULT_GIT_BRANCH, lastRefreshedAt: new Date() }
+        : { source },
     };
 
     // Initialize before indexing; if this fails, nothing is reachable yet.
-    metadata = await this.#collection(id).initialize(
-      metadata,
-      this.domain,
-      visibility === "private" ? this.accountId : "",
-    );
+    metadata = await this.#collection(id).initialize(metadata, this.domain, visibility === "private" ? this.accountId : "");
 
     // Private collections live in the owner's library; public ones live in the domain registry.
     try {
@@ -178,23 +165,15 @@ export class ContextApiImpl extends RpcTarget implements ContextApi {
       }
     } catch (err) {
       // Indexing failed; delete the now-unreachable collection.
-      await this.#collection(id)
-        .deleteSelf()
-        .catch(() => {});
+      await this.#collection(id).deleteSelf().catch(() => {});
       throw err;
     }
     return metadata;
   }
 
-  async updateContextCollection(
-    collectionId: string,
-    options: {
-      title?: string;
-      description?: string;
-      icon?: string;
-      branch?: string;
-    },
-  ): Promise<void> {
+  async updateContextCollection(collectionId: string, options: {
+    title?: string; description?: string; icon?: string; branch?: string;
+  }): Promise<void> {
     await this.#assertCanWrite(collectionId);
     if (options.branch !== undefined) this.#assertArtifactsAvailable();
     await this.#collection(collectionId).updateMetadata(options);
@@ -210,9 +189,7 @@ export class ContextApiImpl extends RpcTarget implements ContextApi {
     await this.#collection(collectionId).syncArtifactSource();
   }
 
-  async createContextCollectionGitToken(
-    collectionId: string,
-  ): Promise<ContextGitTokenCreateResult> {
+  async createContextCollectionGitToken(collectionId: string): Promise<ContextGitTokenCreateResult> {
     await this.#assertCanWrite(collectionId);
     this.#assertArtifactsAvailable();
     return this.#collection(collectionId).createGitToken();
@@ -235,9 +212,7 @@ export class ContextApiImpl extends RpcTarget implements ContextApi {
     await this.#collection(collectionId).deleteSelf();
   }
 
-  async getContextCollectionMetadata(
-    collectionId: string,
-  ): Promise<ContextCollectionMetadata | null> {
+  async getContextCollectionMetadata(collectionId: string): Promise<ContextCollectionMetadata | null> {
     try {
       let [meta, owns, isPublic] = await Promise.all([
         this.#collection(collectionId).getMetadata(),
@@ -253,10 +228,7 @@ export class ContextApiImpl extends RpcTarget implements ContextApi {
 
   // --- Document editing ---
 
-  async listContextDocuments(
-    collectionId: string,
-    prefix?: string,
-  ): Promise<ContextDocumentSummary[]> {
+  async listContextDocuments(collectionId: string, prefix?: string): Promise<ContextDocumentSummary[]> {
     await this.#assertCanRead(collectionId);
     return this.#collection(collectionId).listContextDocuments(prefix);
   }
@@ -266,15 +238,9 @@ export class ContextApiImpl extends RpcTarget implements ContextApi {
     return this.#collection(collectionId).getContextDocument(path);
   }
 
-  async putContextDocument(
-    collectionId: string,
-    path: string,
-    doc: {
-      description: string;
-      body: string;
-      contentType?: string;
-    },
-  ): Promise<void> {
+  async putContextDocument(collectionId: string, path: string, doc: {
+    description: string; body: string; contentType?: string;
+  }): Promise<void> {
     await this.#assertCanWrite(collectionId);
     await this.#collection(collectionId).putContextDocument(path, doc);
   }

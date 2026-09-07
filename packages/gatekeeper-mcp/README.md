@@ -15,10 +15,10 @@ upstream server behind the portal.
 
 One resource type, **Any MCP server**, at two grant breadths:
 
-| Granularity                                                               | Resource URL               | Session type            |
-| ------------------------------------------------------------------------- | -------------------------- | ----------------------- |
-| **Server** — every tool the endpoint offers, including ones it adds later | `<endpoint>`               | `Mcp<Name><tag>Session` |
-| **Named tools** — only the listed tools; anything else is refused         | `<endpoint>#tool=a&tool=b` | `Mcp<Name><tag>Session` |
+| Granularity | Resource URL | Session type |
+| --- | --- | --- |
+| **Server** — every tool the endpoint offers, including ones it adds later | `<endpoint>` | `Mcp<Name><tag>Session` |
+| **Named tools** — only the listed tools; anything else is refused | `<endpoint>#tool=a&tool=b` | `Mcp<Name><tag>Session` |
 
 A `#server=` fragment is refused here; scoping to one server behind a portal is the MCP Server Portals
 connector's grammar. `@gadgets/mcp-shared/scope` owns the grammar and the enforcement.
@@ -69,10 +69,10 @@ See `src/types.d.ts` in `@gadgets/mcp-shared` for the base session API.
 
 ## Configuration
 
-| Variable             | Meaning                                                                                                                                                                                                         |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BASE_URL`           | Public base URL of this Worker, for OAuth redirects.                                                                                                                                                            |
-| `MCP_CLIENT_NAME`    | Client name sent in `initialize` and dynamic client registration.                                                                                                                                               |
+| Variable | Meaning |
+| --- | --- |
+| `BASE_URL` | Public base URL of this Worker, for OAuth redirects. |
+| `MCP_CLIENT_NAME` | Client name sent in `initialize` and dynamic client registration. |
 | `MCP_ALLOW_INSECURE` | `"true"` to disable the endpoint checks entirely: permits `http://` **and** private, loopback, link-local, and cloud-metadata hosts, on the endpoint and on every OAuth URL discovered from it. Local dev only. |
 
 There is nothing to configure per server: users supply endpoints, and an administrator's only lever
@@ -109,7 +109,6 @@ For local development no credentials are needed. Set `MCP_ALLOW_INSECURE=true` i
    rejected registration rather than a missing capability. The remedy is the same either way:
    connect a server that supports registration, or reach it through a portal an administrator has
    configured with a preissued token.
-
 4. Tokens are stored in the `McpAccount` Durable Object and refreshed proactively, before the
    recorded expiry. Nothing outside this Worker can obtain one.
 
@@ -165,7 +164,7 @@ connector can promise. A server that labels a destructive tool `readOnlyHint: tr
 run without a prompt. Refusing the hint would mean an approval prompt for every `search` and `list`,
 which makes the connector unusable for the thing people connect it to do; and it would buy less than
 it looks, since a dishonest server can act on any call, including one the user did approve. What the
-tier does guarantee is that no BYO server gets a write _auto-applied_, and that every call trusted on
+tier does guarantee is that no BYO server gets a write *auto-applied*, and that every call trusted on
 the server's word is recorded as such.
 
 So the trust decision is made once, by the person pasting the URL, and the connect form says so
@@ -177,7 +176,7 @@ rules.
 
 A Gadget bound to an MCP server can only be opened by its owner: `addObserver` refuses
 unconditionally. Being able to authenticate to a server is not evidence of being allowed to see what
-the _owner_ read from it, and the Gadget runs on the owner's credentials throughout. Writes still
+the *owner* read from it, and the Gadget runs on the owner's credentials throughout. Writes still
 work — the alternative, marking every observation `prohibitAllSharing`, would latch a lockdown that
 blocks every action for the rest of the session. See
 [`sharing-policy.ts`](../mcp-shared/src/sharing-policy.ts).
@@ -213,12 +212,12 @@ connect their own server.
 
 ## Layout
 
-| File                  | Purpose                                                         |
-| --------------------- | --------------------------------------------------------------- |
-| `src/mcp.ts`          | Vendor, account DO, user, verifier, gatekeeper facet, session   |
-| `src/connect-form.ts` | The endpoint prompt served during connect                       |
-| `src/server-id.ts`    | Endpoint to display slug, for the binding name and session type |
-| `src/configurator/`   | The grant UI (compiled into `src/generated/`)                   |
+| File | Purpose |
+| --- | --- |
+| `src/mcp.ts` | Vendor, account DO, user, verifier, gatekeeper facet, session |
+| `src/connect-form.ts` | The endpoint prompt served during connect |
+| `src/server-id.ts` | Endpoint to display slug, for the binding name and session type |
+| `src/configurator/` | The grant UI (compiled into `src/generated/`) |
 
 The MCP client, OAuth, tool classification, generated TypeScript, and the scope grammar come from
 [`@gadgets/mcp-shared`](../mcp-shared/README.md).

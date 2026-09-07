@@ -48,19 +48,14 @@ function fieldPath(prefix: string, name: string): string {
   return prefix === "" ? name : `${prefix}.${name}`;
 }
 
-function* scalarFields(
-  value: unknown,
-  path: string,
-  depth: number,
-): Generator<[string, Primitive]> {
+function* scalarFields(value: unknown, path: string, depth: number): Generator<[string, Primitive]> {
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     // An unprefixed namespace whose container is itself a scalar has no field name to report.
     if (path !== "") yield [path, value];
     return;
   }
   // Arrays are not indexed as scalar fields, so they are not walked.
-  if (depth >= MAX_FIELD_DEPTH || !value || typeof value !== "object" || Array.isArray(value))
-    return;
+  if (depth >= MAX_FIELD_DEPTH || !value || typeof value !== "object" || Array.isArray(value)) return;
   for (const [name, child] of Object.entries(value)) {
     yield* scalarFields(child, fieldPath(path, name), depth + 1);
   }
@@ -85,11 +80,7 @@ export function deriveKeys(
       if (existing) {
         existing.lastSeenAt = Math.max(existing.lastSeenAt ?? 0, event.timestamp);
       } else {
-        keys.set(key, {
-          key,
-          type: typeof value as CloudflareObservabilityValueType,
-          lastSeenAt: event.timestamp,
-        });
+        keys.set(key, { key, type: typeof value as CloudflareObservabilityValueType, lastSeenAt: event.timestamp });
       }
     }
   }

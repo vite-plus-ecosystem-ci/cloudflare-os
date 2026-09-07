@@ -1,8 +1,5 @@
 import type {
-  SpreadsheetCellValue,
-  SpreadsheetInfo,
-  SpreadsheetRange,
-  SpreadsheetValueMode,
+  SpreadsheetCellValue, SpreadsheetInfo, SpreadsheetRange, SpreadsheetValueMode,
 } from "./sheets-types";
 import { AccessTokenProvider, fetchWithAuthRetry } from "./auth-retry";
 import { readGoogleJson } from "./google-response";
@@ -61,7 +58,7 @@ function validateRange(range: string): ValidatedRange {
   if (!match) {
     throw new Error(
       `Invalid or unbounded A1 range "${range}". Use a bounded range such as ` +
-        "`'Sheet name'!A1:F200`.",
+      "`'Sheet name'!A1:F200`.",
     );
   }
 
@@ -70,9 +67,7 @@ function validateRange(range: string): ValidatedRange {
   let endColumn = columnNumber(match[3] ?? match[1]);
   let endRow = Number(match[4] ?? match[2]);
   if (endColumn < startColumn || endRow < startRow) {
-    throw new Error(
-      `A1 range "${range}" must run from its top-left cell to its bottom-right cell.`,
-    );
+    throw new Error(`A1 range "${range}" must run from its top-left cell to its bottom-right cell.`);
   }
 
   let rows = endRow - startRow + 1;
@@ -97,14 +92,10 @@ function validateRanges(ranges: string[]): ValidatedRange[] {
 
 function valueRenderOption(mode: SpreadsheetValueMode | undefined): string {
   switch (mode ?? "formatted") {
-    case "formatted":
-      return "FORMATTED_VALUE";
-    case "raw":
-      return "UNFORMATTED_VALUE";
-    case "formula":
-      return "FORMULA";
-    default:
-      throw new Error(`Unknown Google Sheets value mode: ${String(mode)}`);
+    case "formatted": return "FORMATTED_VALUE";
+    case "raw": return "UNFORMATTED_VALUE";
+    case "formula": return "FORMULA";
+    default: throw new Error(`Unknown Google Sheets value mode: ${String(mode)}`);
   }
 }
 
@@ -120,8 +111,9 @@ function normalizeRange(rest: RestValueRange, requested: ValidatedRange): Spread
   let source = Array.isArray(rest.values) ? rest.values : [];
   let values = Array.from({ length: requested.rows }, (_row, rowIndex) => {
     let row = Array.isArray(source[rowIndex]) ? source[rowIndex] : [];
-    return Array.from({ length: requested.columns }, (_cell, columnIndex) =>
-      normalizeCell(row[columnIndex]),
+    return Array.from(
+      { length: requested.columns },
+      (_cell, columnIndex) => normalizeCell(row[columnIndex]),
     );
   });
   return { range: rest.range ?? requested.range, values };
@@ -130,13 +122,11 @@ export class GoogleSheetsApi {
   constructor(private getAccessToken: AccessTokenProvider) {}
 
   async #request<T>(url: URL, operation: string): Promise<T> {
-    let response = await fetchWithAuthRetry(url.toString(), {}, this.getAccessToken, {
-      timeoutMs: REQUEST_TIMEOUT_MS,
-    });
+    let response = await fetchWithAuthRetry(
+      url.toString(), {}, this.getAccessToken, { timeoutMs: REQUEST_TIMEOUT_MS },
+    );
     return readGoogleJson<T>(response, {
-      provider: "Google Sheets",
-      operation,
-      maxBytes: MAX_RESPONSE_BYTES,
+      provider: "Google Sheets", operation, maxBytes: MAX_RESPONSE_BYTES,
     });
   }
 
@@ -145,7 +135,7 @@ export class GoogleSheetsApi {
     url.searchParams.set(
       "fields",
       "spreadsheetId,properties(title,locale,timeZone)," +
-        "sheets(properties(sheetId,title,index,hidden,gridProperties(rowCount,columnCount)))",
+      "sheets(properties(sheetId,title,index,hidden,gridProperties(rowCount,columnCount)))",
     );
     let result = await this.#request<RestSpreadsheet>(url, "get spreadsheet");
     return {
@@ -153,22 +143,18 @@ export class GoogleSheetsApi {
       title: result.properties?.title ?? "Untitled spreadsheet",
       ...(result.properties?.locale ? { locale: result.properties.locale } : {}),
       ...(result.properties?.timeZone ? { timeZone: result.properties.timeZone } : {}),
-      sheets: (result.sheets ?? [])
-        .flatMap((sheet) => {
-          let properties = sheet.properties;
-          if (properties?.sheetId === undefined || properties.title === undefined) return [];
-          return [
-            {
-              id: properties.sheetId,
-              title: properties.title,
-              index: properties.index ?? 0,
-              rowCount: properties.gridProperties?.rowCount ?? 0,
-              columnCount: properties.gridProperties?.columnCount ?? 0,
-              ...(properties.hidden ? { hidden: true } : {}),
-            },
-          ];
-        })
-        .toSorted((a, b) => a.index - b.index),
+      sheets: (result.sheets ?? []).flatMap(sheet => {
+        let properties = sheet.properties;
+        if (properties?.sheetId === undefined || properties.title === undefined) return [];
+        return [{
+          id: properties.sheetId,
+          title: properties.title,
+          index: properties.index ?? 0,
+          rowCount: properties.gridProperties?.rowCount ?? 0,
+          columnCount: properties.gridProperties?.columnCount ?? 0,
+          ...(properties.hidden ? { hidden: true } : {}),
+        }];
+      }).toSorted((a, b) => a.index - b.index),
     };
   }
 
@@ -184,7 +170,10 @@ export class GoogleSheetsApi {
     url.searchParams.set("valueRenderOption", valueRenderOption(valueMode));
     if (valueMode === "raw") url.searchParams.set("dateTimeRenderOption", "SERIAL_NUMBER");
 
-    let result = await this.#request<{ valueRanges?: RestValueRange[] }>(url, "read ranges");
+    let result = await this.#request<{ valueRanges?: RestValueRange[] }>(
+      url,
+      "read ranges",
+    );
     let returned = result.valueRanges ?? [];
     return validated.map((range, index) => normalizeRange(returned[index] ?? {}, range));
   }

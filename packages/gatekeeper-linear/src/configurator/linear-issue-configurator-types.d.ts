@@ -5,11 +5,11 @@ export type ConfiguratorOption = {
   title: string;
   subtitle?: string;
   meta?: string;
-};
+}
 
 export type LinearIssueConfiguratorValues = {
   issueIdentifier?: string | null;
-};
+}
 
 export interface LinearIssueConfiguratorRpc extends LinearWorkspaceConfiguratorRpc {
   listIssues(query: string): Promise<ConfiguratorOption[]>;

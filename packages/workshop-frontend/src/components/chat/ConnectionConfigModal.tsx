@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { Dialog, Button, Input } from "@cloudflare/kumo";
-import { X } from "@phosphor-icons/react";
-import type { Connection, ConnectionResource } from "../../data/sample";
-import { logoComponents } from "../ConnectionLogos";
-import { isImeComposing } from "../../keyboardEvent";
+import { useState } from 'react'
+import { Dialog, Button, Input } from '@cloudflare/kumo'
+import { X } from '@phosphor-icons/react'
+import type { Connection, ConnectionResource } from '../../data/sample'
+import { logoComponents } from '../ConnectionLogos'
+import { isImeComposing } from '../../keyboardEvent'
 
 export default function ConnectionConfigModal({
   connection,
@@ -11,29 +11,31 @@ export default function ConnectionConfigModal({
   onOpenChange,
   onSave,
 }: {
-  connection: Connection;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSave?: (resources: ConnectionResource[]) => void;
+  connection: Connection
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSave?: (resources: ConnectionResource[]) => void
 }) {
-  const [resources, setResources] = useState<ConnectionResource[]>(connection.resources ?? []);
-  const [inputValue, setInputValue] = useState("");
+  const [resources, setResources] = useState<ConnectionResource[]>(
+    connection.resources ?? []
+  )
+  const [inputValue, setInputValue] = useState('')
 
-  const Logo = logoComponents[connection.logo];
-  const config = connection.resourceConfig;
+  const Logo = logoComponents[connection.logo]
+  const config = connection.resourceConfig
 
   function handleAdd() {
-    const v = inputValue.trim();
-    if (!v || !config) return;
+    const v = inputValue.trim()
+    if (!v || !config) return
     setResources((prev) => [
       ...prev,
       { id: `r-${Date.now()}`, label: v, value: v, type: config.resourceType, active: true },
-    ]);
-    setInputValue("");
+    ])
+    setInputValue('')
   }
 
   function handleRemove(id: string) {
-    setResources((prev) => prev.filter((r) => r.id !== id));
+    setResources((prev) => prev.filter((r) => r.id !== id))
   }
 
   return (
@@ -79,14 +81,19 @@ export default function ConnectionConfigModal({
                   value={inputValue}
                   onChange={(e) => setInputValue(e.currentTarget.value)}
                   onKeyDown={(e) => {
-                    if (isImeComposing(e)) return;
-                    if (e.key === "Enter") handleAdd();
+                    if (isImeComposing(e)) return
+                    if (e.key === 'Enter') handleAdd()
                   }}
                   placeholder={config.placeholder}
                   aria-label={config.inputLabel}
                 />
               </div>
-              <Button variant="primary" size="sm" onClick={handleAdd} disabled={!inputValue.trim()}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleAdd}
+                disabled={!inputValue.trim()}
+              >
                 Add
               </Button>
             </div>
@@ -96,7 +103,9 @@ export default function ConnectionConfigModal({
         {/* Resource list */}
         <div className="max-h-56 overflow-y-auto px-5 pb-4">
           {resources.length === 0 ? (
-            <p className="text-sm text-kumo-inactive text-center py-4">No resources added yet</p>
+            <p className="text-sm text-kumo-inactive text-center py-4">
+              No resources added yet
+            </p>
           ) : (
             <div className="space-y-1">
               {resources.map((r) => (
@@ -132,8 +141,8 @@ export default function ConnectionConfigModal({
             variant="primary"
             size="sm"
             onClick={() => {
-              onSave?.(resources);
-              onOpenChange(false);
+              onSave?.(resources)
+              onOpenChange(false)
             }}
           >
             Save
@@ -141,5 +150,5 @@ export default function ConnectionConfigModal({
         </div>
       </Dialog>
     </Dialog.Root>
-  );
+  )
 }

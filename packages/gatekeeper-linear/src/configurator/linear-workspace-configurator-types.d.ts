@@ -3,11 +3,11 @@ export type ConfiguratorOption = {
   title: string;
   subtitle?: string;
   meta?: string;
-};
+}
 
 export type LinearWorkspaceConfiguratorValues = {
   workspaceUrlKey?: string | null;
-};
+}
 
 export interface LinearWorkspaceConfiguratorRpc {
   getWorkspaceUrlKey(): Promise<string>;

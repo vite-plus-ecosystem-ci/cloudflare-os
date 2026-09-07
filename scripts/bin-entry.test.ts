@@ -32,17 +32,15 @@ describe("resolveBinEntry", () => {
   it("resolves a string `bin` to an absolute entry path", () => {
     const pkgDir = pkgWith("vite", "bin/vite.js", ["bin/vite.js"]);
     assert.equal(
-      resolveBinEntry(pkgDir, "vite"),
-      join(pkgDir, "node_modules", "vite", "bin", "vite.js"),
-    );
+        resolveBinEntry(pkgDir, "vite"),
+        join(pkgDir, "node_modules", "vite", "bin", "vite.js"));
   });
 
   it("resolves the matching key of an object `bin`", () => {
     const pkgDir = pkgWith("wrangler", { wrangler: "./main.js", other: "./other.js" }, ["main.js"]);
     assert.equal(
-      resolveBinEntry(pkgDir, "wrangler"),
-      join(pkgDir, "node_modules", "wrangler", "main.js"),
-    );
+        resolveBinEntry(pkgDir, "wrangler"),
+        join(pkgDir, "node_modules", "wrangler", "main.js"));
   });
 
   // The case that broke the `shell: true` attempt at this bug: a checkout under a path with a space
@@ -51,10 +49,7 @@ describe("resolveBinEntry", () => {
     const spaced = join(root, "cf os", "repo");
     const installed = join(spaced, "node_modules", "vite");
     mkdirSync(installed, { recursive: true });
-    writeFileSync(
-      join(installed, "package.json"),
-      JSON.stringify({ name: "vite", bin: "./cli.js" }),
-    );
+    writeFileSync(join(installed, "package.json"), JSON.stringify({ name: "vite", bin: "./cli.js" }));
     writeFileSync(join(installed, "cli.js"), "");
     assert.equal(resolveBinEntry(spaced, "vite"), join(installed, "cli.js"));
   });
@@ -63,9 +58,7 @@ describe("resolveBinEntry", () => {
   it("returns null when the bin cannot be resolved to a file that exists", () => {
     assert.equal(resolveBinEntry(join(root, "nonexistent"), "vite"), null);
     assert.equal(
-      resolveBinEntry(pkgWith("vite", { other: "./other.js" }, ["other.js"]), "vite"),
-      null,
-    );
+        resolveBinEntry(pkgWith("vite", { other: "./other.js" }, ["other.js"]), "vite"), null);
     assert.equal(resolveBinEntry(pkgWith("vite", undefined, []), "vite"), null);
     assert.equal(resolveBinEntry(pkgWith("vite", "./missing.js", []), "vite"), null);
   });

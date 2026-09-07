@@ -57,11 +57,7 @@ export type ProductAnalyticsGadgetInput =
       gadget_owner_user_id?: string;
       /** Gadget-local id of the chat thread. */
       chat_id?: number;
-      interaction_type:
-        | "gadget_ui_connected"
-        | "chat_started"
-        | "chat_message_sent"
-        | "code_merged";
+      interaction_type: "gadget_ui_connected" | "chat_started" | "chat_message_sent" | "code_merged";
     }
   | {
       event_name: "connection_created";
@@ -109,20 +105,17 @@ export type ProductAnalyticsInput =
   | ProductAnalyticsGadgetInput;
 
 export function recordAnalytics(
-  ctx: ExecutionContext | DurableObjectState,
-  env: Cloudflare.Env,
-  event: ProductAnalyticsInput,
-): void {
+    ctx: ExecutionContext | DurableObjectState,
+    env: Cloudflare.Env,
+    event: ProductAnalyticsInput): void {
   try {
     if (!env.PRODUCT_ANALYTICS) {
       return;
     }
 
     // Pull the common fields up to columns; everything else becomes properties.
-    let { event_name, user_id, gadget_id, ...properties } = event as ProductAnalyticsInput & {
-      user_id?: string;
-      gadget_id?: string;
-    };
+    let { event_name, user_id, gadget_id, ...properties } =
+        event as ProductAnalyticsInput & { user_id?: string; gadget_id?: string };
 
     let record: ProductAnalyticsRecord = {
       event_id: crypto.randomUUID(),
@@ -133,20 +126,16 @@ export function recordAnalytics(
       properties,
     };
 
-    let send = env.PRODUCT_ANALYTICS.send([record]).catch((err) => {
+    let send = env.PRODUCT_ANALYTICS.send([record]).catch(err => {
       logger.warn("analytics send failed", {
-        event: "analytics.send.failed",
-        eventName: event_name,
-        error: err,
+        event: "analytics.send.failed", eventName: event_name, error: err,
       });
     });
 
     ctx.waitUntil(send);
   } catch (err) {
     logger.warn("analytics record failed", {
-      event: "analytics.record.failed",
-      eventName: event.event_name,
-      error: err,
+      event: "analytics.record.failed", eventName: event.event_name, error: err,
     });
   }
 }

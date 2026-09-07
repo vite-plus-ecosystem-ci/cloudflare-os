@@ -33,20 +33,18 @@ export default {
   },
 
   render({ values, setValues }) {
-    return (
-      <Section>
-        <Field
-          label="Thread permalink"
-          description="Paste a Slack message link (Copy link on a message). It looks like https://your-workspace.slack.com/archives/C0.../p123..."
-        >
-          <TextInput
-            name="permalink"
-            value={values.permalink}
-            placeholder="https://your-workspace.slack.com/archives/C.../p..."
-            onChange={(permalink) => setValues({ permalink })}
-          />
-        </Field>
-      </Section>
-    );
+    return <Section>
+      <Field
+        label="Thread permalink"
+        description="Paste a Slack message link (Copy link on a message). It looks like https://your-workspace.slack.com/archives/C0.../p123..."
+      >
+        <TextInput
+          name="permalink"
+          value={values.permalink}
+          placeholder="https://your-workspace.slack.com/archives/C.../p..."
+          onChange={permalink => setValues({ permalink })}
+        />
+      </Field>
+    </Section>;
   },
 } satisfies ConfiguratorUISpec<ThreadConfiguratorRpc, ThreadConfiguratorValues>;

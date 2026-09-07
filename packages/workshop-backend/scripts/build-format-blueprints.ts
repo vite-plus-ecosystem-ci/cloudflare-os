@@ -40,30 +40,26 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = join(here, "..");
 const sourceDir = resolve(pkgRoot, process.env.FORMAT_BLUEPRINTS_DIR ?? "format-blueprints");
-const outFile = resolve(
-  pkgRoot,
-  parseOutFlag() ?? join("src", "generated", "format-blueprints.ts"),
-);
+const outFile = resolve(pkgRoot, parseOutFlag() ?? join("src", "generated", "format-blueprints.ts"));
 
 // An empty directory is a supported way to ship no formats, so it is a warning rather than an
 // error. A mistyped FORMAT_BLUEPRINTS_DIR fails in readdir() above, which is the case worth
 // catching.
-let allContents = await readdir(sourceDir, { withFileTypes: true });
-let contents = allContents.filter((entry) => !entry.name.startsWith("."));
-let directoryPaths = new Map(
-  contents.filter((entry) => entry.isDirectory()).map((entry) => [entry.name, entry.name]),
-);
+let allContents = await readdir(sourceDir, {withFileTypes: true});
+let contents = allContents.filter(entry => !entry.name.startsWith("."));
+let directoryPaths = new Map(contents
+    .filter(entry => entry.isDirectory())
+    .map(entry => [entry.name, entry.name]));
 for (const [name, backup] of findInterruptedImportBackups(allContents, sourceDir)) {
   directoryPaths.set(name, backup);
 }
 let directories = [...directoryPaths.keys()].toSorted();
 let directorySet = new Set(directories);
-let files = contents.filter((entry) => entry.isFile()).map((entry) => entry.name);
-let legacyNames = files
-  .filter((file) => file.endsWith(".gadget"))
-  .map((file) => basename(file, ".gadget"))
-  .filter((name) => !directorySet.has(name))
-  .toSorted();
+let files = contents.filter(entry => entry.isFile()).map(entry => entry.name);
+let legacyNames = files.filter(file => file.endsWith(".gadget"))
+    .map(file => basename(file, ".gadget"))
+    .filter(name => !directorySet.has(name))
+    .toSorted();
 let expectedFiles = new Set(["README.md"]);
 for (let name of legacyNames) {
   expectedFiles.add(`${name}.gadget`);
@@ -78,8 +74,8 @@ for (let name of directories) {
   expectedFiles.add(`${name}.json`);
 }
 let unexpected = contents
-  .filter((entry) => !entry.isDirectory() && !expectedFiles.has(entry.name))
-  .map((entry) => entry.name);
+    .filter(entry => !entry.isDirectory() && !expectedFiles.has(entry.name))
+    .map(entry => entry.name);
 if (unexpected.length > 0) {
   throw new Error(`Unexpected files in ${sourceDir}: ${unexpected.join(", ")}`);
 }
@@ -87,28 +83,21 @@ if (directories.length === 0 && legacyNames.length === 0) {
   console.warn(`No blueprint directories in ${sourceDir}; the deployment will bundle no formats.`);
 }
 
-let entries: Array<
-  Omit<FormatBlueprintManifest, "created" | "version" | "lastUpdated" | "bindings"> & {
-    contentHash: string;
-    archive: string;
-  }
-> = [];
+let entries: Array<Omit<FormatBlueprintManifest,
+    "created" | "version" | "lastUpdated" | "bindings"> & {
+      contentHash: string;
+      archive: string;
+    }> = [];
 let totalBytes = 0;
 let seen = new Map<string, string>();
 let sources = [
-  ...directories.map((name) => ({
-    name,
-    directory: directoryPaths.get(name)!,
-    kind: "extracted" as const,
-  })),
-  ...legacyNames.map((name) => ({ name, kind: "legacy" as const })),
-].toSorted((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-validatePortablePaths(
-  sources.map((source) => source.name),
-  sourceDir,
-);
+  ...directories.map(name => ({name, directory: directoryPaths.get(name)!,
+    kind: "extracted" as const})),
+  ...legacyNames.map(name => ({name, kind: "legacy" as const})),
+].toSorted((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+validatePortablePaths(sources.map(source => source.name), sourceDir);
 for (let source of sources) {
-  let { name } = source;
+  let {name} = source;
   let raw: string;
   let entry: FormatBlueprintPresentation;
   let bytes: Uint8Array;
@@ -121,7 +110,7 @@ for (let source of sources) {
       throw new Error(`${name}/ has no blueprint.json describing it.`, { cause: err });
     }
     let manifest = parseFormatBlueprintManifest(name, raw);
-    let { created, version, lastUpdated, bindings, ...presentation } = manifest;
+    let {created, version, lastUpdated, bindings, ...presentation} = manifest;
     entry = presentation;
     let sourceFiles = await readSourceFiles(join(sourceDir, directory, "files"), `${name}/files`);
     let metadata = {
@@ -191,7 +180,7 @@ export const FORMAT_BLUEPRINTS: BundledFormatBlueprint[] = ${JSON.stringify(entr
 // two SPA builds compare before writing.
 let unchanged = false;
 try {
-  unchanged = (await readFile(outFile, "utf8")) === generated;
+  unchanged = await readFile(outFile, "utf8") === generated;
 } catch (err) {
   if (!isErrorCode(err, "ENOENT")) throw err;
 }
@@ -201,10 +190,8 @@ if (unchanged) {
 } else {
   await mkdir(dirname(outFile), { recursive: true });
   await writeFile(outFile, generated);
-  console.log(
-    `Bundled ${entries.length} format blueprint(s) from ${sourceDir}, ` +
-      `${(totalBytes / 1024).toFixed(0)} KiB raw -> ${outFile}`,
-  );
+  console.log(`Bundled ${entries.length} format blueprint(s) from ${sourceDir}, ` +
+      `${(totalBytes / 1024).toFixed(0)} KiB raw -> ${outFile}`);
 }
 
 function isErrorCode(err: unknown, code: string): boolean {

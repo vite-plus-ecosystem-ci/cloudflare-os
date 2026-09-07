@@ -1,6 +1,6 @@
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { useServerConfig } from "./ServerConfigContext";
+import ReactMarkdown, { type Components } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { useServerConfig } from './ServerConfigContext'
 
 /**
  * Centered text in the top bar. Shows the deployment's admin-configured notice (rendered as inline
@@ -26,12 +26,12 @@ const INLINE_MARKDOWN_COMPONENTS: Components = {
       {children}
     </a>
   ),
-};
+}
 
 export default function TopBarNotice() {
-  const notice = (useServerConfig()?.announcement ?? "").trim();
+  const notice = (useServerConfig()?.announcement ?? '').trim()
 
-  if (!notice) return null;
+  if (!notice) return null
 
   return (
     <div
@@ -44,5 +44,5 @@ export default function TopBarNotice() {
         </ReactMarkdown>
       </div>
     </div>
-  );
+  )
 }

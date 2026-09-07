@@ -19,7 +19,7 @@ App configuration:
 
 - **Redirect URL** must match `<BASE_URL>/oauth`, which in local dev defaults to
   `http://localhost:8787/gatekeeper/slack/oauth`.
-- Enable **token rotation** (OAuth & Permissions → _Token Rotation_). Tokens are then short-lived
+- Enable **token rotation** (OAuth & Permissions → *Token Rotation*). Tokens are then short-lived
   (~12h) and refreshed via `oauth.v2.access?grant_type=refresh_token`. Non-rotating tokens also
   work as a fallback (they're returned as-is).
 - Request the **User Token Scopes** the granted resources need (see below). `users:read` is always
@@ -30,11 +30,11 @@ App configuration:
 Access is granted at one of three granularities. Each grantable resource maps to a URL pattern
 that drives both consent (which OAuth scopes are requested) and routing:
 
-| Granularity                               | URL pattern                                               | Session type            |
-| ----------------------------------------- | --------------------------------------------------------- | ----------------------- |
-| Whole workspace                           | `https://*` (catch-all whole-instance)                    | `SlackWorkspaceSession` |
-| A conversation (channel, DM, or group DM) | `https://app.slack.com/client/:teamId/:conversationId`    | `SlackConversation`     |
-| A thread                                  | `https://*.slack.com/archives/:conversationId/:messageId` | `SlackThread`           |
+| Granularity | URL pattern | Session type |
+| --- | --- | --- |
+| Whole workspace | `https://*` (catch-all whole-instance) | `SlackWorkspaceSession` |
+| A conversation (channel, DM, or group DM) | `https://app.slack.com/client/:teamId/:conversationId` | `SlackConversation` |
+| A thread | `https://*.slack.com/archives/:conversationId/:messageId` | `SlackThread` |
 
 Workspace grants use the framework's account-wide `https://*` pattern; more-specific conversation
 and thread URLs take precedence. Channels and DMs share one "Conversation" grant.

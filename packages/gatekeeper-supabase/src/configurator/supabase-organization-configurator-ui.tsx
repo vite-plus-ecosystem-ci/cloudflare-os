@@ -16,24 +16,16 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return (
-      <Section>
-        <Field
-          label="Organization"
-          description="Search the organizations in your connected Supabase account."
-        >
-          <Autocomplete
-            name="slug"
-            value={values.slug}
-            placeholder="Search organizations..."
-            loadOptions={(query) => ui.listOrganizations(query)}
-            onChange={(slug) => setValues({ slug })}
-          />
-        </Field>
-      </Section>
-    );
+    return <Section>
+      <Field label="Organization" description="Search the organizations in your connected Supabase account.">
+        <Autocomplete
+          name="slug"
+          value={values.slug}
+          placeholder="Search organizations..."
+          loadOptions={query => ui.listOrganizations(query)}
+          onChange={slug => setValues({ slug })}
+        />
+      </Field>
+    </Section>;
   },
-} satisfies ConfiguratorUISpec<
-  SupabaseOrganizationConfiguratorRpc,
-  SupabaseOrganizationConfiguratorValues
->;
+} satisfies ConfiguratorUISpec<SupabaseOrganizationConfiguratorRpc, SupabaseOrganizationConfiguratorValues>;

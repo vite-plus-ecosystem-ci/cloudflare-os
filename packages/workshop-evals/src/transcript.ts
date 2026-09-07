@@ -20,12 +20,9 @@ export function toTranscriptEvents(history: readonly AiChatMessage[]): Transcrip
     if (message.type === "message") {
       // The model receives regular messages from both users and Gadgets; agent-authored
       // ones replay as assistant messages with their tool activity below.
-      const role =
-        message.author.type === "user" || message.author.type === "gadget"
-          ? "user"
-          : message.author.type === "agent"
-            ? "assistant"
-            : undefined;
+      const role = message.author.type === "user" || message.author.type === "gadget"
+        ? "user"
+        : message.author.type === "agent" ? "assistant" : undefined;
       if (role === undefined) continue;
       if (message.message !== "") {
         events.push({ type: "message", role, content: message.message, metadata });
@@ -40,9 +37,9 @@ export function toTranscriptEvents(history: readonly AiChatMessage[]): Transcrip
           name: call.toolName,
           metadata,
         } satisfies TranscriptEvent;
-        events.push(
-          argumentsValue === undefined ? toolCall : { ...toolCall, arguments: argumentsValue },
-        );
+        events.push(argumentsValue === undefined
+          ? toolCall
+          : { ...toolCall, arguments: argumentsValue });
       }
       for (const call of calls) {
         if (call.error !== undefined) {
@@ -72,8 +69,7 @@ export function toTranscriptEvents(history: readonly AiChatMessage[]): Transcrip
       events.push({
         type: "message",
         role: "user",
-        content:
-          `A callback was received: \`self.${message.methodName}()\`\n` +
+        content: `A callback was received: \`self.${message.methodName}()\`\n` +
           `Arguments: ${message.argsSummary}`,
         metadata,
       });

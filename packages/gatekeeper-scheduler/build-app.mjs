@@ -16,11 +16,15 @@ const viteArgs = ["build", "-c", "vite.app.config.ts", ...(watch ? ["--watch"] :
 const viteEntry = resolveBinEntry(packageDirectory, "vite");
 const [command, argv] = viteEntry
   ? [process.execPath, [viteEntry, ...viteArgs]]
-  : pnpmCommand(["exec", "vite", ...viteArgs]);
-execFileSync(command, argv, {
-  cwd: packageDirectory,
-  stdio: "inherit",
-  // Always set explicitly an inherited GATEKEEPER_APP_UNMINIFIED would
-  // turn a production build unminified, and Vite+ would cache that under `build:app`.
-  env: { ...process.env, GATEKEEPER_APP_UNMINIFIED: dev ? "true" : "false" },
-});
+  : pnpmCommand(["exec", "vp", ...viteArgs]);
+execFileSync(
+  command,
+  argv,
+  {
+    cwd: packageDirectory,
+    stdio: "inherit",
+    // Always set explicitly an inherited GATEKEEPER_APP_UNMINIFIED would
+    // turn a production build unminified, and Vite+ would cache that under `build:app`.
+    env: { ...process.env, GATEKEEPER_APP_UNMINIFIED: dev ? "true" : "false" },
+  },
+);

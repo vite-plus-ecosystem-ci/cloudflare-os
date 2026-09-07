@@ -1,8 +1,15 @@
-import { normalizeFrontendErrorReport, type FrontendErrorReportV1 } from "@gadgets/error-reporting";
+import {
+  normalizeFrontendErrorReport,
+  type FrontendErrorReportV1,
+} from "@gadgets/error-reporting";
 import type { ErrorEventV1, ErrorReporter } from "@gadgets/backend-utils/error-reporting";
 import { createLogger } from "@gadgets/backend-utils/logger";
 import type { JWTPayload } from "jose";
-import { accessRateLimitKey, verifyCfAccessJwt, type CfAccessEnv } from "./access.js";
+import {
+  accessRateLimitKey,
+  verifyCfAccessJwt,
+  type CfAccessEnv,
+} from "./access.js";
 
 // The bounded string fields can expand when encoded as UTF-8 or JSON escapes.
 const MAX_BODY_BYTES = 128 * 1024;
@@ -14,11 +21,13 @@ const logger = createLogger<ClientErrorLogFields>({ component: "workshop.client-
 export type ClientErrorEnv = Readonly<{
   FRONTEND_ERROR_REPORTER?: Pick<ErrorReporter, "report">;
   FRONTEND_ERROR_RATE_LIMITER?: Pick<RateLimit, "limit">;
-}> &
-  CfAccessEnv;
+}> & CfAccessEnv;
 
 type WaitUntilContext = Pick<ExecutionContext, "waitUntil">;
-type AccessVerifier = (request: Request, env: CfAccessEnv) => Promise<JWTPayload | null>;
+type AccessVerifier = (
+  request: Request,
+  env: CfAccessEnv,
+) => Promise<JWTPayload | null>;
 
 async function readBoundedJson(request: Request): Promise<unknown | "too-large" | "invalid"> {
   const declaredLength = Number(request.headers.get("content-length"));
@@ -81,11 +90,10 @@ function toReporterEvent(report: FrontendErrorReportV1): ErrorEventV1 {
 
 /** Handles the non-RPC browser-report endpoint. Reporting failures never affect the UI response. */
 export async function handleClientErrorRequest(
-  request: Request,
-  env: ClientErrorEnv,
-  ctx: WaitUntilContext,
-  verifyAccess: AccessVerifier = verifyCfAccessJwt,
-): Promise<Response> {
+    request: Request,
+    env: ClientErrorEnv,
+    ctx: WaitUntilContext,
+    verifyAccess: AccessVerifier = verifyCfAccessJwt): Promise<Response> {
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405, headers: { allow: "POST" } });
   }
@@ -119,8 +127,7 @@ export async function handleClientErrorRequest(
     if (!outcome.success) return new Response(null, { status: 204 });
   } catch (error) {
     logger.debug("frontend error report rate limit failed", {
-      event: "frontend_error_report.rate_limit.failed",
-      error,
+      event: "frontend_error_report.rate_limit.failed", error,
     });
     return new Response(null, { status: 204 });
   }
@@ -133,20 +140,14 @@ export async function handleClientErrorRequest(
 
   try {
     const dispatch = reporter.report(toReporterEvent(report));
-    ctx.waitUntil(
-      dispatch.catch((error) => {
-        logger.debug("frontend error report dispatch failed", {
-          event: "frontend_error_report.dispatch.failed",
-          failureSite: report.failureSite,
-          error,
-        });
-      }),
-    );
+    ctx.waitUntil(dispatch.catch((error) => {
+      logger.debug("frontend error report dispatch failed", {
+        event: "frontend_error_report.dispatch.failed", failureSite: report.failureSite, error,
+      });
+    }));
   } catch (error) {
     logger.debug("frontend error report setup failed", {
-      event: "frontend_error_report.setup.failed",
-      failureSite: report.failureSite,
-      error,
+      event: "frontend_error_report.setup.failed", failureSite: report.failureSite, error,
     });
   }
   return new Response(null, { status: 204 });

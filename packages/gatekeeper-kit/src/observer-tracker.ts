@@ -67,10 +67,7 @@ const OBSERVER_WITHHELD_KEY = "observer-withheld";
 const OBSERVER_WITHHOLD_PREFIX = "observer-withhold:";
 
 const RESERVED_PREFIXES = [
-  OBSERVER_PREFIX,
-  OBSERVER_ATTEMPT_PREFIX,
-  OBSERVER_NONCE_PREFIX,
-  OBSERVER_WITHHOLD_PREFIX,
+  OBSERVER_PREFIX, OBSERVER_ATTEMPT_PREFIX, OBSERVER_NONCE_PREFIX, OBSERVER_WITHHOLD_PREFIX,
   OBSERVER_WITHHELD_KEY,
 ];
 
@@ -177,22 +174,15 @@ export class ObserverTracker<V> {
     this.#setPrefix = options.setPrefix ?? "observed:";
     // The brand is asserted here and nowhere else on this path: whatever the caller's function
     // returns *is* the canonical spelling, by definition of the option.
-    this.#canonicalSetId = (options.canonicalSetId ?? ((setId) => setId)) as (
-      setId: string,
-    ) => CanonicalSetId;
+    this.#canonicalSetId =
+      (options.canonicalSetId ?? (setId => setId)) as (setId: string) => CanonicalSetId;
     // A cap of zero refuses every read, and a window of zero never advances.
     this.#maxTrackedSets = requirePositiveInt(
-      "maxTrackedSets",
-      options.maxTrackedSets ?? DEFAULT_MAX_TRACKED_SETS,
-    );
+      "maxTrackedSets", options.maxTrackedSets ?? DEFAULT_MAX_TRACKED_SETS);
     this.#maxObservers = requirePositiveInt(
-      "maxObservers",
-      options.maxObservers ?? DEFAULT_MAX_OBSERVERS,
-    );
+      "maxObservers", options.maxObservers ?? DEFAULT_MAX_OBSERVERS);
     this.#concurrency = requirePositiveInt(
-      "concurrency",
-      options.concurrency ?? DEFAULT_CONCURRENCY,
-    );
+      "concurrency", options.concurrency ?? DEFAULT_CONCURRENCY);
 
     // Overlapping families scan into each other: set ids would come back as verifier keys, and
     // stored verifiers would be handed to `hasSetAccess` as set ids. An empty prefix overlaps by
@@ -200,8 +190,7 @@ export class ObserverTracker<V> {
     for (const reserved of RESERVED_PREFIXES) {
       if (this.#setPrefix.startsWith(reserved) || reserved.startsWith(this.#setPrefix)) {
         throw new Error(
-          `Set prefix "${this.#setPrefix}" overlaps the reserved prefix "${reserved}".`,
-        );
+          `Set prefix "${this.#setPrefix}" overlaps the reserved prefix "${reserved}".`);
       }
     }
   }
@@ -226,8 +215,7 @@ export class ObserverTracker<V> {
     if (!existing.includes(id) && existing.length >= this.#maxObservers) {
       throw new Error(
         `This binding already answers for ${existing.length} collaborators, the most it can ` +
-          "verify on every read. Remove one before adding another.",
-      );
+        "verify on every read. Remove one before adding another.");
     }
     const attemptKey = `${OBSERVER_ATTEMPT_PREFIX}${id}`;
     const nonceKey = `${OBSERVER_NONCE_PREFIX}${id}`;
@@ -241,7 +229,7 @@ export class ObserverTracker<V> {
 
       const checked = new Set<string>();
       for (;;) {
-        const setIds = this.#trackedSets().filter((setId) => !checked.has(setId));
+        const setIds = this.#trackedSets().filter(setId => !checked.has(setId));
         if (setIds.length === 0) {
           this.#requireCurrentAttempt(id, nonceKey, nonce);
           // Promotion and retirement in one awaitless run: the id is never both, and never neither.
@@ -351,19 +339,20 @@ export class ObserverTracker<V> {
     const { kv, hasSetAccess } = this.#options;
     // Canonicalized up front, so the keys written, the state compared, and the ids the oracle is
     // asked about are all the same spelling.
-    const canonical = [...new Set(setIds.map((setId) => this.#canonicalSetId(setId)))];
+    const canonical = [...new Set(setIds.map(setId => this.#canonicalSetId(setId)))];
     // Both partitions come from one state read per set, before the first await, so the "pending"
     // writes below reflect storage as a concurrent addObserver will scan it.
-    const states = canonical.map((setId) => [setId, this.#state(setId)] as const);
-    const promote = states.filter(([, state]) => state !== "observed").map(([setId]) => setId);
+    const states = canonical.map(setId => [setId, this.#state(setId)] as const);
+    const promote = states
+      .filter(([, state]) => state !== "observed")
+      .map(([setId]) => setId);
     const untracked = states.filter(([, state]) => state === undefined).map(([setId]) => setId);
     if (untracked.length > 0) {
       const tracked = this.#trackedSets().length;
       if (tracked + untracked.length > this.#maxTrackedSets) {
         throw new Error(
           `This binding has read ${tracked} distinct items, the most it can track while remaining ` +
-            "shareable. Bind a narrower scope.",
-        );
+          "shareable. Bind a narrower scope.");
       }
       for (const setId of untracked) kv.put<SetState>(this.#setKey(setId), "pending");
     }
@@ -392,11 +381,9 @@ export class ObserverTracker<V> {
         // disagrees about excludes that observer rather than being read positionally. Excluding
         // rather than throwing keeps one broken verifier from failing the whole read.
         const verdicts = access[observer];
-        return (
-          verdicts === undefined ||
-          verdicts.length !== canonical.length ||
-          canonical.some((_setId, index) => verdicts[index] !== true)
-        );
+        return verdicts === undefined
+          || verdicts.length !== canonical.length
+          || canonical.some((_setId, index) => verdicts[index] !== true);
       })
       .map(([id]) => id);
 
@@ -431,8 +418,8 @@ export class ObserverTracker<V> {
 
   /** @returns Every canonical set ID retained by this tracker. */
   #trackedSets(): CanonicalSetId[] {
-    return [...this.#options.kv.list<unknown>({ prefix: this.#setPrefix })].map(
-      ([key]) => key.slice(this.#setPrefix.length) as CanonicalSetId,
+    return [...this.#options.kv.list<unknown>({ prefix: this.#setPrefix })].map(([key]) =>
+      key.slice(this.#setPrefix.length) as CanonicalSetId,
     );
   }
 

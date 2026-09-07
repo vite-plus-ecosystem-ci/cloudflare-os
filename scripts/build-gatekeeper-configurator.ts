@@ -14,7 +14,7 @@ const quietMode = process.argv.includes("--quiet");
 const devMode = process.argv.includes("--dev");
 const frontendReportingEnabled =
   loadEnv(watchMode || devMode ? "development" : "production", packageDir)
-    .VITE_FRONTEND_ERROR_REPORTING === "true";
+      .VITE_FRONTEND_ERROR_REPORTING === "true";
 const configuratorDir = join(packageDir, "src", "configurator");
 const generatedDir = join(packageDir, "src", "generated");
 const vendorId = basename(packageDir).replace(/^gatekeeper-/, "");
@@ -22,12 +22,12 @@ const sourceBase = `app:///gatekeeper/${vendorId}/configurator`;
 // Function constructor bodies start on line 3 of their synthetic function source.
 const functionBodyLineOffset = 2;
 const exceptionSerializerPath = resolve(
-  import.meta.dirname,
-  "../packages/error-reporting/src/serialize-exception.ts",
-);
+  import.meta.dirname, "../packages/error-reporting/src/serialize-exception.ts");
 
 /** What one pass of {@link buildConfiguratorUIs} produced. */
-type ConfiguratorBuildResult = { ok: false } | { ok: true; total: number; writtenCount: number };
+type ConfiguratorBuildResult =
+  | { ok: false }
+  | { ok: true; total: number; writtenCount: number };
 
 function logInfo(message: string): void {
   if (!quietMode) console.log(message);
@@ -35,7 +35,7 @@ function logInfo(message: string): void {
 
 async function writeFileIfChanged(path: string, contents: string): Promise<boolean> {
   try {
-    if ((await readFile(path, "utf8")) === contents) return false;
+    if (await readFile(path, "utf8") === contents) return false;
   } catch (error) {
     if ((error as NodeJS.ErrnoException | undefined)?.code !== "ENOENT") throw error;
   }
@@ -48,10 +48,7 @@ let exceptionSerializerBundle: string | undefined;
 
 async function getCapnwebBundle(): Promise<string> {
   if (capnwebBundle !== undefined) return capnwebBundle;
-  capnwebBundle = await readFile(
-    join(packageDir, "node_modules", "capnweb", "dist", "index.js"),
-    "utf8",
-  );
+  capnwebBundle = await readFile(join(packageDir, "node_modules", "capnweb", "dist", "index.js"), "utf8");
   return capnwebBundle;
 }
 
@@ -72,10 +69,7 @@ async function createExceptionSerializerImport(): Promise<string> {
 }
 
 async function createConfiguratorHtml(configuratorUIModuleSource: string): Promise<string> {
-  const capnwebBase64 = Buffer.from(
-    `//# sourceURL=${sourceBase}/capnweb.js\n${await getCapnwebBundle()}`,
-    "utf8",
-  ).toString("base64");
+  const capnwebBase64 = Buffer.from(`//# sourceURL=${sourceBase}/capnweb.js\n${await getCapnwebBundle()}`, "utf8").toString("base64");
   const exceptionSerializerImport = frontendReportingEnabled
     ? await createExceptionSerializerImport()
     : "";
@@ -983,14 +977,14 @@ function prepareConfiguratorModule(outputText: string): string {
     .replace(/^import\s+type\s+[^;]+;\s*\n?/gm, blankCode)
     .replace(/^export\s+{};\s*\n?/gm, blankCode)
     .replace(/^\/\/# sourceMappingURL=.*$/gm, blankCode)
-    .replace(/export[\t ]+default[\t ]+/, (match) => "return".padEnd(match.length));
+    .replace(/export[\t ]+default[\t ]+/, match => "return".padEnd(match.length));
 }
 
 async function buildConfiguratorUIs(): Promise<ConfiguratorBuildResult> {
   let configuratorUIs: string[];
   try {
     configuratorUIs = (await readdir(configuratorDir))
-      .filter((name) => name.endsWith(".tsx"))
+      .filter(name => name.endsWith(".tsx"))
       .toSorted();
   } catch (error) {
     if ((error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") return { ok: false };
@@ -1018,7 +1012,7 @@ async function buildConfiguratorUIs(): Promise<ConfiguratorBuildResult> {
     });
     if (diagnostics.diagnostics?.length) {
       const formatted = ts.formatDiagnosticsWithColorAndContext(diagnostics.diagnostics, {
-        getCanonicalFileName: (fileName) => fileName,
+        getCanonicalFileName: fileName => fileName,
         getCurrentDirectory: () => packageDir,
         getNewLine: () => "\n",
       });
@@ -1031,20 +1025,21 @@ async function buildConfiguratorUIs(): Promise<ConfiguratorBuildResult> {
     if (/^\s*import\s/m.test(moduleCode) || /^\s*export\s+.*\sfrom\s/m.test(moduleCode)) {
       throw new Error(
         `${configuratorUI} generated unsupported import or re-export statements. ` +
-          `Configurator UI modules must be self-contained after generation.`,
-      );
+        `Configurator UI modules must be self-contained after generation.`);
     }
 
     const sourceMapReference = frontendReportingEnabled
       ? `\n//# sourceMappingURL=${sourceBase}/${moduleName}.js.map`
       : "";
-    const configuratorUIModuleSource = `${moduleCode}\n//# sourceURL=${sourceBase}/${moduleName}.js${sourceMapReference}`;
+    const configuratorUIModuleSource =
+      `${moduleCode}\n//# sourceURL=${sourceBase}/${moduleName}.js${sourceMapReference}`;
     const outputPath = join(generatedDir, outputName);
     const html = await createConfiguratorHtml(configuratorUIModuleSource);
     const artifactPath = join(generatedDir, `${moduleName}.js`);
     const mapPath = join(generatedDir, `${moduleName}.js.map`);
     if (frontendReportingEnabled && diagnostics.sourceMapText) {
-      const artifactContent = `${"\n".repeat(functionBodyLineOffset)}${configuratorUIModuleSource}\n`;
+      const artifactContent =
+        `${"\n".repeat(functionBodyLineOffset)}${configuratorUIModuleSource}\n`;
       await writeFileIfChanged(artifactPath, artifactContent);
       const sourceMap = JSON.parse(diagnostics.sourceMapText);
       sourceMap.file = `${moduleName}.js`;
@@ -1070,13 +1065,9 @@ const initial = await buildConfiguratorUIs();
 if (!initial.ok) process.exit(0);
 
 if (initial.writtenCount > 0) {
-  console.log(
-    `generated ${initial.writtenCount} configurator UI module${initial.writtenCount === 1 ? "" : "s"}: ${packageDir}`,
-  );
+  console.log(`generated ${initial.writtenCount} configurator UI module${initial.writtenCount === 1 ? "" : "s"}: ${packageDir}`);
 } else {
-  logInfo(
-    `configurator UI up-to-date (${initial.total} module${initial.total === 1 ? "" : "s"}): ${packageDir}`,
-  );
+  logInfo(`configurator UI up-to-date (${initial.total} module${initial.total === 1 ? "" : "s"}): ${packageDir}`);
 }
 
 if (!watchMode) process.exit(0);
@@ -1085,18 +1076,14 @@ let timer: NodeJS.Timeout | undefined;
 watch(configuratorDir, { persistent: true }, () => {
   clearTimeout(timer);
   timer = setTimeout(() => {
-    buildConfiguratorUIs()
-      .then((result) => {
-        if (result.ok && result.writtenCount > 0) {
-          console.log(
-            `generated ${result.writtenCount} configurator UI module${result.writtenCount === 1 ? "" : "s"}: ${packageDir}`,
-          );
-        }
-      })
-      .catch((error) => {
-        console.error(`failed to generate configurator UI modules: ${packageDir}`);
-        console.error(error);
-      });
+    buildConfiguratorUIs().then(result => {
+      if (result.ok && result.writtenCount > 0) {
+        console.log(`generated ${result.writtenCount} configurator UI module${result.writtenCount === 1 ? "" : "s"}: ${packageDir}`);
+      }
+    }).catch(error => {
+      console.error(`failed to generate configurator UI modules: ${packageDir}`);
+      console.error(error);
+    });
   }, 50);
 });
 

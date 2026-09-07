@@ -16,21 +16,16 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return (
-      <Section>
-        <Field
-          label="Playlist"
-          description="Search your playlists, or paste a Spotify playlist URL or link."
-        >
-          <Autocomplete
-            name="playlistId"
-            value={values.playlistId}
-            placeholder="Search playlists or paste a URL..."
-            loadOptions={(query) => ui.listPlaylists(query)}
-            onChange={(playlistId) => setValues({ playlistId })}
-          />
-        </Field>
-      </Section>
-    );
+    return <Section>
+      <Field label="Playlist" description="Search your playlists, or paste a Spotify playlist URL or link.">
+        <Autocomplete
+          name="playlistId"
+          value={values.playlistId}
+          placeholder="Search playlists or paste a URL..."
+          loadOptions={query => ui.listPlaylists(query)}
+          onChange={playlistId => setValues({ playlistId })}
+        />
+      </Field>
+    </Section>;
   },
 } satisfies ConfiguratorUISpec<SpotifyPlaylistConfiguratorRpc, SpotifyPlaylistConfiguratorValues>;

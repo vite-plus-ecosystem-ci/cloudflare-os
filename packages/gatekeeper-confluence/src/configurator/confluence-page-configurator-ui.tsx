@@ -20,21 +20,19 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return (
-      <Section>
-        <Field
-          label="Page or blog post"
-          description="Search the pages and blog posts shared with this connection, or paste a Confluence URL."
-        >
-          <Autocomplete
-            name="pageUrl"
-            value={values.pageUrl}
-            placeholder="Search Confluence..."
-            loadOptions={(query) => ui.listPages(query)}
-            onChange={(pageUrl) => setValues({ pageUrl })}
-          />
-        </Field>
-      </Section>
-    );
+    return <Section>
+      <Field
+        label="Page or blog post"
+        description="Search the pages and blog posts shared with this connection, or paste a Confluence URL."
+      >
+        <Autocomplete
+          name="pageUrl"
+          value={values.pageUrl}
+          placeholder="Search Confluence..."
+          loadOptions={query => ui.listPages(query)}
+          onChange={pageUrl => setValues({ pageUrl })}
+        />
+      </Field>
+    </Section>;
   },
 } satisfies ConfiguratorUISpec<ConfluencePageConfiguratorRpc, ConfluencePageConfiguratorValues>;

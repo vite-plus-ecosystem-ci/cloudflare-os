@@ -5,10 +5,7 @@ export { ContextCollectionDurableObject } from "./context-collection.js";
 export { UserLibraryDurableObject } from "./user-library.js";
 export { LibraryRegistryDurableObject } from "./registry-do.js";
 export {
-  GatekeeperVendor,
-  ContextAccount,
-  ContextVerifier,
-  ContextGatekeeper,
+  GatekeeperVendor, ContextAccount, ContextVerifier, ContextGatekeeper,
 } from "./library-gatekeeper.js";
 
 /** Keep ES Module worker format; this worker is used over RPC/DOs, not HTTP. */

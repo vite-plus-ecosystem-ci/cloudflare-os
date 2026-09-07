@@ -25,39 +25,27 @@ describe("pnpmCommand", () => {
   it("passes arguments through untouched, including one containing a space", () => {
     const configPath = "C:\\Users\\Some Name\\cloudflare-os\\wrangler.jsonc";
     const [, args] = pnpmCommand(
-      ["exec", "wrangler", "dev", "-c", configPath],
-      { npm_execpath: PNPM_MJS },
-      "win32",
-    );
+        ["exec", "wrangler", "dev", "-c", configPath], { npm_execpath: PNPM_MJS }, "win32");
     assert.deepEqual(args, [PNPM_MJS, "exec", "wrangler", "dev", "-c", configPath]);
   });
 
   // Substituting this unchecked would run `npm install` against a pnpm workspace.
   it("rejects npm's CLI rather than using the wrong package manager", () => {
-    assert.deepEqual(pnpmCommand(["install"], { npm_execpath: NPM_CLI }, "win32"), [
-      "pnpm",
-      ["install"],
-    ]);
+    assert.deepEqual(
+        pnpmCommand(["install"], { npm_execpath: NPM_CLI }, "win32"), ["pnpm", ["install"]]);
   });
 
   // A direct `node scripts/run-local.ts` has no pnpm ancestor to inherit the variable from. Nothing
   // can be substituted, so the call keeps whatever behaviour it has today.
   it("falls back to bare pnpm when npm_execpath is absent or empty", () => {
     assert.deepEqual(pnpmCommand(["install"], {}, "win32"), ["pnpm", ["install"]]);
-    assert.deepEqual(pnpmCommand(["install"], { npm_execpath: "" }, "win32"), [
-      "pnpm",
-      ["install"],
-    ]);
+    assert.deepEqual(pnpmCommand(["install"], { npm_execpath: "" }, "win32"), ["pnpm", ["install"]]);
   });
 
   it("leaves other platforms exactly as they were", () => {
-    assert.deepEqual(pnpmCommand(["install"], { npm_execpath: PNPM_MJS }, "linux"), [
-      "pnpm",
-      ["install"],
-    ]);
-    assert.deepEqual(pnpmCommand(["install"], { npm_execpath: PNPM_MJS }, "darwin"), [
-      "pnpm",
-      ["install"],
-    ]);
+    assert.deepEqual(
+        pnpmCommand(["install"], { npm_execpath: PNPM_MJS }, "linux"), ["pnpm", ["install"]]);
+    assert.deepEqual(
+        pnpmCommand(["install"], { npm_execpath: PNPM_MJS }, "darwin"), ["pnpm", ["install"]]);
   });
 });

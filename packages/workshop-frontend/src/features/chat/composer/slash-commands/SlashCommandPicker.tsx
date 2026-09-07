@@ -1,24 +1,15 @@
 import { RpcStub } from "capnweb";
 import { createPortal } from "react-dom";
 import {
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type RefObject,
-  type SetStateAction,
+  useCallback, useEffect, useId, useLayoutEffect, useRef, useState,
+  type RefObject, type SetStateAction,
 } from "react";
 import type { Overseer, SlashCommandChoice } from "@gadgets/workshop-shared/api";
 import { ArrowsInIcon, CaretRightIcon, ScrollIcon } from "@phosphor-icons/react";
 import { PICKER_EMPTY, TabHint } from "../../../../components/pickerRows";
 import {
-  exactSlashCommandMatches,
-  filterSlashCommandCatalog,
-  parseSlashCommandInput,
-  slashCommandTokenKey,
-  type ParsedSlashCommandInput,
+  exactSlashCommandMatches, filterSlashCommandCatalog, parseSlashCommandInput,
+  slashCommandTokenKey, type ParsedSlashCommandInput,
 } from "./slashCommandInput";
 import {
   invalidateSlashCommandCatalog,
@@ -40,7 +31,10 @@ function computePopupLayout(anchor: HTMLElement): SlashCommandPopupLayout {
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   const width = Math.min(rect.width, viewportWidth - popup.margin * 2);
-  const left = Math.min(Math.max(rect.left, popup.margin), viewportWidth - width - popup.margin);
+  const left = Math.min(
+    Math.max(rect.left, popup.margin),
+    viewportWidth - width - popup.margin,
+  );
   const spaceAbove = rect.top - popup.margin - popup.gap;
   const spaceBelow = viewportHeight - rect.bottom - popup.margin - popup.gap;
   const openBelow = spaceBelow >= popup.minHeight || spaceBelow > spaceAbove;
@@ -93,26 +87,25 @@ export function useSlashCommandPicker({
   const popupRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
-  const offerable = useCallback(
-    (catalog: SlashCommandChoice[]) =>
-      chatExists ? catalog : catalog.filter((choice) => choice.selection.builtin !== true),
-    [chatExists],
-  );
+  const offerable = useCallback((catalog: SlashCommandChoice[]) =>
+      chatExists ? catalog : catalog.filter(choice => choice.selection.builtin !== true),
+    [chatExists]);
 
-  const parsed =
-    selectedCommand || disabled ? null : parseSlashCommandInput(inputValue, cursorPosition);
+  const parsed = selectedCommand || disabled
+    ? null
+    : parseSlashCommandInput(inputValue, cursorPosition);
   const activeToken = parsed ? slashCommandTokenKey(inputValue, cursorPosition) : null;
   const open = parsed !== null && dismissedToken !== activeToken;
   const query = parsed?.query ?? "";
   const selectable = choicesQuery === query && !loading && error === null;
-  const exactMatches =
-    parsed && selectable
-      ? exactSlashCommandMatches(offerable(catalogRef.current ?? choices), parsed)
-      : [];
+  const exactMatches = parsed && selectable
+    ? exactSlashCommandMatches(offerable(catalogRef.current ?? choices), parsed)
+    : [];
   const exactIndex = exactMatches.length === 1 ? choices.indexOf(exactMatches[0]) : -1;
   const requiresExplicitChoice = exactMatches.length > 1;
-  const activeChoice =
-    !requiresExplicitChoice || explicitChoiceToken === activeToken ? choices[index] : undefined;
+  const activeChoice = !requiresExplicitChoice || explicitChoiceToken === activeToken
+    ? choices[index]
+    : undefined;
   const selectIndex = (next: SetStateAction<number>) => {
     setIndex(next);
     setExplicitChoiceToken(activeToken);
@@ -134,27 +127,21 @@ export function useSlashCommandPicker({
     return catalog;
   }, [getOverseer]);
 
-  const select = useCallback(
-    (choice: SlashCommandChoice) => {
-      const current = parseSlashCommandInput(inputValue, cursorPosition);
-      if (!current) return;
-      onSelect(choice, current.tokenStart, current.tokenEnd);
-      setChoices([]);
-      setChoicesQuery(null);
-      setDismissedToken(null);
-    },
-    [cursorPosition, inputValue, onSelect],
-  );
+  const select = useCallback((choice: SlashCommandChoice) => {
+    const current = parseSlashCommandInput(inputValue, cursorPosition);
+    if (!current) return;
+    onSelect(choice, current.tokenStart, current.tokenEnd);
+    setChoices([]);
+    setChoicesQuery(null);
+    setDismissedToken(null);
+  }, [cursorPosition, inputValue, onSelect]);
 
   useEffect(() => setExplicitChoiceToken(null), [activeToken]);
 
-  const resolveExact = useCallback(
-    async (current: ParsedSlashCommandInput) => {
-      const matches = exactSlashCommandMatches(offerable(await loadCatalog()), current);
-      return matches.length === 1 ? matches[0] : null;
-    },
-    [loadCatalog, offerable],
-  );
+  const resolveExact = useCallback(async (current: ParsedSlashCommandInput) => {
+    const matches = exactSlashCommandMatches(offerable(await loadCatalog()), current);
+    return matches.length === 1 ? matches[0] : null;
+  }, [loadCatalog, offerable]);
 
   const invalidateCatalog = useCallback(() => {
     catalogRef.current = null;
@@ -215,8 +202,7 @@ export function useSlashCommandPicker({
   }, [anchorRef, choices.length, error, loading, open]);
 
   useEffect(() => {
-    listRef.current
-      ?.querySelector<HTMLElement>(`[data-index="${index}"]`)
+    listRef.current?.querySelector<HTMLElement>(`[data-index="${index}"]`)
       ?.scrollIntoView({ block: "nearest" });
   }, [index]);
 
@@ -232,83 +218,74 @@ export function useSlashCommandPicker({
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [activeToken, anchorRef, open]);
 
-  const popup =
-    open && layout
-      ? createPortal(
-          <div
-            ref={popupRef}
-            className="themed-floating-shadow-lg fixed z-[1000] flex flex-col overflow-hidden rounded-2xl border border-kumo-line/70 bg-kumo-base"
-            style={layout}
-          >
-            <div
-              ref={listRef}
-              id={listboxId}
-              role="listbox"
-              aria-label="Slash commands"
-              aria-busy={loading}
-              className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-2"
+  const popup = open && layout ? createPortal(
+    <div
+      ref={popupRef}
+      className="themed-floating-shadow-lg fixed z-[1000] flex flex-col overflow-hidden rounded-2xl border border-kumo-line/70 bg-kumo-base"
+      style={layout}
+    >
+      <div
+        ref={listRef}
+        id={listboxId}
+        role="listbox"
+        aria-label="Slash commands"
+        aria-busy={loading}
+        className="sidebar-scroll min-h-0 flex-1 overflow-y-auto p-2"
+      >
+        {error ? (
+          <p className={PICKER_EMPTY}>{`Couldn’t load commands. ${error}`}</p>
+        ) : loading && choices.length === 0 ? (
+          <p className={PICKER_EMPTY}>Loading commands…</p>
+        ) : choices.length > 0 ? (
+          choices.map((choice, optionIndex) => (
+            <button
+              key={slashCommandKey(choice.selection)}
+              id={`${listboxId}-option-${optionIndex}`}
+              data-index={optionIndex}
+              type="button"
+              role="option"
+              aria-selected={optionIndex === index && activeChoice !== undefined}
+              disabled={!selectable}
+              title={[
+                `/${choice.name}`,
+                choice.description,
+                [choice.providerLabel, choice.resourceLabel].filter(Boolean).join(" · "),
+              ].join("\n")}
+              className={`grid w-full cursor-pointer grid-cols-[auto_fit-content(35%)_auto_minmax(0,1fr)_fit-content(30%)_auto] items-center gap-x-2 rounded-lg px-3 py-2.5 text-left transition-colors disabled:cursor-wait disabled:opacity-60 ${optionIndex === index ? "bg-kumo-tint text-kumo-strong" : "text-kumo-default hover:bg-kumo-tint/70"}`}
+              onMouseMove={() => setIndex(optionIndex)}
+              onClick={() => select(choice)}
             >
-              {error ? (
-                <p className={PICKER_EMPTY}>{`Couldn’t load commands. ${error}`}</p>
-              ) : loading && choices.length === 0 ? (
-                <p className={PICKER_EMPTY}>Loading commands…</p>
-              ) : choices.length > 0 ? (
-                choices.map((choice, optionIndex) => (
-                  <button
-                    key={slashCommandKey(choice.selection)}
-                    id={`${listboxId}-option-${optionIndex}`}
-                    data-index={optionIndex}
-                    type="button"
-                    role="option"
-                    aria-selected={optionIndex === index && activeChoice !== undefined}
-                    disabled={!selectable}
-                    title={[
-                      `/${choice.name}`,
-                      choice.description,
-                      [choice.providerLabel, choice.resourceLabel].filter(Boolean).join(" · "),
-                    ].join("\n")}
-                    className={`grid w-full cursor-pointer grid-cols-[auto_fit-content(35%)_auto_minmax(0,1fr)_fit-content(30%)_auto] items-center gap-x-2 rounded-lg px-3 py-2.5 text-left transition-colors disabled:cursor-wait disabled:opacity-60 ${optionIndex === index ? "bg-kumo-tint text-kumo-strong" : "text-kumo-default hover:bg-kumo-tint/70"}`}
-                    onMouseMove={() => setIndex(optionIndex)}
-                    onClick={() => select(choice)}
-                  >
-                    {choice.selection.builtin === true &&
-                    choice.selection.commandId === "compact" ? (
-                      <ArrowsInIcon size={16} className="mr-1 shrink-0" />
-                    ) : (
-                      <ScrollIcon size={16} className="mr-1 shrink-0" />
-                    )}
-                    <span className="min-w-0 truncate">{choice.name}</span>
-                    <CaretRightIcon
-                      size={11}
-                      aria-hidden="true"
-                      className="shrink-0 text-kumo-inactive"
-                    />
-                    <span className="min-w-0 truncate text-kumo-subtle">{choice.description}</span>
-                    <span className="min-w-0 truncate text-[11.5px] text-kumo-inactive">
-                      {[choice.providerLabel, choice.resourceLabel].filter(Boolean).join(" · ")}
-                    </span>
-                    {optionIndex === index && selectable && (
-                      <span className="ml-1">
-                        <TabHint />
-                      </span>
-                    )}
-                  </button>
-                ))
-              ) : (
-                <p className={PICKER_EMPTY}>
-                  {query ? "No commands match your search." : "No commands are available."}
-                </p>
+              {choice.selection.builtin === true && choice.selection.commandId === "compact"
+                ? <ArrowsInIcon size={16} className="mr-1 shrink-0" />
+                : <ScrollIcon size={16} className="mr-1 shrink-0" />}
+              <span className="min-w-0 truncate">{choice.name}</span>
+              <CaretRightIcon size={11} aria-hidden="true" className="shrink-0 text-kumo-inactive" />
+              <span className="min-w-0 truncate text-kumo-subtle">{choice.description}</span>
+              <span className="min-w-0 truncate text-[11.5px] text-kumo-inactive">
+                {[choice.providerLabel, choice.resourceLabel].filter(Boolean).join(" · ")}
+              </span>
+              {optionIndex === index && selectable && (
+                <span className="ml-1">
+                  <TabHint />
+                </span>
               )}
-            </div>
-          </div>,
-          document.body,
-        )
-      : null;
+            </button>
+          ))
+        ) : (
+          <p className={PICKER_EMPTY}>
+            {query ? "No commands match your search." : "No commands are available."}
+          </p>
+        )}
+      </div>
+    </div>,
+    document.body,
+  ) : null;
 
   return {
     activeChoice,
-    activeDescendant:
-      open && selectable && activeChoice ? `${listboxId}-option-${index}` : undefined,
+    activeDescendant: open && selectable && activeChoice
+      ? `${listboxId}-option-${index}`
+      : undefined,
     choices,
     dismiss: () => setDismissedToken(activeToken),
     invalidateCatalog,

@@ -43,7 +43,7 @@ The escape hatch is structural. A gatekeeper that outgrows the assembly implemen
 `workshop-shared/gatekeeper` interfaces by hand and keeps using whatever leaf modules still fit;
 `packages/mcp-shared` already proves the two styles coexist in one repo.
 
-Provider _policy_ and shared _sequencing_ are deliberately separated. The kit never decides what a
+Provider *policy* and shared *sequencing* are deliberately separated. The kit never decides what a
 provider error means or which scopes to request; it does own the order of operations — nonce
 transitions, callback handoff, rollback when `complete()` fails, refresh coalescing, and the
 races between connect, refresh, and revoke. Today that sequencing exists in at least three
@@ -74,18 +74,18 @@ ironclad's generation counter in the internal repo), which is how sequencing bug
 
 ## 2. Background: relevant existing code
 
-| Concern                                                      | Location                                                                                                                                                                    |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Canonical gatekeeper RPC contract                            | `packages/workshop-shared/src/gatekeeper.ts` (`GatekeeperVendor` :445, `GatekeeperUser` :567, `Gatekeeper` :698, `ApprovalQueue` :934)                                      |
-| Reference OAuth boilerplate (the duplication)                | `packages/gatekeeper-supabase/src/supabase.ts:267-672`, `packages/gatekeeper-github/src/github.ts:931-1333`                                                                 |
-| Shared-base precedent (symbol hooks, undecorated bases)      | `packages/mcp-shared/src/user.ts:30-38`, `src/facet.ts`, `src/account.ts`, `src/http.ts`                                                                                    |
-| Facet instantiation via `ctx.facets`, props-complete classes | `packages/workshop-backend/src/overseer.ts` (`addGatekeeper`), `user.ts:1666-1691` (policy chokepoint)                                                                      |
-| Build-time RPC validation                                    | `capnweb-validate` (`wrangler.jsonc` build command in every gatekeeper; vite plugin in workerd test configs)                                                                |
-| workerd test harness + facet access from tests               | `packages/gatekeeper-cloudflare/vitest.worker.config.ts`, its `__tests__/` `TestHooks` DO                                                                                   |
-| `ctx.exports` typing                                         | generated `worker-configuration.d.ts` `Cloudflare.GlobalProps` (e.g. `packages/gatekeeper-supabase/worker-configuration.d.ts:6-12`, `packages/gatekeeper-mcp/src/env.d.ts`) |
-| Cursor implementations to generalize                         | `packages/gatekeeper-github/src/github.ts:809-929`                                                                                                                          |
-| Existing simulation shapes (design inputs)                   | `packages/gatekeeper-homeassistant/src/simulation.ts`, `packages/gatekeeper-confluence/src/confluence-actions.ts`, `packages/gatekeeper-notion/src/notion-actions.ts`       |
-| Agent-facing authoring guide to rewrite                      | `.agents/skills/write-gatekeeper/SKILL.md`, `SKELETON.md`                                                                                                                   |
+| Concern | Location |
+|---|---|
+| Canonical gatekeeper RPC contract | `packages/workshop-shared/src/gatekeeper.ts` (`GatekeeperVendor` :445, `GatekeeperUser` :567, `Gatekeeper` :698, `ApprovalQueue` :934) |
+| Reference OAuth boilerplate (the duplication) | `packages/gatekeeper-supabase/src/supabase.ts:267-672`, `packages/gatekeeper-github/src/github.ts:931-1333` |
+| Shared-base precedent (symbol hooks, undecorated bases) | `packages/mcp-shared/src/user.ts:30-38`, `src/facet.ts`, `src/account.ts`, `src/http.ts` |
+| Facet instantiation via `ctx.facets`, props-complete classes | `packages/workshop-backend/src/overseer.ts` (`addGatekeeper`), `user.ts:1666-1691` (policy chokepoint) |
+| Build-time RPC validation | `capnweb-validate` (`wrangler.jsonc` build command in every gatekeeper; vite plugin in workerd test configs) |
+| workerd test harness + facet access from tests | `packages/gatekeeper-cloudflare/vitest.worker.config.ts`, its `__tests__/` `TestHooks` DO |
+| `ctx.exports` typing | generated `worker-configuration.d.ts` `Cloudflare.GlobalProps` (e.g. `packages/gatekeeper-supabase/worker-configuration.d.ts:6-12`, `packages/gatekeeper-mcp/src/env.d.ts`) |
+| Cursor implementations to generalize | `packages/gatekeeper-github/src/github.ts:809-929` |
+| Existing simulation shapes (design inputs) | `packages/gatekeeper-homeassistant/src/simulation.ts`, `packages/gatekeeper-confluence/src/confluence-actions.ts`, `packages/gatekeeper-notion/src/notion-actions.ts` |
+| Agent-facing authoring guide to rewrite | `.agents/skills/write-gatekeeper/SKILL.md`, `SKELETON.md` |
 
 ## 3. Concepts & terminology
 
@@ -138,14 +138,10 @@ export const OAUTH_NONCE_LIFETIME_MS = 10 * 60 * 1000;
 export const CONNECT_TIMEOUT_MS = 60 * 60 * 1000;
 export const ACCESS_TOKEN_SAFETY_MS = 60 * 1000;
 export function hexEncode(bytes: Uint8Array): string;
-export function generateNonce(): string; // hex over crypto.getRandomValues
-export function constantTimeEqual(a: string, b: string): boolean; // crypto.subtle.timingSafeEqual
+export function generateNonce(): string;                       // hex over crypto.getRandomValues
+export function constantTimeEqual(a: string, b: string): boolean;  // crypto.subtle.timingSafeEqual
 export type TimedNonce = { value: string; expiresAt: number };
-export function isLiveNonce(
-  stored: TimedNonce | undefined,
-  presented: string,
-  now: number,
-): boolean;
+export function isLiveNonce(stored: TimedNonce | undefined, presented: string, now: number): boolean;
 ```
 
 `constantTimeEqual` uses the native `crypto.subtle.timingSafeEqual` after an encoded-length check
@@ -165,23 +161,15 @@ The two-stage connect nonce machine that every OAuth gatekeeper currently re-imp
 `isLiveNonce` or only the constants.
 
 ```ts
-export const NONCE_KEY = "nonce"; // unchanged from every current gatekeeper
+export const NONCE_KEY = "nonce";               // unchanged from every current gatekeeper
 export type ConnectStage = "initiation" | "oauth";
-export type StoredNonce<Extra extends object = Record<never, never>> = TimedNonce & {
-  stage: ConnectStage;
-} & Extra;
+export type StoredNonce<Extra extends object = Record<never, never>> =
+  TimedNonce & { stage: ConnectStage } & Extra;
 export function putInitiation(kv, initiationNonce: string, now: number): void;
 export function advanceToOAuth<Extra extends object>(
-  kv,
-  initiationNonce: string,
-  now: number,
-  extra?: Extra & NonceExtra,
-): string | null;
+  kv, initiationNonce: string, now: number, extra?: Extra & NonceExtra): string | null;
 export function claimOAuth<Extra extends object>(
-  kv,
-  oauthNonce: string,
-  now: number,
-): StoredNonce<Extra> | null;
+  kv, oauthNonce: string, now: number): StoredNonce<Extra> | null;
 ```
 
 `advanceToOAuth` verifies the initiation nonce (constant time, TTL, stage) and mints the OAuth-stage
@@ -207,7 +195,7 @@ Connect pages open in their own tab and are never framed (the srcDoc-framed surf
 app UIs, a different module entirely), a connect URL carries a nonce that must not leak via
 `Referer`, and an error page
 interpolating provider text must not have that text sniffed into another content type. `no-store`
-is there because the URL's path segment _is_ the bearer capability and the page may echo account
+is there because the URL's path segment *is* the bearer capability and the page may echo account
 identifiers, so a shared cache holding either turns a one-shot link into a readable artifact; the
 Marketo branch sets it (`connect-ui.ts:32-40`) and every OAuth gatekeeper in this repo omits it.
 They belong on the helper rather than each call site for the same reason `PAGE_STYLE` does: a
@@ -246,18 +234,14 @@ never the deployment's admin-chosen accent. Vendor-specific wording stays in the
 ```ts
 const NOT_CONFIGURED_HTML = errorPageHtml(
   "Supabase Gatekeeper Not Configured",
-  "Please configure a Supabase OAuth app client ID and secret for this gatekeeper.",
-);
+  "Please configure a Supabase OAuth app client ID and secret for this gatekeeper.");
 ```
 
 ### 4.4 `./credential-expiry`
 
 ```ts
 export async function notifyCredentialsExpiredOnce(
-  kv,
-  callback: Fetcher<GatekeeperConnectCallback> | undefined,
-  vendorId: string,
-): Promise<void>;
+  kv, callback: Fetcher<GatekeeperConnectCallback> | undefined, vendorId: string): Promise<void>;
 export function clearCredentialExpiryLatch(kv): void;
 ```
 
@@ -265,7 +249,7 @@ export function clearCredentialExpiryLatch(kv): void;
 reconnect" message, which a broken stored callback must not replace with an RPC error). It marks
 the latch **only after** `callback.credentialsExpired()` resolves — and only if no reconnect re-armed
 it meanwhile, which would otherwise silence the new credentials' first expiry. Concurrent callers
-dedupe onto one in-flight notification _per arm_, so a caller arriving after a re-arm gets its own
+dedupe onto one in-flight notification *per arm*, so a caller arriving after a re-arm gets its own
 notification rather than the one already awaiting a callback for the credentials just replaced. That
 entry is released by the caller that installed it, never by the notification itself: a stub that
 throws before returning a promise settles inside the frame that started it, and a release attempted
@@ -317,65 +301,58 @@ export class CredentialsExpiredError extends Error {
   constructor(message: string, opts?: { cause?: unknown });
 }
 
-export class CredentialCoordinator<Creds> {
-  // lives in the UserAccount DO
-  constructor(
-    kv,
-    opts: {
-      // keys are fixed: "credentials", plus ":identity" and
-      expiresAt?(c: Creds): number | undefined; // finite or absent; ":migrated" beside it
-      refreshSkewMs?: number; // default ACCESS_TOKEN_SAFETY_MS
-      legacyKeys?: readonly string[]; // every key the pre-kit layout owns; reaped after the
-      // canonical record exists and again by clear(), so the
-      // reap is idempotent and a failed delete is retried
-      upgrade?(kv: Pick<CredentialsKv, "get">):
-        // lazy legacy-key migration, READS ONLY:
-        Creds | undefined; // reassembles the grant those keys hold. Retired by
-      // clear(), so a clear() (or a restart after one) cannot
-      // resurrect a grant since replaced or revoked
-    },
-  );
-  stored(): Creds | undefined; // mints an identity for a record that predates them, so credentials
-  // and a fence are always surfaced together
-  connect(creds: Creds): void; // a (re)connect's install: rotates the connection generation, THEN
-  // commits (identity rotation + record write). Refresh commits
-  // internally through fresh()/rotate(); there is no public commit
-  clear(): void; // retires the migration, rotates the identity and the connection
-  // generation (rather than deleting them), THEN drops the record
-  identity(): string; // random per write; opaque, equality only — a counter is reset by the
-  // deleteAll() in revoke()/alarm(), which would reissue a fence value
-  // from the revoked grant. "" = never surfaced, and never a fence
+export class CredentialCoordinator<Creds> {                  // lives in the UserAccount DO
+  constructor(kv, opts: {                // keys are fixed: "credentials", plus ":identity" and
+    expiresAt?(c: Creds): number | undefined;      // finite or absent; ":migrated" beside it
+    refreshSkewMs?: number;              // default ACCESS_TOKEN_SAFETY_MS
+    legacyKeys?: readonly string[];      // every key the pre-kit layout owns; reaped after the
+                                         // canonical record exists and again by clear(), so the
+                                         // reap is idempotent and a failed delete is retried
+    upgrade?(kv: Pick<CredentialsKv, "get">):          // lazy legacy-key migration, READS ONLY:
+      Creds | undefined;                 // reassembles the grant those keys hold. Retired by
+                                         // clear(), so a clear() (or a restart after one) cannot
+                                         // resurrect a grant since replaced or revoked
+  });
+  stored(): Creds | undefined;   // mints an identity for a record that predates them, so credentials
+                                 // and a fence are always surfaced together
+  connect(creds: Creds): void;   // a (re)connect's install: rotates the connection generation, THEN
+                                 // commits (identity rotation + record write). Refresh commits
+                                 // internally through fresh()/rotate(); there is no public commit
+  clear(): void;                 // retires the migration, rotates the identity and the connection
+                                 // generation (rather than deleting them), THEN drops the record
+  identity(): string;            // random per write; opaque, equality only — a counter is reset by the
+                                 // deleteAll() in revoke()/alarm(), which would reissue a fence value
+                                 // from the revoked grant. "" = never surfaced, and never a fence
   connectionGeneration(): string; // survives refresh, rotated by connect()/clear(); the cache
-  // authority (§4.10) and the account half of the action fence (§4.8).
-  // Minted on first read, never ""
+                                 // authority (§4.10) and the account half of the action fence (§4.8).
+                                 // Minted on first read, never ""
   fresh(refresh: (current: Creds) => Promise<Creds>): Promise<Creds>;
-  rotate(refresh: (current: Creds) => Promise<Creds>): Promise<Creds>; // refreshes now, whatever
-  // the recorded expiry says: the provider rejected an unexpired
-  // credential, and it is the only authority that matters
+  rotate(refresh: (current: Creds) => Promise<Creds>): Promise<Creds>;   // refreshes now, whatever
+                                 // the recorded expiry says: the provider rejected an unexpired
+                                 // credential, and it is the only authority that matters
 }
 
-export class CredentialSource<Creds> {
-  // held by User entrypoint / facet / verifier
+export class CredentialSource<Creds> {          // held by User entrypoint / facet / verifier
   constructor(opts: {
-    account: () => AccountCredentialStub<Creds>; // { getCredentials(): Promise<{ creds, identity, generation }>; noteCredentialsExpired(identity) }
-    isAuthError(e: unknown): boolean; // grant death only, never a per-resource denial
+    account: () => AccountCredentialStub<Creds>;   // { getCredentials(): Promise<{ creds, identity, generation }>; noteCredentialsExpired(identity) }
+    isAuthError(e: unknown): boolean;              // grant death only, never a per-resource denial
     expiredMessage: string;
-    vendorId?: string; // log attribution
+    vendorId?: string;                             // log attribution
   });
-  get(): Promise<Creds>; // reads the account; concurrent reads coalesce onto one round trip
-  run<T>(fn: (creds: Creds) => Promise<T>): Promise<T>; // hands the call its creds, captures their
-  // identity; an auth failure under an identity a refetch has since
-  // superseded with a live successor is stale — rethrown as retry,
-  // not reported as expiry. No live successor, no retry: a mismatch
-  // alone can mean the read was fenced out, and its failure reports
-  authority(): string | undefined; // the connection generation of the last fetch, synchronously —
-  // named for its facet-side cache-authority role, wired through
-  // KvTtlCache.partitionedBy (§4.10). undefined before the first
-  // fetch, and from a reported expiry until a fetch started after
-  // the report adopts an undead identity: partition unknown, so a
-  // cache keyed on it bypasses rather than serves. Last-seen and
-  // shared — never the action-fence capture, which rides the
-  // generation of its own fetch
+  get(): Promise<Creds>;       // reads the account; concurrent reads coalesce onto one round trip
+  run<T>(fn: (creds: Creds) => Promise<T>): Promise<T>;   // hands the call its creds, captures their
+                                 // identity; an auth failure under an identity a refetch has since
+                                 // superseded with a live successor is stale — rethrown as retry,
+                                 // not reported as expiry. No live successor, no retry: a mismatch
+                                 // alone can mean the read was fenced out, and its failure reports
+  authority(): string | undefined;  // the connection generation of the last fetch, synchronously —
+                                 // named for its facet-side cache-authority role, wired through
+                                 // KvTtlCache.partitionedBy (§4.10). undefined before the first
+                                 // fetch, and from a reported expiry until a fetch started after
+                                 // the report adopts an undead identity: partition unknown, so a
+                                 // cache keyed on it bypasses rather than serves. Last-seen and
+                                 // shared — never the action-fence capture, which rides the
+                                 // generation of its own fetch
 }
 ```
 
@@ -390,7 +367,7 @@ corpus needs a different canonical key — a split or foreign legacy layout migr
 And a settled cache is not the corpus discipline either: across 33 packages no gatekeeper caches a
 credential on a fixed wall clock, 21 fetch from the account on every provider request
 (`github.ts:1392-1395` → `github-api.ts:231-238`), and the three that do cache gate on the
-_provider-issued expiry_ rather than a fetch timestamp (google expiry−60s, supabase expiry−30s,
+*provider-issued expiry* rather than a fetch timestamp (google expiry−60s, supabase expiry−30s,
 slack expiry−5m). The rest do not have the shape at all: three snapshot a bearer at session
 construction (homeassistant, http, gtmdata), two resolve once per MCP operation, and four have no
 connected-account credential path. So every operation reads the account's current
@@ -417,10 +394,10 @@ that had since disconnected, re-run the migration against whatever legacy keys t
 behind, and resurrect a grant the user revoked.
 
 **Write order is load-bearing in both mutators.** An implicit Durable Object transaction is atomic
-against machine failure but is _not_ rolled back by a throw, so the order decides what an unusually
+against machine failure but is *not* rolled back by a throw, so the order decides what an unusually
 placed storage failure leaves behind. The fence goes first: the commit rotating before it publishes
 can only lose the new record, with every in-flight refresh already fenced out, whereas publishing
-first could leave the new record readable under the _old_ fence and let a stale refresh commit
+first could leave the new record readable under the *old* fence and let a stale refresh commit
 straight over a reconnect. `connect()` prepends the connection-generation rotation for the same
 reason: a failure between its writes over-invalidates generation-keyed consumers, where the other
 order serves the new principal under the old generation. `clear()` follows the same rule with the
@@ -469,7 +446,7 @@ failure is fresh evidence and reports as expiry, or a later refetch would re-ado
 The account hop is itself wrapped, so its failure cannot replace `expiredMessage`; everything else
 passes through.
 
-**`isAuthError` is the one classifier the agent can aim.** It decides that a _grant_ is dead, and
+**`isAuthError` is the one classifier the agent can aim.** It decides that a *grant* is dead, and
 the agent chooses which operations run — so a classifier matching bare 401/403 lets it retire a
 healthy connection by requesting one resource the grant does not cover, and the user is prompted to
 reconnect something that never broke. Per-resource denials are `isNoAccessError`'s job (§4.5); this
@@ -487,46 +464,35 @@ position as any caller holding credentials when they die, and handles its own au
 The observer-verification primitives, plus the strategy objects the assembly consumes.
 
 ```ts
-export function asVerifier<T>(user: unknown): T; // the one sanctioned cast, with justification
-export const OBSERVER_DENIED: string; // default denial text
+export function asVerifier<T>(user: unknown): T;    // the one sanctioned cast, with justification
+export const OBSERVER_DENIED: string;               // default denial text
 export type ObservationCheck = {
-  excludeObservers?: string[];
-  commit(): void;
-  discard?(): void; // exactly one of the two runs;
-}; // both MUST be synchronous -- the gate does not await them
+  excludeObservers?: string[]; commit(): void; discard?(): void;  // exactly one of the two runs;
+};                                       // both MUST be synchronous -- the gate does not await them
 
 export type ObserverTrackerOptions<V> = {
   kv;
-  setPrefix?: string; // observed-set records; default "observed:"
-  canonicalSetId?(setId: string): string; // identity when omitted; applied once, at entry
-  verifyBaseline?(verifier: V): Promise<void>; // throwing coarse membership check, ADMISSION ONLY
-  hasSetAccess(verifier: V, setIds: readonly string[]): Promise<boolean[]>; // batched; copied
-  denyMessage?(setId: string): string; // default OBSERVER_DENIED; keep it generic —
-  // shown verbatim to the denied collaborator
-  vendorId?: string; // log attribution
-  maxTrackedSets?: number; // default 1000; refuses to reveal set 1001
-  maxObservers?: number; // default 10; refuses to admit observer 11
-  concurrency?: number; // default 6; concurrent verifier round trips
+  setPrefix?: string;                   // observed-set records; default "observed:"
+  canonicalSetId?(setId: string): string;             // identity when omitted; applied once, at entry
+  verifyBaseline?(verifier: V): Promise<void>;        // throwing coarse membership check, ADMISSION ONLY
+  hasSetAccess(verifier: V, setIds: readonly string[]): Promise<boolean[]>;   // batched; copied
+  denyMessage?(setId: string): string;                // default OBSERVER_DENIED; keep it generic —
+                                                      // shown verbatim to the denied collaborator
+  vendorId?: string;                       // log attribution
+  maxTrackedSets?: number;              // default 1000; refuses to reveal set 1001
+  maxObservers?: number;                // default 10; refuses to admit observer 11
+  concurrency?: number;                 // default 6; concurrent verifier round trips
 };
 export class ObserverTracker<V> {
-  addObserver;
-  removeObserver;
-  prepareObservation;
-  prepareWithheld;
-  observerIds;
+  addObserver; removeObserver; prepareObservation; prepareWithheld; observerIds
 }
-export class ObservationGate implements Disposable {
-  authorize;
-  actions;
-  [Symbol.dispose];
-} // owns the dup
+export class ObservationGate implements Disposable { authorize; actions; [Symbol.dispose] }  // owns the dup
 // Storage: `observer:<id>` admitted, `observer-attempt:<id>` + `observer-nonce:<id>` mid-admission,
 // `observer-withhold:<nonce>` per withheld read in flight, `observer-withheld` latched closed.
 // Modules: the tracker and its storage vocabulary live in `src/observer-tracker.ts`, the strategies
 // and the gate in `src/observers.ts`, which re-exports the tracker so `./observers` stays the one
 // public subpath.
 ```
-
 `addObserver` awaits `verifyBaseline` first — the consumer throws its own baseline error, so the kit
 never has to decide what a non-`true` answer meant (`aclObservers` takes the answering shape instead,
 and admits only a literal `true`) — then verifies the observer against every tracked set, looping
@@ -540,7 +506,7 @@ without access that this workspace read it. The `setId` argument is for diagnost
 `observer:<id>`, so a worker using it must set `compatibility_flags:
 ["allow_irrevocable_stub_storage"]` — every shipped gatekeeper already does, and without it the
 first `addObserver` fails with `DataCloneError: ServiceStub cannot be serialized in this context`.
-Only a _persistent_ stub qualifies: the overseer's verifier is a `WorkerEntrypoint` behind a service
+Only a *persistent* stub qualifies: the overseer's verifier is a `WorkerEntrypoint` behind a service
 binding, while an ad-hoc `RpcTarget` has no durable address and is refused whatever the flag says.
 The Node fake cannot model any of this (§6), so a workerd suite carries it.
 
@@ -576,12 +542,12 @@ that means observed.
 `hasSetAccess` is batched because real oracles are: supabase answers N project refs with one
 `/v1/projects` call. Because it is batched, **a verdict array whose length disagrees with the
 question denies or excludes, in either direction.** A short answer already denied by reading
-`undefined !== true`; an answer _longer_ than the question used to admit, since the surplus entries
+`undefined !== true`; an answer *longer* than the question used to admit, since the surplus entries
 were never looked at — and index position is the only thing tying a verdict to a set, so a length
 the oracle disagrees about invalidates every verdict in the array, not merely the extras. Google
 asserts the same invariant before reading a batch result
 (`gatekeeper-google/src/observers.ts:51-55`); the kit denies rather than throwing on the exclusion
-path, so one broken verifier cannot fail an entire read. A verifier that _throws_ is excluded the
+path, so one broken verifier cannot fail an entire read. A verifier that *throws* is excluded the
 same way and logged at `warn`: a stored stub outlives the workspace that supplied it, and rejecting
 the batch would fail every observation this binding makes from then on.
 
@@ -589,7 +555,7 @@ the batch would fail every observation this binding makes from then on.
 `while (ids.length) ids.splice(0, N)` — is a legal oracle: it returns one verdict per set, in
 order, which is the whole contract, and an oracle whose provider caps ACL lookups has to chunk
 somehow. Shared, that array is a data leak rather than a style problem: the exclusion check
-compares the verdict count against the _same_ array the oracle emptied, so the comparison passes
+compares the verdict count against the *same* array the oracle emptied, so the comparison passes
 vacuously and every observer after the first is admitted to sets nothing verified it against —
 while the honest verifier, whose answer no longer matches the emptied question, is the one
 excluded. A per-call `slice()` is one allocation beside a round trip the same loop is already
@@ -613,31 +579,30 @@ export interface ObserverStrategy {
   addObserver(id: string, user: Fetcher<GatekeeperUserVerifier>): Promise<void>;
   removeObserver(id: string): Promise<void>;
   prepare?(setIds: readonly string[]): Promise<ObservationCheck>;
-  observerIds?(): string[]; // retained observers, candidates mid-admission included
-  prepareWithheld(): ObservationCheck; // enumerates and fences admission in one step. REQUIRED:
-  // every strategy answers the owner-only question itself
+  observerIds?(): string[];        // retained observers, candidates mid-admission included
+  prepareWithheld(): ObservationCheck;    // enumerates and fences admission in one step. REQUIRED:
+                                          // every strategy answers the owner-only question itself
 }
-export function privateObservers(message: string): ObserverStrategy; // A
-export function aclObservers<V>(opts: {
-  // B
-  hasAccess(v: V): Promise<boolean>; // answers rather than throws; only `true` admits
+export function privateObservers(message: string): ObserverStrategy;                       // A
+export function aclObservers<V>(opts: {                                                    // B
+  hasAccess(v: V): Promise<boolean>;   // answers rather than throws; only `true` admits
   denyMessage?: string;
 }): ObserverStrategy;
 export function trackedSetObservers<V>(opts: ObserverTrackerOptions<V>): ObserverStrategy; // C
-export function openObservers(): ObserverStrategy; // D
+export function openObservers(): ObserverStrategy;                                         // D
 
 export function escapeObservationValue(value: string): string;
 export type ObservationScope =
-  | { kind: "baseline" } // admission already covers this disclosure
-  | { kind: "sets"; ids: readonly string[] } // per-set verification; an empty array is refused
-  | { kind: "withholdFromObservers" }; // withhold from every admitted observer
+  | { kind: "baseline" }                        // admission already covers this disclosure
+  | { kind: "sets"; ids: readonly string[] }    // per-set verification; an empty array is refused
+  | { kind: "withholdFromObservers" };          // withhold from every admitted observer
 export type ObservationInput = Omit<ObservationDescription, "excludeObservers">;
 export class ObservationGate {
   constructor(queue: RpcStub<ApprovalQueue>, strategy: ObserverStrategy);
   authorize(input: ObservationInput, scope: ObservationScope): Promise<void>;
-  get actions(): Pick<RpcStub<ApprovalQueue>, "submitAction" | "bindHook">; // borrowed for action
-  // staging; the gate keeps ownership. Narrowed so a raw
-  // authorizeObservation cannot skip the strategy's exclusions
+  get actions(): Pick<RpcStub<ApprovalQueue>, "submitAction" | "bindHook">;   // borrowed for action
+                                         // staging; the gate keeps ownership. Narrowed so a raw
+                                         // authorizeObservation cannot skip the strategy's exclusions
 }
 ```
 
@@ -645,7 +610,7 @@ export class ObservationGate {
 sites and not one passes set ids to `authorizeObservation` itself; instead 8 of 10 tracked-set
 gatekeepers authorize a binding-wide read with a literal `[]` meaning "reveals nothing per-set"
 (`slack.ts:1178`, `jira.ts:1575`, `notion.ts:1450`, `confluence.ts:791`, `google.ts:3439`), while
-Google Drive spells the _opposite_ meaning the same way — `excludeObservers: this.#observerIds()`
+Google Drive spells the *opposite* meaning the same way — `excludeObservers: this.#observerIds()`
 then a throw (`drive-session.ts:271-276`). One spelling, two opposite meanings, exactly one
 gatekeeper noticing. So `sets` refuses an empty array and names `baseline` as the way to say "the
 admission baseline covers this", and `withholdFromObservers` is Drive's shape as a first-class arm.
@@ -705,7 +670,7 @@ serve. A consumer preferring that trade can still throw instead of reading.
 **The latch is earned, and the fence is not the latch.** Latching before the round trip would spend
 it on a refusal: the overseer rejects an observation outright whenever an excluded observer is still
 an authorized collaborator (`overseer.ts:4590-4603`), which is the ordinary answer for a binding
-that has any, so an unshareable binding would be the _normal_ result of a read that disclosed
+that has any, so an unshareable binding would be the *normal* result of a read that disclosed
 nothing and returned an error. Latching only after success needs something else to hold the window,
 because the exclusion list is already sent and an `addObserver` delivered during the round trip
 would be absent from it — and the window outlives the activation. `authorizeObservation()` stores
@@ -722,7 +687,7 @@ attempt record ages out (`OBSERVER_ATTEMPT_LIFETIME_MS`), the marker deliberatel
 expiry would reopen the window mid-read.
 
 An earlier draft held the window with an in-memory count keyed by the storage object's identity, on
-the theory that a fence only has to reach a _concurrent_ admission. That mistakes where the window
+the theory that a fence only has to reach a *concurrent* admission. That mistakes where the window
 ends — the overseer's record survives the activation, the count does not — and the identity keying
 forced a "never wrap `ctx.storage.kv`" construction contract nothing could enforce. The marker is
 plain storage, so both problems are gone.
@@ -765,102 +730,81 @@ and the kit does not model irreducible variance.
 // `src/action-journal.ts`, re-exported here so `./actions` stays the one public subpath.
 
 export type JournalKeys = {
-  nextIdKey?: string; // default "pending:nextActionId"
-  recordPrefix?: string; // default "pending:action:" — disjoint from nextIdKey
+  nextIdKey?: string;                       // default "pending:nextActionId"
+  recordPrefix?: string;                    // default "pending:action:" — disjoint from nextIdKey
 };
-type JournalState =
-  // internal; the kit writes all five
+type JournalState =                                     // internal; the kit writes all five
   "staged" | "pending" | "claimed" | "failed" | "applied";
-export type JournalRecord<A> =
-  // returned by get(); error only on "failed"
+export type JournalRecord<A> =                          // returned by get(); error only on "failed"
   { state: JournalState; action: A; error?: string };
-export type JournalEntry<A> =
-  // listed entries; structurally the
-  { readonly id: number; readonly action: A }; // SimulationRecord createSimulationView takes
+export type JournalEntry<A> =                           // listed entries; structurally the
+  { readonly id: number; readonly action: A };          // SimulationRecord createSimulationView takes
 export class ActionJournal<A> {
-  constructor(
-    kv,
-    opts?: JournalKeys & {
-      upgradeRecord?(raw: unknown): A | undefined; // undefined leaves a raw record unadopted
-      maxPending?: number;
-    },
-  );
+  constructor(kv, opts?: JournalKeys & {
+    upgradeRecord?(raw: unknown): A | undefined;   // undefined leaves a raw record unadopted
+    maxPending?: number });
   // `maxPending` defaults to 50; records carry a version marker, and an unmarked one goes to
   // upgradeRecord rather than being trusted
-  allocate(action: A): number; // sequential id, state "staged"; throws at maxPending
-  markSubmitted(id: number): void; // "staged" → "pending"
-  markClaimed(id: number): void; // "staged" | "pending" → "claimed"
-  restorePending(id: number): void; // "claimed" → "pending"
-  markFailed(id: number, error: string): void; // → "failed", terminal; reason capped; only reject clears it
+  allocate(action: A): number;              // sequential id, state "staged"; throws at maxPending
+  markSubmitted(id: number): void;          // "staged" → "pending"
+  markClaimed(id: number): void;            // "staged" | "pending" → "claimed"
+  restorePending(id: number): void;         // "claimed" → "pending"
+  markFailed(id: number, error: string): void;    // → "failed", terminal; reason capped; only reject clears it
   rollbackSubmission(id: number): void;
-  get(id: number): JournalRecord<A> | undefined; // any state; checks both tiers
+  get(id: number): JournalRecord<A> | undefined;  // any state; checks both tiers
   remove(id: number): void;
-  retain(id: number, action?: A): void; // post-apply write: retained record first, then the
-  // delete; no-op on a "failed" record
-  isRetained(id: number): boolean; // tier membership — trustworthy where open consumer states are not
-  listPending(): JournalEntry<A>[]; // "pending" + "claimed", ascending id; feeds createSimulationView
-  listUndecided(): JournalEntry<A>[]; // "pending" only — what a decision may still retire
+  retain(id: number, action?: A): void;     // post-apply write: retained record first, then the
+                                            // delete; no-op on a "failed" record
+  isRetained(id: number): boolean;          // tier membership — trustworthy where open consumer states are not
+  listPending(): JournalEntry<A>[];         // "pending" + "claimed", ascending id; feeds createSimulationView
+  listUndecided(): JournalEntry<A>[];       // "pending" only — what a decision may still retire
 }
-export type ActionSubmitter =
-  // the surface staging needs; `gate.actions`
-  Pick<RpcStub<ApprovalQueue>, "submitAction">; // (§4.7) and a full stub both satisfy it
-export function stageAction<A>(
-  journal,
-  queue: ActionSubmitter,
-  action: A,
-  description: ActionDescription,
-): Promise<number>;
+export type ActionSubmitter =                           // the surface staging needs; `gate.actions`
+  Pick<RpcStub<ApprovalQueue>, "submitAction">;         // (§4.7) and a full stub both satisfy it
+export function stageAction<A>(journal, queue: ActionSubmitter,
+  action: A, description: ActionDescription): Promise<number>;
 
-export type ActionPresentation =
-  // the approver-facing text; policy fields
-  Pick<ActionDescription, "title" | "description" | "implementsRevert">; // come from the decl
-export type ActionContext = { readonly id: number }; // durable, unique, stable across retries
+export type ActionPresentation =                        // the approver-facing text; policy fields
+  Pick<ActionDescription, "title" | "description" | "implementsRevert">;   // come from the decl
+export type ActionContext = { readonly id: number };    // durable, unique, stable across retries
 export type ResolveOutcome = "applied" | "rejected" | "failed" | "reverted";
 
-export class ActionApplyError extends Error {} // an apply handler's terminal failure; its
-// message is display-safe and becomes the
-// stored answer every later attempt sees
-export const APPLY_OUTCOME_UNKNOWN_MESSAGE: string; // the answer an orphaned claim is failed with
+export class ActionApplyError extends Error {}          // an apply handler's terminal failure; its
+                                                       // message is display-safe and becomes the
+                                                       // stored answer every later attempt sees
+export const APPLY_OUTCOME_UNKNOWN_MESSAGE: string;     // the answer an orphaned claim is failed with
 
-export function defineActions<H, M extends Record<string, unknown>>(
-  defs: {
-    [K in keyof M]: {
-      kind?: ActionKind;
-      autoApprovable?: boolean;
-      delivery: "continue-with-simulation" | "await-decision"; // REQUIRED; → awaitDecision
-      claimBeforeApply?: boolean; // at-most-once for an irreversible provider call
-      describe(
-        payload: M[K],
-        host: H,
-      ):
-        // derived from the stored payload, never passed beside it
-        ActionPresentation | Promise<ActionPresentation>;
-      provides?(payload: M[K]): readonly string[]; // provisional refs this payload creates
-      dependsOn?(payload: M[K]): readonly string[]; // ... and those it needs an earlier one to create
-      apply(payload: M[K], host: H, ctx: ActionContext): Promise<void | { action?: M[K] }>;
-      reject?(payload: M[K], host: H, ctx: ActionContext): Promise<void>;
-    };
-  },
-  opts?: {
-    retainApplied?: boolean; // explicit; default false — facet base asserts revert-hook consistency (§5.9)
-    vendorId?: string; // log attribution; the assembly threads spec.id
-    afterResolve?(host: H, outcome: ResolveOutcome): void | Promise<void>;
-  },
-): ActionSet<H, M>;
+export function defineActions<H, M extends Record<string, unknown>>(defs: {
+  [K in keyof M]: {
+    kind?: ActionKind;
+    autoApprovable?: boolean;
+    delivery: "continue-with-simulation" | "await-decision";   // REQUIRED; → awaitDecision
+    claimBeforeApply?: boolean;             // at-most-once for an irreversible provider call
+    describe(payload: M[K], host: H):       // derived from the stored payload, never passed beside it
+      ActionPresentation | Promise<ActionPresentation>;
+    provides?(payload: M[K]): readonly string[];    // provisional refs this payload creates
+    dependsOn?(payload: M[K]): readonly string[];   // ... and those it needs an earlier one to create
+    apply(payload: M[K], host: H, ctx: ActionContext): Promise<void | { action?: M[K] }>;
+    reject?(payload: M[K], host: H, ctx: ActionContext): Promise<void>;
+  }
+}, opts?: {
+  retainApplied?: boolean;                  // explicit; default false — facet base asserts revert-hook consistency (§5.9)
+  vendorId?: string;                        // log attribution; the assembly threads spec.id
+  afterResolve?(host: H, outcome: ResolveOutcome): void | Promise<void>;
+}): ActionSet<H, M>;
 
 export type BoundActionSet<M> = {
-  submit(queue: ActionSubmitter, kind, payload): Promise<number>; // serialized against other
-  // submissions only
-  apply(id: number): Promise<void>; // both exclusive with each other and with
-  // runExclusive; void for an already-applied id
+  submit(queue: ActionSubmitter, kind, payload): Promise<number>;   // serialized against other
+                                            // submissions only
+  apply(id: number): Promise<void>;         // both exclusive with each other and with
+                                            // runExclusive; void for an already-applied id
   reject(id: number): Promise<void>;
   autoApprovableKinds(): ActionKind[];
   readonly retainsApplied: boolean;
   resolved(outcome: ResolveOutcome): Promise<void>;
-  runExclusive<T>(hook: () => T | Promise<T>): Promise<T>; // the facet's revert seam (§5.9)
+  runExclusive<T>(hook: () => T | Promise<T>): Promise<T>;   // the facet's revert seam (§5.9)
 };
-export type ActionSet<H, M> = {
-  // declarations are module-scoped, the journal and host per-facet
+export type ActionSet<H, M> = {   // declarations are module-scoped, the journal and host per-facet
   bind(journal: ActionJournal<TaggedAction<M>>, host: H): BoundActionSet<M>;
 };
 ```
@@ -874,7 +818,7 @@ contract, the test asserting those literals is load-bearing rather than a tautol
 **A kind this deploy no longer defines fails apply and still rejects.** A queued action outlives a
 deploy — the queue contract allows a decision "hours or days later" — so renaming or removing a
 definition leaves records whose `kind` no longer resolves. `upgradeRecord` does not cover it and must
-not: it adapts a _legacy layout_ into the current record shape, and these records are already
+not: it adapts a *legacy layout* into the current record shape, and these records are already
 current. So apply marks the record terminally failed with a message naming the kind, which both
 stops it projecting into every later read and opens the reject-a-failure path; reject dispatches
 through the definition only if one exists, and retires the record either way. Dispatching reject
@@ -889,12 +833,12 @@ callbacks for one action id concurrently: `approveAction` checks `state !== "pen
 awaits `#getClientProfile()` before dispatching (`overseer.ts:9485-9495`), with the Durable Object's
 input gate open across that await — and `applyPendingAction`'s own comment states that validating
 the record is the caller's responsibility. Its single-flight drainer guards concurrent auto-approval
-_drains_ only, so manual-plus-drain and two manual approvals both reach the gatekeeper. Without a
+*drains* only, so manual-plus-drain and two manual approvals both reach the gatekeeper. Without a
 queue, `resolvable(id)` is a time-of-check/time-of-use window wrapped around a provider call, i.e. a
 double effect on the provider with one journal record to show for it.
 
 This is an inherited corpus-wide hole, not a kit regression: supabase has the identical shape
-(`supabase.ts:1092-1107` — get, `await runQuery`, remove), and no _public_ gatekeeper has a
+(`supabase.ts:1092-1107` — get, `await runQuery`, remove), and no *public* gatekeeper has a
 serialization primitive at all. Two places in either repo defend, and both do it differently:
 `mcp-shared` takes a synchronous `applying` claim over the same TOCTOU
 (`action-store.ts:130-162`), and ironclad checks an `applied:${id}` idempotency marker before
@@ -912,13 +856,13 @@ the same records a revert reads. So the surface is `runExclusive(hook)` rather t
 object. `resolved(outcome)` stays separate from it, since folding a retirement sweep into
 `runExclusive` would fire a spurious `"reverted"`; and a caller must never invoke `apply`/`reject`
 from inside the callback, because they claim this same queue and would wait on their own
-predecessor. `submit` stays off _that_ queue — submission is not a resolution, and queueing it
+predecessor. `submit` stays off *that* queue — submission is not a resolution, and queueing it
 behind a slow apply would stall the agent for a provider round trip — but it holds a second queue
 of its own, so submissions serialize against each other (see the staged-record fix options above).
 
 There is deliberately **no** `put(id, record)` and no `listUnresolved()`. No corpus journal lets
 outside code write arbitrary states into a live record, and `put(id, { state: "applied" })` on one is
-a re-apply footgun; cascade rejection everywhere enumerates _pending_ records only (github's
+a re-apply footgun; cascade rejection everywhere enumerates *pending* records only (github's
 `#listPendingActions`, and the pending scans in linear, notion, confluence, and spotify). For the
 same reason `JournalState` is internal and closed rather than an open `(string & {})` union: no
 consumer stamps its own state.
@@ -936,7 +880,7 @@ confluence (`confluence-actions.ts:571-605`), spotify (`spotify.ts:1816-1844`) a
 storing a graph, which is why the kit stores none either: there is nothing to keep in step, and
 `maxPending` already bounds the scan. Jira is the seventh and cascades not at all, which is why its
 rewriter passes unresolved keys straight to the provider (`jira.ts:466-475` → `:1399-1458`). No
-corpus gatekeeper cascades on _terminal failure_, because none has a terminal failure state for
+corpus gatekeeper cascades on *terminal failure*, because none has a terminal failure state for
 these actions — the kit does, so it is the only one that both strands dependents and retires them.
 The one terminal failure that does **not** cascade is an orphaned claim: its stored answer says the
 effect is unknown, so "was not applied" cannot be asserted over its dependents — the argument that
@@ -1001,7 +945,7 @@ resolution error, and its record is restored to pending and remains retryable.
 The interleaving has two independent halves, and only one of them is closed.
 
 **Closed: two submissions racing each other.** A staged record stays staged across `submitAction`,
-and the capacity scan drops the oldest _staged_ records first, so a second concurrent stage could
+and the capacity scan drops the oldest *staged* records first, so a second concurrent stage could
 delete the record the first was still waiting on — the approval queue accepts an action whose
 journal entry is already gone, and approving it later fails with `Unknown pending action`.
 `stageAction` therefore serializes per journal on its own `SerialTaskQueue` — separate from the
@@ -1021,7 +965,7 @@ fixture (§7 step 11) in front of us rather than an argument here:
    making the interleaving impossible by construction, at the cost of queueing every submit behind
    a slow apply.
 
-Exposing `listUnresolved()` is _not_ on that list: a consumer that can enumerate staged records will
+Exposing `listUnresolved()` is *not* on that list: a consumer that can enumerate staged records will
 eventually try to resolve one, and `staged` means the overseer has not yet been told the action
 exists.
 
@@ -1052,14 +996,14 @@ rows capped at 100 (`action-store.ts:137,204`); the kit keeps only the ids.
 **The key layouts a port must reconcile (verified across both corpora, not inferred).** The kit's
 defaults fit the largest cohort, but neither the counter convention nor the retention layout is
 universal, and both mismatches are silent. Whoever ports a gatekeeper checks it against these two
-tables _before_ pointing the journal at existing keys.
+tables *before* pointing the journal at existing keys.
 
-_Counter convention_ — what the stored number means:
+*Counter convention* — what the stored number means:
 
-| Convention                                        | Gatekeepers                                                                              | Kit                      |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------ |
+| Convention | Gatekeepers | Kit |
+| --- | --- | --- |
 | Next unused (`?? 1`, store `id + 1`, return `id`) | supabase, google, notion, confluence, backstage, cf-wiki, ironclad, jira, salesforce — 9 | **this is `allocate()`** |
-| Last issued (`(?? 0) + 1`, store and return it)   | github, linear, spotify — 3                                                              | incompatible             |
+| Last issued (`(?? 0) + 1`, store and return it) | github, linear, spotify — 3 | incompatible |
 
 Adopting a last-issued counter key as `nextIdKey` **would re-issue the last ID and overwrite its
 pending record** — after which the overseer could approve one description while the journal
@@ -1069,23 +1013,23 @@ retired-id memory, so the misport fails loudly at the moment of harm instead of 
 migrate the counter `+1` in the same commit that adopts the journal. Key name and convention vary independently — `pending:nextActionId`, `seq:action`,
 `counter:action`, `pending:nextId`, `nextActionId` all appear — so a port picks both, separately.
 
-_Retention layout_ — where an applied record lives:
+*Retention layout* — where an applied record lives:
 
-| Layout                                          | Gatekeepers                               | Kit                         |
-| ----------------------------------------------- | ----------------------------------------- | --------------------------- |
-| None: deleted on apply                          | supabase, google, cf-wiki, ironclad — 4   | `retainApplied: false`      |
-| In-place `state`/`status` field on one prefix   | notion, confluence, linear — 3            | not expressible             |
+| Layout | Gatekeepers | Kit |
+| --- | --- | --- |
+| None: deleted on apply | supabase, google, cf-wiki, ironclad — 4 | `retainApplied: false` |
+| In-place `state`/`status` field on one prefix | notion, confluence, linear — 3 | not expressible |
 | Second-tier records under an independent prefix | github (`action:` → `retiredAction:`) — 1 | shape matches, key does not |
-| Derived sibling `retained:${recordPrefix}`      | none                                      | `retainApplied: true`       |
+| Derived sibling `retained:${recordPrefix}` | none | `retainApplied: true` |
 
 So the derived prefix, justified above as "the shape github already uses", generalizes exactly one
-gatekeeper and matches _no_ existing key: github's retained records sit at `retiredAction:${id}`,
+gatekeeper and matches *no* existing key: github's retained records sit at `retiredAction:${id}`,
 not `retained:action:${id}`, and its `#getLiveActionRecord` fallback (`github.ts:1880-1881`) is what
-would stop finding them. That port needs a `retainedPrefix` option — added _then_, designed against
+would stop finding them. That port needs a `retainedPrefix` option — added *then*, designed against
 its one real consumer, rather than shipped now with none. Watch two traps in the tally: ironclad's
 `applied:${id}` holds `true`, not a record (`ironclad.ts:831-890` — an idempotency marker, then the
 pending record is deleted), so it maps to no-retention plus the journal's existing resolution
-dedupe; and the in-place trio is the _plurality of retainers_, so the first of those ports chooses
+dedupe; and the in-place trio is the *plurality of retainers*, so the first of those ports chooses
 between an N-key migration to tiered (buying the O(pending) scan that in-place listing gives up —
 linear filters its whole history at `linear.ts:1136`) and adding the in-place store as a second
 strategy. `JournalState` already carries the `state` field that makes the latter mechanical; what
@@ -1095,27 +1039,27 @@ revert question and the reason this is not a slot the kit cuts in v1.
 **Other port-time obligations, recorded here because no leaf can enforce them.** None is a Layer 1
 defect; each is either additive later or a fact about one provider that only bites on its own port.
 
-| Obligation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Who it affects                                                                          | Why it is deferred                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Ordering credential mutations against `revoke`.** A refresh in flight when `revoke()` wipes storage mints a token the identity fence correctly discards — leaving live provider-side authority nobody stored. Google serializes its four credential paths on one FIFO chain (`google.ts:405-427`), and even it leaks one error-path `kv.delete("refreshToken")` outside the chain (`:524-530`).                                                                                                                                                                                                                                                                                                 | every port with a refresh flow                                                          | `revoke()` is not in the kit — the account base owns it (§5.6): it drains the refresh in flight and best-effort revokes its result as well as the captured grant. `coordinator.fresh()` already coalesces concurrent refreshes; the coordinator needs no queue of its own.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| **Baseline re-checks on the exclusion path.** `verifyBaseline` runs at admission only, so an observer who later loses the binding-wide grant keeps observing. Google's batch result carries it per call — `{ baselineAllowed, allowed[] }` (`gatekeeper-google/src/observers.ts:48-49`) — and excludes on `!baselineAllowed` (`:206-215`).                                                                                                                                                                                                                                                                                                                                                        | google port first                                                                       | Expressible today by folding the baseline into `hasSetAccess` (return all-`false`), so this is a documentation gap rather than a missing capability. Note google's baseline is a recorded _resource grant_ (`resources.ts:203-205`), not org membership, and it _excludes_ rather than removing the observer.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **`maxTrackedSets` is a default, not a corpus constant.** 1000 comes from google's generic default, but its concrete Drive tracker overrides to **2000** (`drive-observers.ts:49-53`), sized against `ceil(N/100)` subrequests.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | supabase, notion, linear ports, which had no cap at all                                 | A port inherits a bound it never had; the number is per-provider and belongs in that port's options.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **`maxObservers` is a platform bound the corpus does not have.** Every retained observer costs one verifier call per read, and Workers cap a request at **32 Worker invocations** — past that the call throws, so a binding with too many collaborators fails _every_ read rather than degrading. No shipped tracker caps this: notion, confluence, context, linear and internal `gatekeeper-shared` fan out over all observers with unbounded `Promise.all`, and google throttles concurrency without bounding the total.                                                                                                                                                                        | every strategy-C port                                                                   | The kit refuses at admission instead, which is the legible half of the same failure. The default is **10**, not 20: an observer count prices only the kit's own hop, and every verifier in the corpus spends a second invocation calling its account DO (`notion.ts:615-635`), so 20 observers is 40 invocations before the read does anything. The real ceiling is per-deployment, so the number belongs in that port's options. `concurrency` is a throttle and never a bound.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **Re-fetch after a reported expiry.** The account keeps the dead grant until reconnect — `noteCredentialsExpired` notifies, it does not clear — so any later `get()` fetches the same credentials back and its callers 401 again.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | all                                                                                     | Self-healing and bounded: each round costs a redundant 401 (the account notifies once), never a wrong authorization. The source keeps reported identities in a per-activation dead set and refuses to re-adopt their generations, and fences out fetches already in flight at the report; without those, a cache hit under the restored partition never reaches the provider, so hit-only paths would mask the outage for the TTL and across the reconnect. A fetch started after the report, adopting an identity not in the set — successful refresh or reconnect — re-establishes the authority.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **Corrupt-record blast radius.** A throwing `upgradeRecord` propagates out of `#coerce`, so one unreadable legacy record makes `listPending()` throw and blinds the whole simulation overlay rather than dropping that entry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | ports supplying `upgradeRecord`                                                         | Both behaviours lose something — a throw blinds everything, skipping hides one pending action from its user — so pick it with a real corpus of legacy records in view.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| **The retained tier is unbounded.** `#requireCapacity` scans only the pending prefix and skips `isRetained`, so `maxPending` bounds pending records and twice that many `staged`/`failed` ones, but never retained ones. A long-lived `retainApplied: true` binding accumulates one record per applied action indefinitely.                                                                                                                                                                                                                                                                                                                                                                       | every retaining port                                                                    | Retention is consumer policy and vendor caps differ; the binding must retire records through `runExclusive` under its own policy.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| **Past its bound, a pruned `failed` record takes the only account of what went wrong.** The Workshop keeps a thrown `applyPendingAction` pending and visible (`overseer.ts:9497-9500`, "the action stays pending and the turn stays suspended"), so the journal record is the sole holder of the reason. Once more than `2 × maxPending` prunable records accumulate, the oldest are dropped: a later approve degrades to `Unknown pending action` and a later reject succeeds silently, which can lose an `ActionApplyError` warning that a provider effect partly landed.                                                                                                                       | any port accumulating more than twice `maxPending` un-rejected failures on one resource | Storage must be bounded, so something must eventually go; the choice is only what and when. Counting failures against the cap instead — the obvious alternative — converts a lost diagnostic into a provider-triggered denial of service, blocking all staging until the user hand-clears them. Staged-first pruning and the doubled bound push this out; closing it entirely needs a tier that keeps reasons after their records, which is the same unbounded retention the row above defers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| **A pending action is not fenced against the connection that staged it.** In-place reconnect keeps the same account DO and `userObjectId` and merely replaces the grant — `reconnectAccount()` is `record.account.reconnect()` (`user.ts:1541-1545`) and `markCredentialsRestored` re-describes on the assumption the user "may have re-authed with different info" (`user.ts:1655-1664`). Neither the overseer's approval record nor the facet's journal is touched, so an action staged under principal A can be approved and applied with principal B's credentials — and an object id that named one thing in A's tenant may name another in B's. No gatekeeper in either corpus fences this. | every port whose provider allows re-auth as a different principal                       | Not fixable with a nonce. A facet-side generation check followed by the handler's own `get()` is not atomic — a reconnect landing between them still yields B — so the fence has to be a credential read that takes the staged generation, `getCredentialsForGeneration(expected)` in the account DO, over the `connectionGeneration()` the coordinator already stores (§4.6; `identity()` cannot serve — every refresh supersedes it, invalidating every pending action). The stage-time half is delivered: the generation rides `getCredentials()`, so a staging call records the generation of its own credential read — never `CredentialSource.authority()`, a shared last-seen value (§4.10) that a concurrent fetch can move between the read and the record, stamping an action derived under A with B's generation. The apply-time fenced read remains open. That reaches only handlers that resolve credentials through the kit; a handler holding its own client still calls the provider unfenced, which is the cost of the escape hatch. Land it with the first port whose provider permits principal-switching re-auth, so the handler ergonomics are designed against a real one — supabase qualifies (reconnect may authorize a different org), so decide at that port whether to take the fence or explicitly re-scope this trigger. |
-| **The expiry latch re-arms with two writes.** `clearCredentialExpiryLatch` clears the boolean and writes a fresh arm. Were the second to fail alone, an in-flight notification for the replaced credentials would match the surviving arm and latch the new ones — the one _silencing_ failure in a module whose every other window fails toward a harmless duplicate notification.                                                                                                                                                                                                                                                                                                               | every port with a refresh flow                                                          | Both writes are adjacent, awaitless and constant-size, so one implicit transaction carries them and no trigger separates them; the function's doc comment states that adjacency as the invariant to preserve. Every candidate fix is worse than the window: swapping the order makes the silence deterministic, and one combined record breaks the plain-boolean compatibility the latch key promises. If a port ever needs it, the escape is a single record holding arm and notified together.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **A crash mid-withheld-read closes admission for good.** The `observer-withhold:<nonce>` marker goes down before the overseer is asked and is stranded by an activation that dies before settling; `addObserver` refuses while any marker stands, and nothing reclaims one. A read the overseer would have refused still leaves the binding unshareable.                                                                                                                                                                                                                                                                                                                                          | every strategy-C port using `withholdFromObservers`                                     | A stranded marker cannot tell a lost reply from a lost request, and the overseer's record is durable before the reply — so reclaiming on any schedule risks disclosing a recorded owner-only description to the next collaborator admitted, while over-fencing costs sharing on a binding already handling owner-only data. The attempt record's fail-closed trade, without the TTL escape. _Trigger:_ a binding observed stuck closed with no `observer-withheld` latch.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **A lost `authorizeObservation` reply reopens admission over a standing withheld record.** `authorize` runs `discard()` on any throw, but a transport failure after the overseer's durable store is indistinguishable from a refusal — the marker comes down while the record stands, and the next collaborator admitted can read the owner-only description through `listActions()`.                                                                                                                                                                                                                                                                                                             | every strategy-C port using `withholdFromObservers`                                     | Keeping the marker on every throw inverts the earned-latch trade: refusal is the _ordinary_ answer for a binding with observers (`overseer.ts:4590-4603`), and would permanently close admission for a read that disclosed nothing. Matching refusal message text was considered and rejected. The fix is a distinguishable refusal result in the `ApprovalQueue` contract, with `discard()` run only on it — batch with the next kernel contract change. _Trigger:_ that change, or the first port shipping withheld reads.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **A dropped action kind strands its dependents silently.** `provides`/`dependsOn` are evaluated from the live definition, so an action staged under a kind a later deploy removed reports no refs, and the dependents it was holding open are not retired with it.                                                                                                                                                                                                                                                                                                                                                                                                                                | any port that removes a shipped action kind                                             | The dependent stays pending and fails at the provider instead of naming the parent it needed, so what is lost is an error message, not an effect — a ref a gatekeeper declares in `dependsOn` is by definition an identifier the provider validates. Closing it means storing the refs on the record, which puts staging metadata inside the journaled action identity and threads it through every state transition. No corpus gatekeeper stores its graph either (§4.8), so the six that cascade port without this. _Trigger:_ the first port to remove a shipped action kind.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **A read during an in-flight apply can overlay an effect the provider already made real.** Simulated reads project `pending` and `claimed` records, and an apply is a provider round trip followed by the journal write, so a read landing between the two fetches the real effect and overlays the same action again — a transient duplicate in the _view_, never a second provider effect (resolution is serialized).                                                                                                                                                                                                                                                                           | every port with continue-with-simulation actions                                        | Inherent to overlaying local pending state onto remote reads: no atomic instant flips both, and it holds for every projected state, so dropping `claimed` from projection would only make the action vanish mid-apply instead. Serializing reads with resolution would stall the agent for the length of a provider call on every read — the trade submission already refuses — and `runExclusive` is the opt-in for a consumer that needs a consistent snapshot. Self-healing: the next read after the journal write is correct. _Trigger:_ an agent observed acting on the duplicate, e.g. staging a corrective action against it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **Pending observed-set records are never reclaimed.** `prepareObservation` marks untracked sets `"pending"` before awaiting the oracle and returns no `discard`, so a read the overseer refuses leaves them behind; only a later successful read of the same sets promotes them, and `#trackedSets()` counts pending rows against `maxTrackedSets`. Enough distinct refused reads and every `prepareObservation` throws "Bind a narrower scope".                                                                                                                                                                                                                                                  | every strategy-C port                                                                   | Inherited behaviour, not introduced: google's shipped tracker writes pending before the await and returns `commit` only (`gatekeeper-google/src/observers.ts:186-236`), with `maxTrackedSets` alongside it. The naive fix is unsafe — two concurrent reads can mark one set pending, and a `discard` that deleted it after the other committed would un-track an observed set and let a later observer in unverified against it. So a reclaiming `discard` must delete only rows still `"pending"`, which is a concurrency argument that wants the fixture in front of it. _Trigger:_ the first strategy-C port, or a binding observed to exhaust its budget.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Obligation | Who it affects | Why it is deferred |
+| --- | --- | --- |
+| **Ordering credential mutations against `revoke`.** A refresh in flight when `revoke()` wipes storage mints a token the identity fence correctly discards — leaving live provider-side authority nobody stored. Google serializes its four credential paths on one FIFO chain (`google.ts:405-427`), and even it leaks one error-path `kv.delete("refreshToken")` outside the chain (`:524-530`). | every port with a refresh flow | `revoke()` is not in the kit — the account base owns it (§5.6): it drains the refresh in flight and best-effort revokes its result as well as the captured grant. `coordinator.fresh()` already coalesces concurrent refreshes; the coordinator needs no queue of its own. |
+| **Baseline re-checks on the exclusion path.** `verifyBaseline` runs at admission only, so an observer who later loses the binding-wide grant keeps observing. Google's batch result carries it per call — `{ baselineAllowed, allowed[] }` (`gatekeeper-google/src/observers.ts:48-49`) — and excludes on `!baselineAllowed` (`:206-215`). | google port first | Expressible today by folding the baseline into `hasSetAccess` (return all-`false`), so this is a documentation gap rather than a missing capability. Note google's baseline is a recorded *resource grant* (`resources.ts:203-205`), not org membership, and it *excludes* rather than removing the observer. |
+| **`maxTrackedSets` is a default, not a corpus constant.** 1000 comes from google's generic default, but its concrete Drive tracker overrides to **2000** (`drive-observers.ts:49-53`), sized against `ceil(N/100)` subrequests. | supabase, notion, linear ports, which had no cap at all | A port inherits a bound it never had; the number is per-provider and belongs in that port's options. |
+| **`maxObservers` is a platform bound the corpus does not have.** Every retained observer costs one verifier call per read, and Workers cap a request at **32 Worker invocations** — past that the call throws, so a binding with too many collaborators fails *every* read rather than degrading. No shipped tracker caps this: notion, confluence, context, linear and internal `gatekeeper-shared` fan out over all observers with unbounded `Promise.all`, and google throttles concurrency without bounding the total. | every strategy-C port | The kit refuses at admission instead, which is the legible half of the same failure. The default is **10**, not 20: an observer count prices only the kit's own hop, and every verifier in the corpus spends a second invocation calling its account DO (`notion.ts:615-635`), so 20 observers is 40 invocations before the read does anything. The real ceiling is per-deployment, so the number belongs in that port's options. `concurrency` is a throttle and never a bound. |
+| **Re-fetch after a reported expiry.** The account keeps the dead grant until reconnect — `noteCredentialsExpired` notifies, it does not clear — so any later `get()` fetches the same credentials back and its callers 401 again. | all | Self-healing and bounded: each round costs a redundant 401 (the account notifies once), never a wrong authorization. The source keeps reported identities in a per-activation dead set and refuses to re-adopt their generations, and fences out fetches already in flight at the report; without those, a cache hit under the restored partition never reaches the provider, so hit-only paths would mask the outage for the TTL and across the reconnect. A fetch started after the report, adopting an identity not in the set — successful refresh or reconnect — re-establishes the authority. |
+| **Corrupt-record blast radius.** A throwing `upgradeRecord` propagates out of `#coerce`, so one unreadable legacy record makes `listPending()` throw and blinds the whole simulation overlay rather than dropping that entry. | ports supplying `upgradeRecord` | Both behaviours lose something — a throw blinds everything, skipping hides one pending action from its user — so pick it with a real corpus of legacy records in view. |
+| **The retained tier is unbounded.** `#requireCapacity` scans only the pending prefix and skips `isRetained`, so `maxPending` bounds pending records and twice that many `staged`/`failed` ones, but never retained ones. A long-lived `retainApplied: true` binding accumulates one record per applied action indefinitely. | every retaining port | Retention is consumer policy and vendor caps differ; the binding must retire records through `runExclusive` under its own policy. |
+| **Past its bound, a pruned `failed` record takes the only account of what went wrong.** The Workshop keeps a thrown `applyPendingAction` pending and visible (`overseer.ts:9497-9500`, "the action stays pending and the turn stays suspended"), so the journal record is the sole holder of the reason. Once more than `2 × maxPending` prunable records accumulate, the oldest are dropped: a later approve degrades to `Unknown pending action` and a later reject succeeds silently, which can lose an `ActionApplyError` warning that a provider effect partly landed. | any port accumulating more than twice `maxPending` un-rejected failures on one resource | Storage must be bounded, so something must eventually go; the choice is only what and when. Counting failures against the cap instead — the obvious alternative — converts a lost diagnostic into a provider-triggered denial of service, blocking all staging until the user hand-clears them. Staged-first pruning and the doubled bound push this out; closing it entirely needs a tier that keeps reasons after their records, which is the same unbounded retention the row above defers. |
+| **A pending action is not fenced against the connection that staged it.** In-place reconnect keeps the same account DO and `userObjectId` and merely replaces the grant — `reconnectAccount()` is `record.account.reconnect()` (`user.ts:1541-1545`) and `markCredentialsRestored` re-describes on the assumption the user "may have re-authed with different info" (`user.ts:1655-1664`). Neither the overseer's approval record nor the facet's journal is touched, so an action staged under principal A can be approved and applied with principal B's credentials — and an object id that named one thing in A's tenant may name another in B's. No gatekeeper in either corpus fences this. | every port whose provider allows re-auth as a different principal | Not fixable with a nonce. A facet-side generation check followed by the handler's own `get()` is not atomic — a reconnect landing between them still yields B — so the fence has to be a credential read that takes the staged generation, `getCredentialsForGeneration(expected)` in the account DO, over the `connectionGeneration()` the coordinator already stores (§4.6; `identity()` cannot serve — every refresh supersedes it, invalidating every pending action). The stage-time half is delivered: the generation rides `getCredentials()`, so a staging call records the generation of its own credential read — never `CredentialSource.authority()`, a shared last-seen value (§4.10) that a concurrent fetch can move between the read and the record, stamping an action derived under A with B's generation. The apply-time fenced read remains open. That reaches only handlers that resolve credentials through the kit; a handler holding its own client still calls the provider unfenced, which is the cost of the escape hatch. Land it with the first port whose provider permits principal-switching re-auth, so the handler ergonomics are designed against a real one — supabase qualifies (reconnect may authorize a different org), so decide at that port whether to take the fence or explicitly re-scope this trigger. |
+| **The expiry latch re-arms with two writes.** `clearCredentialExpiryLatch` clears the boolean and writes a fresh arm. Were the second to fail alone, an in-flight notification for the replaced credentials would match the surviving arm and latch the new ones — the one *silencing* failure in a module whose every other window fails toward a harmless duplicate notification. | every port with a refresh flow | Both writes are adjacent, awaitless and constant-size, so one implicit transaction carries them and no trigger separates them; the function's doc comment states that adjacency as the invariant to preserve. Every candidate fix is worse than the window: swapping the order makes the silence deterministic, and one combined record breaks the plain-boolean compatibility the latch key promises. If a port ever needs it, the escape is a single record holding arm and notified together. |
+| **A crash mid-withheld-read closes admission for good.** The `observer-withhold:<nonce>` marker goes down before the overseer is asked and is stranded by an activation that dies before settling; `addObserver` refuses while any marker stands, and nothing reclaims one. A read the overseer would have refused still leaves the binding unshareable. | every strategy-C port using `withholdFromObservers` | A stranded marker cannot tell a lost reply from a lost request, and the overseer's record is durable before the reply — so reclaiming on any schedule risks disclosing a recorded owner-only description to the next collaborator admitted, while over-fencing costs sharing on a binding already handling owner-only data. The attempt record's fail-closed trade, without the TTL escape. *Trigger:* a binding observed stuck closed with no `observer-withheld` latch. |
+| **A lost `authorizeObservation` reply reopens admission over a standing withheld record.** `authorize` runs `discard()` on any throw, but a transport failure after the overseer's durable store is indistinguishable from a refusal — the marker comes down while the record stands, and the next collaborator admitted can read the owner-only description through `listActions()`. | every strategy-C port using `withholdFromObservers` | Keeping the marker on every throw inverts the earned-latch trade: refusal is the *ordinary* answer for a binding with observers (`overseer.ts:4590-4603`), and would permanently close admission for a read that disclosed nothing. Matching refusal message text was considered and rejected. The fix is a distinguishable refusal result in the `ApprovalQueue` contract, with `discard()` run only on it — batch with the next kernel contract change. *Trigger:* that change, or the first port shipping withheld reads. |
+| **A dropped action kind strands its dependents silently.** `provides`/`dependsOn` are evaluated from the live definition, so an action staged under a kind a later deploy removed reports no refs, and the dependents it was holding open are not retired with it. | any port that removes a shipped action kind | The dependent stays pending and fails at the provider instead of naming the parent it needed, so what is lost is an error message, not an effect — a ref a gatekeeper declares in `dependsOn` is by definition an identifier the provider validates. Closing it means storing the refs on the record, which puts staging metadata inside the journaled action identity and threads it through every state transition. No corpus gatekeeper stores its graph either (§4.8), so the six that cascade port without this. *Trigger:* the first port to remove a shipped action kind. |
+| **A read during an in-flight apply can overlay an effect the provider already made real.** Simulated reads project `pending` and `claimed` records, and an apply is a provider round trip followed by the journal write, so a read landing between the two fetches the real effect and overlays the same action again — a transient duplicate in the *view*, never a second provider effect (resolution is serialized). | every port with continue-with-simulation actions | Inherent to overlaying local pending state onto remote reads: no atomic instant flips both, and it holds for every projected state, so dropping `claimed` from projection would only make the action vanish mid-apply instead. Serializing reads with resolution would stall the agent for the length of a provider call on every read — the trade submission already refuses — and `runExclusive` is the opt-in for a consumer that needs a consistent snapshot. Self-healing: the next read after the journal write is correct. *Trigger:* an agent observed acting on the duplicate, e.g. staging a corrective action against it. |
+| **Pending observed-set records are never reclaimed.** `prepareObservation` marks untracked sets `"pending"` before awaiting the oracle and returns no `discard`, so a read the overseer refuses leaves them behind; only a later successful read of the same sets promotes them, and `#trackedSets()` counts pending rows against `maxTrackedSets`. Enough distinct refused reads and every `prepareObservation` throws "Bind a narrower scope". | every strategy-C port | Inherited behaviour, not introduced: google's shipped tracker writes pending before the await and returns `commit` only (`gatekeeper-google/src/observers.ts:186-236`), with `maxTrackedSets` alongside it. The naive fix is unsafe — two concurrent reads can mark one set pending, and a `discard` that deleted it after the other committed would un-track an observed set and let a later observer in unverified against it. So a reclaiming `discard` must delete only rows still `"pending"`, which is a concurrency argument that wants the fixture in front of it. *Trigger:* the first strategy-C port, or a binding observed to exhaust its budget. |
 
 `stageAction` encodes the one ordering every gatekeeper must get right: allocate the record,
 `submitAction(id, description)`, then mark it submitted — and roll the record back and rethrow if
-submission fails _while the record is still staged_. A record that has left "staged" proves the
+submission fails *while the record is still staged*. A record that has left "staged" proves the
 overseer received the submission — an auto-approval can resolve the action while `submitAction` is
 in flight — so a rejected RPC then means only the reply was lost, and `stageAction` reports the id
 as submitted rather than offering a resubmit of an effect that landed. The resolution verbs supply
@@ -1211,7 +1155,7 @@ the catch confines the damage to zero.
 **Apply is at-least-once by default**, and `claimBeforeApply` is the opt-out. Without it the
 provider call can succeed and the process crash before the journal write, and the overseer's retry
 re-applies — fine for an idempotent write, wrong for one that charges a card. With it the journal
-is moved to `claimed` _before_ the handler runs, so the three outcomes are distinguishable in a
+is moved to `claimed` *before* the handler runs, so the three outcomes are distinguishable in a
 later activation: a plain throw restores `pending` (the handler classified the failure retryable),
 an `ActionApplyError` records `failed` with its display-safe message (terminal — every later
 attempt is answered from the record with no provider call, and only a rejection clears it), and a
@@ -1222,7 +1166,7 @@ is part of the world a read describes — while `failed` ones deliberately do no
 
 **A non-idempotent create must set it.** Without a claim, an interrupted dispatch leaves the record
 retryable, so the retry creates a second entity — and if the first one bound a provisional id, the
-retry's `bind` throws the conflict of §4.9 _after_ the duplicate exists. The claim is what turns
+retry's `bind` throws the conflict of §4.9 *after* the duplicate exists. The claim is what turns
 that into one terminal "outcome unknown" the user reconciles. It is also the corpus answer:
 ironclad and salesforce both write a pre-dispatch marker and refuse the ambiguous retry
 (`ironclad.ts:927-941`, `salesforce.ts:1050-1065`), while confluence, which does not, can re-create
@@ -1259,7 +1203,7 @@ with nothing in their approval queue to clear. Counting `failed` would be worse 
 of terminal provider failures would stop the agent staging anything at all until the user cleared
 them by hand, which is an outage denying service to someone who did nothing wrong.
 
-But exclusion alone would just move the growth: both sit under the _scanned_ prefix, so a run of
+But exclusion alone would just move the growth: both sit under the *scanned* prefix, so a run of
 them would make every later allocation and every simulation scan more expensive. They are therefore
 bounded separately, at `PRUNABLE_RECORD_FACTOR` (2) times `maxPending`, dropped by the same
 `allocate` scan that enforces the cap — which is exactly mcp-shared's shape, a pending cap that
@@ -1293,10 +1237,9 @@ export type SimulationRecord<Action> = { readonly id: number; readonly action: A
 export function createSimulationView<Action, Target>(
   records: readonly SimulationRecord<Action>[],
   targets: (action: Action) => readonly Target[],
-): Readonly<{
-  // frozen; readonly function properties, since
-  all: () => readonly SimulationRecord<Action>[]; // an RPC-reachable object may not hand out a
-  forTarget: (target: Target) => readonly SimulationRecord<Action>[]; // mutable method table
+): Readonly<{                                       // frozen; readonly function properties, since
+  all: () => readonly SimulationRecord<Action>[];   // an RPC-reachable object may not hand out a
+  forTarget: (target: Target) => readonly SimulationRecord<Action>[];   // mutable method table
 }>;
 
 export type SimulationStep<State> =
@@ -1305,33 +1248,19 @@ export type SimulationStep<State> =
   | { kind: "unsupported"; reason: string };
 export type SimulationResult<State, Action> =
   | { kind: "complete"; value: State; appliedCount: number }
-  | {
-      kind: "incomplete";
-      partial: State;
-      appliedCount: number; // `partial`, not `value`: the
-      unsupported: SimulationRecord<Action>;
-      reason: string;
-    }; // fold stops at `unsupported`
-export function replaySimulation<State, Action>(
-  base,
-  records,
-  apply,
-): SimulationResult<State, Action>;
+  | { kind: "incomplete"; partial: State; appliedCount: number;   // `partial`, not `value`: the
+      unsupported: SimulationRecord<Action>; reason: string };    // fold stops at `unsupported`
+export function replaySimulation<State, Action>(base, records, apply): SimulationResult<State, Action>;
 
 export class ProvisionalIds<Id extends string> {
-  constructor(
-    kv,
-    options: {
-      namespace: string;
-      isProvisional?(id: Id): boolean; // classifies an unknown id, so requireResolved can tell
-    },
-  ); // "not ours" from "not bound yet"; it throws without one
-  allocate(
-    format: (sequence: number) => Id, // keys `${ns}seq:provisional`
-    options?: { kind?: string },
-  ): Id; // tagged: also keys `${ns}kind:${id}`
-  bind(provisional: Id, real: Id): void; // keys `${ns}prov:${id}`
-  resolve(id: Id): Id; // identity for unknown or provider ids
+  constructor(kv, options: {
+    namespace: string;
+    isProvisional?(id: Id): boolean;   // classifies an unknown id, so requireResolved can tell
+  });                                  // "not ours" from "not bound yet"; it throws without one
+  allocate(format: (sequence: number) => Id,        // keys `${ns}seq:provisional`
+    options?: { kind?: string }): Id;               // tagged: also keys `${ns}kind:${id}`
+  bind(provisional: Id, real: Id): void;            // keys `${ns}prov:${id}`
+  resolve(id: Id): Id;                              // identity for unknown or provider ids
   isResolved(id: Id): boolean;
   kindOf(id: Id): string | undefined;
   requireResolved(id: Id, options?: { expectedKind?: string }): Id;
@@ -1378,7 +1307,7 @@ nothing to a consumer with one entity type. Marketo carries a `LogicalKind` on e
 (`github.ts:139-142, 1956-1981`) — two independent consumers of the same idea.
 
 **A conflicting rebind throws, and it is not classifier-gated.** Apply is at-least-once (§4.8), so a
-create whose journal write was lost is re-applied and the provider answers with a _second_ entity.
+create whose journal write was lost is re-applied and the provider answers with a *second* entity.
 Overwriting the binding would silently retarget every queued action that resolves that provisional
 and orphan the entity the earlier apply created, so `bind` refuses a different provider ID for an
 already-bound provisional and stays a no-op for the same one — the retry's own path. A duplicate the
@@ -1427,7 +1356,7 @@ invalidates wholesale, the pattern `SupabaseCache` uses at `supabase.ts:777-806`
 schema after a mutating statement applies.
 
 **Entries are partitioned by authority, read per call and never captured.** Every entry carries the
-authority current when it was stored, and a read hits only when that matches the authority _now_,
+authority current when it was stored, and a read hits only when that matches the authority *now*,
 the generation matches, and the TTL has
 not elapsed. The corpus has 21 metadata caches across 16 packages, **none** partitioned by
 principal; 12 of them are durable or warm enough to serve old-principal data after a reconnect, and
@@ -1444,7 +1373,7 @@ the grant under a live facet, and the long-lived cache object is the prevalent c
 exception — slack's `#apiInstance ??=` lives for the DO (`slack.ts:862-874`), jira's `#cache` and
 `#metadata` are instance fields (`jira.ts:1310-1312`), mcp-shared's `#hydrated` is a facet field
 (`facet.ts:63-64`) — and it is also the only shape in which the coalescing below pays for itself. A
-frozen authority would then serve the old principal's entries and, worse, stamp the _new_
+frozen authority would then serve the old principal's entries and, worse, stamp the *new*
 principal's data with the old identity, an entry that inverts the guarantee below rather than merely
 going stale. `CredentialCoordinator.identity()` cannot serve: every successful refresh supersedes
 it, so keying on it silently discards the whole cache each time the grant renews. The account-side
@@ -1474,7 +1403,7 @@ costs a refetch; under-invalidation is already impossible once entries carry the
 mechanism, not two.
 
 The `"cache:"` prefix is fixed rather than a `namespace` option: cache families in the corpus are
-key _segments_ within one namespace (github `cache:<kind>:`, notion `cache:page:`/`cache:db:`,
+key *segments* within one namespace (github `cache:<kind>:`, notion `cache:page:`/`cache:db:`,
 supabase `cache:entry:`), so a per-kind segment belongs in the caller's own `key`, and per-family
 freshness is already per-read through `cached(key, ttlMs, …)` (notion's 30s/60s/1h split). No DO in
 either corpus runs two separate durable TTL caches needing distinct namespaces.
@@ -1484,7 +1413,7 @@ the generation counter lives under a stable key, so a bump never grows the keysp
 fill overwrites the entry. That narrows `CacheKv` to `get`/`put` — no `delete`.
 
 **Concurrent misses coalesce.** An instance-local `Map` keyed
-`JSON.stringify([generation, authority, key])` holds the
+`` JSON.stringify([generation, authority, key]) `` holds the
 in-flight load, so N callers missing one key run `load()` once, and the entry is cleared in a
 `finally` only when it is still the same promise — the guard shape `CredentialSource` uses. Both the
 generation and the authority are part of that key, so a load started before a bump or a reconnect is
@@ -1575,14 +1504,14 @@ which is exactly the data loss marketo's own pager documents (`types.d.ts:357-35
 (`client.ts:628-679`).
 
 Two rules follow from the token being opaque, and both belong to this class alone. A page whose
-`nextToken` equals the token it was _asked_ to continue from throws: the provider is ignoring the
+`nextToken` equals the token it was *asked* to continue from throws: the provider is ignoring the
 token, and the walk would otherwise re-fetch that page until a cap. Only the immediately-prior token
 is compared — an unbounded seen-set would grow with the walk it is meant to protect — and the first
 page, asked `undefined`, is exempt by construction. The refusal is stable and non-advancing, so a
 retry re-asks the same token and is refused again rather than losing the position. And a fixed
 shared `MAX_PROVIDER_PAGES_PER_CALL` bound of **10 provider pages** per `next()` call keeps a quiet
 stream from looping forever and also bounds sparse streams: every provider page counts, not just
-consecutive empty ones. At the bound `next()` returns the buffer _even when empty_, because `[]` is
+consecutive empty ones. At the bound `next()` returns the buffer *even when empty*, because `[]` is
 a legal non-terminal page (only `null` ends a `Cursor`) and the next call resumes the walk with a
 window. It is not an option: google's `CursorPager` hard-codes its own bound, internal cf-wiki loops
 unbounded (a hang on a broken provider), and nobody tunes it per resource. The numeric cursor needs
@@ -1593,9 +1522,7 @@ identity the cursor does not have, and no page ceiling substitutes for one.
 ### 4.12 `./serial-queue` — internal
 
 ```ts
-export class SerialTaskQueue {
-  run<T>(op: () => T | Promise<T>): Promise<T>;
-}
+export class SerialTaskQueue { run<T>(op: () => T | Promise<T>): Promise<T> }
 ```
 
 `SerialTaskQueue` is an **internal module, not a public subpath**: no consumer needs it, and the one
@@ -1627,18 +1554,16 @@ warning on `BoundActionSet.runExclusive`.
 ```ts
 export type AuthRetryOptions<Token> = {
   getToken(options: { forceRefresh: boolean; staleToken?: Token }): Promise<Token>;
-  isAuthError(error: unknown): boolean; // the provider rejecting the credential, not 5xx
+  isAuthError(error: unknown): boolean;          // the provider rejecting the credential, not 5xx
 };
-export function withAuthRetry<Token, T>(
-  options: AuthRetryOptions<Token>,
-  run: (token: Token) => Promise<T>,
-): Promise<T>;
+export function withAuthRetry<Token, T>(options: AuthRetryOptions<Token>,
+  run: (token: Token) => Promise<T>): Promise<T>;
 ```
 
 `CredentialSource.run()` has exactly two outcomes: pass the call through, or report the account
 expired. That is right for the five gatekeepers whose 401 means the grant is gone (supabase,
 github, linear, spotify, homeassistant), and wrong for the four that mint a short-lived derived
-bearer from a longer-lived grant, where a 401 usually means _that bearer_ is stale. All four
+bearer from a longer-lived grant, where a 401 usually means *that bearer* is stale. All four
 hand-roll the same single retry: marketo (`marketo-api.ts:462-477`), google
 (`auth-retry.ts:100-141`, which additionally force-refreshes with the rejected token's identity),
 notion (`notion-api.ts:1022-1052`) and confluence (`confluence-api.ts:527-550`).
@@ -1657,7 +1582,7 @@ stale notifier that stepped on one would mark a healthy grant dead — so neithe
 nor a twice-rejected credential is reported from here. Both belong to the caller's
 `CredentialSource.run(creds => withAuthRetry(...))`: `withAuthRetry` swallows the first 401 and
 rethrows only a persistent one, so `run`'s catch fires exactly once, against the identity it
-captured _before_ the attempt (§5.6).
+captured *before* the attempt (§5.6).
 
 **Where `getToken` comes from is the port's, and today it is a vendor RPC.** For the five providers
 whose 401 means the grant is gone, there is nothing to wire: `CredentialSource.run` alone is the
@@ -1675,21 +1600,18 @@ forces one; whatever RPC a port puts in front of it owes the same dead-grant tre
 `getCredentials()` gives — a still-current `CredentialsExpiredError` becomes
 `noteCredentialsExpired()`, fenced on the identity.
 
-This closes the "401 retry" _logic_ the §4.8 table recorded as deferred. The refresh channel the
+This closes the "401 retry" *logic* the §4.8 table recorded as deferred. The refresh channel the
 retry depends on stays per-vendor until the work item lands.
 
 ### 4.14 `./endpoint`
 
 ```ts
-export function normalizeVendorEndpoint(
-  raw: string,
-  options: {
-    hostPattern: RegExp; // non-global, non-sticky; ANCHORED BY THE KIT, tested against
-    // url.hostname, so any port is accepted and preserved
-    label: string; // names the endpoint in the thrown message
-    requireHttps?: boolean; // default true
-  },
-): string; // origin + normalized path; no query, userinfo or fragment
+export function normalizeVendorEndpoint(raw: string, options: {
+  hostPattern: RegExp;              // non-global, non-sticky; ANCHORED BY THE KIT, tested against
+                                    // url.hostname, so any port is accepted and preserved
+  label: string;                    // names the endpoint in the thrown message
+  requireHttps?: boolean;           // default true
+}): string;                         // origin + normalized path; no query, userinfo or fragment
 ```
 
 For the operator-pasted endpoint an instance-hosted vendor needs (marketo's `<munchkin>.mktorest.com`,
@@ -1713,7 +1635,7 @@ would silently lose `/hass`. And `url.host` carries the port, so an anchored `/^
 tested against it would refuse `ha.example.com:8123`, while 6 of the corpus's 7 endpoint choices
 accept an explicit port and home assistant's own form documents "port if non-standard"
 (`homeassistant.ts:217`). Matching `url.hostname` accepts and preserves any port: the allowlist pins
-_which vendor_ is being addressed, and a different port on an allowlisted host is the same host. The
+*which vendor* is being addressed, and a different port on an allowlisted host is the same host. The
 returned value is `origin + pathname` with trailing slashes stripped (`"/"` reducing to `""`), so a
 vendor with no path gets exactly the old origin output; query and fragment are dropped, and a URL
 carrying userinfo is refused outright, as mcp-portal does (`config.ts:87`).
@@ -1795,10 +1717,8 @@ porting to the assembly.
 ```ts
 export type KitEnv = { BASE_URL?: string; CLIENT_ID?: string; CLIENT_SECRET?: string };
 export type KitAccountProps = { userObjectId: string };
-export type KitLogger = {
-  warn(msg: string, fields?: object): void;
-  error(msg: string, fields?: object): void;
-};
+export type KitLogger = { warn(msg: string, fields?: object): void;
+                          error(msg: string, fields?: object): void };
 export function getBaseUrl(env: KitEnv, id: string): string;
 export function svgLogoUrl(svg: string): string;
 // `Public` is what a facet/configurator may hold; `Grant` is what the account DO stores (§5.6).
@@ -1808,26 +1728,26 @@ export function gatekeeperKit<E extends KitEnv, Grant, X, Public>(): {
   define(spec: GatekeeperSpecInput<E, Grant, X, Public>): GatekeeperSpec<E, Grant, X, Public>;
   resource<P extends Record<string, unknown>>(def: {
     supported: SupportedResource;
-    tsType: string; // exported name in the effective types text (§5.10)
-    hookTsType?: string; // ditto, for resources whose sessions register hooks
-    suggestedBindingName: string; // e.g. "SUPABASE_PROJECT" — the resource *type*, not instance
+    tsType: string;                    // exported name in the effective types text (§5.10)
+    hookTsType?: string;               // ditto, for resources whose sessions register hooks
+    suggestedBindingName: string;      // e.g. "SUPABASE_PROJECT" — the resource *type*, not instance
     resolve?(url: URL): P | null;
     facet?(exports: X, props: KitAccountProps & P): DurableObjectClass<Gatekeeper<unknown>>;
     configurator?(h: AccountHandle<E, Public>): ResourceConfiguratorFrame;
-    types?: string; // per-resource slice; default spec.types (§5.10)
+    types?: string;                    // per-resource slice; default spec.types (§5.10)
   }): ResourceDef<E, Grant, X, Public>;
 };
 
 export type GatekeeperSpecInput<E, Grant, X, Public> = {
-  id: string; // vendor id; names the dev BASE_URL default and log vendorId
-  vendor: VendorDescription; // the canonical type, reused directly
-  auth: AuthStrategy<Grant, E>; // the strategy mints and refreshes the *stored* grant
+  id: string;                        // vendor id; names the dev BASE_URL default and log vendorId
+  vendor: VendorDescription;         // the canonical type, reused directly
+  auth: AuthStrategy<Grant, E>;      // the strategy mints and refreshes the *stored* grant
   account: {
     describe(h: AccountHandle<E, Public>): Promise<AccountDescription>;
-    authenticatedEmail?(h: AccountHandle<E, Public>): Promise<string | null>; // absent → null
+    authenticatedEmail?(h: AccountHandle<E, Public>): Promise<string | null>;  // absent → null
   };
   resources: readonly ResourceDef<E, Grant, X, Public>[];
-  types: string; // the types.txt text
+  types: string;                     // the types.txt text
   notConfigured?: { title: string; detail: string };
   logger?: KitLogger;
 };
@@ -1857,42 +1777,21 @@ title to `${vendor.displayName} Gatekeeper Not Configured`.
 export type BeginResult = { redirectUrl: string } | { html: string };
 export type AttemptMetadata = { connect?: GatekeeperConnectOptions; [key: string]: unknown };
 // A fresh Durable Object stub per call, never a property-derived RpcStub the strategy would leak.
-export type StrategyAccountStub = {
-  completeAuth(payload: unknown, state: string): Promise<boolean>;
-};
+export type StrategyAccountStub = { completeAuth(payload: unknown, state: string): Promise<boolean> };
 
 export interface AuthStrategy<Creds, E extends KitEnv = KitEnv> {
   configured(env: E): boolean;
-  routes(
-    req: Request,
-    ctx: {
-      env: E;
-      baseUrl: string;
-      relPath: string;
-      url: URL;
-      accountForId(id: string): StrategyAccountStub;
-    },
-  ): Promise<Response | null>;
-  begin(ctx: {
-    env: E;
-    baseUrl: string;
-    accountId: string;
-    state: string;
-    metadata: AttemptMetadata;
-    kv; // "auth:"-namespaced view of account storage
+  routes(req: Request, ctx: { env: E; baseUrl: string; relPath: string; url: URL;
+    accountForId(id: string): StrategyAccountStub }): Promise<Response | null>;
+  begin(ctx: { env: E; baseUrl: string; accountId: string; state: string;
+    metadata: AttemptMetadata; kv;            // "auth:"-namespaced view of account storage
     deliver(creds: Creds): Promise<void>;
-    waitUntil(p: Promise<unknown>): void;
-  }): Promise<BeginResult>;
-  obtain(ctx: {
-    env: E;
-    baseUrl: string;
-    payload: unknown;
-    metadata: AttemptMetadata;
-    kv;
-  }): Promise<Creds>;
-  refresh?(creds: Creds, ctx: { env: E }): Promise<Creds>; // CredentialsExpiredError on grant death only
+    waitUntil(p: Promise<unknown>): void }): Promise<BeginResult>;
+  obtain(ctx: { env: E; baseUrl: string; payload: unknown; metadata: AttemptMetadata;
+    kv }): Promise<Creds>;
+  refresh?(creds: Creds, ctx: { env: E }): Promise<Creds>;   // CredentialsExpiredError on grant death only
   revoke?(creds: Creds, ctx: { env: E }): Promise<void>;
-  isAuthError(error: unknown): boolean; // runtime API classification (CredentialSource.run)
+  isAuthError(error: unknown): boolean;      // runtime API classification (CredentialSource.run)
   expiredMessage: string;
   expiresAt?(creds: Creds): number | undefined;
   refreshSkewMs?: number;
@@ -1928,24 +1827,13 @@ a value minted inside `begin` cannot reach it by mutation.
 ```ts
 export function oauth2<Creds, E extends KitEnv = KitEnv>(config: {
   authorizeUrl: string | ((env: E) => string);
-  clientCredentials?(env: E): { id: string; secret: string } | undefined; // default env.CLIENT_ID/SECRET
+  clientCredentials?(env: E): { id: string; secret: string } | undefined;  // default env.CLIENT_ID/SECRET
   scopes?: { full: string[]; auth?: string[]; param?: string; join?: string };
   extraAuthorizeParams?: Record<string, string>;
-  pkce?: boolean; // S256; verifier lives in the strategy's kv view, keyed by state
-  exchange(ctx: {
-    code: string;
-    redirectUri: string;
-    client: { id: string; secret: string };
-    env: E;
-    codeVerifier?: string;
-    requestedScopes?: string[];
-  }): Promise<Creds>;
-  refresh?;
-  revoke?;
-  isAuthError;
-  expiredMessage;
-  expiresAt?;
-  refreshSkewMs?;
+  pkce?: boolean;                                        // S256; verifier lives in the strategy's kv view, keyed by state
+  exchange(ctx: { code: string; redirectUri: string; client: { id: string; secret: string };
+    env: E; codeVerifier?: string; requestedScopes?: string[] }): Promise<Creds>;
+  refresh?; revoke?; isAuthError; expiredMessage; expiresAt?; refreshSkewMs?;
   legacyKeys?: readonly string[];
   upgradeStoredCredentials?;
 }): AuthStrategy<Creds, E>;
@@ -1982,15 +1870,12 @@ assertion.
 ### 5.5 `./http`
 
 ```ts
-export function handleGatekeeperHttp<E extends KitEnv, Creds, Public>(
-  req: Request,
-  opts: {
-    env: E;
-    spec: GatekeeperSpec<E, Creds, any, Public>;
-    accountForId(id: string): AccountStub<Creds>;
-    routes?(req: Request, url: URL, relPath: string): Promise<Response | null>;
-  },
-): Promise<Response>;
+export function handleGatekeeperHttp<E extends KitEnv, Creds, Public>(req: Request, opts: {
+  env: E;
+  spec: GatekeeperSpec<E, Creds, any, Public>;
+  accountForId(id: string): AccountStub<Creds>;
+  routes?(req: Request, url: URL, relPath: string): Promise<Response | null>;
+}): Promise<Response>;
 ```
 
 Routing order: base-path guard (throws on a mismatched prefix, preserving current behavior at
@@ -2044,7 +1929,6 @@ Public loopback-RPC methods and their sequencing:
   does not have and could not safely enable: sign-in replay mints a second session
   (`user.ts:416-426`) and, for cloudflare login, revokes the grant it is about to keep
   (`user.ts:1567-1590`).
-
 - `getCredentials()` — `coordinator.fresh(strategy.refresh)`, projected through
   `config.publicCredentials` and returned as `{ creds, identity, generation }` (the coordinator's
   current credential identity, reissued whenever credentials are written or cleared, plus its
@@ -2076,13 +1960,13 @@ connection generation. The original first four match every existing OAuth gateke
 accounts keep working across a port.
 
 **Refresh material must not cross the account boundary.** `AuthStrategy.refresh(creds)` and
-`revoke(creds)` (§5.2) take `Creds`, so for any gatekeeper with a refresh flow `Creds` _is_ the
+`revoke(creds)` (§5.2) take `Creds`, so for any gatekeeper with a refresh flow `Creds` *is* the
 stored grant, refresh token included. `getCredentials()` is called by the User entrypoint, every
 facet, and every verifier, and every operation in each of them reads it afresh —
 so returning the coordinator's `Creds` unprojected would hand long-lived refresh authority to every
 consumer and cache it there. That is a capability regression against the whole corpus, not a
 theoretical one: across **15** OAuth gatekeepers in both trees, **none** returns refresh material
-over that boundary. Each returns a narrow projection and refreshes _inside_ the account DO —
+over that boundary. Each returns a narrow projection and refreshes *inside* the account DO —
 supabase `{ token, expiresAt }` (`supabase.ts:80-83, 469-479`), github the access token string
 (`github.ts:1141-1147`), google `{ token, expires }` (`google-api.ts:42-45`), linear and notion
 access-token strings (`linear.ts:601-620`, `notion.ts:419-427`), with notion's separate
@@ -2102,7 +1986,7 @@ protected abstract [kitAccountConfig](): {
 ```
 
 Layer 1 already permits this and needs no change: `CredentialCoordinator<Creds>`,
-`AccountCredentialStub<Creds>`, and `CredentialSource<Creds>` are three _independent_ type
+`AccountCredentialStub<Creds>`, and `CredentialSource<Creds>` are three *independent* type
 parameters that merely share a letter, so `CredentialCoordinator<Grant>` in the DO alongside
 `CredentialSource<AccessToken>` in the facet already type-checks today. The leak would be introduced
 here, by wiring the two to one type — which is precisely why this is written down before §5.6 is
@@ -2131,7 +2015,7 @@ notes for whoever lands it:
   providers. A free-standing type plus a small adapter over the bearer `run` already fetched keeps
   the unforced path free of a second account round trip, which is the common case.
 - **Interaction with the fencing row (§4.8).** `getCredentialsForGeneration(expected)` extends this
-  same seam on a _different_ trigger (the first principal-switching port), and generation overlaps
+  same seam on a *different* trigger (the first principal-switching port), and generation overlaps
   with `staleBearer` semantically. Whichever lands first should leave room for the other.
 
 ### 5.7 `./vendor` — `KitVendorBase<E>`
@@ -2153,7 +2037,7 @@ resolver call `def.facet(exports(), props)` without a cast. Implements:
 - `getSupportedResources`.
 - Default `getGatekeeperClassFor(url)`: the first resource whose `resolve(new URL(url))` returns
   non-null wins, yielding `{ class: def.facet(exports(), { ...props, userObjectId }), resource:
-def.supported }`; no match throws `Unsupported ${spec.vendor.displayName} URL: ${url}`. The
+  def.supported }`; no match throws `Unsupported ${spec.vendor.displayName} URL: ${url}`. The
   authenticated identity always wins because `props` are parsed from a caller-supplied URL.
   Gatekeepers with irregular URL grammars (github's repo-with-refinements, email's mailbox
   claiming) override the method; it is a normal public method on the subclass.
@@ -2202,7 +2086,7 @@ and the fixture asserts two concurrent `applyAction` calls share one queue.
 dispatching to a `protected revert?(id: number): Promise<void | { message?: string; canRetry?:
 boolean }>` hook → throw not-implemented when the hook is absent. The consumer's
 hook is ordinary TypeScript reading the journal directly (`journal.get(id)`, switch on kind —
-github's and linear's existing `revertAction` bodies port nearly verbatim), but the _seam_ stays
+github's and linear's existing `revertAction` bodies port nearly verbatim), but the *seam* stays
 kit-owned: revert-vs-apply is the most race-sensitive pair in the corpus (notion's
 `laterConflictingApplied` ordering check assumes non-interleaving), so a hand-written public
 method skipping the queue would be a concurrency regression. Retention consistency is enforced
@@ -2238,7 +2122,7 @@ What the kit adds is enforcement of the seams that are stringly today:
 - **Shape integrity.** Session implementations declare `implements` against the interfaces in
   `types.d.ts` and carry `@validateRpc()`, so `capnweb-validate` validates every RPC call against
   the same declarations the agent reads. The kit does not add machinery here; it inherits it.
-- **The residual gap, stated honestly:** TypeScript cannot verify that the exported _name_ inside
+- **The residual gap, stated honestly:** TypeScript cannot verify that the exported *name* inside
   a serialized text blob denotes the type of a given session object. The single-file symlink case
   closes it by construction (same declarations); multi-file vendors keep the parity-test pattern
   (`gatekeeper-google/__tests__/types-parity.test.ts`); the `define()` check covers name drift in
@@ -2257,7 +2141,7 @@ These are load-bearing; the fixture suite (§7 step 11) exists to prove each one
 
 - **Named exports and migrations.** `ctx.exports.X` and `wrangler.jsonc` migrations resolve by
   export name, so consumers subclass the bases under their own names (`export class UserAccount
-extends KitUserAccountBase<Env, SupabaseCredentials, SupabasePublicCredentials> { … }`). The kit
+  extends KitUserAccountBase<Env, SupabaseCredentials, SupabasePublicCredentials> { … }`). The kit
   never dictates names.
 - **`@validateRpc()` stays in the consumer.** `capnweb-validate build` transforms only the
   consuming package's source tree, so kit bases are undecorated and every consumer decorates its
@@ -2294,7 +2178,7 @@ extends KitUserAccountBase<Env, SupabaseCredentials, SupabasePublicCredentials> 
   `listPending` order above; the `ObservationGate` ordering test, whose `prepare` resolved
   synchronously and so could not distinguish "authorize after prepare" from "authorize before it"
   (it now parks on a resolver the test controls, and asserts the queue is untouched while it does);
-  and the OAuth-claim rejections, every one of which an implementation deleting the record _before_
+  and the OAuth-claim rejections, every one of which an implementation deleting the record *before*
   validating would also satisfy, so a separate test now proves a wrong claim leaves the attempt
   claimable and a right one consumes it exactly once. The wire-visible constants
   (`NONCE_KEY`, `NONCE_BYTES`, and the four durations) are pinned as literals for the same reason:
@@ -2312,7 +2196,7 @@ Each step leaves the tree building; tests land with the module they cover. Nothi
 `packages/gatekeeper-kit` changes before step 12.
 
 1. **Scaffold the package.** `package.json` (name `@gadgets/gatekeeper-kit`, private, `type:
-module`, per-file `exports` map for every module in §4/§5; scripts `build`, `clean`, and
+   module`, per-file `exports` map for every module in §4/§5; scripts `build`, `clean`, and
    `test:run: "vitest run && vitest run -c vitest.worker.config.ts"` as a direct script beside
    the cached Vite `test` task; dependencies `@gadgets/workshop-shared`,
    `@gadgets/backend-utils` (both `workspace:*`); devDependencies
@@ -2403,7 +2287,7 @@ module`, per-file `exports` map for every module in §4/§5; scripts `build`, `c
    reaches the provider; an `ActionApplyError` records the failure, answers every replay from the
    record with no provider call, and is cleared only by `reject`; a claim a second bind finds
    over the same journal is converted to `APPLY_OUTCOME_UNKNOWN_MESSAGE` by both verbs without
-   running a handler; and a journal write that fails _after_ the handler succeeded leaves the
+   running a handler; and a journal write that fails *after* the handler succeeded leaves the
    record `claimed`, fires no hook, and is reported unknown on the next attempt rather than being
    rolled back to `pending`. `SerialTaskQueue`
    ordering and rejection isolation live in the **workerd** project
@@ -2415,7 +2299,7 @@ module`, per-file `exports` map for every module in §4/§5; scripts `build`, `c
    formatters; a `kind` recorded by `allocate` surviving a new instance, `requireResolved`
    refusing a mismatched `expectedKind` with the exact message even while unbound, and an
    untagged or real id passing through; a bare target refused at the type level; cache TTL and
-   generation bump, plus a reconnect under one _live_ instance in both directions, a value whose
+   generation bump, plus a reconnect under one *live* instance in both directions, a value whose
    authority moved mid-load stored under neither, and an in-flight load never shared across the
    change. Cursors get their **own**
    workerd suite
@@ -2446,7 +2330,7 @@ module`, per-file `exports` map for every module in §4/§5; scripts `build`, `c
     owns GC of its retained journal tier.
 11. **Fixture gatekeeper + workerd suite.** `__tests__/fixture/worker.ts` builds a complete
     "Acme" gatekeeper the intended consumer way: `gatekeeperKit<FixtureEnv, AcmeCreds,
-FixtureExports, AcmePublicCreds>()`, `oauth2` against `https://acme.test` endpoints mocked with
+    FixtureExports, AcmePublicCreds>()`, `oauth2` against `https://acme.test` endpoints mocked with
     `fetchMock` from `cloudflare:test`, one `https://acme.test/w/:id` resource with a configurator,
     decorated `GatekeeperVendor`/`GatekeeperUserImpl`/`AcmeGatekeeperImpl` subclasses plus an
     decorated `UserAccount`, a one-method verifier, `defineActions` with one kind, `aclObservers`,
@@ -2478,11 +2362,11 @@ FixtureExports, AcmePublicCreds>()`, `oauth2` against `https://acme.test` endpoi
     re-point every import of them — `mcp-shared/src/{account,http,tools,user,util}.ts`,
     `gatekeeper-mcp/src/{mcp,connect-form}.ts`, `gatekeeper-mcp-portal/src/portal.ts` (verify the
     list with `grep -rn 'connect-nonce\|\./html' packages/mcp-shared packages/gatekeeper-mcp
-packages/gatekeeper-mcp-portal`) — at `@gadgets/gatekeeper-kit/connect-nonce`,
+    packages/gatekeeper-mcp-portal`) — at `@gadgets/gatekeeper-kit/connect-nonce`,
     `/connect-pages`, and `/credential-expiry`. Move `DEFAULT_TOKEN_LIFETIME_S = 60 * 60` local to
     `account.ts`. Replace `McpAccountBase`'s hand-rolled expiry latch with
     `notifyCredentialsExpiredOnce`/`clearCredentialExpiryLatch`, adding `protected abstract
-vendorId(): string` implemented by both connectors (`"mcp"`, `"mcp-portal"`). Keep a
+    vendorId(): string` implemented by both connectors (`"mcp"`, `"mcp-portal"`). Keep a
     file-local pure-JS `constantTimeEqual` in `account.ts` with a comment naming the reason (its
     account tests run in Node, where `crypto.subtle.timingSafeEqual` is unavailable; every Worker
     runtime path uses the kit comparator). Drop `escapeHtml` from `util.ts` in favor of
@@ -2509,13 +2393,13 @@ vendorId(): string` implemented by both connectors (`"mcp"`, `"mcp-portal"`). Ke
       (the client derives it from 401, or an exact 400 `invalid_grant` — never 403) to
       `CredentialsExpiredError` and rethrows everything else untouched, so infrastructure failures
       stop destroying sessions; `extraAuthorizeParams:
-{ response_type: "code" }`; `expiredMessage` and the not-configured wording preserved
+      { response_type: "code" }`; `expiredMessage` and the not-configured wording preserved
       verbatim; `legacyKeys` declares
       `accessToken`/`refreshToken`/`accessTokenExpiresAt` and `upgradeStoredCredentials` reassembles
       the grant from them, leaving the reap to the coordinator.
     - Resource defs gain the static contract fields: the project def `tsType: "SupabaseProject"`,
       `suggestedBindingName: "SUPABASE_PROJECT"`; the organization def `tsType:
-"SupabaseOrganization"`, `suggestedBindingName: "SUPABASE_ORGANIZATION"` — moved out of the
+      "SupabaseOrganization"`, `suggestedBindingName: "SUPABASE_ORGANIZATION"` — moved out of the
       facet's `describe()` (:1049-1067), which shrinks to metadata fetches plus
       `this.resourceDescription({...})`.
     - Thin subclasses with unchanged export names (`GatekeeperVendor`, `UserAccount`,
@@ -2642,25 +2526,25 @@ evidence, and the trigger.
 - **Expiry-derived consumer credential cache** behind `CredentialSource`'s `get`/`run` surface.
   Google caches a fetched token until expiry − 60s (`google/src/auth-retry.ts:181-213`) and slack
   until expiry − 300s (`slack.ts:510-519`) — freshness derived from the credential rather than a
-  fixed TTL. _Trigger:_ the google or slack port. Add an `expiresAt`-aware variant rather than
+  fixed TTL. *Trigger:* the google or slack port. Add an `expiresAt`-aware variant rather than
   reintroducing a TTL knob; it needs an `expiresAt` projection the stored/public credential split
   does not carry today (§4.6).
 - **Split-key handshake variant** behind the `putInitiation`/`advanceToOAuth`/`claimOAuth`
   operations. Internal ironclad stores `initiationNonce` and `oauthNonce` under two keys
-  (`ironclad.ts:129-131,1634-1692`) where the kit uses one `nonce` record. _Trigger:_ the ironclad
+  (`ironclad.ts:129-131,1634-1692`) where the kit uses one `nonce` record. *Trigger:* the ironclad
   port — either a variant module or a one-time key migration. Salesforce
   (`salesforce.ts:150-152,1210-1269`) already matches the kit shape exactly, PKCE verifier in the
   record.
 - **Per-action-id claim serialization** as an alternative to the facet's global `SerialTaskQueue`.
   The durable claim itself is now in the journal (§4.8, `claimBeforeApply`); what stays deferred is
   its granularity. `mcp-shared` stamps `applying` synchronously before awaiting
-  (`action-store.ts:130-162`) and ironclad coalesces per id (`ironclad.ts:957-995`). _Trigger:_
+  (`action-store.ts:130-162`) and ironclad coalesces per id (`ironclad.ts:957-995`). *Trigger:*
   measured per-DO contention where one slow apply may not block unrelated actions — a `deferred:`
   global lock is the simple form, per-id claims the one that matters if throughput does.
 - **Provider-probing reconciliation** behind `ActionDefinition`, as a
   `reconcile?(payload, host, ctx) => "applied" | "absent" | "unknown"` consulted before re-applying a
   `claimed` record. It is the principled answer to `APPLY_OUTCOME_UNKNOWN_MESSAGE`, which today ends
-  in "check the provider yourself". _Trigger:_ the first gatekeeper whose provider supports both an
+  in "check the provider yourself". *Trigger:* the first gatekeeper whose provider supports both an
   idempotency key and lookup by it — 0 of 15 live writers probe today, and three independently chose
   the manual-check message instead (`mcp-shared/src/action-store.ts:43-46`,
   `ironclad.ts:916-931`, and the kit). Half the work is already done: `ActionContext.id` is the
@@ -2668,7 +2552,7 @@ evidence, and the trigger.
 - **A `reverting` marker** for the retained tier, so an interrupted compensating call is
   distinguishable from a completed one. No gatekeeper in either corpus persists one, which is why
   all 11 functional reverts are silently replayable; the kit already owns the right primitive in
-  `claimed`, and the work is extending it past the tier boundary. _Trigger:_ the first
+  `claimed`, and the work is extending it past the tier boundary. *Trigger:* the first
   non-idempotent compensating write — today's are mostly restores of a previous value, which is why
   the gap has cost nothing yet.
 - **Already realized** (orientation only, no work): the `ObserverStrategy` A–D wrappers behind one

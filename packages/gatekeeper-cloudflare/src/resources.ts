@@ -12,7 +12,8 @@ export const ACCOUNT_OBSERVABILITY_RESOURCE: SupportedResource = {
 };
 
 export const WORKER_OBSERVABILITY_RESOURCE: SupportedResource = {
-  urlPattern: `${DASHBOARD_ORIGIN}/:accountId/workers/services/view/:workerName/production/observability`,
+  urlPattern:
+    `${DASHBOARD_ORIGIN}/:accountId/workers/services/view/:workerName/production/observability`,
   title: "Cloudflare Worker observability",
   description: "Query logs, metrics, invocations, and traces for one Worker.",
   grantable: true,
@@ -23,7 +24,7 @@ export const OBSERVABILITY_RESOURCES = [
   WORKER_OBSERVABILITY_RESOURCE,
 ];
 
-const RESOURCE_PATTERNS = new Set(OBSERVABILITY_RESOURCES.map((resource) => resource.urlPattern));
+const RESOURCE_PATTERNS = new Set(OBSERVABILITY_RESOURCES.map(resource => resource.urlPattern));
 
 /** Validate and normalize a Cloudflare account ID at an external input boundary. */
 export function assertCloudflareAccountId(accountId: string): string {
@@ -36,10 +37,8 @@ export function accountObservabilityUrl(accountId: string): string {
 }
 
 export function workerObservabilityUrl(accountId: string, workerName: string): string {
-  return (
-    `${DASHBOARD_ORIGIN}/${assertCloudflareAccountId(accountId)}/workers/services/view/` +
-    `${encodeURIComponent(workerName)}/production/observability`
-  );
+  return `${DASHBOARD_ORIGIN}/${assertCloudflareAccountId(accountId)}/workers/services/view/` +
+    `${encodeURIComponent(workerName)}/production/observability`;
 }
 
 export function parseObservabilityResourceUrl(url: string): {
@@ -51,22 +50,13 @@ export function parseObservabilityResourceUrl(url: string): {
     if (parsed.origin !== DASHBOARD_ORIGIN) throw new Error();
     const segments = parsed.pathname.split("/").filter(Boolean).map(decodeURIComponent);
     const accountId = assertCloudflareAccountId(segments[0] ?? "");
-    if (
-      segments.length === 3 &&
-      segments[1] === "workers-and-pages" &&
-      segments[2] === "observability"
-    ) {
+    if (segments.length === 3 && segments[1] === "workers-and-pages" &&
+        segments[2] === "observability") {
       return { accountId };
     }
-    if (
-      segments.length === 7 &&
-      segments[1] === "workers" &&
-      segments[2] === "services" &&
-      segments[3] === "view" &&
-      segments[4] &&
-      segments[5] === "production" &&
-      segments[6] === "observability"
-    ) {
+    if (segments.length === 7 && segments[1] === "workers" && segments[2] === "services" &&
+        segments[3] === "view" && segments[4] && segments[5] === "production" &&
+        segments[6] === "observability") {
       return { accountId, workerName: segments[4] };
     }
   } catch {
@@ -76,7 +66,7 @@ export function parseObservabilityResourceUrl(url: string): {
 }
 
 export function observabilityScopesForResources(resourceUrlPatterns?: string[]): string[] {
-  if (resourceUrlPatterns?.some((pattern) => !RESOURCE_PATTERNS.has(pattern))) {
+  if (resourceUrlPatterns?.some(pattern => !RESOURCE_PATTERNS.has(pattern))) {
     throw new Error("Unsupported Cloudflare resource type.");
   }
   return resourceUrlPatterns === undefined || resourceUrlPatterns.length > 0
@@ -86,6 +76,6 @@ export function observabilityScopesForResources(resourceUrlPatterns?: string[]):
 
 export function grantedObservabilityResourcePatterns(scopes: string[]): string[] {
   return scopes.includes(OBSERVABILITY_SCOPE)
-    ? OBSERVABILITY_RESOURCES.map((resource) => resource.urlPattern)
+    ? OBSERVABILITY_RESOURCES.map(resource => resource.urlPattern)
     : [];
 }

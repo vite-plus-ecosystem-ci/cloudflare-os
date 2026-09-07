@@ -33,7 +33,9 @@ function fromRow(row: ActionRow): StoredAction {
     submittedAt: row.submitted_at,
     claimedAt: row.claimed_at ?? undefined,
     retryable: row.retryable === null ? undefined : row.retryable === 1,
-    result: row.result_json ? (JSON.parse(row.result_json) as StoredAction["result"]) : undefined,
+    result: row.result_json
+      ? JSON.parse(row.result_json) as StoredAction["result"]
+      : undefined,
     error: row.error ?? undefined,
   };
 }
@@ -71,9 +73,8 @@ export class ActionStore {
   }
 
   get(id: number): StoredAction | undefined {
-    const row = this.#sql
-      .exec<ActionRow>("SELECT * FROM mcp_actions WHERE id = ?", id)
-      .toArray()[0];
+    const row = this.#sql.exec<ActionRow>(
+      "SELECT * FROM mcp_actions WHERE id = ?", id).toArray()[0];
     return row && fromRow(row);
   }
 
@@ -104,28 +105,21 @@ export class ActionStore {
       throw new Error(`MCP tool arguments are too large (maximum ${MAX_ARGUMENT_BYTES} bytes).`);
     }
 
-    const { count } = this.#sql
-      .exec<{ count: number }>(
-        "SELECT count(*) AS count FROM mcp_actions WHERE state IN ('pending', 'applying')",
-      )
-      .one();
+    const { count } = this.#sql.exec<{ count: number }>(
+      "SELECT count(*) AS count FROM mcp_actions WHERE state IN ('pending', 'applying')",
+    ).one();
     if (count >= MAX_PENDING_ACTIONS) {
       throw new Error(
         `${MAX_PENDING_ACTIONS} calls to this MCP server are already awaiting approval. Wait for ` +
-          "them to be approved or rejected before queueing more.",
-      );
+        "them to be approved or rejected before queueing more.");
     }
 
     const submittedAt = Date.now();
-    const { id } = this.#sql
-      .exec<{ id: number }>(
-        `INSERT INTO mcp_actions (tool_name, args_json, state, submitted_at)
+    const { id } = this.#sql.exec<{ id: number }>(
+      `INSERT INTO mcp_actions (tool_name, args_json, state, submitted_at)
        VALUES (?, ?, 'pending', ?) RETURNING id`,
-        toolName,
-        argsJson,
-        submittedAt,
-      )
-      .one();
+      toolName, argsJson, submittedAt,
+    ).one();
     return { id, toolName, args: storedArgs, state: "pending", submittedAt };
   }
 
@@ -157,7 +151,7 @@ export class ActionStore {
 
     let result: McpToolCallResult;
     try {
-      result = await call((client) => client.callTool(stored.toolName, stored.args));
+      result = await call(client => client.callTool(stored.toolName, stored.args));
     } catch (err) {
       const mayHaveLanded = callMayHaveTakenEffect(err);
       stored.state = "failed";
@@ -165,16 +159,12 @@ export class ActionStore {
       stored.error = mayHaveLanded
         ? "This call failed after it had been sent, so it may or may not have taken effect. " +
           "Check the server before staging it again."
-        : err instanceof Error
-          ? err.message
-          : String(err);
+        : err instanceof Error ? err.message : String(err);
       this.#save(stored);
       this.#prune();
       log.warn("tool call failed", {
         event: mayHaveLanded ? "action.apply.outcome-unknown" : "action.apply.failed",
-        actionId: id,
-        toolName: stored.toolName,
-        error: err,
+        actionId: id, toolName: stored.toolName, error: err,
       });
       throw mayHaveLanded ? new Error(stored.error, { cause: err }) : err;
     }
@@ -185,15 +175,14 @@ export class ActionStore {
       const flattened = toCallResult(result);
       const encoded = JSON.stringify(flattened);
       const bytes = encoder.encode(encoded).byteLength;
-      stored.result =
-        bytes > MAX_RESULT_BYTES
-          ? {
-              status: "ok",
-              content: [],
-              text: `(The server's response was too large to retain: ${bytes} bytes.)`,
-              isError: flattened.isError,
-            }
-          : flattened;
+      stored.result = bytes > MAX_RESULT_BYTES
+        ? {
+            status: "ok",
+            content: [],
+            text: `(The server's response was too large to retain: ${bytes} bytes.)`,
+            isError: flattened.isError,
+          }
+        : flattened;
     } catch (err) {
       stored.result = {
         status: "ok",
@@ -201,30 +190,21 @@ export class ActionStore {
         text: "(The call succeeded, but its response could not be read back.)",
       };
       log.warn("could not record tool call result", {
-        event: "action.result.unreadable",
-        actionId: id,
-        toolName: stored.toolName,
-        error: err,
+        event: "action.result.unreadable", actionId: id, toolName: stored.toolName, error: err,
       });
     }
     this.#save(stored);
     this.#prune();
-    log.info("tool call applied", {
-      event: "action.applied",
-      actionId: id,
-      toolName: stored.toolName,
-    });
+    log.info("tool call applied", { event: "action.applied", actionId: id, toolName: stored.toolName });
   }
 
   reject(id: number): void {
     const stored = this.get(id);
     if (!stored || stored.state === "rejected") return;
     if (stored.state !== "pending") {
-      throw new Error(
-        stored.state === "applying"
-          ? `MCP action ${id} is already being applied.`
-          : `MCP action ${id} is already ${stored.state}.`,
-      );
+      throw new Error(stored.state === "applying"
+        ? `MCP action ${id} is already being applied.`
+        : `MCP action ${id} is already ${stored.state}.`);
     }
     this.#sql.exec("UPDATE mcp_actions SET state = 'rejected' WHERE id = ?", id);
     this.#prune();

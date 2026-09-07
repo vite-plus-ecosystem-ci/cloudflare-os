@@ -3,15 +3,9 @@
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
-.markdownContent p {
-  margin: 0.4em 0;
-}
-.markdownContent p:first-child {
-  margin-top: 0;
-}
-.markdownContent p:last-child {
-  margin-bottom: 0;
-}
+.markdownContent p { margin: 0.4em 0; }
+.markdownContent p:first-child { margin-top: 0; }
+.markdownContent p:last-child  { margin-bottom: 0; }
 
 .markdownContent h1,
 .markdownContent h2,
@@ -23,9 +17,7 @@
 }
 .markdownContent h1:first-child,
 .markdownContent h2:first-child,
-.markdownContent h3:first-child {
-  margin-top: 0;
-}
+.markdownContent h3:first-child { margin-top: 0; }
 
 .markdownContent code {
   background-color: var(--color-kumo-tint);
@@ -70,12 +62,8 @@
   color: var(--text-color-kumo-subtle);
   cursor: pointer;
   opacity: 0.6;
-  transition:
-    background-color 150ms ease-out,
-    border-color 150ms ease-out,
-    box-shadow 150ms ease-out,
-    color 150ms ease-out,
-    opacity 150ms ease-out,
+  transition: background-color 150ms ease-out, border-color 150ms ease-out,
+    box-shadow 150ms ease-out, color 150ms ease-out, opacity 150ms ease-out,
     transform 100ms ease-out;
 }
 
@@ -108,9 +96,7 @@
 .markdownContent ol {
   list-style-type: decimal;
 }
-.markdownContent li {
-  margin: 0.2em 0;
-}
+.markdownContent li { margin: 0.2em 0; }
 
 .markdownContent blockquote {
   margin: 0.5em 0;
@@ -123,9 +109,7 @@
   color: var(--color-kumo-brand);
   text-decoration: none;
 }
-.markdownContent a:hover {
-  text-decoration: underline;
-}
+.markdownContent a:hover { text-decoration: underline; }
 
 .markdownContent hr {
   border: none;
@@ -154,10 +138,7 @@
   background-color: var(--color-kumo-elevated);
   font-weight: 600;
 }
-.markdownContent img {
-  max-width: 100%;
-  height: auto;
-}
+.markdownContent img { max-width: 100%; height: auto; }
 
 /* ── Streaming placeholder ────────────────────────────────────────────────── */
 .thinkingShimmer {
@@ -176,12 +157,8 @@
 }
 
 @keyframes thinking-shimmer {
-  from {
-    background-position: 140% 0;
-  }
-  to {
-    background-position: -80% 0;
-  }
+  from { background-position: 140% 0; }
+  to { background-position: -80% 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -193,13 +170,8 @@
 }
 
 /* ── Observation markdown (inline, compact) ───────────────────────────────── */
-.observationMarkdown {
-  line-height: 1.5;
-}
-.observationMarkdown p {
-  margin: 0.2em 0;
-  display: inline;
-}
+.observationMarkdown { line-height: 1.5; }
+.observationMarkdown p { margin: 0.2em 0; display: inline; }
 .observationMarkdown code {
   background-color: var(--color-kumo-tint);
   color: var(--color-kumo-brand);

@@ -9,7 +9,10 @@
 // A subscription is exposed so imperative widgets that can't rely on CSS variables — the CodeMirror
 // editor and the emoji picker — can react when the mode changes at runtime.
 
-import { applyAccentColor, type GatekeeperAppTheme } from "@gadgets/workshop-shared/theme";
+import {
+  applyAccentColor,
+  type GatekeeperAppTheme,
+} from "@gadgets/workshop-shared/theme";
 
 /** The two concrete modes the host resolves `light`/`dark`/`system` down to before pushing it here. */
 export type ResolvedThemeMode = "light" | "dark";
@@ -40,7 +43,9 @@ export function applyAppTheme(theme: GatekeeperAppTheme): void {
 }
 
 /** Subscribe to mode changes. Returns an unsubscribe function. */
-export function subscribeThemeMode(listener: (mode: ResolvedThemeMode) => void): () => void {
+export function subscribeThemeMode(
+  listener: (mode: ResolvedThemeMode) => void,
+): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);

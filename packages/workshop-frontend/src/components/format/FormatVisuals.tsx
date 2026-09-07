@@ -9,60 +9,60 @@
 // The wireframes are abstract: unlike a screenshot they look right before the output has any
 // content, which is when the user is deciding what to make.
 
-import type { BlueprintOutput } from "@gadgets/workshop-shared/api";
-import { FORMAT_ICONS, formatOf, wireframeOf, type FormatWireframe } from "./formats";
+import type { BlueprintOutput } from '@gadgets/workshop-shared/api'
+import { FORMAT_ICONS, formatOf, wireframeOf, type FormatWireframe } from './formats'
 
 // ─── glyph ───────────────────────────────────────────────────────────────────
 
-const GLYPH_SIZES = { sm: 11, md: 15, lg: 17 } as const;
+const GLYPH_SIZES = { sm: 11, md: 15, lg: 17 } as const
 
 export function FormatGlyph({
   output,
-  size = "md",
+  size = 'md',
   className,
   weight,
 }: {
-  output?: BlueprintOutput;
-  size?: keyof typeof GLYPH_SIZES;
-  className?: string;
-  weight?: "regular" | "fill";
+  output?: BlueprintOutput
+  size?: keyof typeof GLYPH_SIZES
+  className?: string
+  weight?: 'regular' | 'fill'
 }) {
-  const Icon = FORMAT_ICONS[formatOf(output).icon];
-  return <Icon size={GLYPH_SIZES[size]} className={className} weight={weight} />;
+  const Icon = FORMAT_ICONS[formatOf(output).icon]
+  return <Icon size={GLYPH_SIZES[size]} className={className} weight={weight} />
 }
 
 // ─── tile ────────────────────────────────────────────────────────────────────
 
 // Tile dimensions and the glyph size that suits each, keyed together so they can't drift.
 const TILE_SIZES = {
-  sm: { box: "h-7 w-7 rounded-lg", glyph: "sm" },
-  md: { box: "h-9 w-9 rounded-lg", glyph: "md" },
-  lg: { box: "h-10 w-10 rounded-xl", glyph: "lg" },
-} as const;
+  sm: { box: 'h-7 w-7 rounded-lg', glyph: 'sm' },
+  md: { box: 'h-9 w-9 rounded-lg', glyph: 'md' },
+  lg: { box: 'h-10 w-10 rounded-xl', glyph: 'lg' },
+} as const
 
 export function FormatTile({
   output,
-  size = "md",
-  className = "",
+  size = 'md',
+  className = '',
 }: {
-  output?: BlueprintOutput;
-  size?: keyof typeof TILE_SIZES;
-  className?: string;
+  output?: BlueprintOutput
+  size?: keyof typeof TILE_SIZES
+  className?: string
 }) {
-  const { box, glyph } = TILE_SIZES[size];
+  const { box, glyph } = TILE_SIZES[size]
   return (
     <div
       className={`grid ${box} shrink-0 place-items-center bg-kumo-fill text-kumo-subtle ${className}`}
     >
       <FormatGlyph output={output} size={glyph} />
     </div>
-  );
+  )
 }
 
 // ─── wireframes ──────────────────────────────────────────────────────────────
 
-const BAR = "rounded-[2px] bg-kumo-line";
-const BAR_STRONG = "rounded-[2px] bg-kumo-fill";
+const BAR = 'rounded-[2px] bg-kumo-line'
+const BAR_STRONG = 'rounded-[2px] bg-kumo-fill'
 
 function PageWireframe() {
   return (
@@ -80,7 +80,7 @@ function PageWireframe() {
         <div className={`h-1.5 w-[60%] ${BAR}`} />
       </div>
     </div>
-  );
+  )
 }
 
 function GridWireframe() {
@@ -89,12 +89,12 @@ function GridWireframe() {
       {Array.from({ length: 6 }).map((_, r) => (
         <div key={r} className="grid flex-1 grid-cols-4 gap-px">
           {Array.from({ length: 4 }).map((__, c) => (
-            <div key={c} className={r === 0 || c === 0 ? "bg-kumo-fill" : "bg-kumo-base"} />
+            <div key={c} className={r === 0 || c === 0 ? 'bg-kumo-fill' : 'bg-kumo-base'} />
           ))}
         </div>
       ))}
     </div>
-  );
+  )
 }
 
 // A deck: one slide framed above a filmstrip of the others. The filmstrip carries the idea, since
@@ -112,14 +112,11 @@ function SlideWireframe() {
 
       <div className="flex h-[20%] shrink-0 gap-1 overflow-hidden">
         {[0, 1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className={`h-full w-[26%] shrink-0 rounded-[2px] ${i === 0 ? BAR_STRONG : BAR}`}
-          />
+          <div key={i} className={`h-full w-[26%] shrink-0 rounded-[2px] ${i === 0 ? BAR_STRONG : BAR}`} />
         ))}
       </div>
     </div>
-  );
+  )
 }
 
 function WindowWireframe() {
@@ -151,7 +148,7 @@ function WindowWireframe() {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 // A checklist: short leading marks against lines of text.
@@ -166,7 +163,7 @@ function ListWireframe() {
         </div>
       ))}
     </div>
-  );
+  )
 }
 
 // A board: columns of stacked cards, for kanban- and flow-shaped things.
@@ -182,7 +179,7 @@ function BoardWireframe() {
         </div>
       ))}
     </div>
-  );
+  )
 }
 
 // A chart: a titled plot with an axis, for report-shaped things.
@@ -192,11 +189,7 @@ function ChartWireframe() {
       <div className={`h-2 w-1/2 ${BAR_STRONG}`} />
       <div className="flex flex-1 items-end gap-1.5 border-b border-l border-kumo-line pb-1 pl-1">
         {[45, 70, 35, 90, 60, 78, 50].map((h, i) => (
-          <div
-            key={i}
-            className={`flex-1 rounded-t-[2px] bg-kumo-fill`}
-            style={{ height: `${h}%` }}
-          />
+          <div key={i} className={`flex-1 rounded-t-[2px] bg-kumo-fill`} style={{ height: `${h}%` }} />
         ))}
       </div>
       <div className="flex gap-1.5">
@@ -204,7 +197,7 @@ function ChartWireframe() {
         <div className={`h-1.5 w-1/4 ${BAR}`} />
       </div>
     </div>
-  );
+  )
 }
 
 const WIREFRAMES: Record<FormatWireframe, () => React.JSX.Element> = {
@@ -215,7 +208,7 @@ const WIREFRAMES: Record<FormatWireframe, () => React.JSX.Element> = {
   list: ListWireframe,
   board: BoardWireframe,
   chart: ChartWireframe,
-};
+}
 
 // ─── thumbnail ───────────────────────────────────────────────────────────────
 
@@ -226,12 +219,12 @@ const WIREFRAMES: Record<FormatWireframe, () => React.JSX.Element> = {
  */
 export function FormatThumbnail({
   output,
-  className = "",
+  className = '',
 }: {
-  output?: BlueprintOutput;
-  className?: string;
+  output?: BlueprintOutput
+  className?: string
 }) {
-  const Wireframe = WIREFRAMES[wireframeOf(output)];
+  const Wireframe = WIREFRAMES[wireframeOf(output)]
   return (
     <div className={`absolute inset-0 bg-kumo-tint ${className}`} aria-hidden="true">
       <div className="themed-thumbnail-shadow absolute left-1/2 top-4 h-[calc(100%-1rem)] w-[78%] -translate-x-1/2 overflow-hidden rounded-t-[6px] bg-kumo-base ring-1 ring-kumo-line/20">
@@ -240,27 +233,21 @@ export function FormatThumbnail({
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 // The size the wireframes are drawn for: bar heights, gaps and insets are in pixels, so they only
 // read correctly at roughly the size of an Outputs card. Anything smaller scales the whole
 // drawing.
-const PREVIEW_WIDTH = 200;
-const PREVIEW_HEIGHT = 150;
+const PREVIEW_WIDTH = 200
+const PREVIEW_HEIGHT = 150
 
 /**
  * A self-contained miniature of the Outputs card at any width, for showing the thumbnail itself
  * (the admin icon picker) rather than filling a card.
  */
-export function FormatPreview({
-  output,
-  width = 120,
-}: {
-  output?: BlueprintOutput;
-  width?: number;
-}) {
-  const scale = width / PREVIEW_WIDTH;
+export function FormatPreview({ output, width = 120 }: { output?: BlueprintOutput; width?: number }) {
+  const scale = width / PREVIEW_WIDTH
   return (
     <div
       className="relative shrink-0 overflow-hidden rounded-md border border-kumo-line"
@@ -273,7 +260,7 @@ export function FormatPreview({
         <FormatThumbnail output={output} />
       </div>
     </div>
-  );
+  )
 }
 
 /**
@@ -281,7 +268,7 @@ export function FormatPreview({
  * than an absolutely-positioned backdrop (e.g. the chat "created app" card). Sized by its parent.
  */
 export function FormatMiniature({ output }: { output?: BlueprintOutput }) {
-  const Wireframe = WIREFRAMES[wireframeOf(output)];
+  const Wireframe = WIREFRAMES[wireframeOf(output)]
   return (
     <span
       className="relative flex h-[52px] w-[62px] overflow-hidden rounded-md border border-kumo-line bg-kumo-base p-1.5 shadow-sm"
@@ -291,5 +278,5 @@ export function FormatMiniature({ output }: { output?: BlueprintOutput }) {
         <Wireframe />
       </span>
     </span>
-  );
+  )
 }

@@ -4,20 +4,15 @@
 // content byte length), followed by UTF-8 JSON metadata and the gzip-compressed Yjs snapshot.
 // See docs/blueprints.md for the full format description.
 
-import {
-  BlueprintMetadata,
-  BlueprintOutput,
-  BlueprintPublicInfo,
-  isOutputIcon,
-} from "@gadgets/workshop-shared/api";
+import { BlueprintMetadata, BlueprintOutput, BlueprintPublicInfo, isOutputIcon } from '@gadgets/workshop-shared/api';
 
-export const FEATURED_BLUEPRINTS_KEY = ".featured";
+export const FEATURED_BLUEPRINTS_KEY = '.featured';
 
 /**
  * Reserved key in the BLUEPRINTS KV namespace holding the deployment-wide admin config (a single
  * JSON object). AdminSettings already owns this namespace; see admin-config.ts.
  */
-export const ADMIN_CONFIG_KEY = ".adminConfig";
+export const ADMIN_CONFIG_KEY = '.adminConfig';
 
 const BLUEPRINT_ARCHIVE_MAGIC = 0xec2e2d3a2300e317n;
 const BLUEPRINT_ARCHIVE_VERSION = 1;
@@ -36,7 +31,7 @@ export type BlueprintKvRecord = {
    * has no owning user.
    */
   ownerId?: string;
-  gadgetId?: string; // undefined = uploaded, not published from a gadget on this instance
+  gadgetId?: string;  // undefined = uploaded, not published from a gadget on this instance
 };
 
 export function isReservedBlueprintKey(id: string): boolean {
@@ -68,12 +63,12 @@ function outputString(value: unknown): string | undefined {
  */
 export function sanitizeBlueprintOutput(output: unknown): BlueprintOutput | undefined {
   if (!output || typeof output !== "object") return undefined;
-  let { id, noun, plural, icon } = output as Partial<BlueprintOutput>;
+  let {id, noun, plural, icon} = output as Partial<BlueprintOutput>;
   let cleanId = outputString(id);
   let cleanNoun = outputString(noun);
   let cleanPlural = outputString(plural);
   if (!cleanId || !cleanNoun || !cleanPlural || !isOutputIcon(icon)) return undefined;
-  return { id: cleanId, noun: cleanNoun, plural: cleanPlural, icon };
+  return {id: cleanId, noun: cleanNoun, plural: cleanPlural, icon};
 }
 
 export function parseBlueprintKvRecord(raw: string): BlueprintKvRecord {
@@ -98,7 +93,7 @@ export function serializeFeaturedBlueprints(featured: BlueprintPublicInfo[]): st
  * The env a blueprint KV read needs. Narrowed to the one binding so helpers that only read
  * blueprints can be called from anywhere holding it, without passing a whole env around.
  */
-export type BlueprintKvEnv = Pick<Cloudflare.Env, "BLUEPRINTS">;
+export type BlueprintKvEnv = Pick<Cloudflare.Env, 'BLUEPRINTS'>;
 
 export async function readBlueprintKvRecord(
   env: BlueprintKvEnv,
@@ -132,7 +127,7 @@ export async function listFeaturedBlueprintsFromKv(
  * root map is filename -> Y.Text) from R2, or null if the content object doesn't exist.
  */
 export async function readBlueprintContent(
-  env: Pick<Cloudflare.Env, "BLUEPRINT_CONTENT">,
+  env: Pick<Cloudflare.Env, 'BLUEPRINT_CONTENT'>,
   blueprintId: string,
   version: number,
 ): Promise<Uint8Array | null> {
@@ -151,10 +146,7 @@ export function randomBlueprintId(): string {
   return idBytes.toHex();
 }
 
-function encodeBlueprintArchivePrefix(
-  metadata: BlueprintMetadata,
-  contentLength: number,
-): Uint8Array {
+function encodeBlueprintArchivePrefix(metadata: BlueprintMetadata, contentLength: number): Uint8Array {
   let metadataBytes = textEncoder.encode(JSON.stringify(metadata));
   let result = new Uint8Array(BLUEPRINT_ARCHIVE_PREFIX_BYTES + metadataBytes.byteLength);
   let view = new DataView(result.buffer);
@@ -175,10 +167,8 @@ export function buildBlueprintArchiveStream(
 
   void (async () => {
     try {
-      await new Response(encodeBlueprintArchivePrefix(metadata, contentLength)).body!.pipeTo(
-        archive.writable,
-        { preventClose: true },
-      );
+      await new Response(encodeBlueprintArchivePrefix(metadata, contentLength)).body!
+          .pipeTo(archive.writable, { preventClose: true });
       await content.pipeTo(archive.writable);
     } catch (err) {
       await archive.writable.abort(err);
@@ -263,13 +253,8 @@ function makeStreamPrefixReader(stream: ReadableStream<Uint8Array>) {
   };
 }
 
-export async function parseBlueprintArchive(
-  archive: ReadableStream<Uint8Array>,
-): Promise<{
-  metadata: BlueprintMetadata;
-  contentLength: number;
-  content: ReadableStream<Uint8Array>;
-}> {
+export async function parseBlueprintArchive(archive: ReadableStream<Uint8Array>)
+    : Promise<{metadata: BlueprintMetadata, contentLength: number, content: ReadableStream<Uint8Array>}> {
   let reader = makeStreamPrefixReader(archive);
   let prefix = await reader.readExact(BLUEPRINT_ARCHIVE_PREFIX_BYTES);
   let view = new DataView(prefix.buffer, prefix.byteOffset, prefix.byteLength);

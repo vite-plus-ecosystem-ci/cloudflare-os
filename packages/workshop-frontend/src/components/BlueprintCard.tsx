@@ -1,6 +1,14 @@
 import { Link } from "@tanstack/react-router";
-import { Hexagon, Robot, Lightning, Star } from "@phosphor-icons/react";
-import { BlueprintBinding, BlueprintMetadata } from "@gadgets/workshop-shared/api";
+import {
+  Hexagon,
+  Robot,
+  Lightning,
+  Star,
+} from "@phosphor-icons/react";
+import {
+  BlueprintBinding,
+  BlueprintMetadata,
+} from "@gadgets/workshop-shared/api";
 import { VendorDescription } from "@gadgets/workshop-shared/gatekeeper";
 
 const gradients = [
@@ -39,7 +47,8 @@ export function uniqueBindingBadges(
     if (b.type === "gatekeeper") {
       key = `gk:${b.gatekeeperName}`;
       vendorKey = b.gatekeeperName.toLowerCase();
-      label = b.gatekeeperName.charAt(0).toUpperCase() + b.gatekeeperName.slice(1);
+      label =
+        b.gatekeeperName.charAt(0).toUpperCase() + b.gatekeeperName.slice(1);
     } else if (b.type === "aiModel") {
       key = "aiModel";
       label = "AI Model";
@@ -62,17 +71,29 @@ export function BindingBadge({
   badge: BindingBadgeInfo;
   vendorDescriptions?: Map<string, VendorDescription>;
 }) {
-  const vendorDescription = badge.vendorKey ? vendorDescriptions?.get(badge.vendorKey) : undefined;
+  const vendorDescription = badge.vendorKey
+    ? vendorDescriptions?.get(badge.vendorKey)
+    : undefined;
 
   let icon: React.ReactNode;
   if (vendorDescription?.logo?.url) {
-    icon = <img src={vendorDescription.logo.url} alt="" className="h-3 w-3 object-contain" />;
+    icon = (
+      <img
+        src={vendorDescription.logo.url}
+        alt=""
+        className="h-3 w-3 object-contain"
+      />
+    );
   } else if (badge.type === "aiModel") {
     icon = <Robot size={11} />;
   } else if (badge.type === "agentSpawner") {
     icon = <Lightning size={11} />;
   } else {
-    icon = <span className="text-[10px] font-semibold leading-none">{badge.label[0]}</span>;
+    icon = (
+      <span className="text-[10px] font-semibold leading-none">
+        {badge.label[0]}
+      </span>
+    );
   }
 
   return (
@@ -122,9 +143,7 @@ export function BlueprintCard({
             <p className="m-0 line-clamp-2 text-[15px] leading-5 font-medium tracking-[-0.25px] text-kumo-default">
               {metadata.title}
             </p>
-            <p
-              className={`mt-1.5 line-clamp-2 min-h-8 text-[12px] leading-4 font-normal tracking-[-0.2px] ${metadata.description ? "text-kumo-subtle" : "text-kumo-inactive italic"}`}
-            >
+            <p className={`mt-1.5 line-clamp-2 min-h-8 text-[12px] leading-4 font-normal tracking-[-0.2px] ${metadata.description ? "text-kumo-subtle" : "text-kumo-inactive italic"}`}>
               {metadata.description || "No description"}
             </p>
           </div>

@@ -20,18 +20,16 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return (
-      <Section>
-        <Field label="Confluence site" description="Choose the Confluence site to connect.">
-          <Autocomplete
-            name="siteUrl"
-            value={values.siteUrl}
-            placeholder="Search sites..."
-            loadOptions={(query) => ui.listSites(query)}
-            onChange={(siteUrl) => setValues({ siteUrl })}
-          />
-        </Field>
-      </Section>
-    );
+    return <Section>
+      <Field label="Confluence site" description="Choose the Confluence site to connect.">
+        <Autocomplete
+          name="siteUrl"
+          value={values.siteUrl}
+          placeholder="Search sites..."
+          loadOptions={query => ui.listSites(query)}
+          onChange={siteUrl => setValues({ siteUrl })}
+        />
+      </Field>
+    </Section>;
   },
 } satisfies ConfiguratorUISpec<ConfluenceSiteConfiguratorRpc, ConfluenceSiteConfiguratorValues>;

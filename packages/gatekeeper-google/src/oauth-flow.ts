@@ -3,11 +3,7 @@ import { resourceUrlPatternsToOAuthScopes, validateResourceUrlPatterns } from ".
 const FLOW_KEY = "oauthFlow";
 const NONCE_LIFETIME_MS = 10 * 60 * 1000;
 const LEGACY_FLOW_KEYS = [
-  "nonce",
-  "requestedScopes",
-  "requestedResources",
-  "reconnecting",
-  "ephemeral",
+  "nonce", "requestedScopes", "requestedResources", "reconnecting", "ephemeral",
 ] as const;
 
 export type OAuthFlowMode = "connect" | "auth" | "reconnect";
@@ -40,24 +36,15 @@ function constantTimeEqual(a: string, b: string): boolean {
   return difference === 0;
 }
 
-function matchesFlow(
-  flow: StoredOAuthFlow | undefined,
-  stage: StoredOAuthFlow["stage"],
-  nonce: string,
-  now: number,
-): flow is StoredOAuthFlow {
-  return (
-    !!flow && flow.stage === stage && now < flow.expiresAt && constantTimeEqual(flow.value, nonce)
-  );
+function matchesFlow(flow: StoredOAuthFlow | undefined, stage: StoredOAuthFlow["stage"],
+                 nonce: string, now: number): flow is StoredOAuthFlow {
+  return !!flow && flow.stage === stage && now < flow.expiresAt &&
+    constantTimeEqual(flow.value, nonce);
 }
 
-export function prepareOAuthFlow(
-  kv: SynchronousKv,
-  initiationNonce: string,
-  requestedResources: readonly string[],
-  mode: OAuthFlowMode,
-  now: number,
-): void {
+export function prepareOAuthFlow(kv: SynchronousKv, initiationNonce: string,
+                                 requestedResources: readonly string[], mode: OAuthFlowMode,
+                                 now: number): void {
   validateResourceUrlPatterns(requestedResources);
   for (let key of LEGACY_FLOW_KEYS) kv.delete(key);
   kv.put<StoredOAuthFlow>(FLOW_KEY, {
@@ -71,38 +58,26 @@ export function prepareOAuthFlow(
 
 /** Merge resources from an OAuth completion with grants committed by an overlapping flow. */
 export function mergeGrantedResources(
-  kv: SynchronousKv,
-  requestedResources: readonly string[],
-): void {
+    kv: SynchronousKv, requestedResources: readonly string[]): void {
   let grantedResources = kv.get<string[]>("grantedResources") ?? [];
   kv.put("grantedResources", [...new Set([...grantedResources, ...requestedResources])]);
 }
 
-export function beginStoredOAuthFlow(
-  kv: SynchronousKv,
-  initiationNonce: string,
-  oauthNonce: string,
-  oauthRedirectUri: string,
-  now: number,
-): { oauthNonce: string; scopes: string[] } | null {
+export function beginStoredOAuthFlow(kv: SynchronousKv, initiationNonce: string,
+                                     oauthNonce: string, oauthRedirectUri: string, now: number)
+    : {oauthNonce: string, scopes: string[]} | null {
   let flow = kv.get<StoredOAuthFlow>(FLOW_KEY);
   if (!matchesFlow(flow, "initiation", initiationNonce, now)) return null;
 
   kv.put<StoredOAuthFlow>(FLOW_KEY, {
-    ...flow,
-    value: oauthNonce,
-    expiresAt: now + NONCE_LIFETIME_MS,
-    stage: "oauth",
+    ...flow, value: oauthNonce, expiresAt: now + NONCE_LIFETIME_MS, stage: "oauth",
     oauthRedirectUri,
   });
   return { oauthNonce, scopes: resourceUrlPatternsToOAuthScopes(flow.requestedResources) };
 }
 
-export function claimStoredOAuthFlow(
-  kv: SynchronousKv,
-  oauthNonce: string,
-  now: number,
-): { mode: OAuthFlowMode; requestedResources: string[]; oauthRedirectUri: string } | null {
+export function claimStoredOAuthFlow(kv: SynchronousKv, oauthNonce: string, now: number)
+    : {mode: OAuthFlowMode, requestedResources: string[], oauthRedirectUri: string} | null {
   let flow = kv.get<StoredOAuthFlow>(FLOW_KEY);
   if (!matchesFlow(flow, "oauth", oauthNonce, now) || !flow.oauthRedirectUri) return null;
 
@@ -116,9 +91,7 @@ export function claimStoredOAuthFlow(
 
 /** Preserve destructive intent across the `ephemeral` to cleanup-marker deployment cutover. */
 export function shouldDeleteCredentialsOnAlarm(kv: SynchronousKv): boolean {
-  return (
-    kv.get<string>("refreshToken") === undefined ||
+  return kv.get<string>("refreshToken") === undefined ||
     kv.get<boolean>("deleteCredentialsOnAlarm") === true ||
-    kv.get<boolean>("ephemeral") === true
-  );
+    kv.get<boolean>("ephemeral") === true;
 }

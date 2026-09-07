@@ -11,13 +11,8 @@ type ExternalMessageGatewayProps = {
 };
 
 @validateRpc()
-export class ExternalMessageGateway
-  extends WorkerEntrypoint<Cloudflare.Env, ExternalMessageGatewayProps>
-  implements ExternalMessageGatewayContract
-{
-  async submitExternalMessage(
-    input: SubmitExternalMessageInput,
-  ): Promise<SubmitExternalMessageResult> {
+export class ExternalMessageGateway extends WorkerEntrypoint<Cloudflare.Env, ExternalMessageGatewayProps> implements ExternalMessageGatewayContract {
+  async submitExternalMessage(input: SubmitExternalMessageInput): Promise<SubmitExternalMessageResult> {
     let source = this.ctx.props.source;
     if (!source) throw new Error("ExternalMessageGateway source prop is required.");
 

@@ -5,7 +5,7 @@ export type BigQueryConfiguratorValues = {
   projectId?: string | null;
   datasetId?: string | null;
   tableId?: string | null;
-};
+}
 
 export interface BigQueryConfiguratorRpc {
   listProjects(query: string): Promise<ConfiguratorOption[]>;

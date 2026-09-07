@@ -1,59 +1,57 @@
-import { logRpcFailure } from "../rpcErrors";
-import { useState, useEffect } from "react";
-import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router";
-import { TooltipProvider, Toasty } from "@cloudflare/kumo";
-import { RpcStub } from "capnweb";
-import { AuthenticatedApi } from "@gadgets/workshop-shared/api";
-import { useRpcStub, useConnectionLost } from "../RpcContext";
-import { useAuth, CF_ACCESS_MODE } from "../useAuth";
-import { AuthProvider } from "../AuthContext";
-import { FeatureFlagsProvider } from "../FeatureFlagsContext";
-import Header from "../components/Header";
-import AppShell from "../components/AppShell/AppShell";
-import LoginPage from "../LoginPage";
-import OnboardingWizard from "../OnboardingWizard";
-import AccountSelectionModal from "../components/billing/AccountSelectionModal";
+import { logRpcFailure } from '../rpcErrors'
+import { useState, useEffect } from 'react'
+import { createRootRoute, Outlet, useRouterState } from '@tanstack/react-router'
+import { TooltipProvider, Toasty } from '@cloudflare/kumo'
+import { RpcStub } from 'capnweb'
+import { AuthenticatedApi } from '@gadgets/workshop-shared/api'
+import { useRpcStub, useConnectionLost } from '../RpcContext'
+import { useAuth, CF_ACCESS_MODE } from '../useAuth'
+import { AuthProvider } from '../AuthContext'
+import { FeatureFlagsProvider } from '../FeatureFlagsContext'
+import Header from '../components/Header'
+import AppShell from '../components/AppShell/AppShell'
+import LoginPage from '../LoginPage'
+import OnboardingWizard from '../OnboardingWizard'
+import AccountSelectionModal from '../components/billing/AccountSelectionModal'
 
 export const Route = createRootRoute({
   component: RootComponent,
-});
+})
 
 function RootComponent() {
-  const rpcStub = useRpcStub();
-  const connectionLost = useConnectionLost();
-  const { isAuthenticated, authenticatedApi, isLoading, error, logout, login } = useAuth(rpcStub);
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const rpcStub = useRpcStub()
+  const connectionLost = useConnectionLost()
+  const { isAuthenticated, authenticatedApi, isLoading, error, logout, login } = useAuth(rpcStub)
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
 
   // Routes that don't require auth (public routes)
-  const isSignup = pathname === "/signup";
-  const isBlueprint = pathname.startsWith("/blueprint/");
+  const isSignup = pathname === '/signup'
+  const isBlueprint = pathname.startsWith('/blueprint/')
 
   // A standalone (no app shell) render is used only for signed-out visitors of public routes.
   // Signed-in users get the full app chrome so public pages (esp. the blueprint detail) feel
   // native — sidebar and all — instead of floating on a bare page.
-  const standalone = isSignup || (isBlueprint && !isAuthenticated);
+  const standalone = isSignup || (isBlueprint && !isAuthenticated)
 
   // The workspace editor renders fullscreen (no app chrome). /gadget/ is the legacy URL, kept
   // here so the chrome doesn't flash in during the redirect to /workspace/.
-  const isWorkspaceEditor = pathname.startsWith("/workspace/") || pathname.startsWith("/gadget/");
+  const isWorkspaceEditor = pathname.startsWith('/workspace/') || pathname.startsWith('/gadget/')
 
   const handleLoginSuccess = () => {
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem('authToken')
     if (token) {
-      login(token);
+      login(token)
     }
-  };
+  }
 
   // Loading state
   if (isLoading && !standalone) {
     return (
       <div className="flex min-h-full items-center justify-center flex-col gap-4 bg-kumo-base">
         <div className="w-8 h-8 border-2 border-kumo-brand border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-kumo-subtle">
-          {connectionLost ? "Waiting for server…" : "Loading..."}
-        </p>
+        <p className="text-sm text-kumo-subtle">{connectionLost ? 'Waiting for server…' : 'Loading...'}</p>
       </div>
-    );
+    )
   }
 
   // Auth error
@@ -68,7 +66,7 @@ function RootComponent() {
           Retry
         </button>
       </div>
-    );
+    )
   }
 
   // CF Access mode: show spinner while pipelined auth resolves
@@ -78,17 +76,17 @@ function RootComponent() {
         <div className="w-8 h-8 border-2 border-kumo-brand border-t-transparent rounded-full animate-spin" />
         <p className="text-sm text-kumo-subtle">Authenticating...</p>
       </div>
-    );
+    )
   }
 
   // Not authenticated and not a public route — show login
   if (!isAuthenticated && !standalone) {
-    return <LoginPage rpcStub={rpcStub} onLoginSuccess={handleLoginSuccess} />;
+    return <LoginPage rpcStub={rpcStub} onLoginSuccess={handleLoginSuccess} />
   }
 
   // Signed-out visitors of public routes render without the auth wrapper / app shell.
   if (standalone) {
-    const showHeader = !isSignup;
+    const showHeader = !isSignup
     return (
       <TooltipProvider>
         <Toasty>
@@ -100,13 +98,13 @@ function RootComponent() {
           </div>
         </Toasty>
       </TooltipProvider>
-    );
+    )
   }
 
   // Authenticated — render the full shell (with onboarding gate)
   // authenticatedApi is guaranteed non-null here: isLoading, error, and
   // !isAuthenticated branches all return early above.
-  if (!authenticatedApi) return null;
+  if (!authenticatedApi) return null
   return (
     <AuthProvider authenticatedApi={authenticatedApi} onLogout={logout}>
       <FeatureFlagsProvider>
@@ -120,7 +118,7 @@ function RootComponent() {
         </TooltipProvider>
       </FeatureFlagsProvider>
     </AuthProvider>
-  );
+  )
 }
 
 /**
@@ -132,28 +130,23 @@ function AuthenticatedShell({
   authenticatedApi,
   isWorkspaceEditor,
 }: {
-  authenticatedApi: RpcStub<AuthenticatedApi>;
-  isWorkspaceEditor: boolean;
+  authenticatedApi: RpcStub<AuthenticatedApi>
+  isWorkspaceEditor: boolean
 }) {
   // null = still checking, true = needs onboarding, false = onboarding done
-  const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | null>(null);
+  const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | null>(null)
 
   useEffect(() => {
-    let cancelled = false;
-    authenticatedApi
-      .isOnboardingCompleted()
-      .then((completed) => {
-        if (!cancelled) setOnboardingNeeded(!completed);
-      })
-      .catch((err) => {
-        logRpcFailure("Failed to check onboarding status:", err);
-        // If the check fails, skip onboarding to avoid blocking the user
-        if (!cancelled) setOnboardingNeeded(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [authenticatedApi]);
+    let cancelled = false
+    authenticatedApi.isOnboardingCompleted().then((completed) => {
+      if (!cancelled) setOnboardingNeeded(!completed)
+    }).catch((err) => {
+      logRpcFailure('Failed to check onboarding status:', err)
+      // If the check fails, skip onboarding to avoid blocking the user
+      if (!cancelled) setOnboardingNeeded(false)
+    })
+    return () => { cancelled = true }
+  }, [authenticatedApi])
 
   // Still checking onboarding status
   if (onboardingNeeded === null) {
@@ -161,18 +154,18 @@ function AuthenticatedShell({
       <div className="flex min-h-full items-center justify-center flex-col gap-4 bg-kumo-base">
         <div className="w-8 h-8 border-2 border-kumo-brand border-t-transparent rounded-full animate-spin" />
       </div>
-    );
+    )
   }
 
   // Show onboarding wizard
   if (onboardingNeeded) {
-    return <OnboardingWizard onComplete={() => setOnboardingNeeded(false)} />;
+    return <OnboardingWizard onComplete={() => setOnboardingNeeded(false)} />
   }
 
   // Normal app shell. The workspace editor is rendered fullscreen (no chrome); everything else
   // gets the persistent left-rail AppShell. Connection loss is surfaced by a chip in whichever of
   // those two top bars is showing, never by a banner that reflows the page (see ReconnectingChip).
-  const fullscreen = isWorkspaceEditor;
+  const fullscreen = isWorkspaceEditor
   return (
     <>
       <AccountSelectionModal />
@@ -186,5 +179,5 @@ function AuthenticatedShell({
         </AppShell>
       )}
     </>
-  );
+  )
 }

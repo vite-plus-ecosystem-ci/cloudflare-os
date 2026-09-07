@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
-import type { GatekeeperAppInfo } from "@gadgets/workshop-shared/api";
-import { useOptionalAuthenticatedApi } from "./AuthContext";
+import { useEffect, useState } from 'react'
+import type { GatekeeperAppInfo } from '@gadgets/workshop-shared/api'
+import { useOptionalAuthenticatedApi } from './AuthContext'
 
 // Shared per-API-stub cache of the listGatekeeperApps() request, so multiple callers in one render
 // cycle (e.g. the Header nav and the /gatekeepers/$appId page) share a single RPC instead of each
 // firing their own. Keyed weakly by the stub, so it's dropped when the authenticated session ends.
-const appsRequestByApi = new WeakMap<object, Promise<GatekeeperAppInfo[]>>();
+const appsRequestByApi = new WeakMap<object, Promise<GatekeeperAppInfo[]>>()
 
 // Mounted useGatekeeperApps() hooks register here so an explicit refresh can prompt them to refetch.
-const refreshListeners = new Set<() => void>();
+const refreshListeners = new Set<() => void>()
 
 /**
  * Drop the cached apps request and prompt mounted hooks to refetch. Unlike connected accounts, the
@@ -16,8 +16,8 @@ const refreshListeners = new Set<() => void>();
  * gatekeepers provide a UI (opting into or disconnecting an optional ambient gatekeeper).
  */
 export function refreshGatekeeperApps(api: object): void {
-  appsRequestByApi.delete(api);
-  for (const listener of refreshListeners) listener();
+  appsRequestByApi.delete(api)
+  for (const listener of refreshListeners) listener()
 }
 
 /**
@@ -28,42 +28,40 @@ export function refreshGatekeeperApps(api: object): void {
  * (id/title/icon), so it's safe to hold in state.
  */
 export function useGatekeeperApps(): GatekeeperAppInfo[] {
-  const auth = useOptionalAuthenticatedApi();
-  const [apps, setApps] = useState<GatekeeperAppInfo[]>([]);
+  const auth = useOptionalAuthenticatedApi()
+  const [apps, setApps] = useState<GatekeeperAppInfo[]>([])
   // Bumped by refreshGatekeeperApps() to re-run the fetch effect after the cache is invalidated.
-  const [refreshTick, setRefreshTick] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
-    const listener = () => setRefreshTick((t) => t + 1);
-    refreshListeners.add(listener);
-    return () => {
-      refreshListeners.delete(listener);
-    };
-  }, []);
+    const listener = () => setRefreshTick((t) => t + 1)
+    refreshListeners.add(listener)
+    return () => { refreshListeners.delete(listener) }
+  }, [])
 
   useEffect(() => {
     if (!auth) {
-      setApps([]);
-      return;
+      setApps([])
+      return
     }
-    const api: object = auth.authenticatedApi;
-    let request = appsRequestByApi.get(api);
+    const api: object = auth.authenticatedApi
+    let request = appsRequestByApi.get(api)
     if (!request) {
-      request = auth.authenticatedApi.listGatekeeperApps();
-      appsRequestByApi.set(api, request);
+      request = auth.authenticatedApi.listGatekeeperApps()
+      appsRequestByApi.set(api, request)
       // Don't cache a failure permanently — drop it so a later mount can retry.
-      request.catch(() => appsRequestByApi.delete(api));
+      request.catch(() => appsRequestByApi.delete(api))
     }
-    let cancelled = false;
+    let cancelled = false
     request
       .then((list) => {
-        if (!cancelled) setApps(list);
+        if (!cancelled) setApps(list)
       })
-      .catch(() => {});
+      .catch(() => {})
     return () => {
-      cancelled = true;
-    };
-  }, [auth, refreshTick]);
+      cancelled = true
+    }
+  }, [auth, refreshTick])
 
-  return apps;
+  return apps
 }

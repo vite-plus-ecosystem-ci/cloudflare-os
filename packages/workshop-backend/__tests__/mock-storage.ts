@@ -28,12 +28,10 @@ export function makeMockStorage(): DurableObjectStorage {
       *list<T = unknown>(options: DurableObjectListOptions = {}): Iterable<[string, T]> {
         let results: { key: string; value: any }[] = [];
         for (let [key, value] of map) {
-          if (
-            (options.prefix === undefined || key.startsWith(options.prefix)) &&
-            (options.start === undefined || key >= options.start) &&
-            (options.startAfter === undefined || key > options.startAfter) &&
-            (options.end === undefined || key < options.end)
-          ) {
+          if ((options.prefix === undefined || key.startsWith(options.prefix))
+              && (options.start === undefined || key >= options.start)
+              && (options.startAfter === undefined || key > options.startAfter)
+              && (options.end === undefined || key < options.end)) {
             results.push({ key, value });
           }
         }

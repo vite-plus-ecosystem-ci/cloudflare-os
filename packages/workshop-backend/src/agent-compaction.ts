@@ -1,13 +1,9 @@
-import {
-  SUGGESTED_MODELS,
-  WORKERS_AI_OUTPUT_LIMIT,
-  type AiChatMessage,
-  type AiModelConfig,
-} from "@gadgets/workshop-shared/api";
-import { composeCodeChange, type CodeChange } from "@gadgets/workshop-shared/code-change";
-import type { Api, Message, Model } from "@earendil-works/pi-ai";
-import type { ChatBindingEntry, CompactionCheckpoint } from "./agent";
-import { zeroUsage } from "./ai-invoke";
+import {SUGGESTED_MODELS, WORKERS_AI_OUTPUT_LIMIT, type AiChatMessage, type AiModelConfig}
+  from "@gadgets/workshop-shared/api";
+import {composeCodeChange, type CodeChange} from "@gadgets/workshop-shared/code-change";
+import type {Api, Message, Model} from "@earendil-works/pi-ai";
+import type {ChatBindingEntry, CompactionCheckpoint} from "./agent";
+import {zeroUsage} from "./ai-invoke";
 
 // Context compaction keeps long chats within the model's limit. It summarizes the messages before a
 // boundary and stores their replay state in a checkpoint. Canonical history keeps every message, so
@@ -29,13 +25,11 @@ const DEFAULT_CONTEXT_WINDOW = 128_000;
  * prompt's budget and sent as the request's response cap. A Cloudflare model configured by hand has
  * no SUGGESTED_MODELS entry to declare its reservation, so the provider's applies.
  */
-export function getModelTokenLimits(config: AiModelConfig): {
-  inputBudget: number;
-  maxOutputTokens?: number;
-} {
+export function getModelTokenLimits(config: AiModelConfig):
+    {inputBudget: number, maxOutputTokens?: number} {
   let model = SUGGESTED_MODELS[config.provider][config.model];
-  let maxOutputTokens =
-    model?.outputLimit ?? (config.provider === "cloudflare" ? WORKERS_AI_OUTPUT_LIMIT : undefined);
+  let maxOutputTokens = model?.outputLimit ??
+      (config.provider === "cloudflare" ? WORKERS_AI_OUTPUT_LIMIT : undefined);
   return {
     inputBudget: (model?.contextWindow ?? DEFAULT_CONTEXT_WINDOW) - (maxOutputTokens ?? 0),
     maxOutputTokens,
@@ -72,11 +66,8 @@ export function shouldCompactChat(contextTokens: number, inputBudget: number): b
  */
 export function isCompactionTurn(messages: AiChatMessage[]): boolean {
   let last = messages.at(-1);
-  return (
-    last?.type === "slashCommand" &&
-    last.request.id.builtin === true &&
-    last.request.id.commandId === "compact"
-  );
+  return last?.type === "slashCommand" && last.request.id.builtin === true &&
+      last.request.id.commandId === "compact";
 }
 
 /**
@@ -87,15 +78,10 @@ export function isCompactionTurn(messages: AiChatMessage[]): boolean {
  */
 export function startsAgentTurn(message: AiChatMessage): boolean {
   switch (message.type) {
-    case "message":
-      return message.author.type === "user" || message.author.type === "gadget";
-    case "agentCallback":
-    case "agentNudge":
-      return true;
-    case "connectionRequest":
-      return message.state === "accepted";
-    default:
-      return false;
+    case "message": return message.author.type === "user" || message.author.type === "gadget";
+    case "agentCallback": case "agentNudge": return true;
+    case "connectionRequest": return message.state === "accepted";
+    default: return false;
   }
 }
 
@@ -103,7 +89,7 @@ export function startsAgentTurn(message: AiChatMessage): boolean {
  * One batch of code changes, addressed by the chat sequence that recorded it. `change` is absent
  * for a batch that records only gadget creations or binding additions.
  */
-export type ChangeBatch = { sequence: number; change?: CodeChange };
+export type ChangeBatch = {sequence: number, change?: CodeChange};
 
 /**
  * Folds `merge` and `revert` over a chat log. A merge accepts through `mergeThrough` inclusively; a
@@ -114,9 +100,7 @@ export type ChangeBatch = { sequence: number; change?: CodeChange };
  * so nothing replays it.)
  */
 export function foldProposedChanges(
-  messages: Iterable<AiChatMessage>,
-  seed: readonly ChangeBatch[] = [],
-): ChangeBatch[] {
+    messages: Iterable<AiChatMessage>, seed: readonly ChangeBatch[] = []): ChangeBatch[] {
   let proposed = [...seed];
   for (let message of messages) {
     if (message.type === "changes") {
@@ -125,14 +109,15 @@ export function foldProposedChanges(
       // must not make a read-only migrated chat show proposed changes. A boundary *with* a change
       // is an ordinary proposed batch.
       if (!message.conversionBoundary || message.change !== undefined) {
-        proposed.push({ sequence: message.sequence, change: message.change });
+        proposed.push({sequence: message.sequence, change: message.change});
       }
     } else if (message.type === "merge") {
       while (proposed.length > 0 && proposed[0].sequence <= message.mergeThrough) {
         proposed.shift();
       }
     } else if (message.type === "revert") {
-      while (proposed.length > 0 && proposed[proposed.length - 1].sequence >= message.revertFrom) {
+      while (proposed.length > 0 &&
+             proposed[proposed.length - 1].sequence >= message.revertFrom) {
         proposed.pop();
       }
     }
@@ -151,8 +136,7 @@ export function foldProposedChanges(
  * tool reads whose content was later reverted.
  */
 export function chatChangeStatuses(
-  messages: Iterable<AiChatMessage>,
-): Map<number, "merged" | "reverted"> {
+    messages: Iterable<AiChatMessage>): Map<number, "merged" | "reverted"> {
   let statuses = new Map<number, "merged" | "reverted">();
   let seen: number[] = [];
   let mark = (from: number, through: number, status: "merged" | "reverted") => {
@@ -195,9 +179,8 @@ export function chatChangeStatuses(
  * resolve at). Migration-internal: nothing else reads the legacy log anymore.
  */
 export function legacyChatBaseVersion(
-  checkpoint: CompactionCheckpoint | undefined,
-  messages: Iterable<AiChatMessage>,
-): number | "current" {
+    checkpoint: CompactionCheckpoint | undefined,
+    messages: Iterable<AiChatMessage>): number | "current" {
   let anchor = checkpoint?.observedCodeVersion;
   let bump = (version: number | undefined) => {
     if (version !== undefined && (anchor === undefined || version > anchor)) anchor = version;
@@ -222,8 +205,7 @@ export function legacyChatBaseVersion(
  */
 export function findProtectedFromSequence(messages: AiChatMessage[]): number | undefined {
   let protectedIndex = messages.findIndex(
-    (message) => message.type === "connectionRequest" && message.state === "pending",
-  );
+      message => message.type === "connectionRequest" && message.state === "pending");
   if (protectedIndex < 0) return undefined;
 
   // Protect from the start of the turn that raised it, so the tail keeps the exchange explaining
@@ -257,45 +239,34 @@ function projectionMessageWeight(message: Message): number {
   // data (base64 image payloads ride ImageContent.data) with a short marker because the model's
   // attachment cost depends on the content it processes, not the byte count.
   return JSON.stringify(message, (key, value) =>
-    key === "data" && typeof value === "string" && value.length > 64 ? "[binary]" : value,
-  ).length;
+    key === "data" && typeof value === "string" && value.length > 64 ? "[binary]" : value).length;
 }
 
 /** Estimate tokens for messages not included in provider usage, or when usage data is unavailable. */
 export function estimateProjectionTokens(projection: CompactionProjectionMessage[]): number {
-  return Math.ceil(
-    projection.reduce((total, { message }) => total + projectionMessageWeight(message), 0) / 4,
-  );
+  return Math.ceil(projection.reduce((total, {message}) =>
+    total + projectionMessageWeight(message), 0) / 4);
 }
 
 function flattenModelMessage(message: Message): string {
   if (message.role === "toolResult") {
-    let text = message.content
-      .map((part) => (part.type === "text" ? part.text : `[image ${part.mimeType}]`))
-      .filter((part) => part)
-      .join("\n");
+    let text = message.content.map(part =>
+        part.type === "text" ? part.text : `[image ${part.mimeType}]`)
+        .filter(part => part).join("\n");
     // Keep the error flag visible: without it the summarizer could describe a failed
     // operation as having succeeded.
     return `[${message.toolName} ${message.isError ? "error" : "result"} ${text}]`;
   }
   if (typeof message.content === "string") return message.content;
-  return message.content
-    .map((part) => {
-      switch (part.type) {
-        case "text":
-          return part.text;
-        case "thinking":
-          return part.redacted ? "" : part.thinking;
-        case "toolCall":
-          return `[${part.name} ${JSON.stringify(part.arguments)}]`;
-        case "image":
-          return `[image ${part.mimeType}]`;
-        default:
-          return "";
-      }
-    })
-    .filter((text) => text)
-    .join("\n");
+  return message.content.map(part => {
+    switch (part.type) {
+      case "text": return part.text;
+      case "thinking": return part.redacted ? "" : part.thinking;
+      case "toolCall": return `[${part.name} ${JSON.stringify(part.arguments)}]`;
+      case "image": return `[image ${part.mimeType}]`;
+      default: return "";
+    }
+  }).filter(text => text).join("\n");
 }
 
 /**
@@ -306,29 +277,26 @@ function flattenModelMessage(message: Message): string {
  * bookkeeping fields pi requires on assistant messages.
  */
 export function buildSummaryPrompt(
-  projection: CompactionProjectionMessage[],
-  compactedTo: number,
-  model: Model<Api>,
-): Message[] {
-  let turns: { role: "user" | "assistant"; text: string }[] = [];
+    projection: CompactionProjectionMessage[], compactedTo: number,
+    model: Model<Api>): Message[] {
+  let turns: {role: "user" | "assistant", text: string}[] = [];
   // An earlier summary arrives as a `user` message with no sequence, so it is kept and the new
   // summary supersedes it. (The coding-agent system prompt is not in the projection at all; the
   // summarizer uses its own.)
-  for (let { message, sequence } of projection) {
+  for (let {message, sequence} of projection) {
     if (sequence !== undefined && sequence >= compactedTo) continue;
     let text = flattenModelMessage(message);
     if (!text) continue;
-    let role = message.role === "assistant" ? ("assistant" as const) : ("user" as const);
+    let role = message.role === "assistant" ? "assistant" as const : "user" as const;
     let last = turns[turns.length - 1];
     if (last?.role === role) last.text += `\n${text}`;
-    else turns.push({ role, text });
+    else turns.push({role, text});
   }
   let timestamp = Date.now();
-  return turns.map((turn) =>
-    turn.role === "assistant"
+  return turns.map(turn => turn.role === "assistant"
       ? {
           role: "assistant",
-          content: [{ type: "text", text: turn.text }],
+          content: [{type: "text", text: turn.text}],
           api: model.api,
           provider: model.provider,
           model: model.id,
@@ -336,8 +304,7 @@ export function buildSummaryPrompt(
           stopReason: "stop",
           timestamp,
         }
-      : { role: "user", content: turn.text, timestamp },
-  );
+      : {role: "user", content: turn.text, timestamp});
 }
 
 /**
@@ -346,16 +313,12 @@ export function buildSummaryPrompt(
  * `protectedFromSequence` is the first sequence holding state the checkpoint cannot own.
  */
 export function findCompactionBoundary(
-  projection: CompactionProjectionMessage[],
-  inputBudget: number,
-  contextTokens: number,
-  compactedTo = 0,
-  protectedFromSequence?: number,
-): number | undefined {
+    projection: CompactionProjectionMessage[], inputBudget: number, contextTokens: number,
+    compactedTo = 0, protectedFromSequence?: number): number | undefined {
   // Walk backward until the retained messages fill the target budget, then move the cut to a record
   // boundary. Provider tokenizers differ, so character weights divide the measured token count among
   // messages; the weights affect only where the cut lands.
-  let weights = projection.map(({ message }) => projectionMessageWeight(message));
+  let weights = projection.map(({message}) => projectionMessageWeight(message));
   let tokensPerWeight = contextTokens / weights.reduce((sum, weight) => sum + weight, 0);
   let tailBudget = inputBudget * COMPACTION_TARGET_RATIO;
   let keptTokens = 0;
@@ -371,12 +334,12 @@ export function findCompactionBoundary(
   // already under the target -- which is every explicit `/compact` on a short chat. Falling back to
   // the newest cut summarizes all but the last record, so the command always does what it says.
   if (sequence === undefined || sequence <= compactedTo) {
-    sequence = projection.findLast(({ canCut }) => canCut)?.sequence;
+    sequence = projection.findLast(({canCut}) => canCut)?.sequence;
   }
   if (sequence === undefined) return;
 
-  let boundary =
-    protectedFromSequence === undefined ? sequence : Math.min(sequence, protectedFromSequence);
+  let boundary = protectedFromSequence === undefined
+      ? sequence : Math.min(sequence, protectedFromSequence);
   return boundary > compactedTo ? boundary : undefined;
 }
 
@@ -389,10 +352,8 @@ export function findCompactionBoundary(
  * has `revertFrom >= compactedTo`, which is what makes refusing below that safe rather than a hole.
  */
 export function protectRetainedReverts(
-  boundary: number | undefined,
-  messages: AiChatMessage[],
-  compactedTo = 0,
-): number | undefined {
+    boundary: number | undefined, messages: AiChatMessage[], compactedTo = 0)
+    : number | undefined {
   if (boundary === undefined) return;
   let cut = boundary;
   for (let i = messages.length - 1; i >= 0; --i) {
@@ -409,12 +370,11 @@ export function protectRetainedReverts(
  * layer, which `previous` already contains once a chat has compacted before.
  */
 export function buildCompactionState(
-  messages: AiChatMessage[],
-  compactedTo: number,
-  initialBindings: [string, ChatBindingEntry][],
-  previous: CompactionCheckpoint | undefined,
-): Omit<CompactionCheckpoint, "chatId" | "compactedTo" | "summary"> {
-  let compacted = messages.filter((message) => message.sequence < compactedTo);
+    messages: AiChatMessage[], compactedTo: number,
+    initialBindings: [string, ChatBindingEntry][],
+    previous: CompactionCheckpoint | undefined)
+    : Omit<CompactionCheckpoint, "chatId" | "compactedTo" | "summary"> {
+  let compacted = messages.filter(message => message.sequence < compactedTo);
   let chatBindings = new Map(previous?.chatBindings ?? initialBindings);
   let callbackNameCounter = 0;
   let nextChangeId = previous?.nextChangeId ?? 0;
@@ -423,18 +383,16 @@ export function buildCompactionState(
     if (message.type === "message") {
       for (let capsule of message.capsules ?? []) {
         if (capsule.bindingName !== undefined && !chatBindings.has(capsule.bindingName)) {
-          chatBindings.set(capsule.bindingName, { type: "workpiece", id: capsule.gatekeeperId });
+          chatBindings.set(capsule.bindingName, {type: "workpiece", id: capsule.gatekeeperId});
         }
       }
       for (let call of message.toolCalls ?? []) {
         if (call.error) continue;
         if (call.toolName === "createGadget" && call.output !== undefined) {
-          chatBindings.set(call.input.bindingName, { type: "workpiece", id: call.output.gadgetId });
+          chatBindings.set(call.input.bindingName, {type: "workpiece", id: call.output.gadgetId});
         } else if (call.toolName === "createWorktree" && call.output !== undefined) {
-          chatBindings.set(call.input.bindingName, {
-            type: "workpiece",
-            id: call.output.worktreeId,
-          });
+          chatBindings.set(call.input.bindingName,
+              {type: "workpiece", id: call.output.worktreeId});
         }
       }
     } else if (message.type === "agentCallback") {
@@ -442,25 +400,21 @@ export function buildCompactionState(
       do {
         name = `PARAMS_${++callbackNameCounter}`;
       } while (chatBindings.has(name));
-      chatBindings.set(name, { type: "value", messageSequence: message.sequence });
-    } else if (
-      message.type === "connectionRequest" &&
-      message.state === "accepted" &&
-      message.gatekeeperId !== undefined &&
-      message.bindingName !== undefined
-    ) {
+      chatBindings.set(name, {type: "value", messageSequence: message.sequence});
+    } else if (message.type === "connectionRequest" && message.state === "accepted" &&
+               message.gatekeeperId !== undefined && message.bindingName !== undefined) {
       if (!chatBindings.has(message.bindingName)) {
-        chatBindings.set(message.bindingName, { type: "workpiece", id: message.gatekeeperId });
+        chatBindings.set(message.bindingName, {type: "workpiece", id: message.gatekeeperId});
       }
     } else if (message.type === "changes") {
-      for (let { gadgetId, bindingName } of message.createdGadgets ?? []) {
+      for (let {gadgetId, bindingName} of message.createdGadgets ?? []) {
         if (!chatBindings.has(bindingName)) {
-          chatBindings.set(bindingName, { type: "workpiece", id: gadgetId });
+          chatBindings.set(bindingName, {type: "workpiece", id: gadgetId});
         }
       }
-      for (let { worktreeId, bindingName } of message.createdWorktrees ?? []) {
+      for (let {worktreeId, bindingName} of message.createdWorktrees ?? []) {
         if (!chatBindings.has(bindingName)) {
-          chatBindings.set(bindingName, { type: "workpiece", id: worktreeId });
+          chatBindings.set(bindingName, {type: "workpiece", id: worktreeId});
         }
       }
       ++nextChangeId;
@@ -474,7 +428,7 @@ export function buildCompactionState(
   // which is sound because rollbackChatCompaction guarantees no revert in the tail reaches
   // below the boundary.
   let statuses = chatChangeStatuses(compacted);
-  let pins = new Map((previous?.pins ?? []).map((pin) => [pin.gadgetId, pin] as const));
+  let pins = new Map((previous?.pins ?? []).map(pin => [pin.gadgetId, pin] as const));
   let epoch = previous?.epoch;
   for (let message of compacted) {
     if (message.type === "merge" && message.epochBoundary) {
@@ -485,7 +439,7 @@ export function buildCompactionState(
       // re-pin them lazily, so the checkpoint must carry them or post-compaction replay would
       // lose the worktrees' bases.
       for (let pin of message.worktreePins ?? []) {
-        pins.set(pin.worktreeId, { gadgetId: pin.worktreeId, baseCommit: pin.baseCommit });
+        pins.set(pin.worktreeId, {gadgetId: pin.worktreeId, baseCommit: pin.baseCommit});
       }
     } else if (message.type === "changes" && statuses.get(message.sequence) !== "reverted") {
       if (message.conversionBoundary) {
@@ -503,16 +457,14 @@ export function buildCompactionState(
   // Composition is bounded by content size, not edit count, so `proposedChange` can't grow with
   // history the way merged CRDT updates could.
   let proposed = foldProposedChanges(
-    compacted,
-    previous?.proposedChange !== undefined
-      ? [{ sequence: -1, change: previous.proposedChange }]
-      : [],
-  );
+      compacted,
+      previous?.proposedChange !== undefined
+          ? [{sequence: -1, change: previous.proposedChange}] : []);
   let proposedChange: CodeChange | undefined;
   for (let batch of proposed) {
     if (batch.change === undefined) continue;
-    proposedChange =
-      proposedChange === undefined ? batch.change : composeCodeChange(proposedChange, batch.change);
+    proposedChange = proposedChange === undefined
+        ? batch.change : composeCodeChange(proposedChange, batch.change);
   }
 
   return {

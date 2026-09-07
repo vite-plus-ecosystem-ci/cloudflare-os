@@ -33,10 +33,14 @@ export default function SignupPage({ rpcStub }: SignupPageProps) {
       : undefined;
 
   const passwordError =
-    password && password.length < 8 ? "Must be at least 8 characters" : undefined;
+    password && password.length < 8
+      ? "Must be at least 8 characters"
+      : undefined;
 
   const confirmError =
-    confirmPassword && confirmPassword !== password ? "Passwords do not match" : undefined;
+    confirmPassword && confirmPassword !== password
+      ? "Passwords do not match"
+      : undefined;
 
   const canSubmit =
     username &&
@@ -55,7 +59,11 @@ export default function SignupPage({ rpcStub }: SignupPageProps) {
 
     try {
       const passwordHash = await hashPassword(username, password);
-      const token = await rpcStub.createAccount(username, username, passwordHash);
+      const token = await rpcStub.createAccount(
+        username,
+        username,
+        passwordHash,
+      );
       if (token) {
         localStorage.setItem("authToken", token);
         window.location.href = "/";
@@ -79,9 +87,7 @@ export default function SignupPage({ rpcStub }: SignupPageProps) {
           <p className="text-sm text-kumo-danger text-center">
             Couldn&apos;t load deployment settings.
           </p>
-          <Button variant="secondary" onClick={() => window.location.reload()}>
-            Reload
-          </Button>
+          <Button variant="secondary" onClick={() => window.location.reload()}>Reload</Button>
         </div>
       );
     }
@@ -106,10 +112,13 @@ export default function SignupPage({ rpcStub }: SignupPageProps) {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          backgroundImage: "radial-gradient(circle, var(--color-kumo-line) 1px, transparent 1px)",
+          backgroundImage:
+            "radial-gradient(circle, var(--color-kumo-line) 1px, transparent 1px)",
           backgroundSize: "24px 24px",
-          maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%)",
-          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%)",
+          maskImage:
+            "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%)",
         }}
       />
 
@@ -121,12 +130,18 @@ export default function SignupPage({ rpcStub }: SignupPageProps) {
               <Hexagon size={20} className="text-white" weight="bold" />
             </div>
           </SiteLogo>
-          <h1 className="text-xl font-semibold text-kumo-default">{siteName}</h1>
+          <h1 className="text-xl font-semibold text-kumo-default">
+            {siteName}
+          </h1>
           <p className="text-sm text-kumo-subtle mt-1">Create your account</p>
         </div>
 
         {!signupsEnabled && (
-          <Banner variant="default" title="Signups are closed" className="mb-4">
+          <Banner
+            variant="default"
+            title="Signups are closed"
+            className="mb-4"
+          >
             New account registration is currently disabled on this deployment.
           </Banner>
         )}

@@ -31,13 +31,12 @@ export const composerDocumentFromDraft = (
 ): ComposerDocument => ({
   text: draft?.text ?? "",
   capsules: [],
-  formats:
-    draft?.formats.map(({ position, length, noun, icon }) => ({
-      start: position,
-      length,
-      noun,
-      icon,
-    })) ?? [],
+  formats: draft?.formats.map(({ position, length, noun, icon }) => ({
+    start: position,
+    length,
+    noun,
+    icon,
+  })) ?? [],
   command: draft?.command
     ? {
         start: draft.command.position,
@@ -59,38 +58,31 @@ const storedDraftFromDocument = (document: ComposerDocument): StoredComposerDraf
     document.command ?? undefined,
   );
 
-const documentMatchesStoredDraft = (document: ComposerDocument, draft: StoredComposerDraft) => {
+const documentMatchesStoredDraft = (
+  document: ComposerDocument,
+  draft: StoredComposerDraft,
+) => {
   const storedCommand = draft.command;
-  if (
-    document.text !== draft.text ||
-    document.capsules.length > 0 ||
-    !!document.command !== !!storedCommand ||
-    (document.command &&
-      storedCommand &&
+  if (document.text !== draft.text || document.capsules.length > 0 ||
+      !!document.command !== !!storedCommand || document.command && storedCommand &&
       (document.command.start !== storedCommand.position ||
         document.command.length !== storedCommand.length ||
         slashCommandKey(document.command.choice.selection) !==
-          slashCommandKey(storedCommand.choice.selection)))
-  ) {
+          slashCommandKey(storedCommand.choice.selection))) {
     return false;
   }
-  return (
-    document.formats.length === draft.formats.length &&
+  return document.formats.length === draft.formats.length &&
     document.formats.every((format, index) => {
       const stored = draft.formats[index];
-      return (
-        !format.logo &&
-        format.start === stored.position &&
-        format.length === stored.length &&
-        format.noun === stored.noun &&
-        format.icon === stored.icon
-      );
-    })
-  );
+      return !format.logo && format.start === stored.position && format.length === stored.length &&
+        format.noun === stored.noun && format.icon === stored.icon;
+    });
 };
 
-const storedDraftsMatch = (first: StoredComposerDraft | undefined, second: StoredComposerDraft) =>
-  first !== undefined && JSON.stringify(first) === JSON.stringify(second);
+const storedDraftsMatch = (
+  first: StoredComposerDraft | undefined,
+  second: StoredComposerDraft,
+) => first !== undefined && JSON.stringify(first) === JSON.stringify(second);
 
 const composerDocumentsMatch = (first: ComposerDocument, second: ComposerDocument) =>
   JSON.stringify(first) === JSON.stringify(second);
@@ -104,9 +96,9 @@ export const useComposerDraft = ({
 }) => {
   const [initialDraft] = useState(() => readComposerDraft(storageKey));
   const [document, setDocument] = useState<ComposerDocument>(() =>
-    composerDocumentFromDraft(initialDraft),
-  );
-  const [presentationRequest, setPresentationRequest] = useState<DraftPresentationRequest>();
+    composerDocumentFromDraft(initialDraft));
+  const [presentationRequest, setPresentationRequest] =
+    useState<DraftPresentationRequest>();
   const documentRef = useRef(document);
   const loadedKeyRef = useRef(storageKey);
   const editedRef = useRef(false);
@@ -144,11 +136,8 @@ export const useComposerDraft = ({
 
     void Promise.all(draft.formats.map(({ icon }) => formatIconDataUrl(icon))).then((logos) => {
       requestAnimationFrame(() => {
-        if (
-          restoreGenerationRef.current !== generation ||
-          loadedKeyRef.current !== key ||
-          !documentMatchesStoredDraft(documentRef.current, draft)
-        ) {
+        if (restoreGenerationRef.current !== generation || loadedKeyRef.current !== key ||
+            !documentMatchesStoredDraft(documentRef.current, draft)) {
           return;
         }
         const restored = decorateComposerDraft(draft, logos, logoSlot);
@@ -183,8 +172,8 @@ export const useComposerDraft = ({
     setPresentationRequest(undefined);
     const storedDraft = readComposerDraft(storageKey);
     const currentDocument = documentRef.current;
-    const preserveLocalDraft =
-      previousKey === undefined && (editedRef.current || currentDocument.text.length > 0);
+    const preserveLocalDraft = previousKey === undefined &&
+      (editedRef.current || currentDocument.text.length > 0);
     if (preserveLocalDraft) {
       writeComposerDraft(storageKey, storedDraftFromDocument(currentDocument));
       skipWriteRef.current = false;
@@ -261,7 +250,8 @@ export const useComposerDraft = ({
   ): (T & { documentRevision: number; editRevision: number }) | null => {
     if (documentRevisionRef.current !== snapshot.documentRevision) {
       const documentChanges = documentRevisionRef.current - snapshot.documentRevision;
-      const presentationChanges = presentationRevisionRef.current - snapshot.presentationRevision;
+      const presentationChanges =
+        presentationRevisionRef.current - snapshot.presentationRevision;
       if (!options?.allowPresentationChanges || documentChanges !== presentationChanges) {
         return null;
       }

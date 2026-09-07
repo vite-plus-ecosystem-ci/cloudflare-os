@@ -1,23 +1,19 @@
-import { useState } from "react";
-import { Check, Plus, UserCircle } from "@phosphor-icons/react";
-import {
-  AccountDescription,
-  SupportedResource,
-  VendorDescription,
-} from "@gadgets/workshop-shared/gatekeeper";
+import { useState } from 'react'
+import { Check, Plus, UserCircle } from '@phosphor-icons/react'
+import { AccountDescription, SupportedResource, VendorDescription } from '@gadgets/workshop-shared/gatekeeper'
 
 /**
  * Account info as consumed by the chooser. Matches the shape used by GatekeeperModal and the
  * blueprint configure panel.
  */
 export type AccountOption = {
-  id: number;
-  description: AccountDescription;
-  vendorId: string;
-  vendorDescription: VendorDescription;
-  supportedResources: SupportedResource[];
-  credentialsValid: boolean;
-};
+  id: number
+  description: AccountDescription
+  vendorId: string
+  vendorDescription: VendorDescription
+  supportedResources: SupportedResource[]
+  credentialsValid: boolean
+}
 
 /**
  * Renders a connected-account avatar with graceful fallback. Some vendors (notably Google) hand
@@ -25,26 +21,13 @@ export type AccountOption = {
  * credentials themselves expiring; on load failure we fall back to the vendor logo, then a
  * generic user icon.
  */
-export function AccountAvatar({
-  avatarUrl,
-  logoUrl,
-}: {
-  avatarUrl: string | undefined;
-  logoUrl: string | undefined;
-}) {
-  const [failed, setFailed] = useState(false);
+export function AccountAvatar({ avatarUrl, logoUrl }: { avatarUrl: string | undefined, logoUrl: string | undefined }) {
+  const [failed, setFailed] = useState(false)
   if (avatarUrl && !failed) {
-    return (
-      <img
-        src={avatarUrl}
-        alt=""
-        className="h-full w-full object-cover"
-        onError={() => setFailed(true)}
-      />
-    );
+    return <img src={avatarUrl} alt="" className="h-full w-full object-cover" onError={() => setFailed(true)} />
   }
-  if (logoUrl) return <img src={logoUrl} alt="" className="h-4 w-4 object-contain" />;
-  return <UserCircle size={17} className="text-kumo-subtle" />;
+  if (logoUrl) return <img src={logoUrl} alt="" className="h-4 w-4 object-contain" />
+  return <UserCircle size={17} className="text-kumo-subtle" />
 }
 
 export function AccountChooser({
@@ -62,54 +45,49 @@ export function AccountChooser({
   onReconnect,
   onGrantAccess,
 }: {
-  accounts: AccountOption[];
-  selectedAccountId: number | null;
-  vendorId?: string;
-  vendorName: string;
-  resourceTitle?: string;
-  connecting: boolean;
-  reconnectingAccountId: number | null;
-  requiredResourceUrlPatterns?: string[];
-  grantingAccountId?: number | null;
-  onSelect: (id: number) => void;
-  onConnect: () => void;
-  onReconnect: (id: number) => void;
-  onGrantAccess?: (id: number) => void;
+  accounts: AccountOption[]
+  selectedAccountId: number | null
+  vendorId?: string
+  vendorName: string
+  resourceTitle?: string
+  connecting: boolean
+  reconnectingAccountId: number | null
+  requiredResourceUrlPatterns?: string[]
+  grantingAccountId?: number | null
+  onSelect: (id: number) => void
+  onConnect: () => void
+  onReconnect: (id: number) => void
+  onGrantAccess?: (id: number) => void
 }) {
-  const isEmailMailbox = vendorId === "email" && resourceTitle === "Email Mailbox";
+  const isEmailMailbox = vendorId === 'email' && resourceTitle === 'Email Mailbox'
 
   return (
     <section className="overflow-hidden rounded-xl border border-kumo-line bg-kumo-base">
       <div className="border-b border-kumo-line px-3 py-2.5">
-        <p className="text-[12px] leading-4 font-medium tracking-[-0.2px] text-kumo-default">
-          Account
-        </p>
+        <p className="text-[12px] leading-4 font-medium tracking-[-0.2px] text-kumo-default">Account</p>
         <p className="mt-0.5 text-[12px] leading-4 font-normal tracking-[-0.2px] text-kumo-subtle">
           {isEmailMailbox
-            ? "Enable the Email receiver account, then choose the mailbox name below."
-            : `Pick which ${vendorName} identity this ${resourceTitle ?? "connection"} should use.`}
+            ? 'Enable the Email receiver account, then choose the mailbox name below.'
+            : `Pick which ${vendorName} identity this ${resourceTitle ?? 'connection'} should use.`}
         </p>
       </div>
       <div className="divide-y divide-kumo-line">
-        {accounts.map((account) => {
-          const selected = selectedAccountId === account.id;
-          const name =
-            account.description.uniqueName ||
-            account.description.displayName ||
-            "Connected account";
-          const expired = !account.credentialsValid;
-          const reconnecting = reconnectingAccountId === account.id;
-          const granted = account.description.grantedResourceUrlPatterns;
+        {accounts.map(account => {
+          const selected = selectedAccountId === account.id
+          const name = account.description.uniqueName || account.description.displayName || 'Connected account'
+          const expired = !account.credentialsValid
+          const reconnecting = reconnectingAccountId === account.id
+          const granted = account.description.grantedResourceUrlPatterns
           const accountMissing =
             requiredResourceUrlPatterns && granted !== undefined
-              ? requiredResourceUrlPatterns.filter((p) => !granted.includes(p))
-              : [];
-          const needsAccess = !expired && accountMissing.length > 0;
-          const granting = grantingAccountId === account.id;
+              ? requiredResourceUrlPatterns.filter(p => !granted.includes(p))
+              : []
+          const needsAccess = !expired && accountMissing.length > 0
+          const granting = grantingAccountId === account.id
           return (
             <div
               key={account.id}
-              className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${selected ? "bg-kumo-tint" : ""}`}
+              className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${selected ? 'bg-kumo-tint' : ''}`}
             >
               <button
                 type="button"
@@ -120,28 +98,20 @@ export function AccountChooser({
                 <div
                   className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full"
                   style={{
-                    backgroundColor: account.vendorDescription.color ?? "var(--color-kumo-tint)",
+                    backgroundColor:
+                      account.vendorDescription.color ?? 'var(--color-kumo-tint)',
                   }}
                 >
-                  <AccountAvatar
-                    avatarUrl={account.description.avatar?.url}
-                    logoUrl={account.vendorDescription.logo?.url}
-                  />
+                  <AccountAvatar avatarUrl={account.description.avatar?.url} logoUrl={account.vendorDescription.logo?.url} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] leading-[18px] font-medium tracking-[-0.25px] text-kumo-default">
-                    {name}
-                  </p>
-                  <p
-                    className={`truncate text-[12px] leading-4 font-normal tracking-[-0.2px] ${needsAccess ? "text-kumo-brand" : "text-kumo-subtle"}`}
-                  >
+                  <p className="truncate text-[13px] leading-[18px] font-medium tracking-[-0.25px] text-kumo-default">{name}</p>
+                  <p className={`truncate text-[12px] leading-4 font-normal tracking-[-0.2px] ${needsAccess ? 'text-kumo-brand' : 'text-kumo-subtle'}`}>
                     {expired
-                      ? "Expired credentials"
+                      ? 'Expired credentials'
                       : needsAccess
-                        ? "Additional permission needed"
-                        : resourceTitle
-                          ? `Connected ${vendorName} account`
-                          : "Connected"}
+                      ? 'Additional permission needed'
+                      : resourceTitle ? `Connected ${vendorName} account` : 'Connected'}
                   </p>
                 </div>
               </button>
@@ -152,7 +122,7 @@ export function AccountChooser({
                   disabled={reconnecting}
                   className="shrink-0 cursor-pointer rounded-md border border-kumo-line px-2 py-1 text-[12px] leading-4 font-medium tracking-[-0.2px] text-kumo-default transition-colors hover:bg-kumo-elevated disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {reconnecting ? "Opening..." : "Reconnect"}
+                  {reconnecting ? 'Opening...' : 'Reconnect'}
                 </button>
               ) : needsAccess ? (
                 <button
@@ -161,12 +131,12 @@ export function AccountChooser({
                   disabled={granting}
                   className="shrink-0 cursor-pointer rounded-md border border-kumo-line px-2 py-1 text-[12px] leading-4 font-medium tracking-[-0.2px] text-kumo-default transition-colors hover:bg-kumo-elevated disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {granting ? "Opening..." : "Grant access"}
+                  {granting ? 'Opening...' : 'Grant access'}
                 </button>
               ) : null}
               {selected && <Check size={15} weight="bold" className="shrink-0 text-kumo-brand" />}
             </div>
-          );
+          )
         })}
 
         {(!isEmailMailbox || accounts.length === 0) && (
@@ -182,13 +152,11 @@ export function AccountChooser({
               <Plus size={14} />
             )}
             {isEmailMailbox
-              ? "Enable Email mailboxes"
-              : accounts.length === 0
-                ? `Connect ${vendorName}`
-                : `Use another ${vendorName} account`}
+              ? 'Enable Email mailboxes'
+              : accounts.length === 0 ? `Connect ${vendorName}` : `Use another ${vendorName} account`}
           </button>
         )}
       </div>
     </section>
-  );
+  )
 }

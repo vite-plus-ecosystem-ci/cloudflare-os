@@ -22,12 +22,8 @@ export {
 /** The queue surface staging needs; `gate.actions` and a full stub both satisfy it. */
 export type ActionSubmitter = Pick<RpcStub<ApprovalQueue>, "submitAction">;
 
-type ActionLogFields = {
-  outcome: ResolveOutcome;
-  vendorId: string;
-  action: number;
-  stranded: number;
-};
+type ActionLogFields =
+  { outcome: ResolveOutcome; vendorId: string; action: number; stranded: number };
 
 const logger = createLogger<ActionLogFields>({ component: "gatekeeper.actions" });
 
@@ -49,7 +45,7 @@ export function stageAction<A>(
   description: ActionDescription,
 ): Promise<number> {
   let lane = submissions.get(journal);
-  if (!lane) submissions.set(journal, (lane = new SerialTaskQueue()));
+  if (!lane) submissions.set(journal, lane = new SerialTaskQueue());
   return lane.run(async () => {
     const id = journal.allocate(action);
     try {
@@ -74,15 +70,12 @@ export function stageAction<A>(
 export class ActionApplyError extends Error {}
 
 /** Message stored when a dispatched action's outcome is unknown. */
-export const APPLY_OUTCOME_UNKNOWN_MESSAGE =
-  "This action was interrupted after it was dispatched, " +
-  "so it may or may not have taken effect. Check the provider before submitting it again.";
+export const APPLY_OUTCOME_UNKNOWN_MESSAGE = "This action was interrupted after it was dispatched, "
+  + "so it may or may not have taken effect. Check the provider before submitting it again.";
 
 /** The approver-facing text for one action; its policy fields come from the declaration. */
-export type ActionPresentation = Pick<
-  ActionDescription,
-  "title" | "description" | "implementsRevert"
->;
+export type ActionPresentation =
+  Pick<ActionDescription, "title" | "description" | "implementsRevert">;
 
 /**
  * Durable action ID available to handlers. It is stable across retries and can seed provider
@@ -290,8 +283,7 @@ export function defineActions<Host, M extends Record<string, unknown>>(
     if (declaredLabel === undefined) labelByTag.set(tag, label);
     else if (declaredLabel !== label) {
       throw new Error(
-        `Action tag "${tag}" is declared with two labels, "${declaredLabel}" and "${label}".`,
-      );
+        `Action tag "${tag}" is declared with two labels, "${declaredLabel}" and "${label}".`);
     }
     if (definition.autoApprovable === true) autoApprovableByTag.set(tag, definition.kind);
   }
@@ -347,22 +339,17 @@ export function defineActions<Host, M extends Record<string, unknown>>(
           if (dead.length === 0) return;
 
           // A staged dependent can race this scan; apply rejects its unresolved reference later.
-          const stranded = strandedBy(
-            dead,
-            journal.listUndecided().map((record) => {
-              const definition = definitionFor(record.action);
-              return {
-                id: record.id,
-                provides: definition?.provides?.(record.action.payload) ?? [],
-                dependsOn: definition?.dependsOn?.(record.action.payload) ?? [],
-              };
-            }),
-          );
+          const stranded = strandedBy(dead, journal.listUndecided().map(record => {
+            const definition = definitionFor(record.action);
+            return {
+              id: record.id,
+              provides: definition?.provides?.(record.action.payload) ?? [],
+              dependsOn: definition?.dependsOn?.(record.action.payload) ?? [],
+            };
+          }));
           for (const strandedId of stranded) {
             journal.markFailed(
-              strandedId,
-              `This action needed action ${id}, which was not applied.`,
-            );
+              strandedId, `This action needed action ${id}, which was not applied.`);
           }
           if (stranded.length > 0) {
             attributed.debug("retired actions left unresolvable by a decision", {
@@ -436,10 +423,9 @@ export function defineActions<Host, M extends Record<string, unknown>>(
           }
 
           // Persist apply artifacts outside the handler catch so a failed write cannot replay the effect.
-          const applied =
-            result?.action === undefined
-              ? undefined
-              : ({ kind: action.kind, payload: result.action } as TaggedAction<M>);
+          const applied = result?.action === undefined
+            ? undefined
+            : { kind: action.kind, payload: result.action } as TaggedAction<M>;
           if (options.retainApplied) journal.retain(id, applied);
           else journal.retire(id);
           await resolved("applied");
@@ -503,9 +489,9 @@ export function defineActions<Host, M extends Record<string, unknown>>(
           });
         },
 
-        apply: (id) => resolutionQueue.run(() => applyRecord(id)),
+        apply: id => resolutionQueue.run(() => applyRecord(id)),
 
-        reject: (id) => resolutionQueue.run(() => rejectRecord(id)),
+        reject: id => resolutionQueue.run(() => rejectRecord(id)),
 
         autoApprovableKinds: () => [...autoApprovableByTag.values()],
 
@@ -513,7 +499,7 @@ export function defineActions<Host, M extends Record<string, unknown>>(
 
         resolved,
 
-        runExclusive: (hook) => resolutionQueue.run(hook),
+        runExclusive: hook => resolutionQueue.run(hook),
       };
       bound.set(journal, { host, set });
       return set;

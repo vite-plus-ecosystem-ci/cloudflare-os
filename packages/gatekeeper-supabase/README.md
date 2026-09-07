@@ -25,7 +25,6 @@ flow.
    ```
 
    For local development that is `http://localhost:8787/gatekeeper/supabase/oauth`.
-
 3. After creating it, copy the **Client ID** and **Client Secret** (the secret is shown once).
 
 > Use the OAuth app's **Client ID + Client Secret** — not a personal access token or project API

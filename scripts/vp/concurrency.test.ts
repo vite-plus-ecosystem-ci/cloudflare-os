@@ -4,18 +4,9 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { after, describe, it } from "node:test";
 import {
-  BYTES_PER_TASK,
-  ROOT_ENV_FILE,
-  VP_DEFAULT_CONCURRENCY_LIMIT,
-  VP_RUN_CONCURRENCY_LIMIT,
-  cgroupMemoryLimitBytes,
-  cgroupMounts,
-  concurrencyEnv,
-  defaultConcurrencyLimit,
-  effectiveMemoryBytes,
-  envFileConcurrencyLimit,
-  overridesConcurrency,
-  splitConcurrencyLimit,
+  BYTES_PER_TASK, ROOT_ENV_FILE, VP_DEFAULT_CONCURRENCY_LIMIT, VP_RUN_CONCURRENCY_LIMIT,
+  cgroupMemoryLimitBytes, cgroupMounts, concurrencyEnv, defaultConcurrencyLimit,
+  effectiveMemoryBytes, envFileConcurrencyLimit, overridesConcurrency, splitConcurrencyLimit,
   vpRunEnv,
 } from "./concurrency.ts";
 
@@ -25,14 +16,14 @@ describe("defaultConcurrencyLimit", () => {
   // The machines the header comment cites, plus both directions of the floor: too little memory
   // for the cores, and too few cores for the memory.
   const table: [cpus: number, gib: number, expected: number][] = [
-    [4, 16, 4], // CI (ubuntu-latest): unchanged from Vite+'s default
+    [4, 16, 4],    // CI (ubuntu-latest): unchanged from Vite+'s default
     [4, 8, 4],
     [8, 16, 8],
-    [10, 32, 10], // CPU-bound: 32 GiB would allow 16
+    [10, 32, 10],  // CPU-bound: 32 GiB would allow 16
     [16, 64, 16],
-    [2, 4, 4], // below the floor on both counts
-    [64, 8, 4], // memory caps a many-core box at the floor
-    [16, 24, 12], // memory caps below the cpu count
+    [2, 4, 4],     // below the floor on both counts
+    [64, 8, 4],    // memory caps a many-core box at the floor
+    [16, 24, 12],  // memory caps below the cpu count
   ];
   for (const [cpus, gib, expected] of table) {
     it(`${cpus} cpus / ${gib} GiB -> ${expected}`, () => {
@@ -127,79 +118,44 @@ function mountInfoWith(lines: string[]): string {
 }
 
 describe("cgroupMounts", () => {
-  const table: [
-    label: string,
-    lines: string[],
-    v2Root: string | null,
-    v1MemoryRoot: string | null,
-  ][] = [
-    [
-      "canonical v2 at the cgroupfs root",
-      [
-        "23 27 0:22 / /sys ro,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs ro",
-        "28 23 0:25 / /sys/fs/cgroup ro,nosuid,nodev,noexec shared:9 - cgroup2 cgroup2 " +
-          "rw,nsdelegate,memory_recursiveprot",
-      ],
-      "/sys/fs/cgroup",
-      null,
-    ],
+  const table: [label: string, lines: string[], v2Root: string | null,
+    v1MemoryRoot: string | null][] = [
+    ["canonical v2 at the cgroupfs root", [
+      "23 27 0:22 / /sys ro,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs ro",
+      "28 23 0:25 / /sys/fs/cgroup ro,nosuid,nodev,noexec shared:9 - cgroup2 cgroup2 " +
+        "rw,nsdelegate,memory_recursiveprot",
+    ], "/sys/fs/cgroup", null],
     // The hybrid layout the hardcoded v2 path missed entirely: cgroup2 is not at the root.
-    [
-      "hybrid cgroup2 beside a v1 memory controller",
-      [
-        "30 23 0:26 / /sys/fs/cgroup/unified rw,nosuid,nodev,noexec,relatime shared:5 - cgroup2 " +
-          "cgroup2 rw",
-        "35 23 0:31 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime shared:10 - cgroup " +
-          "cgroup rw,memory",
-      ],
-      "/sys/fs/cgroup/unified",
-      "/sys/fs/cgroup/memory",
-    ],
+    ["hybrid cgroup2 beside a v1 memory controller", [
+      "30 23 0:26 / /sys/fs/cgroup/unified rw,nosuid,nodev,noexec,relatime shared:5 - cgroup2 " +
+        "cgroup2 rw",
+      "35 23 0:31 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime shared:10 - cgroup " +
+        "cgroup rw,memory",
+    ], "/sys/fs/cgroup/unified", "/sys/fs/cgroup/memory"],
     // A joined-name v1 mount: the controller is there, just not at the `memory` subdirectory.
-    [
-      "v1 memory co-mounted under a joined name",
-      [
-        "36 23 0:32 / /sys/fs/cgroup/cpu,memory rw,nosuid,nodev,noexec,relatime shared:11 - cgroup " +
-          "cgroup rw,cpu,cpuacct,memory",
-      ],
-      null,
-      "/sys/fs/cgroup/cpu,memory",
-    ],
+    ["v1 memory co-mounted under a joined name", [
+      "36 23 0:32 / /sys/fs/cgroup/cpu,memory rw,nosuid,nodev,noexec,relatime shared:11 - cgroup " +
+        "cgroup rw,cpu,cpuacct,memory",
+    ], null, "/sys/fs/cgroup/cpu,memory"],
     // `shared:9` present versus absent shifts every later field, which is the whole reason the line
     // is split on ` - ` before it is split into fields.
-    [
-      "a line with no optional fields at all",
-      ["28 23 0:25 / /sys/fs/cgroup rw,relatime - cgroup2 cgroup2 rw"],
-      "/sys/fs/cgroup",
-      null,
-    ],
-    [
-      "a mount point carrying octal escapes",
-      ["28 23 0:25 / /tmp/odd\\040cgroup\\134dir rw,relatime shared:9 - cgroup2 cgroup2 rw"],
-      "/tmp/odd cgroup\\dir",
-      null,
-    ],
+    ["a line with no optional fields at all", [
+      "28 23 0:25 / /sys/fs/cgroup rw,relatime - cgroup2 cgroup2 rw",
+    ], "/sys/fs/cgroup", null],
+    ["a mount point carrying octal escapes", [
+      "28 23 0:25 / /tmp/odd\\040cgroup\\134dir rw,relatime shared:9 - cgroup2 cgroup2 rw",
+    ], "/tmp/odd cgroup\\dir", null],
     // Shortest wins, so the canonical mount beats a bind mount of the same hierarchy.
-    [
-      "a nested bind mount of the same hierarchy",
-      [
-        "40 23 0:25 /foo /var/lib/nested/cgroup2 rw,relatime - cgroup2 cgroup2 rw",
-        "28 23 0:25 / /sys/fs/cgroup rw,relatime shared:9 - cgroup2 cgroup2 rw",
-      ],
-      "/sys/fs/cgroup",
-      null,
-    ],
+    ["a nested bind mount of the same hierarchy", [
+      "40 23 0:25 /foo /var/lib/nested/cgroup2 rw,relatime - cgroup2 cgroup2 rw",
+      "28 23 0:25 / /sys/fs/cgroup rw,relatime shared:9 - cgroup2 cgroup2 rw",
+    ], "/sys/fs/cgroup", null],
     // A `cgroup` mount without the controller must not be mistaken for one that has it, and no
     // non-cgroup filesystem may match either.
-    [
-      "no cgroup mounts at all",
-      [
-        "25 27 8:1 / / rw,relatime shared:1 - ext4 /dev/sda1 rw",
-        "33 23 0:29 / /sys/fs/cgroup/pids rw,relatime shared:8 - cgroup cgroup rw,pids",
-      ],
-      null,
-      null,
-    ],
+    ["no cgroup mounts at all", [
+      "25 27 8:1 / / rw,relatime shared:1 - ext4 /dev/sda1 rw",
+      "33 23 0:29 / /sys/fs/cgroup/pids rw,relatime shared:8 - cgroup cgroup rw,pids",
+    ], null, null],
     ["unparseable junk", ["", "nonsense", "1 2 3 - ", "- cgroup2 cgroup2 rw"], null, null],
   ];
 
@@ -226,21 +182,17 @@ describe("cgroupMemoryLimitBytes", () => {
   });
 
   it("takes the tightest ancestor, not the deepest cgroup", () => {
-    const probe = cgroupFixture(
-      {
-        "foo/bar/memory.max": String(8 * GiB),
-        "foo/memory.max": String(2 * GiB),
-      },
-      "0::/foo/bar\n",
-    );
+    const probe = cgroupFixture({
+      "foo/bar/memory.max": String(8 * GiB),
+      "foo/memory.max": String(2 * GiB),
+    }, "0::/foo/bar\n");
     assert.equal(cgroupMemoryLimitBytes({ ...probe, platform: "linux" }), 2 * GiB);
   });
 
   it("reads a v1 memory.limit_in_bytes for the memory controller's own path", () => {
     const probe = cgroupFixture(
-      { "memory/svc/memory.limit_in_bytes": String(4 * GiB) },
-      "12:memory,cpu:/svc\n11:pids:/other\n",
-    );
+        { "memory/svc/memory.limit_in_bytes": String(4 * GiB) },
+        "12:memory,cpu:/svc\n11:pids:/other\n");
     assert.equal(cgroupMemoryLimitBytes({ ...probe, platform: "linux" }), 4 * GiB);
   });
 
@@ -270,20 +222,19 @@ describe("cgroupMemoryLimitBytes", () => {
   // read without `mountInfo`, so the case is a demonstration of the bug and not just of the fix.
   it("finds a hybrid layout's cgroup2 mount away from the cgroupfs root", () => {
     const probe = cgroupFixture(
-      { "unified/memory.max": String(4 * GiB) },
-      "0::/\n",
-      (root) => `30 23 0:26 / ${root}/unified rw,relatime shared:5 - cgroup2 cgroup2 rw`,
-    );
+        { "unified/memory.max": String(4 * GiB) },
+        "0::/\n",
+        root => `30 23 0:26 / ${root}/unified rw,relatime shared:5 - cgroup2 cgroup2 rw`);
     assert.equal(cgroupMemoryLimitBytes({ ...probe, mountInfo: ABSENT, platform: "linux" }), null);
     assert.equal(cgroupMemoryLimitBytes({ ...probe, platform: "linux" }), 4 * GiB);
   });
 
   it("finds a v1 memory controller co-mounted under a joined name", () => {
     const probe = cgroupFixture(
-      { "cpu,memory/svc/memory.limit_in_bytes": String(2 * GiB) },
-      "12:cpu,memory:/svc\n",
-      (root) => `36 23 0:32 / ${root}/cpu,memory rw,relatime - cgroup cgroup rw,cpu,cpuacct,memory`,
-    );
+        { "cpu,memory/svc/memory.limit_in_bytes": String(2 * GiB) },
+        "12:cpu,memory:/svc\n",
+        root =>
+          `36 23 0:32 / ${root}/cpu,memory rw,relatime - cgroup cgroup rw,cpu,cpuacct,memory`);
     assert.equal(cgroupMemoryLimitBytes({ ...probe, mountInfo: ABSENT, platform: "linux" }), null);
     assert.equal(cgroupMemoryLimitBytes({ ...probe, platform: "linux" }), 2 * GiB);
   });
@@ -292,13 +243,10 @@ describe("cgroupMemoryLimitBytes", () => {
   // that is what makes this change purely additive.
   it("falls back to the canonical layout when mountinfo is unreadable", () => {
     const probe = cgroupFixture(
-      { "memory.max": String(4 * GiB), "memory/memory.limit_in_bytes": String(2 * GiB) },
-      "0::/\n5:memory:/\n",
-    );
-    assert.equal(
-      cgroupMemoryLimitBytes({ ...probe, mountInfo: ABSENT, platform: "linux" }),
-      2 * GiB,
-    );
+        { "memory.max": String(4 * GiB), "memory/memory.limit_in_bytes": String(2 * GiB) },
+        "0::/\n5:memory:/\n");
+    assert.equal(cgroupMemoryLimitBytes({ ...probe, mountInfo: ABSENT, platform: "linux" }),
+        2 * GiB);
   });
 
   it("reports no limit and reads nothing off Linux", () => {
@@ -347,10 +295,8 @@ describe("envFileConcurrencyLimit", () => {
   // Unvalidated on purpose: vite-task reports a bad value against the name the user set, and this
   // suite pins that so nobody "helpfully" adds a parse here that swallows it instead.
   it("passes a non-numeric value through untouched", () => {
-    assert.equal(
-      envFileConcurrencyLimit(envFileWith("VP_RUN_CONCURRENCY_LIMIT=garbage\n")),
-      "garbage",
-    );
+    assert.equal(envFileConcurrencyLimit(envFileWith("VP_RUN_CONCURRENCY_LIMIT=garbage\n")),
+        "garbage");
   });
 
   it("defaults to the repo-root .env, not the current directory", () => {
@@ -359,7 +305,8 @@ describe("envFileConcurrencyLimit", () => {
     // `..` hops from here, which would mirror whatever the implementation does and go green with it.
     assert.equal(basename(ROOT_ENV_FILE), ".env");
     const root = dirname(ROOT_ENV_FILE);
-    assert.ok(existsSync(join(root, "pnpm-workspace.yaml")), `${root} is not the workspace root`);
+    assert.ok(existsSync(join(root, "pnpm-workspace.yaml")),
+        `${root} is not the workspace root`);
   });
 });
 
@@ -372,10 +319,9 @@ describe("concurrencyEnv", () => {
     assert.equal(env[VP_RUN_CONCURRENCY_LIMIT], "10");
     assert.equal(env.PATH, "/usr/bin");
     assert.equal(
-      note,
-      "vp run: concurrency 10 (10 cpus, 32.0 GiB) -- " +
-        "set VP_RUN_CONCURRENCY_LIMIT in the environment or the repo-root .env to override",
-    );
+        note,
+        "vp run: concurrency 10 (10 cpus, 32.0 GiB) -- " +
+          "set VP_RUN_CONCURRENCY_LIMIT in the environment or the repo-root .env to override");
   });
 
   // Saying *why* the number is small is the whole point of the flag: a container user otherwise
@@ -383,10 +329,9 @@ describe("concurrencyEnv", () => {
   it("names the cgroup limit when that is what capped the memory", () => {
     const { note } = concurrencyEnv({}, { cpus: 16, memoryBytes: 4 * GiB, cgroupLimited: true });
     assert.equal(
-      note,
-      "vp run: concurrency 4 (16 cpus, 4.0 GiB cgroup limit) -- " +
-        "set VP_RUN_CONCURRENCY_LIMIT in the environment or the repo-root .env to override",
-    );
+        note,
+        "vp run: concurrency 4 (16 cpus, 4.0 GiB cgroup limit) -- " +
+          "set VP_RUN_CONCURRENCY_LIMIT in the environment or the repo-root .env to override");
   });
 
   // The `.env` step, and the note that makes it verifiable: the failure it replaces was a value
@@ -448,7 +393,7 @@ describe("overridesConcurrency", () => {
     // Among other arguments, and after the task specifier -- where pnpm appends a forwarded flag.
     [["--filter=!cloudflare-os", "--cache", "build", "--concurrency-limit", "2"], true],
     [["--parallel", "--filter=@gadgets/typed-storage", "build"], true],
-    [["--concurrency-limit"], true], // value omitted; vp reports that itself
+    [["--concurrency-limit"], true],       // value omitted; vp reports that itself
     [[], false],
     [["build"], false],
     [["--filter=!cloudflare-os", "--cache", "test"], false],
@@ -473,9 +418,7 @@ describe("overridesConcurrency", () => {
 function captureStderr(run: () => NodeJS.ProcessEnv): { env: NodeJS.ProcessEnv; err: string } {
   const original = console.error;
   let err = "";
-  console.error = (...args: unknown[]) => {
-    err += `${args.join(" ")}\n`;
-  };
+  console.error = (...args: unknown[]) => { err += `${args.join(" ")}\n`; };
   try {
     return { env: run(), err };
   } finally {
@@ -491,19 +434,15 @@ describe("vpRunEnv", () => {
       const { env, err } = captureStderr(() => vpRunEnv({ env: {}, vpArgs: args }));
       // Set regardless: the flag wins in vp either way, and leaving it set is what preserves
       // behaviour if the flag turns out to be malformed.
-      assert.match(
-        env[VP_RUN_CONCURRENCY_LIMIT] ?? "",
-        /^\d+$/,
-        `expected a resolved limit for ${JSON.stringify(args)}`,
-      );
+      assert.match(env[VP_RUN_CONCURRENCY_LIMIT] ?? "", /^\d+$/,
+          `expected a resolved limit for ${JSON.stringify(args)}`);
       assert.equal(err, "", `expected no note for ${JSON.stringify(args)}`);
     }
   });
 
   it("prints the note when no flag overrides it", () => {
-    const { env, err } = captureStderr(() =>
-      vpRunEnv({ env: {}, vpArgs: ["--filter=!cloudflare-os", "build"] }),
-    );
+    const { env, err } = captureStderr(
+        () => vpRunEnv({ env: {}, vpArgs: ["--filter=!cloudflare-os", "build"] }));
     assert.match(env[VP_RUN_CONCURRENCY_LIMIT] ?? "", /^\d+$/);
     assert.match(err, /^vp run: concurrency \d+ /);
   });
@@ -519,9 +458,8 @@ describe("vpRunEnv", () => {
   // independent of any flag.
   it("stays silent for an environment value, flag or no flag", () => {
     for (const args of [[], ["--parallel"]]) {
-      const { env, err } = captureStderr(() =>
-        vpRunEnv({ env: { [VP_RUN_CONCURRENCY_LIMIT]: "3" }, vpArgs: args }),
-      );
+      const { env, err } = captureStderr(
+          () => vpRunEnv({ env: { [VP_RUN_CONCURRENCY_LIMIT]: "3" }, vpArgs: args }));
       assert.equal(env[VP_RUN_CONCURRENCY_LIMIT], "3");
       assert.equal(err, "");
     }
@@ -547,10 +485,7 @@ const SPLITS: [label: string, value: string, runs: number, expected: string][] =
 describe("splitConcurrencyLimit", () => {
   for (const [label, value, runs, expected] of SPLITS) {
     it(`${label}: ${value} / ${runs} -> ${expected}`, () => {
-      const env = splitConcurrencyLimit(
-        { PATH: "/usr/bin", [VP_RUN_CONCURRENCY_LIMIT]: value },
-        runs,
-      );
+      const env = splitConcurrencyLimit({ PATH: "/usr/bin", [VP_RUN_CONCURRENCY_LIMIT]: value }, runs);
       assert.equal(env[VP_RUN_CONCURRENCY_LIMIT], expected);
       assert.equal(env.PATH, "/usr/bin");
     });
@@ -576,8 +511,7 @@ describe("vpRunEnv concurrentRuns", () => {
   for (const [label, value, runs, expected] of SPLITS) {
     it(`${label}: ${value} / ${runs} -> ${expected}`, () => {
       const { env, err } = captureStderr(() =>
-        vpRunEnv({ env: { [VP_RUN_CONCURRENCY_LIMIT]: value }, concurrentRuns: runs }),
-      );
+          vpRunEnv({ env: { [VP_RUN_CONCURRENCY_LIMIT]: value }, concurrentRuns: runs }));
       assert.equal(env[VP_RUN_CONCURRENCY_LIMIT], expected);
       assert.equal(err, "");
     });
@@ -593,10 +527,7 @@ describe("vpRunEnv concurrentRuns", () => {
     assert.match(split.env[VP_RUN_CONCURRENCY_LIMIT] ?? "", /^\d+$/);
     assert.ok(perRun <= total, `${perRun} > ${total}`);
     assert.ok(perRun >= VP_DEFAULT_CONCURRENCY_LIMIT);
-    assert.equal(
-      perRun,
-      Math.min(total, Math.max(VP_DEFAULT_CONCURRENCY_LIMIT, Math.floor(total / 2))),
-    );
+    assert.equal(perRun, Math.min(total, Math.max(VP_DEFAULT_CONCURRENCY_LIMIT, Math.floor(total / 2))));
     assert.equal(split.err, whole.err);
     assert.match(split.err, /^vp run: concurrency \d+ /);
   });

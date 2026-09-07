@@ -31,7 +31,9 @@ export interface McpGatekeeperUserContext {
 export const mcpGatekeeperUserContext = Symbol("mcpGatekeeperUserContext");
 
 /** Common account lifecycle for MCP gatekeeper user entrypoints. */
-export abstract class McpGatekeeperUserBase<E> extends WorkerEntrypoint<E, McpGatekeeperUserProps> {
+export abstract class McpGatekeeperUserBase<E>
+  extends WorkerEntrypoint<E, McpGatekeeperUserProps> {
+
   /** Supplies connector-owned lifecycle values without exposing an RPC-addressable method. */
   protected abstract [mcpGatekeeperUserContext](): McpGatekeeperUserContext;
 

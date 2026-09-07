@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Loader } from "@cloudflare/kumo";
+import { useState } from 'react'
+import { Loader } from '@cloudflare/kumo'
 import {
   Code as CodeIcon,
   Database,
@@ -12,8 +12,8 @@ import {
   CheckCircle,
   WarningCircle,
   Clock,
-} from "@phosphor-icons/react";
-import type { ToolCall } from "../../data/chat";
+} from '@phosphor-icons/react'
+import type { ToolCall } from '../../data/chat'
 
 const iconMap: Record<string, React.ElementType> = {
   code: CodeIcon,
@@ -24,26 +24,26 @@ const iconMap: Record<string, React.ElementType> = {
   search: MagnifyingGlass,
   shield: Shield,
   zap: Lightning,
-};
+}
 
 function StatusIndicator({ status }: { status: string }) {
   switch (status) {
-    case "running":
-      return <Loader size="sm" />;
-    case "complete":
-      return <CheckCircle size={14} weight="fill" className="text-kumo-success" />;
-    case "error":
-      return <WarningCircle size={14} weight="fill" className="text-kumo-danger" />;
-    case "waiting":
-      return <Clock size={14} className="text-kumo-subtle" />;
+    case 'running':
+      return <Loader size="sm" />
+    case 'complete':
+      return <CheckCircle size={14} weight="fill" className="text-kumo-success" />
+    case 'error':
+      return <WarningCircle size={14} weight="fill" className="text-kumo-danger" />
+    case 'waiting':
+      return <Clock size={14} className="text-kumo-subtle" />
     default:
-      return null;
+      return null
   }
 }
 
 export default function ToolCallCard({ tool }: { tool: ToolCall }) {
-  const [open, setOpen] = useState(false);
-  const Icon = iconMap[tool.icon] || Lightning;
+  const [open, setOpen] = useState(false)
+  const Icon = iconMap[tool.icon] || Lightning
 
   return (
     <div className="rounded-lg border border-kumo-line overflow-hidden">
@@ -56,12 +56,14 @@ export default function ToolCallCard({ tool }: { tool: ToolCall }) {
         <span className="flex-1 text-xs text-kumo-default truncate">{tool.label}</span>
         {tool.duration != null && (
           <span className="font-mono text-[11px] text-kumo-subtle tabular-nums flex-shrink-0">
-            {tool.duration >= 1000 ? `${(tool.duration / 1000).toFixed(1)}s` : `${tool.duration}ms`}
+            {tool.duration >= 1000
+              ? `${(tool.duration / 1000).toFixed(1)}s`
+              : `${tool.duration}ms`}
           </span>
         )}
         <StatusIndicator status={tool.status} />
         <svg
-          className={`w-3 h-3 text-kumo-subtle transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-3 h-3 text-kumo-subtle transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -76,9 +78,7 @@ export default function ToolCallCard({ tool }: { tool: ToolCall }) {
         <div className="px-3 pb-3 pt-1 border-t border-kumo-line space-y-2">
           {tool.input && (
             <div>
-              <span className="font-mono text-[10px] text-kumo-subtle uppercase tracking-wider">
-                Input
-              </span>
+              <span className="font-mono text-[10px] text-kumo-subtle uppercase tracking-wider">Input</span>
               <pre className="text-xs font-mono text-kumo-subtle whitespace-pre-wrap leading-relaxed mt-1 bg-kumo-tint rounded-md px-2 py-1.5">
                 {JSON.stringify(tool.input, null, 2)}
               </pre>
@@ -86,14 +86,12 @@ export default function ToolCallCard({ tool }: { tool: ToolCall }) {
           )}
           {tool.output && (
             <div>
-              <span className="font-mono text-[10px] text-kumo-subtle uppercase tracking-wider">
-                Output
-              </span>
+              <span className="font-mono text-[10px] text-kumo-subtle uppercase tracking-wider">Output</span>
               <p className="text-xs text-kumo-subtle mt-1">{tool.output}</p>
             </div>
           )}
         </div>
       )}
     </div>
-  );
+  )
 }

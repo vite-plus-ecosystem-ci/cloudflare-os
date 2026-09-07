@@ -2,7 +2,7 @@
 
 This package provides an email receiving gatekeeper for Gadgets. It allows a Gadget to receive inbound emails at an address like `<name>@<host>` via a hook.
 
-Unlike most gatekeepers which connect to external services, this gatekeeper _is_ the service -- it implements a Cloudflare Email Worker that receives mail directly.
+Unlike most gatekeepers which connect to external services, this gatekeeper *is* the service -- it implements a Cloudflare Email Worker that receives mail directly.
 
 ## How It Works
 
@@ -34,7 +34,7 @@ The binding provides an `EmailSession` interface with a single method:
 
 ```typescript
 interface EmailSession {
-  getAddress(): Promise<string>; // e.g. "myinbox@example.com"
+  getAddress(): Promise<string>;  // e.g. "myinbox@example.com"
 }
 ```
 
@@ -54,7 +54,6 @@ export class MyEmailHandler extends WorkerEntrypoint {
 ```
 
 Then prompt your coding agent to use the `setBindingHook` tool to connect it:
-
 - Binding: `EMAIL`
 - Export name: `MyEmailHandler`
 
@@ -84,7 +83,6 @@ This is a test email body.'
 ```
 
 The `to` address's local part (`myinbox`) determines which `EmailAddress` Durable Object receives the email. Make sure:
-
 - You have a Gadget with an Email Mailbox binding for `myinbox@<host>`
 - The binding has a hook connected via `setBindingHook`
 

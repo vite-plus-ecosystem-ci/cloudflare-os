@@ -53,8 +53,7 @@ async function main() {
   const keyUrl = (key: string) => `${endpoint}/${bucket}/${key}`;
 
   const manifest = JSON.parse(
-    readFileSync(join(args.release, "manifest.json"), "utf8"),
-  ) as ReleaseManifest;
+      readFileSync(join(args.release, "manifest.json"), "utf8")) as ReleaseManifest;
 
   const blobs = [
     ...readdirSync(join(args.release, "modules")).map((sha256) => ({
@@ -95,7 +94,8 @@ async function main() {
   await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, worker));
   console.log(`blobs: ${uploaded} uploaded, ${skipped} already present`);
 
-  const manifestKey = `${args.candidate ? "candidates" : "releases"}/${manifest.releaseId}/manifest.json`;
+  const manifestKey =
+    `${args.candidate ? "candidates" : "releases"}/${manifest.releaseId}/manifest.json`;
   const put = await client.fetch(keyUrl(manifestKey), {
     method: "PUT",
     body: readFileSync(join(args.release, "manifest.json")),
@@ -104,11 +104,9 @@ async function main() {
   if (!put.ok) {
     throw new Error(`PUT ${manifestKey}: ${put.status} ${await put.text()}`);
   }
-  console.log(
-    args.candidate
-      ? `candidate uploaded (not yet visible to the deploy service): ${manifestKey}`
-      : `release complete: ${manifestKey}`,
-  );
+  console.log(args.candidate
+    ? `candidate uploaded (not yet visible to the deploy service): ${manifestKey}`
+    : `release complete: ${manifestKey}`);
 }
 
 await main();

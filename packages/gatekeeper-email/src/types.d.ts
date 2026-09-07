@@ -3,7 +3,7 @@ export type EmailAddress = {
   name: string;
   /** Email address, e.g. "john@example.com". */
   address: string;
-};
+}
 
 export type EmailAttachment = {
   /** Filename of the attachment, if provided. */
@@ -14,7 +14,7 @@ export type EmailAttachment = {
   disposition: string | null;
   /** The attachment content as an ArrayBuffer. */
   content: ArrayBuffer;
-};
+}
 
 /** An inbound email message, parsed into structured fields. */
 export type IncomingEmail = {
@@ -34,7 +34,7 @@ export type IncomingEmail = {
   html: string | null;
   /** File attachments. */
   attachments: EmailAttachment[];
-};
+}
 
 /** Session interface for an email binding. Provides the email address. */
 export interface EmailSession {

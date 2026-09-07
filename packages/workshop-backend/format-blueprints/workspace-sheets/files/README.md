@@ -32,22 +32,22 @@ A lightweight, persistent spreadsheet Gadget with a familiar grid interface, for
 
 ## Keyboard shortcuts
 
-| Shortcut                             | Action                                 |
-| ------------------------------------ | -------------------------------------- |
-| Arrow keys                           | Move the active cell                   |
-| Shift + Arrow                        | Extend the selection                   |
-| Enter / F2                           | Edit the active cell                   |
-| Tab / Shift + Tab                    | Move right / left                      |
-| Delete / Backspace                   | Clear selected cells                   |
-| Ctrl/Cmd + C, X, V                   | Copy, cut, paste                       |
-| Ctrl/Cmd + Z                         | Undo                                   |
-| Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z | Redo                                   |
-| Ctrl/Cmd + B                         | Bold                                   |
-| Ctrl/Cmd + I                         | Italic                                 |
-| Ctrl/Cmd + U                         | Underline                              |
-| Ctrl/Cmd + A                         | Select the whole sheet                 |
-| Ctrl/Cmd + Arrow                     | Jump across populated or empty regions |
-| Alt + Enter                          | Insert a line break while editing      |
+| Shortcut | Action |
+| --- | --- |
+| Arrow keys | Move the active cell |
+| Shift + Arrow | Extend the selection |
+| Enter / F2 | Edit the active cell |
+| Tab / Shift + Tab | Move right / left |
+| Delete / Backspace | Clear selected cells |
+| Ctrl/Cmd + C, X, V | Copy, cut, paste |
+| Ctrl/Cmd + Z | Undo |
+| Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z | Redo |
+| Ctrl/Cmd + B | Bold |
+| Ctrl/Cmd + I | Italic |
+| Ctrl/Cmd + U | Underline |
+| Ctrl/Cmd + A | Select the whole sheet |
+| Ctrl/Cmd + Arrow | Jump across populated or empty regions |
+| Alt + Enter | Insert a line break while editing |
 
 ## Programmatic population
 
@@ -110,17 +110,15 @@ For bulk imports, `sheetReplacements` is more efficient than sending many indivi
 ```js
 await gadget.applyOperation({
   senderId: "csv-import",
-  sheetReplacements: [
-    {
-      sheetId,
-      cells: {
-        A1: { value: "Name", fmt: { b: true }, version: 1 },
-        B1: { value: "Total", fmt: { b: true }, version: 1 },
-        A2: { value: "Example", fmt: null, version: 1 },
-        B2: { value: "1250", fmt: { nf: "currency", d: 2 }, version: 1 },
-      },
+  sheetReplacements: [{
+    sheetId,
+    cells: {
+      A1: { value: "Name", fmt: { b: true }, version: 1 },
+      B1: { value: "Total", fmt: { b: true }, version: 1 },
+      A2: { value: "Example", fmt: null, version: 1 },
+      B2: { value: "1250", fmt: { nf: "currency", d: 2 }, version: 1 },
     },
-  ],
+  }],
 });
 ```
 

@@ -23,24 +23,24 @@ export type ReservedLogField =
   | "secret"
   | "token";
 type SafeFields<ExtraFields extends object> = {
-  [
-    Key in keyof ExtraFields as Key extends ReservedLogField ? never : Key
-  ]: ExtraFields[Key] extends LogValue ? ExtraFields[Key] : never;
+  [Key in keyof ExtraFields as Key extends ReservedLogField ? never : Key]:
+    ExtraFields[Key] extends LogValue ? ExtraFields[Key] : never;
 };
-type ProhibitedFields<ExtraFields extends object, Exceptions extends ReservedLogField = never> = {
-  [Key in Extract<keyof ExtraFields, Exclude<ReservedLogField, Exceptions>>]?: never;
+type ProhibitedFields<
+  ExtraFields extends object,
+  Exceptions extends ReservedLogField = never,
+> = { [Key in Extract<keyof ExtraFields, Exclude<ReservedLogField, Exceptions>>]?: never };
+type AllowedFields<ExtraFields extends object> =
+  SafeFields<ExtraFields> & ProhibitedFields<ExtraFields>;
+type LogDetails<ExtraFields extends object> =
+  Partial<SafeFields<ExtraFields>> & ProhibitedFields<ExtraFields, "event" | "error"> & {
+  event: string;
+  error?: unknown;
 };
-type AllowedFields<ExtraFields extends object> = SafeFields<ExtraFields> &
-  ProhibitedFields<ExtraFields>;
-type LogDetails<ExtraFields extends object> = Partial<SafeFields<ExtraFields>> &
-  ProhibitedFields<ExtraFields, "event" | "error"> & {
-    event: string;
-    error?: unknown;
-  };
-type LoggerDefaults<ExtraFields extends object> = Partial<SafeFields<ExtraFields>> &
-  ProhibitedFields<ExtraFields, "component"> & {
-    component: string;
-  };
+type LoggerDefaults<ExtraFields extends object> =
+  Partial<SafeFields<ExtraFields>> & ProhibitedFields<ExtraFields, "component"> & {
+  component: string;
+};
 type LogContextReader = () => Readonly<Record<string, LogValue>> | undefined;
 
 function normalizeError(error: unknown): string {

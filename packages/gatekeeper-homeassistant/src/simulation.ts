@@ -128,11 +128,7 @@ function applyServiceToState(
       const pos = typeof d.position === "number" ? d.position : undefined;
       if (pos == null) return state;
       const newState = pos === 0 ? "closed" : "open";
-      return withChangedState(
-        withMergedAttributes(state, { current_position: pos }, now),
-        newState,
-        now,
-      );
+      return withChangedState(withMergedAttributes(state, { current_position: pos }, now), newState, now);
     }
 
     // -------- Climate --------

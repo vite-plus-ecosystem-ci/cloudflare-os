@@ -1,24 +1,24 @@
-import { useState, useEffect } from "react";
-import { Button } from "@cloudflare/kumo";
-import { Badge } from "@cloudflare/kumo";
-import { Text } from "@cloudflare/kumo";
-import { Shield, X, Check } from "@phosphor-icons/react";
-import { samplePermissions, type PermissionRequest } from "../../data/chat";
-import { logoComponents } from "../ConnectionLogos";
+import { useState, useEffect } from 'react'
+import { Button } from '@cloudflare/kumo'
+import { Badge } from '@cloudflare/kumo'
+import { Text } from '@cloudflare/kumo'
+import { Shield, X, Check } from '@phosphor-icons/react'
+import { samplePermissions, type PermissionRequest } from '../../data/chat'
+import { logoComponents } from '../ConnectionLogos'
 
 function PermissionCard({
   perm,
   onGrant,
   onDeny,
 }: {
-  perm: PermissionRequest;
-  onGrant: () => void;
-  onDeny: () => void;
+  perm: PermissionRequest
+  onGrant: () => void
+  onDeny: () => void
 }) {
-  const [showScopes, setShowScopes] = useState(false);
-  const Logo = logoComponents[perm.connectionLogo];
+  const [showScopes, setShowScopes] = useState(false)
+  const Logo = logoComponents[perm.connectionLogo]
 
-  if (perm.status !== "pending") return null;
+  if (perm.status !== 'pending') return null
 
   return (
     <div className="rounded-xl border border-kumo-line bg-kumo-base shadow-lg overflow-hidden animate-slide-in">
@@ -49,15 +49,13 @@ function PermissionCard({
         className="mx-3 px-3 py-2 rounded-lg bg-kumo-tint flex items-center gap-2.5 w-[calc(100%-1.5rem)] text-left hover:bg-kumo-fill/40 transition-colors cursor-pointer"
       >
         {Logo && <Logo size={16} />}
-        <Text variant="body" size="sm" bold as="span">
-          {perm.connectionName}
-        </Text>
+        <Text variant="body" size="sm" bold as="span">{perm.connectionName}</Text>
         <div className="ml-auto flex items-center gap-1.5">
           <Badge variant="secondary">
-            {perm.scopes.length} {perm.scopes.length === 1 ? "scope" : "scopes"}
+            {perm.scopes.length} {perm.scopes.length === 1 ? 'scope' : 'scopes'}
           </Badge>
           <svg
-            className={`w-3.5 h-3.5 text-kumo-subtle transition-transform ${showScopes ? "rotate-180" : ""}`}
+            className={`w-3.5 h-3.5 text-kumo-subtle transition-transform ${showScopes ? 'rotate-180' : ''}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -91,9 +89,7 @@ function PermissionCard({
               API scopes
             </span>
             {perm.scopes.map((scope) => (
-              <div key={scope} className="font-mono text-xs text-kumo-subtle">
-                {scope}
-              </div>
+              <div key={scope} className="font-mono text-xs text-kumo-subtle">{scope}</div>
             ))}
           </div>
         </div>
@@ -109,40 +105,43 @@ function PermissionCard({
         </Button>
       </div>
     </div>
-  );
+  )
 }
 
 export default function PermissionToasts() {
-  const [permissions, setPermissions] = useState<PermissionRequest[]>([]);
-  const [grantedToast, setGrantedToast] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState<PermissionRequest[]>([])
+  const [grantedToast, setGrantedToast] = useState<string | null>(null)
 
   useEffect(() => {
     const t1 = setTimeout(() => {
-      setPermissions([{ ...samplePermissions[0], status: "pending" }]);
-    }, 2000);
+      setPermissions([{ ...samplePermissions[0], status: 'pending' }])
+    }, 2000)
     const t2 = setTimeout(() => {
-      setPermissions((prev) => [...prev, { ...samplePermissions[1], status: "pending" }]);
-    }, 5000);
+      setPermissions((prev) => [
+        ...prev,
+        { ...samplePermissions[1], status: 'pending' },
+      ])
+    }, 5000)
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, []);
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
+  }, [])
 
   function handleGrant(id: string) {
-    const perm = permissions.find((p) => p.id === id);
-    setPermissions((prev) => prev.filter((p) => p.id !== id));
+    const perm = permissions.find((p) => p.id === id)
+    setPermissions((prev) => prev.filter((p) => p.id !== id))
     if (perm) {
-      setGrantedToast(perm.connectionName);
-      setTimeout(() => setGrantedToast(null), 3000);
+      setGrantedToast(perm.connectionName)
+      setTimeout(() => setGrantedToast(null), 3000)
     }
   }
 
   function handleDeny(id: string) {
-    setPermissions((prev) => prev.filter((p) => p.id !== id));
+    setPermissions((prev) => prev.filter((p) => p.id !== id))
   }
 
-  const pending = permissions.filter((p) => p.status === "pending");
+  const pending = permissions.filter((p) => p.status === 'pending')
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 w-80">
@@ -166,5 +165,5 @@ export default function PermissionToasts() {
         />
       ))}
     </div>
-  );
+  )
 }

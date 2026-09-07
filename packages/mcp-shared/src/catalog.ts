@@ -89,25 +89,20 @@ export async function scopedCatalog(request: CatalogRequest): Promise<ScopedCata
         request.env,
         request.account,
         request.endpoint,
-        serverId ? (tool) => toolBelongsToServer(tool.name, serverId) : undefined,
+        serverId ? tool => toolBelongsToServer(tool.name, serverId) : undefined,
         { deadline: request.deadline },
       );
       const revision = await catalogRevision(fetched.tools);
       if (cached && cached.revision !== revision) {
         request.log.info("server tool catalog changed", {
-          event: "catalog.changed",
-          catalogRevision: revision,
-          toolCount: fetched.tools.length,
+          event: "catalog.changed", catalogRevision: revision, toolCount: fetched.tools.length,
         });
       }
       tools = fetched.tools;
       truncated = fetched.truncated;
       try {
         request.store.put<CachedCatalog>("catalog", {
-          tools,
-          revision,
-          fetchedAt: Date.now(),
-          truncated,
+          tools, revision, fetchedAt: Date.now(), truncated,
         });
       } catch (err) {
         // The client leaves 32 KiB below the documented per-value limit, but storage serialization
@@ -115,16 +110,14 @@ export async function scopedCatalog(request: CatalogRequest): Promise<ScopedCata
         // runtime still rejects this value, use the fresh catalog now rather than turning a useful
         // server response into a failed operation. The next call will fetch it again.
         request.log.warn("could not cache tool catalog", {
-          event: "catalog.cache.write.failed",
-          error: err,
+          event: "catalog.cache.write.failed", error: err,
         });
       }
     } catch (err) {
       // Serve the last known catalog rather than breaking a running Gadget on a transient failure.
       if (!tools) throw err;
       request.log.warn("could not refresh tool catalog", {
-        event: "catalog.refresh.failed",
-        error: err,
+        event: "catalog.refresh.failed", error: err,
       });
     }
   }
@@ -137,15 +130,14 @@ export async function scopedCatalog(request: CatalogRequest): Promise<ScopedCata
   // scope first is what keeps the `portal_*` exclusion in force: without it, a `#server=portal`
   // grant would filter down to exactly the portal's own tools, find no evidence of a portal, and let
   // a Gadget call `portal_toggle_servers` to widen its own reach.
-  const isPortal =
-    request.scope.serverId !== undefined ||
-    looksLikePortal(all, { truncated, cap: MAX_TOOLS_PER_SERVER });
+  const isPortal = request.scope.serverId !== undefined
+    || looksLikePortal(all, { truncated, cap: MAX_TOOLS_PER_SERVER });
   return {
     isPortal,
     truncated,
     tools: all
-      .filter((tool) => scopeAllows(request.scope, tool.name, isPortal))
-      .map((tool) => classifyTool(tool, request.trust)),
+      .filter(tool => scopeAllows(request.scope, tool.name, isPortal))
+      .map(tool => classifyTool(tool, request.trust)),
   };
 }
 
@@ -184,10 +176,8 @@ export class HydratedTools {
       this.#totalBytes -= existing.bytes;
     }
     const bytes = new TextEncoder().encode(JSON.stringify(tool)).byteLength;
-    while (
-      this.#entries.size >= HydratedTools.MAX_ENTRIES ||
-      this.#totalBytes + bytes > HydratedTools.MAX_BYTES
-    ) {
+    while (this.#entries.size >= HydratedTools.MAX_ENTRIES
+        || this.#totalBytes + bytes > HydratedTools.MAX_BYTES) {
       const oldest = this.#entries.keys().next();
       if (oldest.done) break;
       const removed = this.#entries.get(oldest.value);
@@ -209,14 +199,12 @@ export class HydratedTools {
       throw new Error("Too many MCP tool definitions are already loading.");
     }
 
-    const pending = load(name)
-      .then((loaded) => {
-        this.#remember(name, loaded ?? null);
-        return loaded;
-      })
-      .finally(() => {
-        if (this.#loads.get(name) === pending) this.#loads.delete(name);
-      });
+    const pending = load(name).then(loaded => {
+      this.#remember(name, loaded ?? null);
+      return loaded;
+    }).finally(() => {
+      if (this.#loads.get(name) === pending) this.#loads.delete(name);
+    });
     this.#loads.set(name, pending);
     return pending;
   }

@@ -1,26 +1,26 @@
-import { useState } from "react";
-import { Table } from "@cloudflare/kumo";
-import { Badge } from "@cloudflare/kumo";
-import { Button } from "@cloudflare/kumo";
-import { sampleDataRows } from "../../data/chat";
+import { useState } from 'react'
+import { Table } from '@cloudflare/kumo'
+import { Badge } from '@cloudflare/kumo'
+import { Button } from '@cloudflare/kumo'
+import { sampleDataRows } from '../../data/chat'
 
 export default function DataTab() {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   function toggleRow(id: string) {
     setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   function toggleAll() {
     if (selectedIds.size === sampleDataRows.length) {
-      setSelectedIds(new Set());
+      setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(sampleDataRows.map((r) => r.id)));
+      setSelectedIds(new Set(sampleDataRows.map((r) => r.id)))
     }
   }
 
@@ -34,14 +34,12 @@ export default function DataTab() {
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
-            <span className="text-xs text-kumo-subtle">{selectedIds.size} selected</span>
+            <span className="text-xs text-kumo-subtle">
+              {selectedIds.size} selected
+            </span>
           )}
-          <Button variant="ghost" size="xs">
-            Filter
-          </Button>
-          <Button variant="ghost" size="xs">
-            Sort
-          </Button>
+          <Button variant="ghost" size="xs">Filter</Button>
+          <Button variant="ghost" size="xs">Sort</Button>
         </div>
       </div>
 
@@ -64,7 +62,7 @@ export default function DataTab() {
           </Table.Header>
           <Table.Body>
             {sampleDataRows.map((row) => (
-              <Table.Row key={row.id} variant={selectedIds.has(row.id) ? "selected" : "default"}>
+              <Table.Row key={row.id} variant={selectedIds.has(row.id) ? 'selected' : 'default'}>
                 <Table.CheckCell
                   checked={selectedIds.has(row.id)}
                   onValueChange={() => toggleRow(row.id)}
@@ -104,5 +102,5 @@ export default function DataTab() {
         </span>
       </div>
     </div>
-  );
+  )
 }

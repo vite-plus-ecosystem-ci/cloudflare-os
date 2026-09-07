@@ -1,47 +1,22 @@
 import { WorkerEntrypoint, DurableObject, RpcTarget, RpcStub } from "cloudflare:workers";
 import { skipRpcValidation, validateRpc } from "capnweb-validate";
 import {
-  GatekeeperUser,
-  GatekeeperVendor as GatekeeperVendorIface,
-  Gatekeeper,
-  ResourceDescription,
-  ApprovalQueue,
-  VendorDescription,
-  GatekeeperConnectCallback,
-  GatekeeperConnectOptions,
-  AccountDescription,
-  SupportedResource,
-  ResourceConfiguratorFrame,
-  ActionKind,
-  Cursor,
-  GatekeeperUserVerifier,
-  ObservationDescription,
+  GatekeeperUser, GatekeeperVendor as GatekeeperVendorIface, Gatekeeper, ResourceDescription,
+  ApprovalQueue, VendorDescription, GatekeeperConnectCallback, GatekeeperConnectOptions,
+  AccountDescription, SupportedResource, ResourceConfiguratorFrame, ActionKind, Cursor,
+  GatekeeperUserVerifier, ObservationDescription,
   stripTrailingSlashes,
 } from "@gadgets/workshop-shared/gatekeeper";
 import {
-  SlackApi,
-  SlackApiError,
-  SlackAccessToken,
-  SlackConversationTypeFilter,
-  exchangeAuthCode,
-  refreshAccessToken,
-  revokeToken,
+  SlackApi, SlackApiError, SlackAccessToken, SlackConversationTypeFilter, exchangeAuthCode,
+  refreshAccessToken, revokeToken,
 } from "./slack-api";
 import {
-  SlackConversation,
-  SlackConversationEntry,
-  SlackConversationInfo,
-  SlackMessage,
-  SlackMessageEntry,
-  SlackThread,
-  SlackUser,
-  SlackWorkspaceInfo,
-  SlackWorkspaceSession,
+  SlackConversation, SlackConversationEntry, SlackConversationInfo, SlackMessage,
+  SlackMessageEntry, SlackThread, SlackUser, SlackWorkspaceInfo, SlackWorkspaceSession,
 } from "./types";
 import {
-  ConversationConfiguratorUI,
-  ThreadConfiguratorUI,
-  WorkspaceConfiguratorUI,
+  ConversationConfiguratorUI, ThreadConfiguratorUI, WorkspaceConfiguratorUI,
 } from "./slack-configurators";
 import TYPES_CODE from "./types.txt";
 import WORKSPACE_CONFIGURATOR_HTML from "./generated/workspace-configurator-ui.txt";
@@ -64,7 +39,7 @@ const OAUTH_NONCE_LIFETIME_MS = 10 * 60 * 1000;
 const ACCESS_TOKEN_EXPIRY_SAFETY_MS = 5 * 60 * 1000;
 
 function hexEncode(bytes: Uint8Array): string {
-  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 function generateNonce(): string {
@@ -114,13 +89,10 @@ const MAX_CONCURRENT_REQUESTS = 5;
 // Promise.all per batch, so it rejects on the first failed call — deliberate, since the observer
 // access checks that use it must fail closed rather than act on a partial result.
 async function mapWithConcurrency<T, R>(
-  items: T[],
-  fn: (item: T) => Promise<R>,
-  limit = MAX_CONCURRENT_REQUESTS,
-): Promise<R[]> {
+    items: T[], fn: (item: T) => Promise<R>, limit = MAX_CONCURRENT_REQUESTS): Promise<R[]> {
   let results: R[] = [];
   for (let i = 0; i < items.length; i += limit) {
-    results.push(...(await Promise.all(items.slice(i, i + limit).map(fn))));
+    results.push(...await Promise.all(items.slice(i, i + limit).map(fn)));
   }
   return results;
 }
@@ -135,8 +107,8 @@ const WORKSPACE_RESOURCE: SupportedResource = {
   urlPattern: "https://*",
   title: "Slack Workspace",
   description:
-    "Read channels, direct messages, members, and search across the whole connected workspace. " +
-    "The workspace is auto-detected from the connected account — no URL or ID need be supplied.",
+      "Read channels, direct messages, members, and search across the whole connected workspace. " +
+      "The workspace is auto-detected from the connected account — no URL or ID need be supplied.",
   grantable: true,
 };
 
@@ -155,14 +127,10 @@ const THREAD_RESOURCE: SupportedResource = {
 };
 
 const CONVERSATION_READ_SCOPES = [
-  "channels:read",
-  "channels:history",
-  "groups:read",
-  "groups:history",
-  "im:read",
-  "im:history",
-  "mpim:read",
-  "mpim:history",
+  "channels:read", "channels:history",
+  "groups:read", "groups:history",
+  "im:read", "im:history",
+  "mpim:read", "mpim:history",
 ];
 
 const RESOURCE_SCOPES: { resource: SupportedResource; scopes: string[] }[] = [
@@ -180,12 +148,12 @@ const RESOURCE_SCOPES: { resource: SupportedResource; scopes: string[] }[] = [
   },
 ];
 
-const SUPPORTED_RESOURCES: SupportedResource[] = RESOURCE_SCOPES.map((entry) => entry.resource);
+const SUPPORTED_RESOURCES: SupportedResource[] = RESOURCE_SCOPES.map(entry => entry.resource);
 
 function validateResourceUrlPatterns(resourceUrlPatterns?: string[]): void {
   if (resourceUrlPatterns === undefined) return;
-  let known = new Set(RESOURCE_SCOPES.map((entry) => entry.resource.urlPattern));
-  let unknown = resourceUrlPatterns.filter((pattern) => !known.has(pattern));
+  let known = new Set(RESOURCE_SCOPES.map(entry => entry.resource.urlPattern));
+  let unknown = resourceUrlPatterns.filter(pattern => !known.has(pattern));
   if (unknown.length > 0) {
     throw new Error(`Unknown grantable resource URL pattern(s): ${unknown.join(", ")}`);
   }
@@ -195,10 +163,8 @@ function resourceUrlPatternsToScopes(resourceUrlPatterns?: string[]): string[] {
   validateResourceUrlPatterns(resourceUrlPatterns);
   let scopes = new Set<string>(IDENTITY_SCOPES);
   for (let entry of RESOURCE_SCOPES) {
-    if (
-      resourceUrlPatterns === undefined ||
-      resourceUrlPatterns.includes(entry.resource.urlPattern)
-    ) {
+    if (resourceUrlPatterns === undefined ||
+        resourceUrlPatterns.includes(entry.resource.urlPattern)) {
       for (let scope of entry.scopes) scopes.add(scope);
     }
   }
@@ -208,9 +174,9 @@ function resourceUrlPatternsToScopes(resourceUrlPatterns?: string[]): string[] {
 function grantedResourcesFromScopes(grantedScopes: string[]): string[] {
   let granted = new Set(grantedScopes);
   // Expose a resource only when every required Slack scope was granted.
-  return RESOURCE_SCOPES.filter((entry) => entry.scopes.every((scope) => granted.has(scope))).map(
-    (entry) => entry.resource.urlPattern,
-  );
+  return RESOURCE_SCOPES
+      .filter(entry => entry.scopes.every(scope => granted.has(scope)))
+      .map(entry => entry.resource.urlPattern);
 }
 
 const SLACK_LOGO_URL = `data:image/svg+xml,${encodeURIComponent(SLACK_LOGO_SVG)}`;
@@ -262,9 +228,8 @@ export default {
 
     if (path.length === 2 && path[0].length === 64 && path[1].length === NONCE_BYTES * 2) {
       if (!env.CLIENT_ID || !env.CLIENT_SECRET) {
-        return new Response(NOT_CONFIGURED_HTML, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        });
+        return new Response(NOT_CONFIGURED_HTML,
+            { headers: { "Content-Type": "text/html; charset=utf-8" } });
       }
 
       let doId = path[0];
@@ -272,9 +237,8 @@ export default {
       let stub = ctx.exports.UserAccount.get(ctx.exports.UserAccount.idFromString(doId));
       let begun = await stub.beginOAuthFlow(initiationNonce);
       if (begun === null) {
-        return new Response(INVALID_LINK_HTML, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        });
+        return new Response(INVALID_LINK_HTML,
+            { headers: { "Content-Type": "text/html; charset=utf-8" } });
       }
 
       let authUrl = new URL("https://slack.com/oauth/v2/authorize");
@@ -299,14 +263,12 @@ export default {
       if (!code) return new Response("Error: no 'code' provided");
 
       let stub = ctx.exports.UserAccount.get(ctx.exports.UserAccount.idFromString(doId));
-      if (!(await stub.acceptAuthCode(code, oauthNonce))) {
-        return new Response(INVALID_LINK_HTML, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        });
+      if (!await stub.acceptAuthCode(code, oauthNonce)) {
+        return new Response(INVALID_LINK_HTML,
+            { headers: { "Content-Type": "text/html; charset=utf-8" } });
       }
-      return new Response(SELF_CLOSING_HTML, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      return new Response(SELF_CLOSING_HTML,
+          { headers: { "Content-Type": "text/html; charset=utf-8" } });
     } else {
       return new Response("Not Found", { status: 404 });
     }
@@ -325,24 +287,19 @@ export class GatekeeperVendor extends WorkerEntrypoint<Env> implements Gatekeepe
       color: "#f4ede4",
       tagline: "Read channels, DMs, and threads",
       description:
-        "Connect your Slack account to give Cloudflare OS read-only access to the workspaces, " +
-        "channels, direct messages, and threads you can see. Build agents that summarize " +
-        "conversations, monitor channels, or search across your Slack history.",
+          "Connect your Slack account to give Cloudflare OS read-only access to the workspaces, " +
+          "channels, direct messages, and threads you can see. Build agents that summarize " +
+          "conversations, monitor channels, or search across your Slack history.",
     };
   }
 
-  async connectAccount(
-    callback: Fetcher<GatekeeperConnectCallback>,
-    options?: GatekeeperConnectOptions,
-  ): Promise<{ url: string }> {
+  async connectAccount(callback: Fetcher<GatekeeperConnectCallback>,
+                       options?: GatekeeperConnectOptions): Promise<{ url: string }> {
     let userObjectId = this.ctx.exports.UserAccount.newUniqueId();
     let initiationNonce = generateNonce();
     let requestedScopes = resourceUrlPatternsToScopes(options?.resourceUrlPatterns);
-    await this.ctx.exports.UserAccount.get(userObjectId).setCallback(
-      callback,
-      initiationNonce,
-      requestedScopes,
-    );
+    await this.ctx.exports.UserAccount.get(userObjectId)
+        .setCallback(callback, initiationNonce, requestedScopes);
     return { url: `${getBaseUrl(this.env)}/${userObjectId.toString()}/${initiationNonce}` };
   }
 
@@ -364,9 +321,7 @@ export class UserAccount extends DurableObject<Env> {
   async #updateCredentials<T>(operation: () => Promise<T>): Promise<T> {
     let previous = this.#credentialUpdate;
     let release!: () => void;
-    this.#credentialUpdate = new Promise((resolve) => {
-      release = resolve;
-    });
+    this.#credentialUpdate = new Promise(resolve => { release = resolve; });
     await previous;
     try {
       return await operation();
@@ -376,10 +331,8 @@ export class UserAccount extends DurableObject<Env> {
   }
 
   async setCallback(
-    callback: Fetcher<GatekeeperConnectCallback>,
-    initiationNonce: string,
-    requestedScopes: string[],
-  ) {
+      callback: Fetcher<GatekeeperConnectCallback>, initiationNonce: string,
+      requestedScopes: string[]) {
     // Self-destruct if the flow is never completed.
     if (!this.ctx.storage.kv.get<SlackAccessToken>("accessToken")) {
       this.ctx.storage.setAlarm(Date.now() + 3600 * 1000);
@@ -409,20 +362,15 @@ export class UserAccount extends DurableObject<Env> {
 
   async getGrantedResourceUrlPatterns(): Promise<string[]> {
     let granted = this.ctx.storage.kv.get<string[]>("grantedScopes");
-    if (granted === undefined) return SUPPORTED_RESOURCES.map((resource) => resource.urlPattern);
+    if (granted === undefined) return SUPPORTED_RESOURCES.map(resource => resource.urlPattern);
     return grantedResourcesFromScopes(granted);
   }
 
-  async beginOAuthFlow(
-    initiationNonce: string,
-  ): Promise<{ oauthNonce: string; scopes: string[] } | null> {
+  async beginOAuthFlow(initiationNonce: string)
+      : Promise<{ oauthNonce: string; scopes: string[] } | null> {
     let stored = this.ctx.storage.kv.get<StoredNonce>("nonce");
-    if (
-      !stored ||
-      stored.stage !== "initiation" ||
-      Date.now() >= stored.expiresAt ||
-      !constantTimeEqual(stored.value, initiationNonce)
-    ) {
+    if (!stored || stored.stage !== "initiation" ||
+        Date.now() >= stored.expiresAt || !constantTimeEqual(stored.value, initiationNonce)) {
       return null;
     }
     let oauthNonce = generateNonce();
@@ -431,19 +379,14 @@ export class UserAccount extends DurableObject<Env> {
       expiresAt: Date.now() + OAUTH_NONCE_LIFETIME_MS,
       stage: "oauth",
     });
-    let scopes =
-      this.ctx.storage.kv.get<string[]>("requestedScopes") ?? resourceUrlPatternsToScopes();
+    let scopes = this.ctx.storage.kv.get<string[]>("requestedScopes") ?? resourceUrlPatternsToScopes();
     return { oauthNonce, scopes };
   }
 
   async acceptAuthCode(code: string, oauthNonce: string): Promise<boolean> {
     let stored = this.ctx.storage.kv.get<StoredNonce>("nonce");
-    if (
-      !stored ||
-      stored.stage !== "oauth" ||
-      Date.now() >= stored.expiresAt ||
-      !constantTimeEqual(stored.value, oauthNonce)
-    ) {
+    if (!stored || stored.stage !== "oauth" ||
+        Date.now() >= stored.expiresAt || !constantTimeEqual(stored.value, oauthNonce)) {
       return false;
     }
     // Consume OAuth state before the network exchange to prevent callback replay.
@@ -460,11 +403,7 @@ export class UserAccount extends DurableObject<Env> {
       }
 
       let grant = await exchangeAuthCode(
-        code,
-        this.env.CLIENT_ID,
-        this.env.CLIENT_SECRET,
-        getBaseUrl(this.env) + "/oauth",
-      );
+          code, this.env.CLIENT_ID, this.env.CLIENT_SECRET, getBaseUrl(this.env) + "/oauth");
 
       this.ctx.storage.kv.put<SlackAccessToken>("accessToken", grant.accessToken);
       if (grant.refreshToken) this.ctx.storage.kv.put<string>("refreshToken", grant.refreshToken);
@@ -487,9 +426,7 @@ export class UserAccount extends DurableObject<Env> {
       try {
         let props: SlackUserImplProps = { userObjectId: this.ctx.id.toString() };
         await completion.callback.complete(
-          this.ctx.exports.SlackUserImpl({ props }),
-          completion.grant.accessToken.expires,
-        );
+            this.ctx.exports.SlackUserImpl({ props }), completion.grant.accessToken.expires);
       } catch (err) {
         await this.#updateCredentials(async () => {
           let storedToken = this.ctx.storage.kv.get<SlackAccessToken>("accessToken");
@@ -539,9 +476,8 @@ export class UserAccount extends DurableObject<Env> {
     let result = await refreshAccessToken(refreshToken, this.env.CLIENT_ID, this.env.CLIENT_SECRET);
     if (result === null) {
       let callback = this.ctx.storage.kv.get<Fetcher<GatekeeperConnectCallback>>("callback");
-      callback
-        ?.credentialsExpired()
-        .catch((err) => console.error("Failed to notify Slack credential expiry:", err));
+      callback?.credentialsExpired().catch(err =>
+          console.error("Failed to notify Slack credential expiry:", err));
       throw new Error("Slack credentials have expired or been revoked. Please re-authenticate.");
     }
 
@@ -573,8 +509,7 @@ export class UserAccount extends DurableObject<Env> {
 
 // Cache the token within one SlackApi instance while respecting its refresh window.
 function createAccessTokenGetter(
-  getStub: () => DurableObjectStub<UserAccount>,
-): () => Promise<string> {
+    getStub: () => DurableObjectStub<UserAccount>): () => Promise<string> {
   let cached: SlackAccessToken | undefined;
   return async () => {
     if (!cached || cached.expires.valueOf() < Date.now() + ACCESS_TOKEN_EXPIRY_SAFETY_MS) {
@@ -591,14 +526,11 @@ type SlackUserImplProps = {
 };
 
 @validateRpc()
-export class SlackUserImpl
-  extends WorkerEntrypoint<Env, SlackUserImplProps>
-  implements GatekeeperUser
-{
+export class SlackUserImpl extends WorkerEntrypoint<Env, SlackUserImplProps>
+                           implements GatekeeperUser {
   #account(): DurableObjectStub<UserAccount> {
     return this.ctx.exports.UserAccount.get(
-      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
-    );
+        this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
   }
 
   #api(): SlackApi {
@@ -611,9 +543,7 @@ export class SlackUserImpl
     let teamIdPromise = account.getTeamId();
     let grantedPromise = account.getGrantedResourceUrlPatterns();
     let description = await this.#api().getAccountDescription(
-      await userIdPromise,
-      await teamIdPromise,
-    );
+        await userIdPromise, await teamIdPromise);
     description.grantedResourceUrlPatterns = await grantedPromise;
     return description;
   }
@@ -637,9 +567,7 @@ export class SlackUserImpl
       let conversationId = segments[1];
       let messageId = segments[2];
       if (!conversationId || !messageId) {
-        throw new Error(
-          "Invalid Slack thread URL: expected /archives/<conversationId>/<messageId>.",
-        );
+        throw new Error("Invalid Slack thread URL: expected /archives/<conversationId>/<messageId>.");
       }
       let threadTs = parsed.searchParams.get("thread_ts") || messageIdToTs(messageId);
       let props: SlackThreadGatekeeperImplProps = {
@@ -703,9 +631,7 @@ export class SlackUserImpl
   async reconnect(): Promise<{ url: string }> {
     let account = this.#account();
     let initiationNonce = generateNonce();
-    let requestedScopes = resourceUrlPatternsToScopes(
-      await account.getGrantedResourceUrlPatterns(),
-    );
+    let requestedScopes = resourceUrlPatternsToScopes(await account.getGrantedResourceUrlPatterns());
     await account.prepareReconnect(initiationNonce, requestedScopes);
     return { url: `${getBaseUrl(this.env)}/${this.ctx.props.userObjectId}/${initiationNonce}` };
   }
@@ -713,7 +639,7 @@ export class SlackUserImpl
   async ensureResources(resourceUrlPatterns: string[]): Promise<{ url?: string }> {
     let account = this.#account();
     let granted = new Set(await account.getGrantedResourceUrlPatterns());
-    if (resourceUrlPatterns.every((pattern) => granted.has(pattern))) return {};
+    if (resourceUrlPatterns.every(pattern => granted.has(pattern))) return {};
 
     let union = new Set([...granted, ...resourceUrlPatterns]);
     let requestedScopes = resourceUrlPatternsToScopes([...union]);
@@ -767,14 +693,11 @@ export interface SlackVerifierApi extends GatekeeperUserVerifier {
 }
 
 @validateRpc()
-export class SlackVerifier
-  extends WorkerEntrypoint<Env, SlackVerifierProps>
-  implements SlackVerifierApi
-{
+export class SlackVerifier extends WorkerEntrypoint<Env, SlackVerifierProps>
+    implements SlackVerifierApi {
   #api(): SlackApi {
     let account = this.ctx.exports.UserAccount.get(
-      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
-    );
+        this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
     return new SlackApi(createAccessTokenGetter(() => account));
   }
 
@@ -797,8 +720,7 @@ export class SlackVerifier
       await this.#api().getConversationInfo(conversationId);
       return true;
     } catch (error) {
-      if (error instanceof SlackApiError && (error.isAccessError || error.isAuthError))
-        return false;
+      if (error instanceof SlackApiError && (error.isAccessError || error.isAuthError)) return false;
       throw error;
     }
   }
@@ -835,16 +757,11 @@ function dupSessionContext(ctx: SlackSessionContext): SlackSessionContext {
 // reveals conversation identity or content should go through this rather than calling
 // approvalQueue.authorizeObservation directly.
 async function authorizeConversationObservation(
-  ctx: SlackSessionContext,
-  conversationIds: string[],
-  description: ObservationDescription,
-): Promise<void> {
+    ctx: SlackSessionContext, conversationIds: string[],
+    description: ObservationDescription): Promise<void> {
   if (ctx.tracker) {
     await ctx.tracker.authorizeConversationObservation(
-      ctx.approvalQueue,
-      conversationIds,
-      description,
-    );
+        ctx.approvalQueue, conversationIds, description);
   } else {
     await ctx.approvalQueue.authorizeObservation(description);
   }
@@ -862,21 +779,16 @@ function conversationLabel(info: SlackConversationInfo): string {
 }
 
 function conversationEntry(
-  ctx: SlackSessionContext,
-  info: SlackConversationInfo,
-): SlackConversationEntry {
+    ctx: SlackSessionContext, info: SlackConversationInfo): SlackConversationEntry {
   return { info, conversation: new SlackConversationImpl(dupSessionContext(ctx), info.id) };
 }
 
 function messageEntry(
-  ctx: SlackSessionContext,
-  channelId: string,
-  message: SlackMessage,
-): SlackMessageEntry {
+    ctx: SlackSessionContext, channelId: string, message: SlackMessage): SlackMessageEntry {
   let threadRoot = message.threadTs ?? (message.replyCount ? message.ts : undefined);
   let thread = threadRoot
-    ? new SlackThreadImpl(dupSessionContext(ctx), channelId, threadRoot)
-    : undefined;
+      ? new SlackThreadImpl(dupSessionContext(ctx), channelId, threadRoot)
+      : undefined;
   return { message, thread };
 }
 
@@ -896,8 +808,7 @@ function validateSearchQuery(query: string): void {
 class SlackCursor<T> extends RpcTarget implements Cursor<T> {
   #ctx: SlackSessionContext;
   #loadPage: (
-    ctx: SlackSessionContext,
-    cursor: string | undefined,
+    ctx: SlackSessionContext, cursor: string | undefined,
   ) => Promise<{ items: T[]; nextCursor?: string }>;
   #cursor: string | undefined;
   #exhausted = false;
@@ -905,12 +816,10 @@ class SlackCursor<T> extends RpcTarget implements Cursor<T> {
   #tail: Promise<void> = Promise.resolve();
 
   constructor(
-    ctx: SlackSessionContext,
-    loadPage: (
       ctx: SlackSessionContext,
-      cursor: string | undefined,
-    ) => Promise<{ items: T[]; nextCursor?: string }>,
-  ) {
+      loadPage: (
+        ctx: SlackSessionContext, cursor: string | undefined,
+      ) => Promise<{ items: T[]; nextCursor?: string }>) {
     super();
     this.#ctx = dupSessionContext(ctx);
     this.#loadPage = loadPage;
@@ -922,10 +831,7 @@ class SlackCursor<T> extends RpcTarget implements Cursor<T> {
 
   next(): Promise<T[] | null> {
     let result = this.#tail.then(() => this.#nextPage());
-    this.#tail = result.then(
-      () => undefined,
-      () => undefined,
-    );
+    this.#tail = result.then(() => undefined, () => undefined);
     return result;
   }
 
@@ -957,20 +863,17 @@ type SlackWorkspaceGatekeeperImplProps = {
 type TrackedConversationState = "pending" | "observed";
 
 @validateRpc()
-export class SlackWorkspaceGatekeeperImpl
-  extends DurableObject<Env, SlackWorkspaceGatekeeperImplProps>
-  implements Gatekeeper<SlackWorkspaceSession>
-{
+export class SlackWorkspaceGatekeeperImpl extends DurableObject<Env, SlackWorkspaceGatekeeperImplProps>
+    implements Gatekeeper<SlackWorkspaceSession> {
   #apiInstance?: SlackApi;
 
   #account(): DurableObjectStub<UserAccount> {
     return this.ctx.exports.UserAccount.get(
-      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
-    );
+        this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
   }
 
   #api(): SlackApi {
-    return (this.#apiInstance ??= new SlackApi(createAccessTokenGetter(() => this.#account())));
+    return this.#apiInstance ??= new SlackApi(createAccessTokenGetter(() => this.#account()));
   }
 
   async describe(): Promise<ResourceDescription> {
@@ -993,11 +896,8 @@ export class SlackWorkspaceGatekeeperImpl
   }
 
   async startSession(approvalQueue: RpcStub<ApprovalQueue>): Promise<SlackWorkspaceSession> {
-    return new SlackWorkspaceSessionImpl({
-      api: this.#api(),
-      approvalQueue: approvalQueue.dup(),
-      tracker: this,
-    });
+    return new SlackWorkspaceSessionImpl(
+        { api: this.#api(), approvalQueue: approvalQueue.dup(), tracker: this });
   }
 
   // ── Observer tracking (data-set tracking by conversation) ─────────
@@ -1011,26 +911,18 @@ export class SlackWorkspaceGatekeeperImpl
   // forward-exclusion check can run. The overseer re-runs addObserver on every open, catching loss
   // of access promptly.
 
-  #observerKey(id: string): string {
-    return `observer:${id}`;
-  }
-  #trackedConversationKey(id: string): string {
-    return `trackedConversation:${id}`;
-  }
+  #observerKey(id: string): string { return `observer:${id}`; }
+  #trackedConversationKey(id: string): string { return `trackedConversation:${id}`; }
 
   #isConversationObserved(conversationId: string): boolean {
-    return (
-      this.ctx.storage.kv.get<TrackedConversationState>(
-        this.#trackedConversationKey(conversationId),
-      ) === "observed"
-    );
+    return this.ctx.storage.kv.get<TrackedConversationState>(
+        this.#trackedConversationKey(conversationId)) === "observed";
   }
 
   #listTrackedConversations(): string[] {
     let prefix = "trackedConversation:";
-    return [...this.ctx.storage.kv.list<TrackedConversationState>({ prefix })].map(([key]) =>
-      key.slice(prefix.length),
-    );
+    return [...this.ctx.storage.kv.list<TrackedConversationState>({ prefix })]
+        .map(([key]) => key.slice(prefix.length));
   }
 
   *#listObservers(): IterableIterator<[string, Fetcher<SlackVerifierApi>]> {
@@ -1044,10 +936,9 @@ export class SlackWorkspaceGatekeeperImpl
   // one of them, plus a commit() promoting them to observed. Conversations stay pending (and are
   // rechecked on retry) until commit() runs, so an observation the overseer blocks is not recorded
   // as revealed.
-  async #prepareConversationObservation(
-    conversationIds: string[],
-  ): Promise<{ excludeObservers?: string[]; commit(): void }> {
-    let pending = [...new Set(conversationIds)].filter((id) => !this.#isConversationObserved(id));
+  async #prepareConversationObservation(conversationIds: string[]):
+      Promise<{ excludeObservers?: string[]; commit(): void }> {
+    let pending = [...new Set(conversationIds)].filter(id => !this.#isConversationObserved(id));
     if (pending.length === 0) return { commit() {} };
     for (let id of pending) {
       let key = this.#trackedConversationKey(id);
@@ -1057,17 +948,14 @@ export class SlackWorkspaceGatekeeperImpl
     }
     let excluded: string[] = [];
     for (let [id, verifier] of this.#listObservers()) {
-      let access = await mapWithConcurrency(pending, (cid) => verifier.hasConversationAccess(cid));
-      if (!access.every((hasAccess) => hasAccess)) excluded.push(id);
+      let access = await mapWithConcurrency(pending, cid => verifier.hasConversationAccess(cid));
+      if (!access.every(hasAccess => hasAccess)) excluded.push(id);
     }
     return {
       excludeObservers: excluded.length > 0 ? excluded : undefined,
       commit: () => {
         for (let id of pending) {
-          this.ctx.storage.kv.put<TrackedConversationState>(
-            this.#trackedConversationKey(id),
-            "observed",
-          );
+          this.ctx.storage.kv.put<TrackedConversationState>(this.#trackedConversationKey(id), "observed");
         }
       },
     };
@@ -1079,12 +967,9 @@ export class SlackWorkspaceGatekeeperImpl
    * authorizeConversationObservation.
    */
   async authorizeConversationObservation(
-    queue: RpcStub<ApprovalQueue>,
-    conversationIds: string[],
-    description: ObservationDescription,
-  ): Promise<void> {
-    let check =
-      conversationIds.length > 0
+      queue: RpcStub<ApprovalQueue>, conversationIds: string[],
+      description: ObservationDescription): Promise<void> {
+    let check = conversationIds.length > 0
         ? await this.#prepareConversationObservation(conversationIds)
         : { excludeObservers: undefined, commit() {} };
     await queue.authorizeObservation({ ...description, excludeObservers: check.excludeObservers });
@@ -1097,26 +982,23 @@ export class SlackWorkspaceGatekeeperImpl
     let observerTeamId = await verifier.getTeamId();
     if (!observerTeamId || observerTeamId !== boundTeamId) {
       throw new Error(
-        "This collaborator is not a member of the connected Slack workspace, so they cannot be " +
-          "allowed to observe it.",
-      );
+          "This collaborator is not a member of the connected Slack workspace, so they cannot be " +
+          "allowed to observe it.");
     }
     // Loop until no new conversations appear mid-check (concurrent observations may add more).
     let checked = new Set<string>();
     while (true) {
-      let conversationIds = this.#listTrackedConversations().filter((cid) => !checked.has(cid));
+      let conversationIds = this.#listTrackedConversations().filter(cid => !checked.has(cid));
       if (conversationIds.length === 0) {
         this.ctx.storage.kv.put(this.#observerKey(id), verifier);
         return;
       }
-      let access = await mapWithConcurrency(conversationIds, (cid) =>
-        verifier.hasConversationAccess(cid),
-      );
-      if (access.some((hasAccess) => !hasAccess)) {
+      let access = await mapWithConcurrency(
+          conversationIds, cid => verifier.hasConversationAccess(cid));
+      if (access.some(hasAccess => !hasAccess)) {
         throw new Error(
-          "This collaborator does not have access to a Slack conversation whose data this workspace " +
-            "has read, so they cannot be allowed to observe it.",
-        );
+            "This collaborator does not have access to a Slack conversation whose data this workspace " +
+            "has read, so they cannot be allowed to observe it.");
       }
       for (let cid of conversationIds) checked.add(cid);
     }
@@ -1126,15 +1008,9 @@ export class SlackWorkspaceGatekeeperImpl
     this.ctx.storage.kv.delete(this.#observerKey(id));
   }
 
-  applyAction(): Promise<void> {
-    return unreachableAction();
-  }
-  rejectAction(): Promise<void> {
-    return unreachableAction();
-  }
-  revertAction(): Promise<void> {
-    return unreachableAction();
-  }
+  applyAction(): Promise<void> { return unreachableAction(); }
+  rejectAction(): Promise<void> { return unreachableAction(); }
+  revertAction(): Promise<void> { return unreachableAction(); }
 }
 
 type SlackConversationGatekeeperImplProps = {
@@ -1144,19 +1020,17 @@ type SlackConversationGatekeeperImplProps = {
 
 @validateRpc()
 export class SlackConversationGatekeeperImpl
-  extends DurableObject<Env, SlackConversationGatekeeperImplProps>
-  implements Gatekeeper<SlackConversation>
-{
+    extends DurableObject<Env, SlackConversationGatekeeperImplProps>
+    implements Gatekeeper<SlackConversation> {
   #apiInstance?: SlackApi;
 
   #account(): DurableObjectStub<UserAccount> {
     return this.ctx.exports.UserAccount.get(
-      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
-    );
+        this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
   }
 
   #api(): SlackApi {
-    return (this.#apiInstance ??= new SlackApi(createAccessTokenGetter(() => this.#account())));
+    return this.#apiInstance ??= new SlackApi(createAccessTokenGetter(() => this.#account()));
   }
 
   async describe(): Promise<ResourceDescription> {
@@ -1183,9 +1057,8 @@ export class SlackConversationGatekeeperImpl
 
   async startSession(approvalQueue: RpcStub<ApprovalQueue>): Promise<SlackConversation> {
     return new SlackConversationImpl(
-      { api: this.#api(), approvalQueue: approvalQueue.dup() },
-      this.ctx.props.conversationId,
-    );
+        { api: this.#api(), approvalQueue: approvalQueue.dup() },
+        this.ctx.props.conversationId);
   }
 
   /**
@@ -1199,23 +1072,16 @@ export class SlackConversationGatekeeperImpl
     let verifier = user as unknown as Fetcher<SlackVerifierApi>;
     if (!(await verifier.hasConversationAccess(this.ctx.props.conversationId))) {
       throw new Error(
-        "This collaborator does not have access to the connected Slack conversation, so they " +
-          "cannot be allowed to observe data this workspace read from it.",
-      );
+          "This collaborator does not have access to the connected Slack conversation, so they " +
+          "cannot be allowed to observe data this workspace read from it.");
     }
   }
 
   async removeObserver(_id: string): Promise<void> {}
 
-  applyAction(): Promise<void> {
-    return unreachableAction();
-  }
-  rejectAction(): Promise<void> {
-    return unreachableAction();
-  }
-  revertAction(): Promise<void> {
-    return unreachableAction();
-  }
+  applyAction(): Promise<void> { return unreachableAction(); }
+  rejectAction(): Promise<void> { return unreachableAction(); }
+  revertAction(): Promise<void> { return unreachableAction(); }
 }
 
 type SlackThreadGatekeeperImplProps = {
@@ -1226,31 +1092,24 @@ type SlackThreadGatekeeperImplProps = {
 };
 
 @validateRpc()
-export class SlackThreadGatekeeperImpl
-  extends DurableObject<Env, SlackThreadGatekeeperImplProps>
-  implements Gatekeeper<SlackThread>
-{
+export class SlackThreadGatekeeperImpl extends DurableObject<Env, SlackThreadGatekeeperImplProps>
+    implements Gatekeeper<SlackThread> {
   #apiInstance?: SlackApi;
 
   #account(): DurableObjectStub<UserAccount> {
     return this.ctx.exports.UserAccount.get(
-      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
-    );
+        this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
   }
 
   #api(): SlackApi {
-    return (this.#apiInstance ??= new SlackApi(createAccessTokenGetter(() => this.#account())));
+    return this.#apiInstance ??= new SlackApi(createAccessTokenGetter(() => this.#account()));
   }
 
   async describe(): Promise<ResourceDescription> {
     let snippet = "Slack thread";
     try {
       let page = await this.#api().listReplies(
-        this.ctx.props.conversationId,
-        this.ctx.props.threadTs,
-        undefined,
-        1,
-      );
+          this.ctx.props.conversationId, this.ctx.props.threadTs, undefined, 1);
       if (page.items[0]) snippet = truncate(page.items[0].text) || snippet;
     } catch {
       // Keep the generic snippet when the root is unavailable.
@@ -1274,10 +1133,8 @@ export class SlackThreadGatekeeperImpl
 
   async startSession(approvalQueue: RpcStub<ApprovalQueue>): Promise<SlackThread> {
     return new SlackThreadImpl(
-      { api: this.#api(), approvalQueue: approvalQueue.dup() },
-      this.ctx.props.conversationId,
-      this.ctx.props.threadTs,
-    );
+        { api: this.#api(), approvalQueue: approvalQueue.dup() },
+        this.ctx.props.conversationId, this.ctx.props.threadTs);
   }
 
   /**
@@ -1290,23 +1147,16 @@ export class SlackThreadGatekeeperImpl
     let verifier = user as unknown as Fetcher<SlackVerifierApi>;
     if (!(await verifier.hasConversationAccess(this.ctx.props.conversationId))) {
       throw new Error(
-        "This collaborator does not have access to the Slack conversation containing this " +
-          "thread, so they cannot be allowed to observe data this workspace read from it.",
-      );
+          "This collaborator does not have access to the Slack conversation containing this " +
+          "thread, so they cannot be allowed to observe data this workspace read from it.");
     }
   }
 
   async removeObserver(_id: string): Promise<void> {}
 
-  applyAction(): Promise<void> {
-    return unreachableAction();
-  }
-  rejectAction(): Promise<void> {
-    return unreachableAction();
-  }
-  revertAction(): Promise<void> {
-    return unreachableAction();
-  }
+  applyAction(): Promise<void> { return unreachableAction(); }
+  rejectAction(): Promise<void> { return unreachableAction(); }
+  revertAction(): Promise<void> { return unreachableAction(); }
 }
 
 // ── Session stubs ───────────────────────────────────────────────────
@@ -1334,25 +1184,17 @@ class SlackWorkspaceSessionImpl extends RpcTarget implements SlackWorkspaceSessi
   }
 
   #listConversations(
-    types: SlackConversationTypeFilter[],
-    title: string,
-  ): Cursor<SlackConversationEntry> {
+      types: SlackConversationTypeFilter[], title: string): Cursor<SlackConversationEntry> {
     return new SlackCursor<SlackConversationEntry>(this.#ctx, async (ctx, cursor) => {
       let page = await ctx.api.listUserConversations(types, cursor, CONVERSATION_PAGE_SIZE);
-      await authorizeConversationObservation(
-        ctx,
-        page.items.map((info) => info.id),
-        {
-          title: `${title} (${page.items.length})`,
-          description:
-            page.items.length > 0
-              ? `Listed conversations:\n${page.items
-                  .map((info) => `- ${info.name ? "#" + info.name : conversationLabel(info)}`)
-                  .join("\n")}`
-              : "No conversations on this page.",
-        },
-      );
-      let entries = page.items.map((info) => conversationEntry(ctx, info));
+      await authorizeConversationObservation(ctx, page.items.map(info => info.id), {
+        title: `${title} (${page.items.length})`,
+        description: page.items.length > 0
+            ? `Listed conversations:\n${page.items.map(info =>
+                `- ${info.name ? "#" + info.name : conversationLabel(info)}`).join("\n")}`
+            : "No conversations on this page.",
+      });
+      let entries = page.items.map(info => conversationEntry(ctx, info));
       return { items: entries, nextCursor: page.nextCursor };
     });
   }
@@ -1398,14 +1240,14 @@ class SlackWorkspaceSessionImpl extends RpcTarget implements SlackWorkspaceSessi
     validateSearchQuery(query);
     return new SlackCursor<SlackMessageEntry>(this.#ctx, async (ctx, cursor) => {
       let page = await ctx.api.searchMessages(query, cursor, SEARCH_PAGE_SIZE);
-      let channelIds = [...new Set(page.items.map((match) => match.channelId))];
+      let channelIds = [...new Set(page.items.map(match => match.channelId))];
       await authorizeConversationObservation(ctx, channelIds, {
         title: `Search Slack (${page.items.length} results)`,
         description:
-          `Search the workspace for messages.\n\nQuery: ${truncate(query)}\n\n` +
-          `Matched ${page.items.length} messages on this page.`,
+            `Search the workspace for messages.\n\nQuery: ${truncate(query)}\n\n` +
+            `Matched ${page.items.length} messages on this page.`,
       });
-      let entries = page.items.map((match) => messageEntry(ctx, match.channelId, match.message));
+      let entries = page.items.map(match => messageEntry(ctx, match.channelId, match.message));
       return { items: entries, nextCursor: page.nextCursor };
     });
   }
@@ -1439,7 +1281,7 @@ class SlackConversationImpl extends RpcTarget implements SlackConversation {
     let conversationId = this.#conversationId;
     return new SlackCursor<SlackUser>(this.#ctx, async (ctx, cursor) => {
       let page = await ctx.api.listConversationMembers(conversationId, cursor, MEMBER_PAGE_SIZE);
-      let users = await mapWithConcurrency(page.items, (id) => ctx.api.getUser(id));
+      let users = await mapWithConcurrency(page.items, id => ctx.api.getUser(id));
       await authorizeConversationObservation(ctx, [conversationId], {
         title: `List Slack conversation members (${users.length})`,
         description: `Read ${users.length} members of conversation ${conversationId}.`,
@@ -1454,9 +1296,11 @@ class SlackConversationImpl extends RpcTarget implements SlackConversation {
       let page = await ctx.api.listHistory(conversationId, cursor, HISTORY_PAGE_SIZE);
       await authorizeConversationObservation(ctx, [conversationId], {
         title: `Read Slack messages (${page.items.length})`,
-        description: `Read a page of ${page.items.length} messages from conversation ${conversationId}.`,
+        description:
+            `Read a page of ${page.items.length} messages from conversation ${conversationId}.`,
       });
-      let entries = page.items.map((message) => messageEntry(ctx, conversationId, message));
+      let entries = page.items.map(message =>
+          messageEntry(ctx, conversationId, message));
       return { items: entries, nextCursor: page.nextCursor };
     });
   }
@@ -1474,18 +1318,14 @@ class SlackConversationImpl extends RpcTarget implements SlackConversation {
       let info = await (infoPromise ??= ctx.api.getConversationInfo(conversationId));
       let effectiveQuery = info.name ? `in:#${info.name} ${query}` : query;
       let page = await ctx.api.searchMessages(
-        effectiveQuery,
-        cursor,
-        SEARCH_PAGE_SIZE,
-        conversationId,
-      );
+          effectiveQuery, cursor, SEARCH_PAGE_SIZE, conversationId);
       await authorizeConversationObservation(ctx, [conversationId], {
         title: `Search Slack conversation (${page.items.length} results)`,
         description:
-          `Search within ${conversationLabel(info)}.\n\nQuery: ${truncate(query)}\n\n` +
-          `Matched ${page.items.length} messages on this page.`,
+            `Search within ${conversationLabel(info)}.\n\nQuery: ${truncate(query)}\n\n` +
+            `Matched ${page.items.length} messages on this page.`,
       });
-      let entries = page.items.map((match) => messageEntry(ctx, match.channelId, match.message));
+      let entries = page.items.map(match => messageEntry(ctx, match.channelId, match.message));
       return { items: entries, nextCursor: page.nextCursor };
     });
   }
@@ -1511,25 +1351,17 @@ class SlackThreadImpl extends RpcTarget implements SlackThread {
 
   // Resolve reply timestamps to the thread root once per session.
   #resolveRoot(): Promise<{ rootTs: string; root: SlackMessage | undefined }> {
-    return (this.#resolved ??= (async () => {
+    return this.#resolved ??= (async () => {
       let page = await this.#ctx.api.listReplies(
-        this.#conversationId,
-        this.#threadTs,
-        undefined,
-        1,
-      );
+          this.#conversationId, this.#threadTs, undefined, 1);
       let first = page.items[0];
       if (first?.threadTs && first.threadTs !== this.#threadTs) {
         let rootPage = await this.#ctx.api.listReplies(
-          this.#conversationId,
-          first.threadTs,
-          undefined,
-          1,
-        );
+            this.#conversationId, first.threadTs, undefined, 1);
         return { rootTs: first.threadTs, root: rootPage.items[0] };
       }
       return { rootTs: this.#threadTs, root: first };
-    })());
+    })();
   }
 
   async getRoot(): Promise<SlackMessage> {
@@ -1548,18 +1380,15 @@ class SlackThreadImpl extends RpcTarget implements SlackThread {
     let cursor: string | undefined;
     for (let page = 0; page < MAX_REPLY_PAGES; page++) {
       let result = await this.#ctx.api.listReplies(
-        this.#conversationId,
-        rootTs,
-        cursor,
-        HISTORY_PAGE_SIZE,
-      );
+          this.#conversationId, rootTs, cursor, HISTORY_PAGE_SIZE);
       messages.push(...result.items);
       cursor = result.nextCursor;
       if (!cursor || messages.length >= MAX_THREAD_REPLIES) break;
     }
     await authorizeConversationObservation(this.#ctx, [this.#conversationId], {
       title: `Read Slack thread (${messages.length} messages)`,
-      description: `Read a thread of ${messages.length} messages in conversation ${this.#conversationId}.`,
+      description:
+          `Read a thread of ${messages.length} messages in conversation ${this.#conversationId}.`,
     });
     return messages.slice(0, MAX_THREAD_REPLIES);
   }

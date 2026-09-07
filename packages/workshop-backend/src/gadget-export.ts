@@ -6,14 +6,12 @@ import { createExportDeadline, limitExportStream } from "./export-limits";
 /** Name of the optional Gadget export handler entrypoint. */
 export const GADGET_EXPORT_ENTRYPOINT = "ExportHandler";
 
-type GadgetExportCapability<Gadget extends DurableObject = DurableObject> = RpcStub<
-  RpcTarget & Pick<Gadget, keyof Gadget>
->;
+type GadgetExportCapability<Gadget extends DurableObject = DurableObject> =
+  RpcStub<RpcTarget & Pick<Gadget, keyof Gadget>>;
 
 /** Optional Worker entrypoint exported by a Gadget to customize file exports. */
-export interface GadgetExportEntrypoint<
-  Gadget extends DurableObject = DurableObject,
-> extends WorkerEntrypoint {
+export interface GadgetExportEntrypoint<Gadget extends DurableObject = DurableObject>
+    extends WorkerEntrypoint {
   /** Lists all export formats supported by the Gadget. */
   getExportFormats(gadget: GadgetExportCapability<Gadget>): Promise<GadgetExportFormat[]>;
 
@@ -27,41 +25,41 @@ const MAX_EXPORT_LABEL_LENGTH = 128;
 const MAX_CONTENT_TYPE_LENGTH = 255;
 const MAX_FILE_EXTENSION_LENGTH = 16;
 
-const BROWSER_CONTENT_TYPES = new Set(["text/html", "application/pdf", "image/png", "image/jpeg"]);
+const BROWSER_CONTENT_TYPES = new Set([
+  "text/html",
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+]);
 
 function boundedString(name: string, maxLength: number) {
-  return z
-    .string()
+  return z.string()
     .min(1, `Gadget export format ${name} must be between 1 and ${maxLength} characters.`)
-    .max(maxLength, `Gadget export format ${name} must be between 1 and ${maxLength} characters.`);
+    .max(maxLength,
+      `Gadget export format ${name} must be between 1 and ${maxLength} characters.`);
 }
 
-const EXPORT_FORMAT_SCHEMA: z.ZodType<GadgetExportFormat> = z
-  .object({
-    id: boundedString("id", MAX_EXPORT_ID_LENGTH),
-    label: boundedString("label", MAX_EXPORT_LABEL_LENGTH),
-    mode: z.enum(["browser", "server"]),
-    contentType: boundedString("contentType", MAX_CONTENT_TYPE_LENGTH).regex(
-      /^[-!#$%&'*+.^_`|~0-9A-Za-z]+\/[-!#$%&'*+.^_`|~0-9A-Za-z]+$/,
-      "Gadget export format has an invalid content type.",
-    ),
-    fileExtension: boundedString("fileExtension", MAX_FILE_EXTENSION_LENGTH).regex(
-      /^\.[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/,
-      "Gadget export format has an invalid file extension.",
-    ),
-  })
-  .superRefine((format, context) => {
-    if (format.mode === "browser" && !BROWSER_CONTENT_TYPES.has(format.contentType)) {
-      context.addIssue({
-        code: "custom",
-        path: ["contentType"],
-        message: `Browser export format ${format.id} has an unsupported content type.`,
-      });
-    }
-  });
+const EXPORT_FORMAT_SCHEMA: z.ZodType<GadgetExportFormat> = z.object({
+  id: boundedString("id", MAX_EXPORT_ID_LENGTH),
+  label: boundedString("label", MAX_EXPORT_LABEL_LENGTH),
+  mode: z.enum(["browser", "server"]),
+  contentType: boundedString("contentType", MAX_CONTENT_TYPE_LENGTH)
+    .regex(/^[-!#$%&'*+.^_`|~0-9A-Za-z]+\/[-!#$%&'*+.^_`|~0-9A-Za-z]+$/,
+      "Gadget export format has an invalid content type."),
+  fileExtension: boundedString("fileExtension", MAX_FILE_EXTENSION_LENGTH)
+    .regex(/^\.[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/,
+      "Gadget export format has an invalid file extension."),
+}).superRefine((format, context) => {
+  if (format.mode === "browser" && !BROWSER_CONTENT_TYPES.has(format.contentType)) {
+    context.addIssue({
+      code: "custom",
+      path: ["contentType"],
+      message: `Browser export format ${format.id} has an unsupported content type.`,
+    });
+  }
+});
 
-const EXPORT_FORMATS_SCHEMA = z
-  .array(EXPORT_FORMAT_SCHEMA)
+const EXPORT_FORMATS_SCHEMA = z.array(EXPORT_FORMAT_SCHEMA)
   .max(MAX_EXPORT_FORMATS, `A Gadget may define at most ${MAX_EXPORT_FORMATS} export formats.`)
   .superRefine((formats, context) => {
     const ids = new Set<string>();
@@ -96,7 +94,7 @@ const DEFAULT_EXPORT_FORMATS: GadgetExportFormat[] = [
 
 /** Returns fresh copies of the default HTML and PDF export formats. */
 export function defaultExportFormats(): GadgetExportFormat[] {
-  return DEFAULT_EXPORT_FORMATS.map((format) => ({ ...format }));
+  return DEFAULT_EXPORT_FORMATS.map(format => ({...format}));
 }
 
 /** Validates and normalizes export format metadata returned by Gadget code. */
@@ -110,7 +108,7 @@ export function validateExportFormats(value: unknown): GadgetExportFormat[] {
 
 /** Reads custom formats, returning null when the named entrypoint appears to be absent. */
 export async function readCustomExportFormats<Gadget>(
-  handler: { getExportFormats(gadget: Gadget): Promise<unknown> },
+  handler: {getExportFormats(gadget: Gadget): Promise<unknown>},
   gadget: Gadget,
 ): Promise<GadgetExportFormat[] | null> {
   const deadline = createExportDeadline("Listing Gadget export formats timed out.");
@@ -123,11 +121,9 @@ export async function readCustomExportFormats<Gadget>(
     // returned instead. Until the runtime provides a more descriptive error
     // message, we assume that all internal errors mean that the entrypoint is
     // missing.
-    if (
-      error instanceof Error &&
-      (error.message === `Worker has no such entrypoint: ${GADGET_EXPORT_ENTRYPOINT}` ||
-        error.message.startsWith("internal error"))
-    ) {
+    if (error instanceof Error &&
+        (error.message === `Worker has no such entrypoint: ${GADGET_EXPORT_ENTRYPOINT}` ||
+          error.message.startsWith("internal error"))) {
       return null;
     }
     throw error;
@@ -147,12 +143,7 @@ export async function exportServerFormat(
     return limitExportStream(source, deadline);
   } catch (error) {
     deadline.clear();
-    void streamPromise
-      .then(
-        (stream) => stream.cancel(error),
-        () => {},
-      )
-      .catch(() => {});
+    void streamPromise.then(stream => stream.cancel(error), () => {}).catch(() => {});
     throw error;
   }
 }

@@ -41,14 +41,11 @@ function matches(parts: (string | undefined)[], query: string): boolean {
   const lower = query.trim().toLowerCase();
   if (!lower) return true;
   const corpus = parts.filter(Boolean).join(" ").toLowerCase();
-  return lower.split(/\s+/).every((term) => corpus.includes(term));
+  return lower.split(/\s+/).every(term => corpus.includes(term));
 }
 
 @validateRpc()
-export class SupabaseProjectConfiguratorUI
-  extends RpcTarget
-  implements SupabaseProjectConfiguratorRpc
-{
+export class SupabaseProjectConfiguratorUI extends RpcTarget implements SupabaseProjectConfiguratorRpc {
   constructor(getToken: () => Promise<string>) {
     super();
     tokenGetters.set(this, getToken);
@@ -57,9 +54,9 @@ export class SupabaseProjectConfiguratorUI
   async listProjects(query: string): Promise<ConfiguratorOption[]> {
     const projects = await cachedList(this, projectListCache, () => api(this).listProjects());
     return projects
-      .filter((project) => matches([project.name, project.ref, project.region], query))
+      .filter(project => matches([project.name, project.ref, project.region], query))
       .slice(0, OPTION_LIMIT)
-      .map((project) => ({
+      .map(project => ({
         value: project.ref,
         title: project.name,
         subtitle: `${project.organization_slug} · ${project.region}`,
@@ -69,10 +66,7 @@ export class SupabaseProjectConfiguratorUI
 }
 
 @validateRpc()
-export class SupabaseOrganizationConfiguratorUI
-  extends RpcTarget
-  implements SupabaseOrganizationConfiguratorRpc
-{
+export class SupabaseOrganizationConfiguratorUI extends RpcTarget implements SupabaseOrganizationConfiguratorRpc {
   constructor(getToken: () => Promise<string>) {
     super();
     tokenGetters.set(this, getToken);
@@ -81,9 +75,9 @@ export class SupabaseOrganizationConfiguratorUI
   async listOrganizations(query: string): Promise<ConfiguratorOption[]> {
     const organizations = await cachedList(this, orgListCache, () => api(this).listOrganizations());
     return organizations
-      .filter((org) => matches([org.name, org.slug], query))
+      .filter(org => matches([org.name, org.slug], query))
       .slice(0, OPTION_LIMIT)
-      .map((org) => ({
+      .map(org => ({
         value: org.slug,
         title: org.name,
         subtitle: org.slug,

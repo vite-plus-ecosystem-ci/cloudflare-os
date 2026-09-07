@@ -10,11 +10,7 @@
 
 import type { RpcStub } from "cloudflare:workers";
 import { ActionFileStore, type ActionFileReference } from "@gadgets/gatekeeper-kit/action-files";
-import type {
-  ActionDescription,
-  ApprovalQueue,
-  ObservationDescription,
-} from "@gadgets/workshop-shared/gatekeeper";
+import type { ActionDescription, ApprovalQueue, ObservationDescription } from "@gadgets/workshop-shared/gatekeeper";
 import {
   ConfluenceApi,
   contentBodyMarkdown,
@@ -151,13 +147,13 @@ export class ConfluenceStore {
   }
 
   pendingActions(): StoredActionRecord[] {
-    return this.allActions().filter((r) => r.state === "pending");
+    return this.allActions().filter(r => r.state === "pending");
   }
 
   /** Pending actions targeting a piece of content (addressed by either provisional or real ID). */
   pendingForContent(contentId: string): StoredActionRecord[] {
     const target = this.resolveId(contentId);
-    return this.pendingActions().filter((r) => {
+    return this.pendingActions().filter(r => {
       const t = actionContentId(r.action);
       return t !== null && this.resolveId(t) === target;
     });
@@ -206,15 +202,12 @@ export class ConfluenceStore {
 
   knowsProvisional(id: string): boolean {
     if (this.resolveId(id) !== id) return true;
-    return this.allActions().some(
-      (r) => r.action.type === "createContent" && r.action.provisionalId === id,
-    );
+    return this.allActions().some(r => r.action.type === "createContent" && r.action.provisionalId === id);
   }
 
   createActionFor(provisionalId: string): StoredActionRecord | undefined {
     return this.allActions().find(
-      (r) => r.action.type === "createContent" && r.action.provisionalId === provisionalId,
-    );
+      r => r.action.type === "createContent" && r.action.provisionalId === provisionalId);
   }
 
   // --- cached base reads ---
@@ -249,8 +242,7 @@ export class ConfluenceStore {
   }
 }
 
-const contentKindOf = (c: ContentResponse): ContentType =>
-  c.type === "blogpost" ? "blogpost" : "page";
+const contentKindOf = (c: ContentResponse): ContentType => (c.type === "blogpost" ? "blogpost" : "page");
 
 // ---------------------------------------------------------------------------------------------
 // Simulation: overlay pending actions onto base reads.
@@ -296,12 +288,7 @@ export function simulateComments(base: Comment[], records: StoredActionRecord[])
   const out = [...base];
   for (const r of records) {
     if (r.action.type === "addComment") {
-      out.push({
-        id: `~comment-${r.id}`,
-        text: r.action.text,
-        author: null,
-        createdAt: new Date(r.submittedAt),
-      });
+      out.push({ id: `~comment-${r.id}`, text: r.action.text, author: null, createdAt: new Date(r.submittedAt) });
     }
   }
   return out;
@@ -344,19 +331,15 @@ function overlayList(
   const pending = store.pendingActions();
   const trashed = new Set(
     pending
-      .filter((r) => r.action.type === "trash")
-      .map((r) => store.resolveId(actionContentId(r.action)!)),
-  );
-  const out = base.filter((item) => !trashed.has(store.resolveId(item.id)));
+      .filter(r => r.action.type === "trash")
+      .map(r => store.resolveId(actionContentId(r.action)!)));
+  const out = base.filter(item => !trashed.has(store.resolveId(item.id)));
 
   if (includeProvisional) {
     for (const r of pending) {
       // Include only creations that haven't been applied yet (still resolve to a provisional ID).
-      if (
-        r.action.type === "createContent" &&
-        keep(r.action) &&
-        ConfluenceStore.isProvisional(store.resolveId(r.action.provisionalId))
-      ) {
+      if (r.action.type === "createContent" && keep(r.action) &&
+          ConfluenceStore.isProvisional(store.resolveId(r.action.provisionalId))) {
         out.push(provisionalSummary(r, store));
       }
     }
@@ -366,50 +349,28 @@ function overlayList(
 
 /** Overlay for a space's content listing (pages or blog posts). */
 export function overlaySpaceContent(
-  base: ContentSummary[],
-  store: ConfluenceStore,
-  spaceKey: string,
-  type: ContentType,
-  firstPage: boolean,
+  base: ContentSummary[], store: ConfluenceStore, spaceKey: string, type: ContentType, firstPage: boolean,
 ): ContentSummary[] {
-  return overlayList(
-    base,
-    store,
-    (a) =>
-      a.kind === type &&
-      a.parent.spaceKey === spaceKey &&
-      (type === "blogpost" || a.parent.type === "space"),
-    firstPage,
-  );
+  return overlayList(base, store, a =>
+    a.kind === type && a.parent.spaceKey === spaceKey && (type === "blogpost" || a.parent.type === "space"),
+    firstPage);
 }
 
 /** Overlay for a page's child-page listing. */
 export function overlayChildPages(
-  base: ContentSummary[],
-  store: ConfluenceStore,
-  parentId: string,
-  firstPage: boolean,
+  base: ContentSummary[], store: ConfluenceStore, parentId: string, firstPage: boolean,
 ): ContentSummary[] {
   const resolvedParent = store.resolveId(parentId);
-  return overlayList(
-    base,
-    store,
-    (a) =>
-      a.kind === "page" &&
-      a.parent.type === "page" &&
-      store.resolveId(a.parent.parentId) === resolvedParent,
-    firstPage,
-  );
+  return overlayList(base, store, a =>
+    a.kind === "page" && a.parent.type === "page" && store.resolveId(a.parent.parentId) === resolvedParent,
+    firstPage);
 }
 
 /** Overlay for search results. */
 export function overlaySearch(
-  base: ContentSummary[],
-  store: ConfluenceStore,
-  firstPage: boolean,
-  typeFilter?: ContentType,
+  base: ContentSummary[], store: ConfluenceStore, firstPage: boolean, typeFilter?: ContentType,
 ): ContentSummary[] {
-  return overlayList(base, store, (a) => !typeFilter || a.kind === typeFilter, firstPage);
+  return overlayList(base, store, a => !typeFilter || a.kind === typeFilter, firstPage);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -419,21 +380,15 @@ export function observation(title: string, description: string): ObservationDesc
   return { title, description };
 }
 
-const kind = (tag: string, label: string): ActionDescription["actionKind"] => ({
-  tag: `confluence.${tag}`,
-  label,
-});
+const kind = (tag: string, label: string): ActionDescription["actionKind"] => ({ tag: `confluence.${tag}`, label });
 
 function describeAction(action: ConfluenceAction): ActionDescription {
   switch (action.type) {
     case "createContent":
       return {
         title: `Create Confluence ${action.kind === "blogpost" ? "blog post" : "page"}`,
-        description:
-          `Create a new ${action.kind === "blogpost" ? "blog post" : "page"} titled **${action.title}**` +
-          (action.parent.type === "page"
-            ? " as a child page."
-            : ` in space ${action.parent.spaceKey}.`),
+        description: `Create a new ${action.kind === "blogpost" ? "blog post" : "page"} titled **${action.title}**` +
+          (action.parent.type === "page" ? " as a child page." : ` in space ${action.parent.spaceKey}.`),
         implementsRevert: true,
         actionKind: kind("createContent", "Create page/blog post"),
       };
@@ -512,9 +467,7 @@ function truncate(text: string, max = 2000): string {
 
 /** Record a pending action and submit it for approval. Rolls back the record if submit fails. */
 export async function stageAction(
-  store: ConfluenceStore,
-  approvalQueue: RpcStub<ApprovalQueue>,
-  action: ConfluenceAction,
+  store: ConfluenceStore, approvalQueue: RpcStub<ApprovalQueue>, action: ConfluenceAction,
 ): Promise<number> {
   const id = store.nextActionId();
   store.putAction({ id, action, state: "pending", submittedAt: Date.now() });
@@ -557,24 +510,15 @@ async function applyAction(store: ConfluenceStore, record: StoredActionRecord): 
       if (!spaceKey) throw new Error("Cannot create content without a space.");
       const spaceId = await store.getSpaceId(spaceKey);
       const storageValue = markdownToStorage(action.content ?? "");
-      const created =
-        action.kind === "blogpost"
-          ? await api.createBlogPost({
-              spaceId,
-              title: action.title,
-              status: action.status,
-              storageValue,
-            })
-          : await api.createPage({
-              spaceId,
-              title: action.title,
-              status: action.status,
-              storageValue,
-              parentId:
-                action.parent.type === "page"
-                  ? requireResolved(store, action.parent.parentId)
-                  : undefined,
-            });
+      const created = action.kind === "blogpost"
+        ? await api.createBlogPost({ spaceId, title: action.title, status: action.status, storageValue })
+        : await api.createPage({
+            spaceId,
+            title: action.title,
+            status: action.status,
+            storageValue,
+            parentId: action.parent.type === "page" ? requireResolved(store, action.parent.parentId) : undefined,
+          });
       record.createdContentId = created.id;
       store.setProvisional(action.provisionalId, created.id);
       store.putAction(record);
@@ -627,11 +571,8 @@ async function applyAction(store: ConfluenceStore, record: StoredActionRecord): 
       const id = requireResolved(store, action.contentId);
       // The comment container type must match the target (blog posts reject a "page" container).
       const target = await store.getContentResponse(id, true);
-      const created = await api.addComment(
-        id,
-        markdownToStorage(action.text),
-        target.type === "blogpost" ? "blogpost" : "page",
-      );
+      const created = await api.addComment(id, markdownToStorage(action.text),
+        target.type === "blogpost" ? "blogpost" : "page");
       record.createdContentId = created.id;
       store.putAction(record);
       break;
@@ -647,8 +588,7 @@ async function applyAction(store: ConfluenceStore, record: StoredActionRecord): 
     case "uploadAttachment": {
       const id = requireResolved(store, action.contentId);
       const created = await api.uploadAttachment(id, {
-        ...action,
-        data: await store.readAttachment(action),
+        ...action, data: await store.readAttachment(action),
       });
       record.createdAttachmentId = created.id;
       store.putAction(record);
@@ -682,10 +622,7 @@ export async function applyStoredAction(store: ConfluenceStore, id: number): Pro
   await applyAction(store, record);
 }
 
-export function rejectStoredAction(
-  store: ConfluenceStore,
-  id: number,
-): void | { restart?: boolean } {
+export function rejectStoredAction(store: ConfluenceStore, id: number): void | { restart?: boolean } {
   const record = store.getAction(id);
   if (!record) return;
   store.deleteAction(id);
@@ -698,12 +635,8 @@ export function rejectStoredAction(
     for (;;) {
       let added = false;
       for (const r of pending) {
-        if (
-          r.action.type === "createContent" &&
-          r.action.parent.type === "page" &&
-          purge.has(r.action.parent.parentId) &&
-          !purge.has(r.action.provisionalId)
-        ) {
+        if (r.action.type === "createContent" && r.action.parent.type === "page" &&
+            purge.has(r.action.parent.parentId) && !purge.has(r.action.provisionalId)) {
           purge.add(r.action.provisionalId);
           added = true;
         }
@@ -727,10 +660,7 @@ export function rejectStoredAction(
 
 type RevertResult = void | { message?: string; canRetry?: boolean; restart?: boolean };
 
-export async function revertStoredAction(
-  store: ConfluenceStore,
-  id: number,
-): Promise<RevertResult> {
+export async function revertStoredAction(store: ConfluenceStore, id: number): Promise<RevertResult> {
   const record = store.getAction(id);
   if (!record) throw new Error(`Unknown action: ${id}`);
 
@@ -744,10 +674,7 @@ export async function revertStoredAction(
   return result;
 }
 
-async function revertAction(
-  store: ConfluenceStore,
-  record: StoredActionRecord,
-): Promise<RevertResult> {
+async function revertAction(store: ConfluenceStore, record: StoredActionRecord): Promise<RevertResult> {
   const api = store.api;
   const action = record.action;
 
@@ -758,9 +685,7 @@ async function revertAction(
     case "setContent":
     case "appendContent": {
       if (action.type === "appendContent" && action.previousMarkdown === undefined) {
-        return {
-          message: "Cannot automatically revert this append (the prior content was not captured).",
-        };
+        return { message: "Cannot automatically revert this append (the prior content was not captured)." };
       }
       const id2 = requireResolved(store, action.contentId);
       const current = await store.getContentResponse(id2, true);

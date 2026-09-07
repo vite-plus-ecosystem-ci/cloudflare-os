@@ -18,17 +18,14 @@ import { stripTrailingSlashes } from "@gadgets/workshop-shared/gatekeeper";
  * });
  * ```
  */
-export function normalizeVendorEndpoint(
-  raw: string,
-  options: {
-    /** Neither global nor sticky -- both carry `lastIndex` between calls. */
-    hostPattern: RegExp;
-    /** Names the endpoint in error messages, e.g. "Marketo REST endpoint". */
-    label: string;
-    /** Default true. */
-    requireHttps?: boolean;
-  },
-): string {
+export function normalizeVendorEndpoint(raw: string, options: {
+  /** Neither global nor sticky -- both carry `lastIndex` between calls. */
+  hostPattern: RegExp;
+  /** Names the endpoint in error messages, e.g. "Marketo REST endpoint". */
+  label: string;
+  /** Default true. */
+  requireHttps?: boolean;
+}): string {
   // Stateful regular expressions would alternate between accepting and rejecting the same host.
   if (options.hostPattern.global || options.hostPattern.sticky) {
     throw new Error(`${options.label} host pattern must not be global or sticky.`);

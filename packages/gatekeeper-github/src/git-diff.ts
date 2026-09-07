@@ -70,19 +70,15 @@ const MODE_GITLINK = 0o160000;
 /** The structural kind of a tree entry, from its mode. */
 export function treeEntryKind(mode: string): "dir" | "symlink" | "gitlink" | "file" {
   switch (parseInt(mode, 8) & FILE_MODE_MASK) {
-    case MODE_DIR:
-      return "dir";
-    case MODE_SYMLINK:
-      return "symlink";
-    case MODE_GITLINK:
-      return "gitlink";
-    default:
-      return "file";
+    case MODE_DIR: return "dir";
+    case MODE_SYMLINK: return "symlink";
+    case MODE_GITLINK: return "gitlink";
+    default: return "file";
   }
 }
 
 function hexOid(bytes: Uint8Array): string {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return [...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
 /**
@@ -110,9 +106,7 @@ export function parseGitTreePayload(payload: Uint8Array, oid: GitOid): GitTreeEn
       throw new Error(`git object ${oid} is not a well-formed tree (non-UTF-8 entry name)`);
     }
     if (!/^[0-7]+$/.test(mode)) {
-      throw new Error(
-        `git object ${oid} is not a well-formed tree (bad mode ${JSON.stringify(mode)})`,
-      );
+      throw new Error(`git object ${oid} is not a well-formed tree (bad mode ${JSON.stringify(mode)})`);
     }
     entries.push({ mode, name, oid: hexOid(payload.subarray(nul + 1, nul + 21)) });
     offset = nul + 21;
@@ -145,8 +139,8 @@ async function walkTreeDiff(
   out: ChangedEntry[],
 ): Promise<void> {
   if (oldOid === newOid) return;
-  const oldEntries = new Map((await loadTree(source, oldOid)).map((entry) => [entry.name, entry]));
-  const newEntries = new Map((await loadTree(source, newOid)).map((entry) => [entry.name, entry]));
+  const oldEntries = new Map((await loadTree(source, oldOid)).map(entry => [entry.name, entry]));
+  const newEntries = new Map((await loadTree(source, newOid)).map(entry => [entry.name, entry]));
 
   const names = [...new Set([...oldEntries.keys(), ...newEntries.keys()])].toSorted();
   for (const name of names) {
@@ -194,7 +188,7 @@ export async function changedPathsBetweenTrees(
 ): Promise<string[]> {
   const entries: ChangedEntry[] = [];
   await walkTreeDiff(source, oldTree, newTree, "", entries);
-  return [...new Set(entries.map((entry) => entry.path))];
+  return [...new Set(entries.map(entry => entry.path))];
 }
 
 function isBinary(bytes: Uint8Array): boolean {
@@ -232,30 +226,18 @@ export async function diffGitTrees(
     // reported without a patch, like GitHub does.
     const oldKind = entry.oldEntry ? treeEntryKind(entry.oldEntry.mode) : undefined;
     const newKind = entry.newEntry ? treeEntryKind(entry.newEntry.mode) : undefined;
-    if (
-      oldKind === "gitlink" ||
-      newKind === "gitlink" ||
-      (entry.oldEntry && entry.newEntry && entry.oldEntry.oid === entry.newEntry.oid)
-    ) {
+    if (oldKind === "gitlink" || newKind === "gitlink" ||
+        (entry.oldEntry && entry.newEntry && entry.oldEntry.oid === entry.newEntry.oid)) {
       files.push(omitted);
       continue;
     }
 
-    const oldContent = entry.oldEntry
-      ? await source.getBlob(entry.oldEntry.oid)
-      : new Uint8Array(0);
-    const newContent = entry.newEntry
-      ? await source.getBlob(entry.newEntry.oid)
-      : new Uint8Array(0);
-    if (
-      oldContent === "unavailable" ||
-      newContent === "unavailable" ||
-      oldContent.byteLength > MAX_DIFF_BLOB_BYTES ||
-      newContent.byteLength > MAX_DIFF_BLOB_BYTES ||
-      oldContent.byteLength + newContent.byteLength > budget ||
-      isBinary(oldContent) ||
-      isBinary(newContent)
-    ) {
+    const oldContent = entry.oldEntry ? await source.getBlob(entry.oldEntry.oid) : new Uint8Array(0);
+    const newContent = entry.newEntry ? await source.getBlob(entry.newEntry.oid) : new Uint8Array(0);
+    if (oldContent === "unavailable" || newContent === "unavailable" ||
+        oldContent.byteLength > MAX_DIFF_BLOB_BYTES || newContent.byteLength > MAX_DIFF_BLOB_BYTES ||
+        oldContent.byteLength + newContent.byteLength > budget ||
+        isBinary(oldContent) || isBinary(newContent)) {
       files.push(omitted);
       continue;
     }
@@ -263,10 +245,8 @@ export async function diffGitTrees(
 
     // Keep a leading BOM (`ignoreBOM: true`) so a BOM-only change still produces a visible diff.
     const decoder = new TextDecoder("utf-8", { fatal: false, ignoreBOM: true });
-    const { hunks, additions, deletions } = diffTextLines(
-      decoder.decode(oldContent),
-      decoder.decode(newContent),
-    );
+    const { hunks, additions, deletions } =
+      diffTextLines(decoder.decode(oldContent), decoder.decode(newContent));
     files.push({
       path: entry.path,
       status: entry.status,
@@ -297,16 +277,10 @@ const HUNK_CONTEXT_LINES = 3;
  * side names the line it attaches after (git's `-l,0` / `+m,0` convention, 0 at the start of
  * the file) -- which is how GitHub's patches spell it, so `parsePatch` sees one grammar.
  */
-function hunkHeader(
-  oldStart: number,
-  oldCount: number,
-  newStart: number,
-  newCount: number,
-): string {
-  return (
-    `@@ -${oldStart}${oldCount === 1 ? "" : `,${oldCount}`}` +
-    ` +${newStart}${newCount === 1 ? "" : `,${newCount}`} @@`
-  );
+function hunkHeader(oldStart: number, oldCount: number, newStart: number, newCount: number)
+    : string {
+  return `@@ -${oldStart}${oldCount === 1 ? "" : `,${oldCount}`}` +
+    ` +${newStart}${newCount === 1 ? "" : `,${newCount}`} @@`;
 }
 
 /**
@@ -325,10 +299,7 @@ function hunkHeader(
  * O(lines x edits) with both factors bounded, while a huge file with a small change still
  * diffs minimally.
  */
-export function diffTextLines(
-  oldText: string,
-  newText: string,
-): {
+export function diffTextLines(oldText: string, newText: string): {
   hunks: GitHubPullRequestDiffHunk[];
   additions: number;
   deletions: number;
@@ -345,11 +316,8 @@ export function diffTextLines(
   // which only the prefix's last possible step and the suffix's first can hit.
   const eolMismatch = oldNoEol !== newNoEol;
   let start = 0;
-  while (
-    start < oldLines.length &&
-    start < newLines.length &&
-    oldLines[start] === newLines[start]
-  ) {
+  while (start < oldLines.length && start < newLines.length &&
+         oldLines[start] === newLines[start]) {
     if (eolMismatch && start === oldLines.length - 1 && start === newLines.length - 1) break;
     start++;
   }
@@ -361,13 +329,11 @@ export function diffTextLines(
     newEnd--;
   }
 
-  const patch =
-    oldEnd - start <= MAX_DIFF_LINES_PER_FILE && newEnd - start <= MAX_DIFF_LINES_PER_FILE
-      ? structuredPatch("a", "b", oldText, newText, undefined, undefined, {
-          context: HUNK_CONTEXT_LINES,
-          maxEditLength: MAX_DIFF_EDIT_DISTANCE,
-        })
-      : undefined;
+  const patch = oldEnd - start <= MAX_DIFF_LINES_PER_FILE &&
+      newEnd - start <= MAX_DIFF_LINES_PER_FILE
+    ? structuredPatch("a", "b", oldText, newText, undefined, undefined,
+                      { context: HUNK_CONTEXT_LINES, maxEditLength: MAX_DIFF_EDIT_DISTANCE })
+    : undefined;
   if (patch === undefined) {
     return wholesaleDiff(oldLines, newLines, oldNoEol, newNoEol, start, oldEnd, newEnd);
   }
@@ -396,12 +362,8 @@ export function diffTextLines(
       } else if (raw.startsWith("\\")) {
         lines.push({ kind: "context", text: raw });
       } else {
-        lines.push({
-          kind: "context",
-          text: raw.slice(1),
-          oldLineNumber: oldLine++,
-          newLineNumber: newLine++,
-        });
+        lines.push({ kind: "context", text: raw.slice(1),
+                     oldLineNumber: oldLine++, newLineNumber: newLine++ });
       }
     }
     hunks.push({ header: hunkHeader(oldStart, hunk.oldLines, newStart, hunk.newLines), lines });
@@ -418,13 +380,8 @@ export function diffTextLines(
  * after a trailing context line ending both sides -- since jsdiff never sees this path.
  */
 function wholesaleDiff(
-  oldLines: string[],
-  newLines: string[],
-  oldNoEol: boolean,
-  newNoEol: boolean,
-  start: number,
-  oldEnd: number,
-  newEnd: number,
+  oldLines: string[], newLines: string[], oldNoEol: boolean, newNoEol: boolean,
+  start: number, oldEnd: number, newEnd: number,
 ): { hunks: GitHubPullRequestDiffHunk[]; additions: number; deletions: number } {
   const marker: GitHubPullRequestDiffLine = { kind: "context", text: NO_NEWLINE_MARKER };
   const contextBefore = Math.min(HUNK_CONTEXT_LINES, start);
@@ -442,12 +399,8 @@ function wholesaleDiff(
   }
   if (newNoEol && newEnd === newLines.length && newEnd > start) lines.push(marker);
   for (let i = 0; i < contextAfter; i++) {
-    lines.push({
-      kind: "context",
-      text: oldLines[oldEnd + i],
-      oldLineNumber: oldEnd + i + 1,
-      newLineNumber: newEnd + i + 1,
-    });
+    lines.push({ kind: "context", text: oldLines[oldEnd + i],
+                 oldLineNumber: oldEnd + i + 1, newLineNumber: newEnd + i + 1 });
   }
   if (contextAfter > 0 && oldEnd + contextAfter === oldLines.length && oldNoEol && newNoEol) {
     lines.push(marker);
@@ -456,10 +409,7 @@ function wholesaleDiff(
   const oldCount = contextBefore + (oldEnd - start) + contextAfter;
   const newCount = contextBefore + (newEnd - start) + contextAfter;
   const header = hunkHeader(
-    oldCount === 0 ? start : start - contextBefore + 1,
-    oldCount,
-    newCount === 0 ? start : start - contextBefore + 1,
-    newCount,
-  );
+    oldCount === 0 ? start : start - contextBefore + 1, oldCount,
+    newCount === 0 ? start : start - contextBefore + 1, newCount);
   return { hunks: [{ header, lines }], additions: newEnd - start, deletions: oldEnd - start };
 }

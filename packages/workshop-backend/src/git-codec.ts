@@ -80,7 +80,7 @@ export function encodeLooseObject(type: GitObjectType, payload: Uint8Array): Uin
 }
 
 /** Decodes a loose object record's `data` bytes into its type and headerless payload. */
-export function decodeLooseObject(data: Uint8Array): { type: GitObjectType; payload: Uint8Array } {
+export function decodeLooseObject(data: Uint8Array): { type: GitObjectType, payload: Uint8Array } {
   let whole: Uint8Array;
   try {
     whole = inflate(data);
@@ -111,13 +111,8 @@ export function decodeLooseObject(data: Uint8Array): { type: GitObjectType; payl
 /** The five tree entry modes git writes, exactly as serialized (no leading zero on trees). */
 export type GitTreeEntryMode = "100644" | "100755" | "40000" | "120000" | "160000";
 
-const TREE_ENTRY_MODES: readonly GitTreeEntryMode[] = [
-  "100644",
-  "100755",
-  "40000",
-  "120000",
-  "160000",
-];
+const TREE_ENTRY_MODES: readonly GitTreeEntryMode[] =
+    ["100644", "100755", "40000", "120000", "160000"];
 
 /** The object type a tree entry of the given mode references. */
 export function treeEntryObjectType(mode: GitTreeEntryMode): GitObjectType {
@@ -183,15 +178,14 @@ export function parseGitTree(payload: Uint8Array, treeOid?: GitOid): GitTreeEntr
   // ignoreBOM keeps a leading BOM as content: stripping it would make the decode lossy, which
   // is exactly the aliasing this strict decode exists to prevent.
   let decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
-  return scanGitTree(payload, treeOid).map((entry) => {
+  return scanGitTree(payload, treeOid).map(entry => {
     let name: string;
     try {
       name = decoder.decode(entry.nameBytes);
     } catch {
       throw new Error(
-        `tree object ${treeOid ?? "(unidentified)"} contains an entry name that is not ` +
-          `valid UTF-8 (bytes ${toHex(entry.nameBytes)}); such trees are not supported`,
-      );
+          `tree object ${treeOid ?? "(unidentified)"} contains an entry name that is not ` +
+          `valid UTF-8 (bytes ${toHex(entry.nameBytes)}); such trees are not supported`);
     }
     return { mode: entry.mode, name, oid: entry.oid };
   });
@@ -220,9 +214,8 @@ export function parseGitCommitRefs(payload: Uint8Array, commitOid?: GitOid): Git
   while (pos < payload.byteLength) {
     let eol = payload.indexOf(0x0a, pos);
     if (eol < 0) eol = payload.byteLength;
-    if (eol === pos) break; // blank line: end of headers
-    if (payload[pos] !== 0x20) {
-      // skip continuation lines
+    if (eol === pos) break;                    // blank line: end of headers
+    if (payload[pos] !== 0x20) {               // skip continuation lines
       let line = decoder.decode(payload.subarray(pos, eol));
       if (line.startsWith("tree ")) {
         if (tree !== undefined) throw new Error(`corrupt commit object ${where}: multiple trees`);
@@ -251,18 +244,10 @@ export interface PackableObject {
   payload: Uint8Array;
 }
 
-const PACK_TYPE_CODES: Partial<Record<GitObjectType, number>> = {
-  commit: 1,
-  tree: 2,
-  blob: 3,
-  tag: 4,
-};
-const PACK_CODE_TYPES: Record<number, GitObjectType> = {
-  1: "commit",
-  2: "tree",
-  3: "blob",
-  4: "tag",
-};
+const PACK_TYPE_CODES: Partial<Record<GitObjectType, number>> =
+    { commit: 1, tree: 2, blob: 3, tag: 4 };
+const PACK_CODE_TYPES: Record<number, GitObjectType> =
+    { 1: "commit", 2: "tree", 3: "blob", 4: "tag" };
 const OFS_DELTA = 6;
 const REF_DELTA = 7;
 
@@ -334,9 +319,7 @@ export interface DecodePackOptions {
  * each decoded object, as `GitCache.put()` does.)
  */
 export async function decodePackBytes(
-  pack: Uint8Array,
-  options: DecodePackOptions,
-): Promise<PackableObject[]> {
+    pack: Uint8Array, options: DecodePackOptions): Promise<PackableObject[]> {
   if (pack.byteLength < 12 + 20) throw new Error("invalid packfile: too short");
   let view = new DataView(pack.buffer, pack.byteOffset, pack.byteLength);
   if (new TextDecoder().decode(pack.subarray(0, 4)) !== "PACK") {
@@ -374,9 +357,8 @@ export async function decodePackBytes(
     }
     if (size > options.maxObjectSize) {
       throw new Error(
-        `invalid packfile: entry of ${size} bytes exceeds the ` +
-          `${options.maxObjectSize}-byte limit`,
-      );
+          `invalid packfile: entry of ${size} bytes exceeds the ` +
+          `${options.maxObjectSize}-byte limit`);
     }
 
     let entry: Entry = {};
@@ -436,8 +418,8 @@ export async function decodePackBytes(
       base = resolve(byOffset.get(entry.baseOffset)!, depth + 1);
     } else {
       let inPack = oidIndex.get(entry.baseOid!);
-      base =
-        inPack !== undefined ? resolve(inPack, depth + 1) : options.resolveBase?.(entry.baseOid!);
+      base = inPack !== undefined ? resolve(inPack, depth + 1)
+                                  : options.resolveBase?.(entry.baseOid!);
     }
     if (base === undefined) return undefined;
     entry.resolved = {
@@ -463,15 +445,14 @@ export async function decodePackBytes(
       }
     }
     // The next pass can only succeed if some unresolved ref-delta's base is now indexed.
-    if (!unresolved.some((i) => oidIndex.has(entries[i].baseOid ?? ""))) {
+    if (!unresolved.some(i => oidIndex.has(entries[i].baseOid ?? ""))) {
       throw new Error(
-        `invalid packfile: delta base ` +
-          `${entries[unresolved[0]].baseOid ?? "(by offset)"} is unavailable`,
-      );
+          `invalid packfile: delta base ` +
+          `${entries[unresolved[0]].baseOid ?? "(by offset)"} is unavailable`);
     }
   }
 
-  return entries.map((entry) => entry.resolved!);
+  return entries.map(entry => entry.resolved!);
 }
 
 // Inflates one pack entry's zlib stream starting at `offset`, returning the data and the offset
@@ -491,12 +472,8 @@ interface InflateWithInternals {
   push(data: Uint8Array, flush: boolean): void;
 }
 
-function inflatePackData(
-  pack: Uint8Array,
-  offset: number,
-  end: number,
-  expectedSize: number,
-): { data: Uint8Array; end: number } {
+function inflatePackData(pack: Uint8Array, offset: number, end: number, expectedSize: number):
+    { data: Uint8Array, end: number } {
   let inflator = new Inflate() as unknown as InflateWithInternals;
   let chunks: Uint8Array[] = [];
   let total = 0;
@@ -560,9 +537,7 @@ export function applyGitDelta(delta: Uint8Array, base: Uint8Array, maxSize: numb
   if (baseSize !== base.byteLength) throw new Error("invalid delta: base size mismatch");
   let targetSize = readVarint();
   if (targetSize > maxSize) {
-    throw new Error(
-      `invalid delta: result of ${targetSize} bytes exceeds the ${maxSize}-byte limit`,
-    );
+    throw new Error(`invalid delta: result of ${targetSize} bytes exceeds the ${maxSize}-byte limit`);
   }
 
   let target = new Uint8Array(targetSize);

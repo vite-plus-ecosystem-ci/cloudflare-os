@@ -123,16 +123,11 @@ async function postToken(body: Record<string, string>): Promise<OAuthGrant> {
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
-  const parsed = (await response.json().catch(() => null)) as {
-    access_token?: string;
-    refresh_token?: string;
-    expires_in?: number;
-    error?: string;
-    error_description?: string;
-  } | null;
+  const parsed = (await response.json().catch(() => null)) as
+    | { access_token?: string; refresh_token?: string; expires_in?: number; error?: string; error_description?: string }
+    | null;
   if (!response.ok || !parsed?.access_token) {
-    const message =
-      [parsed?.error, parsed?.error_description].filter(Boolean).join(": ") ||
+    const message = [parsed?.error, parsed?.error_description].filter(Boolean).join(": ") ||
       `Atlassian OAuth token request failed: ${response.status} ${response.statusText}`;
     throw new ConfluenceApiError(response.status, message);
   }
@@ -144,10 +139,7 @@ async function postToken(body: Record<string, string>): Promise<OAuthGrant> {
 }
 
 export function exchangeAuthCode(
-  code: string,
-  clientId: string,
-  clientSecret: string,
-  redirectUri: string,
+  code: string, clientId: string, clientSecret: string, redirectUri: string,
 ): Promise<OAuthGrant> {
   return postToken({
     grant_type: "authorization_code",
@@ -159,9 +151,7 @@ export function exchangeAuthCode(
 }
 
 export function refreshAccessToken(
-  refreshToken: string,
-  clientId: string,
-  clientSecret: string,
+  refreshToken: string, clientId: string, clientSecret: string,
 ): Promise<OAuthGrant> {
   return postToken({
     grant_type: "refresh_token",
@@ -177,30 +167,22 @@ async function getJson<T>(url: string, token: string): Promise<T> {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
-    throw new ConfluenceApiError(
-      response.status,
-      `${response.status} ${response.statusText} for ${url}`,
-    );
+    throw new ConfluenceApiError(response.status, `${response.status} ${response.statusText} for ${url}`);
   }
   return (await response.json()) as T;
 }
 
 /** Lists the Confluence sites this token can access (each carries the cloud ID used for API calls). */
 export async function getAccessibleResources(token: string): Promise<AccessibleResource[]> {
-  const all = await getJson<AccessibleResource[]>(
-    `${ATLASSIAN_API}/oauth/token/accessible-resources`,
-    token,
-  );
+  const all = await getJson<AccessibleResource[]>(`${ATLASSIAN_API}/oauth/token/accessible-resources`, token);
   // Only sites that granted at least one Confluence scope are usable here.
-  return all.filter((r) => r.scopes.some((s) => s.includes("confluence")));
+  return all.filter(r => r.scopes.some(s => s.includes("confluence")));
 }
 
 /** Fetches the authorizing user's identity (requires the `read:me` scope). */
 export async function getAtlassianIdentity(token: string): Promise<AtlassianIdentity> {
   const me = await getJson<{ account_id: string; name?: string; email?: string; picture?: string }>(
-    `${ATLASSIAN_API}/me`,
-    token,
-  );
+    `${ATLASSIAN_API}/me`, token);
   return { accountId: me.account_id, name: me.name, email: me.email, picture: me.picture };
 }
 
@@ -227,11 +209,9 @@ export function classifyConfluenceUrl(url: string): UrlClassification {
   const spaceKey = at(segments, "spaces");
   const pageId = at(segments, "pages");
   const pageIdParam = parsed.searchParams.get("pageId") ?? undefined;
-  const blogId = segments.includes("blog")
-    ? segments.filter((s) => /^\d+$/.test(s)).at(-1)
-    : undefined;
+  const blogId = segments.includes("blog") ? segments.filter(s => /^\d+$/.test(s)).at(-1) : undefined;
 
-  const contentId = [pageId, blogId, pageIdParam].find((id) => id && /^\d+$/.test(id));
+  const contentId = [pageId, blogId, pageIdParam].find(id => id && /^\d+$/.test(id));
   if (contentId) return { kind: "content", host, contentId, ...(spaceKey ? { spaceKey } : {}) };
   if (spaceKey) return { kind: "space", host, spaceKey };
   return { kind: "site", host };
@@ -279,19 +259,12 @@ export function escapeCqlString(value: string): string {
  * so a space-scoped caller must use `text`/`type`, which stay restricted to that space. With no
  * `spaceKey` (site-level search), a raw `cql` is honored verbatim and takes precedence.
  */
-export function buildCql(options: {
-  text?: string;
-  cql?: string;
-  type?: ContentType;
-  spaceKey?: string;
-}): string {
+export function buildCql(options: { text?: string; cql?: string; type?: ContentType; spaceKey?: string }): string {
   const rawCql = options.cql?.trim();
   if (rawCql && options.spaceKey) {
-    throw new ConfluenceApiError(
-      400,
+    throw new ConfluenceApiError(400,
       "Raw CQL is not supported on a space-scoped connection; use `text`/`type`, which are " +
-        "restricted to this space.",
-    );
+      "restricted to this space.");
   }
   if (rawCql) return rawCql;
 
@@ -300,9 +273,7 @@ export function buildCql(options: {
   if (options.spaceKey) clauses.push(`space = ${escapeCqlString(options.spaceKey)}`);
   if (options.text?.trim()) clauses.push(`text ~ ${escapeCqlString(options.text.trim())}`);
 
-  return clauses.length
-    ? clauses.join(" AND ")
-    : "type in (page, blogpost) order by lastmodified desc";
+  return clauses.length ? clauses.join(" AND ") : "type in (page, blogpost) order by lastmodified desc";
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -382,19 +353,12 @@ type V1SearchResult = {
     _links?: { webui?: string };
   };
 };
-type V1SearchResponse = {
-  results: V1SearchResult[];
-  start?: number;
-  limit?: number;
-  size?: number;
-  _links?: { next?: string };
-};
+type V1SearchResponse = { results: V1SearchResult[]; start?: number; limit?: number; size?: number; _links?: { next?: string } };
 
 // ---------------------------------------------------------------------------------------------
 // Converters (pure)
 
-const contentTypeOf = (type: string | undefined): ContentType =>
-  type === "blogpost" ? "blogpost" : "page";
+const contentTypeOf = (type: string | undefined): ContentType => (type === "blogpost" ? "blogpost" : "page");
 const statusOf = (status: string | undefined): ContentStatus =>
   status === "draft" || status === "trashed" || status === "archived" ? status : "current";
 
@@ -448,19 +412,13 @@ export function contentToMetadata(c: ContentResponse, webBase: string): ContentM
 }
 
 /** A child page (minimal shape) summarized using the parent's space key for the URL. */
-export function childPageToSummary(
-  child: ChildPageResponse,
-  webBase: string,
-  spaceKey: string | undefined,
-): ContentSummary {
+export function childPageToSummary(child: ChildPageResponse, webBase: string, spaceKey: string | undefined): ContentSummary {
   return {
     id: child.id,
     type: "page",
     title: child.title,
     spaceKey,
-    url: spaceKey
-      ? `${webBase}/spaces/${spaceKey}/pages/${child.id}`
-      : `${webBase}/pages/${child.id}`,
+    url: spaceKey ? `${webBase}/spaces/${spaceKey}/pages/${child.id}` : `${webBase}/pages/${child.id}`,
     status: statusOf(child.status),
   };
 }
@@ -514,10 +472,7 @@ export function attachmentBelongsToContent(a: AttachmentResponse, contentId: str
   return a.pageId === contentId || a.blogPostId === contentId;
 }
 
-function searchResultToSummary(
-  content: NonNullable<V1SearchResult["content"]>,
-  webBase: string,
-): ContentSummary {
+function searchResultToSummary(content: NonNullable<V1SearchResult["content"]>, webBase: string): ContentSummary {
   const summary: ContentSummary = {
     id: content.id,
     type: contentTypeOf(content.type),
@@ -574,12 +529,7 @@ export class ConfluenceApi {
     const headers = new Headers(init?.headers);
     headers.set("Authorization", `Bearer ${token}`);
     if (!headers.has("Accept")) headers.set("Accept", "application/json");
-    return await fetch(url, {
-      ...init,
-      method,
-      headers,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
+    return await fetch(url, { ...init, method, headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   }
 
   // Core request: `path` is the gateway-relative path (e.g. "/wiki/api/v2/pages/1"). Refreshes the
@@ -592,9 +542,7 @@ export class ConfluenceApi {
       try {
         token = await this.#refresh();
         response = await this.#send(method, url, token, init);
-      } catch {
-        /* fall through with the original 401 */
-      }
+      } catch { /* fall through with the original 401 */ }
     }
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
@@ -611,10 +559,7 @@ export class ConfluenceApi {
     });
   }
 
-  async #list<T>(
-    path: string,
-    params: Record<string, string | number | undefined>,
-  ): Promise<Paged<T>> {
+  async #list<T>(path: string, params: Record<string, string | number | undefined>): Promise<Paged<T>> {
     const query = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) if (v !== undefined) query.set(k, String(v));
     const qs = query.toString();
@@ -624,11 +569,7 @@ export class ConfluenceApi {
 
   // --- spaces ---
 
-  listSpaces(params: {
-    type?: string;
-    cursor?: string;
-    limit?: number;
-  }): Promise<Paged<SpaceResponse>> {
+  listSpaces(params: { type?: string; cursor?: string; limit?: number }): Promise<Paged<SpaceResponse>> {
     return this.#list<SpaceResponse>(`${V2}/spaces`, {
       type: params.type,
       cursor: params.cursor,
@@ -638,9 +579,7 @@ export class ConfluenceApi {
 
   async getSpaceByKey(key: string): Promise<SpaceResponse> {
     const res = await this.#request<V2List<SpaceResponse>>(
-      "GET",
-      `${V2}/spaces?keys=${encodeURIComponent(key)}&limit=1`,
-    );
+      "GET", `${V2}/spaces?keys=${encodeURIComponent(key)}&limit=1`);
     const space = res.results[0];
     if (!space) throw new ConfluenceApiError(404, `No such space: ${key}`);
     return space;
@@ -654,19 +593,13 @@ export class ConfluenceApi {
   // --- content reads ---
 
   async getPage(id: string): Promise<ContentResponse> {
-    const c = await this.#request<ContentResponse>(
-      "GET",
-      `${V2}/pages/${encodeURIComponent(id)}?${PAGE_BODY}`,
-    );
+    const c = await this.#request<ContentResponse>("GET", `${V2}/pages/${encodeURIComponent(id)}?${PAGE_BODY}`);
     c.type = "page";
     return c;
   }
 
   async getBlogPost(id: string): Promise<ContentResponse> {
-    const c = await this.#request<ContentResponse>(
-      "GET",
-      `${V2}/blogposts/${encodeURIComponent(id)}?${PAGE_BODY}`,
-    );
+    const c = await this.#request<ContentResponse>("GET", `${V2}/blogposts/${encodeURIComponent(id)}?${PAGE_BODY}`);
     c.type = "blogpost";
     return c;
   }
@@ -684,10 +617,7 @@ export class ConfluenceApi {
   }
 
   listPagesInSpace(params: {
-    spaceId: string;
-    depth?: "root" | "all";
-    cursor?: string;
-    limit?: number;
+    spaceId: string; depth?: "root" | "all"; cursor?: string; limit?: number;
   }): Promise<Paged<ContentResponse>> {
     return this.#list<ContentResponse>(`${V2}/spaces/${encodeURIComponent(params.spaceId)}/pages`, {
       depth: params.depth ?? "root",
@@ -696,11 +626,7 @@ export class ConfluenceApi {
     }).then(tagAll("page"));
   }
 
-  listBlogPostsInSpace(params: {
-    spaceId: string;
-    cursor?: string;
-    limit?: number;
-  }): Promise<Paged<ContentResponse>> {
+  listBlogPostsInSpace(params: { spaceId: string; cursor?: string; limit?: number }): Promise<Paged<ContentResponse>> {
     return this.#list<ContentResponse>(`${V2}/blogposts`, {
       "space-id": params.spaceId,
       cursor: params.cursor,
@@ -708,10 +634,7 @@ export class ConfluenceApi {
     }).then(tagAll("blogpost"));
   }
 
-  listChildPages(
-    id: string,
-    params: { cursor?: string; limit?: number },
-  ): Promise<Paged<ChildPageResponse>> {
+  listChildPages(id: string, params: { cursor?: string; limit?: number }): Promise<Paged<ChildPageResponse>> {
     return this.#list<ChildPageResponse>(`${V2}/pages/${encodeURIComponent(id)}/children`, {
       cursor: params.cursor,
       limit: params.limit,
@@ -722,10 +645,7 @@ export class ConfluenceApi {
    * CQL search — no v2 equivalent, so this uses the v1 search endpoint (start/limit paged; we
    * encode the next start offset as the opaque cursor). Degrades clearly if v1 search is removed.
    */
-  async search(
-    cql: string,
-    params: { cursor?: string; limit?: number },
-  ): Promise<Paged<ContentSummary>> {
+  async search(cql: string, params: { cursor?: string; limit?: number }): Promise<Paged<ContentSummary>> {
     const start = params.cursor ? Number(params.cursor) : 0;
     const limit = params.limit ?? 25;
     const query = `cql=${encodeURIComponent(cql)}&start=${start}&limit=${limit}`;
@@ -736,9 +656,9 @@ export class ConfluenceApi {
       throw degradeIfGone(err, "Confluence search");
     }
     const results = res.results
-      .map((r) => r.content)
+      .map(r => r.content)
       .filter((c): c is NonNullable<V1SearchResult["content"]> => !!c)
-      .map((c) => searchResultToSummary(c, this.webBase));
+      .map(c => searchResultToSummary(c, this.webBase));
     const hasMore = Boolean(res._links?.next);
     return { results, nextCursor: hasMore ? String(start + limit) : undefined };
   }
@@ -746,11 +666,7 @@ export class ConfluenceApi {
   // --- content writes ---
 
   createPage(body: {
-    title: string;
-    storageValue: string;
-    status: "current" | "draft";
-    spaceId: string;
-    parentId?: string;
+    title: string; storageValue: string; status: "current" | "draft"; spaceId: string; parentId?: string;
   }): Promise<ContentResponse> {
     return this.#json("POST", `${V2}/pages`, {
       spaceId: body.spaceId,
@@ -762,10 +678,7 @@ export class ConfluenceApi {
   }
 
   createBlogPost(body: {
-    title: string;
-    storageValue: string;
-    status: "current" | "draft";
-    spaceId: string;
+    title: string; storageValue: string; status: "current" | "draft"; spaceId: string;
   }): Promise<ContentResponse> {
     return this.#json("POST", `${V2}/blogposts`, {
       spaceId: body.spaceId,
@@ -776,12 +689,7 @@ export class ConfluenceApi {
   }
 
   updateContent(body: {
-    id: string;
-    type: ContentType;
-    title: string;
-    version: number;
-    storageValue: string;
-    status?: string;
+    id: string; type: ContentType; title: string; version: number; storageValue: string; status?: string;
   }): Promise<ContentResponse> {
     const path = body.type === "blogpost" ? "blogposts" : "pages";
     return this.#json("PUT", `${V2}/${path}/${encodeURIComponent(body.id)}`, {
@@ -801,9 +709,7 @@ export class ConfluenceApi {
   /** Restore from trash has no v2 endpoint; fall back to v1 and degrade if it's gone. */
   async restoreContent(id: string): Promise<void> {
     try {
-      await this.#json("PUT", `${V1}/content/${encodeURIComponent(id)}?status=trashed`, {
-        status: "current",
-      });
+      await this.#json("PUT", `${V1}/content/${encodeURIComponent(id)}?status=trashed`, { status: "current" });
     } catch (err) {
       throw degradeIfGone(err, "Restoring trashed content");
     }
@@ -811,11 +717,7 @@ export class ConfluenceApi {
 
   // --- comments ---
 
-  listComments(
-    id: string,
-    type: ContentType,
-    params: { cursor?: string; limit?: number },
-  ): Promise<Paged<CommentResponse>> {
+  listComments(id: string, type: ContentType, params: { cursor?: string; limit?: number }): Promise<Paged<CommentResponse>> {
     const path = type === "blogpost" ? "blogposts" : "pages";
     return this.#list<CommentResponse>(`${V2}/${path}/${encodeURIComponent(id)}/footer-comments`, {
       "body-format": "storage",
@@ -824,11 +726,7 @@ export class ConfluenceApi {
     });
   }
 
-  addComment(
-    containerId: string,
-    storageValue: string,
-    containerType: ContentType,
-  ): Promise<CommentResponse> {
+  addComment(containerId: string, storageValue: string, containerType: ContentType): Promise<CommentResponse> {
     const key = containerType === "blogpost" ? "blogPostId" : "pageId";
     return this.#json("POST", `${V2}/footer-comments`, {
       [key]: containerId,
@@ -844,19 +742,14 @@ export class ConfluenceApi {
 
   async getLabels(id: string, type: ContentType): Promise<string[]> {
     const path = type === "blogpost" ? "blogposts" : "pages";
-    const res = await this.#list<{ name: string }>(
-      `${V2}/${path}/${encodeURIComponent(id)}/labels`,
-      { limit: 250 },
-    );
-    return res.results.map((l) => l.name);
+    const res = await this.#list<{ name: string }>(`${V2}/${path}/${encodeURIComponent(id)}/labels`, { limit: 250 });
+    return res.results.map(l => l.name);
   }
 
   /** Label writes have no v2 endpoint; use v1 and degrade if it's gone. */
   async addLabel(id: string, name: string): Promise<void> {
     try {
-      await this.#json("POST", `${V1}/content/${encodeURIComponent(id)}/label`, [
-        { prefix: "global", name },
-      ]);
+      await this.#json("POST", `${V1}/content/${encodeURIComponent(id)}/label`, [{ prefix: "global", name }]);
     } catch (err) {
       throw degradeIfGone(err, "Adding labels");
     }
@@ -864,10 +757,7 @@ export class ConfluenceApi {
 
   async removeLabel(id: string, name: string): Promise<void> {
     try {
-      await this.#request(
-        "DELETE",
-        `${V1}/content/${encodeURIComponent(id)}/label?name=${encodeURIComponent(name)}`,
-      );
+      await this.#request("DELETE", `${V1}/content/${encodeURIComponent(id)}/label?name=${encodeURIComponent(name)}`);
     } catch (err) {
       throw degradeIfGone(err, "Removing labels");
     }
@@ -875,11 +765,7 @@ export class ConfluenceApi {
 
   // --- attachments ---
 
-  listAttachments(
-    id: string,
-    type: ContentType,
-    params: { cursor?: string; limit?: number },
-  ): Promise<Paged<AttachmentResponse>> {
+  listAttachments(id: string, type: ContentType, params: { cursor?: string; limit?: number }): Promise<Paged<AttachmentResponse>> {
     const path = type === "blogpost" ? "blogposts" : "pages";
     return this.#list<AttachmentResponse>(`${V2}/${path}/${encodeURIComponent(id)}/attachments`, {
       cursor: params.cursor,
@@ -896,27 +782,18 @@ export class ConfluenceApi {
   }
 
   /** Attachment upload has no v2 endpoint; use v1 and degrade if it's gone. */
-  async uploadAttachment(
-    id: string,
-    file: {
-      filename: string;
-      mediaType: string;
-      data: Uint8Array;
-      comment?: string;
-    },
-  ): Promise<AttachmentResponse> {
+  async uploadAttachment(id: string, file: {
+    filename: string; mediaType: string; data: Uint8Array; comment?: string;
+  }): Promise<AttachmentResponse> {
     const form = new FormData();
     form.set("file", new Blob([file.data], { type: file.mediaType }), file.filename);
     if (file.comment) form.set("comment", file.comment);
     try {
       const res = await this.#request<{ results: AttachmentResponse[] }>(
-        "POST",
-        `${V1}/content/${encodeURIComponent(id)}/child/attachment`,
-        {
+        "POST", `${V1}/content/${encodeURIComponent(id)}/child/attachment`, {
           headers: { "X-Atlassian-Token": "no-check" },
           body: form,
-        },
-      );
+        });
       return res.results[0];
     } catch (err) {
       throw degradeIfGone(err, "Uploading attachments");
@@ -932,11 +809,7 @@ export class ConfluenceApi {
       token = await this.#refresh();
       response = await this.#send("GET", url, token, { headers: { Accept: "*/*" } });
     }
-    if (!response.ok)
-      throw new ConfluenceApiError(
-        response.status,
-        `Attachment download failed: ${response.status}`,
-      );
+    if (!response.ok) throw new ConfluenceApiError(response.status, `Attachment download failed: ${response.status}`);
     return {
       data: new Uint8Array(await response.arrayBuffer()),
       mediaType: response.headers.get("Content-Type") ?? "application/octet-stream",
@@ -945,23 +818,17 @@ export class ConfluenceApi {
 }
 
 // Tag a fetched content object / list with its kind (v2 omits `type` from page/blogpost objects).
-const tagOne =
-  (type: ContentType) =>
-  (c: ContentResponse): ContentResponse => ((c.type = type), c);
-const tagAll =
-  (type: ContentType) =>
-  (paged: Paged<ContentResponse>): Paged<ContentResponse> => {
-    for (const c of paged.results) c.type = type;
-    return paged;
-  };
+const tagOne = (type: ContentType) => (c: ContentResponse): ContentResponse => ((c.type = type), c);
+const tagAll = (type: ContentType) => (paged: Paged<ContentResponse>): Paged<ContentResponse> => {
+  for (const c of paged.results) c.type = type;
+  return paged;
+};
 
 // Turn a removed-endpoint error into a clear "capability unavailable" message.
 function degradeIfGone(err: unknown, capability: string): ConfluenceApiError {
   if (err instanceof ConfluenceApiError && (err.isGone || err.status === 404)) {
-    return new ConfluenceApiError(
-      err.status,
-      `${capability} is not available: the underlying Confluence endpoint has been removed.`,
-    );
+    return new ConfluenceApiError(err.status,
+      `${capability} is not available: the underlying Confluence endpoint has been removed.`);
   }
   return err instanceof ConfluenceApiError ? err : new ConfluenceApiError(500, String(err));
 }
@@ -971,8 +838,6 @@ function errorMessage(response: Response, detail: string): string {
     const parsed = JSON.parse(detail) as { message?: string; errors?: { title?: string }[] };
     const msg = parsed.message ?? parsed.errors?.[0]?.title;
     if (msg) return `${response.status}: ${msg}`;
-  } catch {
-    /* not JSON */
-  }
+  } catch { /* not JSON */ }
   return `${response.status} ${response.statusText}`;
 }

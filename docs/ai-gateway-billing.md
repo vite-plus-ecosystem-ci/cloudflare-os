@@ -92,7 +92,7 @@ MINIMUM_CLOUDFLARE_BALANCE=2    # min connected-account balance (USD) to proceed
 
 The free-tier daily LLM-call counter lives on each `UserDurableObject` (no separate binding).
 
-The OAuth tokens live in the connected Cloudflare _gatekeeper_ account. Each `UserDurableObject`
+The OAuth tokens live in the connected Cloudflare *gatekeeper* account. Each `UserDurableObject`
 stores only lightweight billing state (the selected account id + a cached credit balance, plus the
 daily counter) — no tokens.
 

@@ -1,57 +1,58 @@
-import { useState, FormEvent } from "react";
-import { Link } from "@tanstack/react-router";
-import { RpcStub } from "capnweb";
-import { PublicApi } from "@gadgets/workshop-shared/api";
-import { Hexagon } from "@phosphor-icons/react";
-import { Input, Button, Banner, Loader } from "@cloudflare/kumo";
-import { hashPassword } from "./passwordHash";
-import { useServerConfig, useServerConfigError, useSiteName } from "./ServerConfigContext";
-import { useDocumentTitle } from "./useDocumentTitle";
-import { useConnectionLost } from "./RpcContext";
-import OAuthButtons from "./components/auth/OAuthButtons";
-import SiteLogo from "./components/SiteLogo";
+import { useState, FormEvent } from 'react'
+import { Link } from '@tanstack/react-router'
+import { RpcStub } from 'capnweb'
+import { PublicApi } from '@gadgets/workshop-shared/api'
+import { Hexagon } from '@phosphor-icons/react'
+import { Input, Button, Banner, Loader } from '@cloudflare/kumo'
+import { hashPassword } from './passwordHash'
+import { useServerConfig, useServerConfigError, useSiteName } from './ServerConfigContext'
+import { useDocumentTitle } from './useDocumentTitle'
+import { useConnectionLost } from './RpcContext'
+import OAuthButtons from './components/auth/OAuthButtons'
+import SiteLogo from './components/SiteLogo'
+
 
 interface LoginPageProps {
-  rpcStub: RpcStub<PublicApi>;
-  onLoginSuccess?: () => void;
+  rpcStub: RpcStub<PublicApi>
+  onLoginSuccess?: () => void
 }
 
 export default function LoginPage({ rpcStub, onLoginSuccess }: LoginPageProps) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const serverConfig = useServerConfig();
-  const serverConfigError = useServerConfigError();
-  const siteName = useSiteName();
-  const connectionLost = useConnectionLost();
-  useDocumentTitle("Sign in");
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const serverConfig = useServerConfig()
+  const serverConfigError = useServerConfigError()
+  const siteName = useSiteName()
+  const connectionLost = useConnectionLost()
+  useDocumentTitle('Sign in')
 
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!username || !password || loading) return;
-    setLoading(true);
-    setError(null);
+    e.preventDefault()
+    if (!username || !password || loading) return
+    setLoading(true)
+    setError(null)
 
     try {
-      const passwordHash = await hashPassword(username, password);
-      const token = await rpcStub.login(username, passwordHash);
+      const passwordHash = await hashPassword(username, password)
+      const token = await rpcStub.login(username, passwordHash)
       if (token) {
-        localStorage.setItem("authToken", token);
+        localStorage.setItem('authToken', token)
         if (onLoginSuccess) {
-          onLoginSuccess();
+          onLoginSuccess()
         } else {
-          window.location.reload();
+          window.location.reload()
         }
       } else {
-        setError("Invalid username or password");
+        setError('Invalid username or password')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   // Until the deployment config loads we don't know which auth methods are enabled, so don't guess:
   // defaulting to the password form would show it even where it's disabled (and hide configured
@@ -67,24 +68,22 @@ export default function LoginPage({ rpcStub, onLoginSuccess }: LoginPageProps) {
           <p className="text-sm text-kumo-danger text-center">
             Couldn&apos;t load deployment settings.
           </p>
-          <Button variant="secondary" onClick={() => window.location.reload()}>
-            Reload
-          </Button>
+          <Button variant="secondary" onClick={() => window.location.reload()}>Reload</Button>
         </div>
-      );
+      )
     }
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center gap-4 overflow-y-auto bg-kumo-base px-4 py-8">
         <Loader size="lg" />
         <p className="text-sm text-kumo-subtle text-center">
-          {connectionLost ? "Can't reach the server. Retrying…" : "Loading…"}
+          {connectionLost ? "Can't reach the server. Retrying…" : 'Loading…'}
         </p>
       </div>
-    );
+    )
   }
 
-  const authVendors = serverConfig.authVendors ?? [];
-  const passwordAuthEnabled = serverConfig.passwordAuthEnabled;
+  const authVendors = serverConfig.authVendors ?? []
+  const passwordAuthEnabled = serverConfig.passwordAuthEnabled
 
   return (
     <div className="relative flex h-full min-h-0 flex-col items-center justify-start overflow-y-auto bg-kumo-base px-4 py-8">
@@ -92,10 +91,10 @@ export default function LoginPage({ rpcStub, onLoginSuccess }: LoginPageProps) {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          backgroundImage: "radial-gradient(circle, var(--color-kumo-line) 1px, transparent 1px)",
-          backgroundSize: "24px 24px",
-          maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%)",
-          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%)",
+          backgroundImage: 'radial-gradient(circle, var(--color-kumo-line) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+          maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%)',
         }}
       />
 
@@ -137,7 +136,9 @@ export default function LoginPage({ rpcStub, onLoginSuccess }: LoginPageProps) {
                 placeholder="••••••••"
               />
 
-              {error && <Banner variant="error" title={error} />}
+              {error && (
+                <Banner variant="error" title={error} />
+              )}
 
               <Button
                 type="submit"
@@ -151,7 +152,7 @@ export default function LoginPage({ rpcStub, onLoginSuccess }: LoginPageProps) {
             </form>
 
             <p className="text-center text-sm text-kumo-subtle mt-6">
-              Don't have an account?{" "}
+              Don't have an account?{' '}
               <Link to="/signup" className="text-kumo-brand hover:underline font-medium">
                 Create one
               </Link>
@@ -161,7 +162,7 @@ export default function LoginPage({ rpcStub, onLoginSuccess }: LoginPageProps) {
 
         {/* Gatekeeper sign-in options, shown whenever any auth vendor is configured. */}
         {authVendors.length > 0 && (
-          <div className={passwordAuthEnabled ? "mt-6" : ""}>
+          <div className={passwordAuthEnabled ? 'mt-6' : ''}>
             {passwordAuthEnabled && (
               <div className="flex items-center gap-3 mb-4">
                 <div className="h-px flex-1 bg-kumo-line" />
@@ -177,5 +178,5 @@ export default function LoginPage({ rpcStub, onLoginSuccess }: LoginPageProps) {
         )}
       </div>
     </div>
-  );
+  )
 }

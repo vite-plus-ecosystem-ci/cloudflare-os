@@ -5,13 +5,13 @@
 // supplies. The base never touches the Durable Object, the account, or the endpoint's credentials.
 
 import { RpcTarget, type RpcStub } from "cloudflare:workers";
-import type {
-  ActionDescription,
-  ActionKind,
-  ApprovalQueue,
-} from "@gadgets/workshop-shared/gatekeeper";
+import type { ActionDescription, ActionKind, ApprovalQueue }
+  from "@gadgets/workshop-shared/gatekeeper";
 
-import { MAX_TOOL_NAME_CHARS, type McpClient } from "./client.js";
+import {
+  MAX_TOOL_NAME_CHARS,
+  type McpClient,
+} from "./client.js";
 import type { WithClientOptions } from "./connection.js";
 import { isWholeEndpoint, type ToolScope } from "./scope.js";
 import { toolQueryTerms, MAX_QUERY_CHARS, MAX_SEARCH_RESULTS } from "./tool-search.js";
@@ -24,7 +24,12 @@ import {
   toolSummary,
   type ClassifiedTool,
 } from "./tools.js";
-import type { McpCallResult, McpToolInfo, McpToolListOptions, McpToolSummary } from "./types";
+import type {
+  McpCallResult,
+  McpToolInfo,
+  McpToolListOptions,
+  McpToolSummary,
+} from "./types";
 
 /**
  * A queued tool call, awaiting a decision. Persisted by the host in its own storage; the session
@@ -73,7 +78,10 @@ export interface McpSessionHost {
   /** Finds one granted tool definition by exact wire name. */
   findTool(name: string): Promise<ClassifiedTool | undefined>;
   /** Runs `fn` against an initialized client for this binding's endpoint. */
-  call<T>(fn: (client: McpClient) => Promise<T>, options?: WithClientOptions): Promise<T>;
+  call<T>(
+    fn: (client: McpClient) => Promise<T>,
+    options?: WithClientOptions,
+  ): Promise<T>;
 
   /** The approval-kind tag for one tool, namespaced so pre-approvals cannot cross servers. */
   actionKindFor(toolName: string): ActionKind;
@@ -111,7 +119,9 @@ export class McpSessionBase extends RpcTarget {
     (this.#queue as RpcStub<ApprovalQueue> & { [Symbol.dispose](): void })[Symbol.dispose]();
   }
 
-  async listTools(options?: McpToolListOptions): Promise<McpToolInfo[] | McpToolSummary[]> {
+  async listTools(
+    options?: McpToolListOptions,
+  ): Promise<McpToolInfo[] | McpToolSummary[]> {
     if (options === undefined) {
       const tools = await this.#host.tools();
       await this.#queue.authorizeObservation({
@@ -193,7 +203,7 @@ export class McpSessionBase extends RpcTarget {
     });
 
     if (entry.mode === "read") {
-      const result = await host.call((client) => client.callTool(name, toolArgs));
+      const result = await host.call(client => client.callTool(name, toolArgs));
       // Authorize before the data is handed back, per the gatekeeper contract.
       await this.#queue.authorizeObservation(described);
       return toCallResult(result);
@@ -240,10 +250,9 @@ export class McpSessionBase extends RpcTarget {
         return {
           status: "pending",
           actionId,
-          message:
-            stored.state === "applying"
-              ? `Calling "${stored.toolName}" on ${host.serverName} was approved and is running.`
-              : `Calling "${stored.toolName}" on ${host.serverName} is awaiting approval.`,
+          message: stored.state === "applying"
+            ? `Calling "${stored.toolName}" on ${host.serverName} was approved and is running.`
+            : `Calling "${stored.toolName}" on ${host.serverName} is awaiting approval.`,
         };
       case "rejected":
         return {
@@ -253,15 +262,12 @@ export class McpSessionBase extends RpcTarget {
       case "failed":
         return {
           status: "failed",
-          message: stored.error ?? `Calling "${stored.toolName}" on ${host.serverName} failed.`,
+          message: stored.error
+            ?? `Calling "${stored.toolName}" on ${host.serverName} failed.`,
         };
       case "applied": {
-        const result = stored.result ?? {
-          status: "ok" as const,
-          content: [],
-          text: "",
-          isError: false,
-        };
+        const result = stored.result
+          ?? { status: "ok" as const, content: [], text: "", isError: false };
         // The result was produced while the Gadget was not looking, so it becomes an observation at
         // the moment it is handed over rather than when the call was applied.
         await this.#queue.authorizeObservation({

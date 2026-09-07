@@ -1,11 +1,4 @@
-import {
-  Button,
-  Dialog,
-  DropdownMenu,
-  Input,
-  InputArea,
-  useKumoToastManager,
-} from "@cloudflare/kumo";
+import { Button, Dialog, DropdownMenu, Input, InputArea, useKumoToastManager } from "@cloudflare/kumo";
 import {
   BookOpen,
   Buildings,
@@ -33,7 +26,14 @@ import {
   User,
   X,
 } from "@phosphor-icons/react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type {
@@ -126,7 +126,9 @@ async function runWithConcurrency<T>(
       await fn(items[next++]);
     }
   }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
+  );
 }
 
 // Segment-aware path-prefix replacement.
@@ -181,7 +183,11 @@ function IconPickerButton({
     if (!open) return;
     const onDocClick = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (wrapRef.current?.contains(target) || pickerHostRef.current?.contains(target)) return;
+      if (
+        wrapRef.current?.contains(target) ||
+        pickerHostRef.current?.contains(target)
+      )
+        return;
       setOpen(false);
     };
     document.addEventListener("mousedown", onDocClick);
@@ -208,7 +214,10 @@ function IconPickerButton({
       const top = openAbove
         ? Math.max(GAP, rect.top - GAP - PICKER_H)
         : Math.min(window.innerHeight - PICKER_H - GAP, rect.bottom + GAP);
-      const left = Math.min(Math.max(GAP, rect.left), window.innerWidth - PICKER_W - GAP);
+      const left = Math.min(
+        Math.max(GAP, rect.left),
+        window.innerWidth - PICKER_W - GAP,
+      );
       setPos({ left, top });
     };
     place();
@@ -299,7 +308,11 @@ function CollectionProvenance({ source }: { source: EnabledCollectionInfo["sourc
   return (
     <span
       className="flex w-52 items-center gap-1 whitespace-nowrap"
-      title={isPublic ? "Provided by your organization for everyone" : "A collection you created"}
+      title={
+        isPublic
+          ? "Provided by your organization for everyone"
+          : "A collection you created"
+      }
     >
       {isPublic ? <Buildings size={11} /> : <User size={11} />}
       {isPublic ? "Required by your organization" : "Created by you"}
@@ -395,7 +408,10 @@ function CollectionsSkeleton() {
   return (
     <div className="flex flex-col gap-0.5">
       {[1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="h-[58px] animate-pulse rounded-lg bg-kumo-elevated" />
+        <div
+          key={i}
+          className="h-[58px] animate-pulse rounded-lg bg-kumo-elevated"
+        />
       ))}
     </div>
   );
@@ -483,7 +499,13 @@ function WorkshopInputArea({ className = "", ...props }: ComponentProps<typeof I
   );
 }
 
-function FieldLabel({ children, optional = false }: { children: ReactNode; optional?: boolean }) {
+function FieldLabel({
+  children,
+  optional = false,
+}: {
+  children: ReactNode;
+  optional?: boolean;
+}) {
   return (
     <label className="mb-1.5 flex items-center gap-1.5 text-[12px] leading-4 font-medium tracking-[-0.2px] text-kumo-subtle">
       <span>{children}</span>
@@ -511,11 +533,18 @@ function KebabMenu({
   stopPropagation?: boolean;
   children: ReactNode;
 }) {
-  const stop = stopPropagation ? (e: React.MouseEvent) => e.stopPropagation() : undefined;
+  const stop = stopPropagation
+    ? (e: React.MouseEvent) => e.stopPropagation()
+    : undefined;
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger render={trigger} />
-      <DropdownMenu.Content onClick={stop} className={MENU_CONTENT} align="end" sideOffset={6}>
+      <DropdownMenu.Content
+        onClick={stop}
+        className={MENU_CONTENT}
+        align="end"
+        sideOffset={6}
+      >
         {children}
       </DropdownMenu.Content>
     </DropdownMenu>
@@ -582,7 +611,13 @@ function CollectionDescriptionField({
   );
 }
 
-function ModalHeader({ title, description }: { title: string; description?: ReactNode }) {
+function ModalHeader({
+  title,
+  description,
+}: {
+  title: string;
+  description?: ReactNode;
+}) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-kumo-line px-4 py-5 sm:px-6">
       <div className="min-w-0">
@@ -617,14 +652,12 @@ function DeletePermanentlyDescription({
 }) {
   return (
     <>
-      This permanently deletes <span className="font-medium text-kumo-default">{name}</span>
+      This permanently deletes{" "}
+      <span className="font-medium text-kumo-default">{name}</span>
       {documents !== undefined ? (
         <>
-          {" "}
-          and all{" "}
-          <span className="font-medium text-kumo-danger">
-            {pluralize(documents, "document")}
-          </span>{" "}
+          {" "}and all{" "}
+          <span className="font-medium text-kumo-danger">{pluralize(documents, "document")}</span>{" "}
           inside it
         </>
       ) : null}
@@ -660,8 +693,7 @@ const CONTENT_SOURCE_OPTIONS = [
     value: "git" as const,
     Icon: GitBranch,
     title: "Git mirror",
-    description:
-      "Push content from git using repository mirroring. All changes must be made through git.",
+    description: "Push content from git using repository mirroring. All changes must be made through git.",
   },
 ];
 
@@ -737,7 +769,9 @@ function CreateCollectionView({
           <CaretLeft size={14} />
           Context &amp; Skills
         </button>
-        <h1 className="text-2xl font-semibold tracking-tight text-kumo-default">New collection</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-kumo-default">
+          New collection
+        </h1>
         <p className="mt-1 max-w-2xl text-[13px] leading-[18px] tracking-[-0.25px] text-kumo-subtle">
           A collection of documents, skills, and other files your agents can use.
         </p>
@@ -763,44 +797,47 @@ function CreateCollectionView({
               <div className="ctx-rise" style={{ animationDelay: "160ms" }}>
                 <FieldLabel>Type</FieldLabel>
                 <div role="radiogroup" aria-label="Collection type" className="grid gap-2">
-                  {CONTENT_SOURCE_OPTIONS.map(
-                    ({ value, Icon, title: optionTitle, description: optionDescription }) => {
-                      const selected = source === value;
-                      return (
-                        <button
-                          key={value}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          onClick={() => setSource(value)}
-                          className={`press flex items-start gap-3 rounded-xl border-2 px-3 py-2.5 text-left transition-[border-color,background-color] duration-150 ease-out ${
-                            selected
-                              ? "border-kumo-brand/50 bg-kumo-brand/[0.05]"
-                              : "border-kumo-line bg-kumo-base hover:border-kumo-ring/60"
-                          }`}
-                        >
-                          <Icon
-                            size={16}
-                            weight={selected ? "fill" : "regular"}
-                            className={`mt-0.5 shrink-0 ${selected ? "text-kumo-brand" : "text-kumo-subtle"}`}
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[13px] leading-[18px] font-medium tracking-[-0.25px] text-kumo-default">
-                              {optionTitle}
-                            </span>
-                            <span className="mt-0.5 block text-[12px] leading-4 tracking-[-0.2px] text-kumo-subtle">
-                              {optionDescription}
-                            </span>
+                  {CONTENT_SOURCE_OPTIONS.map(({
+                    value,
+                    Icon,
+                    title: optionTitle,
+                    description: optionDescription,
+                  }) => {
+                    const selected = source === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setSource(value)}
+                        className={`press flex items-start gap-3 rounded-xl border-2 px-3 py-2.5 text-left transition-[border-color,background-color] duration-150 ease-out ${
+                          selected
+                            ? "border-kumo-brand/50 bg-kumo-brand/[0.05]"
+                            : "border-kumo-line bg-kumo-base hover:border-kumo-ring/60"
+                        }`}
+                      >
+                        <Icon
+                          size={16}
+                          weight={selected ? "fill" : "regular"}
+                          className={`mt-0.5 shrink-0 ${selected ? "text-kumo-brand" : "text-kumo-subtle"}`}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[13px] leading-[18px] font-medium tracking-[-0.25px] text-kumo-default">
+                            {optionTitle}
                           </span>
-                          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
-                            {selected && (
-                              <Check size={13} weight="bold" className="text-kumo-brand" />
-                            )}
+                          <span className="mt-0.5 block text-[12px] leading-4 tracking-[-0.2px] text-kumo-subtle">
+                            {optionDescription}
                           </span>
-                        </button>
-                      );
-                    },
-                  )}
+                        </span>
+                        <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
+                          {selected && (
+                            <Check size={13} weight="bold" className="text-kumo-brand" />
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -808,44 +845,47 @@ function CreateCollectionView({
               <div className="ctx-rise" style={{ animationDelay: "200ms" }}>
                 <FieldLabel>Visibility</FieldLabel>
                 <div role="radiogroup" aria-label="Visibility" className="grid gap-2">
-                  {VISIBILITY_OPTIONS.map(
-                    ({ value, Icon, title: optionTitle, description: optionDescription }) => {
-                      const selected = visibility === value;
-                      return (
-                        <button
-                          key={value}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          onClick={() => setVisibility(value)}
-                          className={`press flex items-start gap-3 rounded-xl border-2 px-3 py-2.5 text-left transition-[border-color,background-color] duration-150 ease-out ${
-                            selected
-                              ? "border-kumo-brand/50 bg-kumo-brand/[0.05]"
-                              : "border-kumo-line bg-kumo-base hover:border-kumo-ring/60"
-                          }`}
-                        >
-                          <Icon
-                            size={16}
-                            weight={selected ? "fill" : "regular"}
-                            className={`mt-0.5 shrink-0 ${selected ? "text-kumo-brand" : "text-kumo-subtle"}`}
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[13px] leading-[18px] font-medium tracking-[-0.25px] text-kumo-default">
-                              {optionTitle}
-                            </span>
-                            <span className="mt-0.5 block text-[12px] leading-4 tracking-[-0.2px] text-kumo-subtle">
-                              {optionDescription}
-                            </span>
+                  {VISIBILITY_OPTIONS.map(({
+                    value,
+                    Icon,
+                    title: optionTitle,
+                    description: optionDescription,
+                  }) => {
+                    const selected = visibility === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setVisibility(value)}
+                        className={`press flex items-start gap-3 rounded-xl border-2 px-3 py-2.5 text-left transition-[border-color,background-color] duration-150 ease-out ${
+                          selected
+                            ? "border-kumo-brand/50 bg-kumo-brand/[0.05]"
+                            : "border-kumo-line bg-kumo-base hover:border-kumo-ring/60"
+                        }`}
+                      >
+                        <Icon
+                          size={16}
+                          weight={selected ? "fill" : "regular"}
+                          className={`mt-0.5 shrink-0 ${selected ? "text-kumo-brand" : "text-kumo-subtle"}`}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[13px] leading-[18px] font-medium tracking-[-0.25px] text-kumo-default">
+                            {optionTitle}
                           </span>
-                          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
-                            {selected && (
-                              <Check size={13} weight="bold" className="text-kumo-brand" />
-                            )}
+                          <span className="mt-0.5 block text-[12px] leading-4 tracking-[-0.2px] text-kumo-subtle">
+                            {optionDescription}
                           </span>
-                        </button>
-                      );
-                    },
-                  )}
+                        </span>
+                        <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
+                          {selected && (
+                            <Check size={13} weight="bold" className="text-kumo-brand" />
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -908,7 +948,9 @@ export default function ContextLibraryPage() {
   const [enabledLoaded, setEnabledLoaded] = useState(false);
 
   const loadAll = useCallback(async () => {
-    const enabledResult = await context.listEnabledContextCollections().catch(() => null);
+    const enabledResult = await context
+      .listEnabledContextCollections()
+      .catch(() => null);
     if (enabledResult) {
       setEnabled(enabledResult);
       setEnabledLoaded(true);
@@ -1042,7 +1084,11 @@ export default function ContextLibraryPage() {
         ) : (
           <div className="flex flex-col gap-0.5">
             {filtered.map((c) => (
-              <CollectionRow key={c.id} collection={c} onClick={() => goToCollection(c.id)} />
+              <CollectionRow
+                key={c.id}
+                collection={c}
+                onClick={() => goToCollection(c.id)}
+              />
             ))}
           </div>
         )}
@@ -1141,11 +1187,7 @@ function CollectionOverview({
           <div className="mt-9 grid grid-cols-2 gap-x-8 gap-y-5 @xl:grid-cols-4">
             <MetaField label="Source">
               <span className="inline-flex items-center gap-1.5">
-                {isPublic ? (
-                  <Buildings size={12} className="shrink-0" />
-                ) : (
-                  <User size={12} className="shrink-0" />
-                )}
+                {isPublic ? <Buildings size={12} className="shrink-0" /> : <User size={12} className="shrink-0" />}
                 {isPublic ? "Your organization" : "You"}
               </span>
             </MetaField>
@@ -1181,7 +1223,9 @@ function CollectionOverview({
               {metadata.description}
             </p>
           ) : (
-            <p className="text-[13px] italic leading-5 text-kumo-inactive">No description yet.</p>
+            <p className="text-[13px] italic leading-5 text-kumo-inactive">
+              No description yet.
+            </p>
           )}
         </section>
 
@@ -1201,8 +1245,8 @@ function CollectionOverview({
                       ? "This git mirror is empty. Mirror content from git, then refresh."
                       : "No Git content was cached before synchronization became unavailable."
                     : canWrite
-                      ? "Use the + in the Files panel to create or upload skills or files. Agents use the names and descriptions to decide what to read."
-                      : "This collection is empty."}
+                    ? "Use the + in the Files panel to create or upload skills or files. Agents use the names and descriptions to decide what to read."
+                    : "This collection is empty."}
                 </p>
               </div>
             </div>
@@ -1298,9 +1342,7 @@ function CollectionSettingsModal({
   const [title, setTitle] = useState(metadata.title);
   const [description, setDescription] = useState(metadata.description);
   const [icon, setIcon] = useState(metadata.icon ?? DEFAULT_COLLECTION_ICON);
-  const [branch, setBranch] = useState(
-    metadata.content.source === "git" ? metadata.content.branch : DEFAULT_GIT_BRANCH,
-  );
+  const [branch, setBranch] = useState(metadata.content.source === "git" ? metadata.content.branch : DEFAULT_GIT_BRANCH);
   const [confirmText, setConfirmText] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -1326,8 +1368,7 @@ function CollectionSettingsModal({
     title.trim() !== metadata.title ||
     description.trim() !== metadata.description ||
     icon !== (metadata.icon ?? DEFAULT_COLLECTION_ICON) ||
-    (metadata.content.source === "git" &&
-      supportsGitCollections &&
+    (metadata.content.source === "git" && supportsGitCollections &&
       branch.trim() !== metadata.content.branch);
 
   const handleSave = async () => {
@@ -1338,13 +1379,12 @@ function CollectionSettingsModal({
       branch?: string;
     } = {};
     if (title.trim() !== metadata.title) updates.title = title.trim();
-    if (description.trim() !== metadata.description) updates.description = description.trim();
-    if (icon !== (metadata.icon ?? DEFAULT_COLLECTION_ICON)) updates.icon = icon;
-    if (
-      metadata.content.source === "git" &&
-      supportsGitCollections &&
-      branch.trim() !== metadata.content.branch
-    )
+    if (description.trim() !== metadata.description)
+      updates.description = description.trim();
+    if (icon !== (metadata.icon ?? DEFAULT_COLLECTION_ICON))
+      updates.icon = icon;
+    if (metadata.content.source === "git" && supportsGitCollections &&
+        branch.trim() !== metadata.content.branch)
       updates.branch = branch.trim();
     if (Object.keys(updates).length === 0) {
       onClose();
@@ -1457,8 +1497,11 @@ function CollectionSettingsModal({
 
             <div className="px-4 py-5 sm:px-6">
               <FieldLabel>
-                Type <span className="font-mono text-kumo-default">{metadata.title}</span> to
-                confirm
+                Type{" "}
+                <span className="font-mono text-kumo-default">
+                  {metadata.title}
+                </span>{" "}
+                to confirm
               </FieldLabel>
               <WorkshopInput
                 value={confirmText}
@@ -1531,10 +1574,7 @@ function GitTokenManagementModal({
       const result = await context.listContextCollectionGitTokens(collectionId);
       setGitTokens(result.tokens);
     } catch (err) {
-      toastsRef.current.add({
-        title: `Failed to load Git tokens: ${(err as Error).message}`,
-        variant: "error",
-      });
+      toastsRef.current.add({ title: `Failed to load Git tokens: ${(err as Error).message}`, variant: "error" });
     } finally {
       setLoadingTokens(false);
     }
@@ -1552,10 +1592,7 @@ function GitTokenManagementModal({
       await loadGitTokens();
       toasts.add({ title: "Git token created", variant: "success" });
     } catch (err) {
-      toasts.add({
-        title: `Failed to create Git token: ${(err as Error).message}`,
-        variant: "error",
-      });
+      toasts.add({ title: `Failed to create Git token: ${(err as Error).message}`, variant: "error" });
     } finally {
       setCreatingToken(false);
     }
@@ -1568,10 +1605,7 @@ function GitTokenManagementModal({
       await loadGitTokens();
       toasts.add({ title: "Git token revoked", variant: "success" });
     } catch (err) {
-      toasts.add({
-        title: `Failed to revoke Git token: ${(err as Error).message}`,
-        variant: "error",
-      });
+      toasts.add({ title: `Failed to revoke Git token: ${(err as Error).message}`, variant: "error" });
     } finally {
       setRevokingToken(null);
     }
@@ -1597,7 +1631,9 @@ function GitTokenManagementModal({
         className="z-[1000]! w-[min(560px,calc(100vw-32px))]! overflow-visible bg-kumo-base p-0 top-[14%]! translate-y-0!"
         size="sm"
       >
-        <ModalHeader title="Manage git tokens" />
+        <ModalHeader
+          title="Manage git tokens"
+        />
 
         <div className="space-y-3 px-4 py-5 sm:px-6">
           <div className="flex items-center justify-between gap-3">
@@ -1620,8 +1656,7 @@ function GitTokenManagementModal({
               <div>
                 <div className="font-medium text-kumo-default">Token created</div>
                 <p className="mt-0.5">
-                  Use these credentials to push content to your collection. The password is only
-                  shown once.
+                  Use these credentials to push content to your collection. The password is only shown once.
                 </p>
               </div>
               <div className="space-y-2">
@@ -1636,13 +1671,7 @@ function GitTokenManagementModal({
                     <WorkshopButton
                       tone="secondary"
                       className="h-8!"
-                      onClick={() =>
-                        copyToClipboard(
-                          newGitToken.remote,
-                          "Remote URL copied",
-                          "Failed to copy remote URL",
-                        )
-                      }
+                      onClick={() => copyToClipboard(newGitToken.remote, "Remote URL copied", "Failed to copy remote URL")}
                     >
                       Copy
                     </WorkshopButton>
@@ -1660,13 +1689,7 @@ function GitTokenManagementModal({
                     <WorkshopButton
                       tone="secondary"
                       className="h-8!"
-                      onClick={() =>
-                        copyToClipboard(
-                          newGitToken.plaintext,
-                          "Password copied",
-                          "Failed to copy password",
-                        )
-                      }
+                      onClick={() => copyToClipboard(newGitToken.plaintext, "Password copied", "Failed to copy password")}
                     >
                       Copy
                     </WorkshopButton>
@@ -1676,14 +1699,10 @@ function GitTokenManagementModal({
               <div className="border-t border-green-500/20 pt-3">
                 <div className="font-medium text-kumo-default">Configure GitLab mirroring</div>
                 <p className="mt-0.5">
-                  These steps are specific to GitLab. Other git providers may use different setup
-                  flows.
+                  These steps are specific to GitLab. Other git providers may use different setup flows.
                 </p>
                 <ol className="mt-2 list-decimal space-y-1.5 pl-4">
-                  <li>
-                    Open your GitLab project and go to Settings &gt; Repository &gt; Mirroring
-                    repositories
-                  </li>
+                  <li>Open your GitLab project and go to Settings &gt; Repository &gt; Mirroring repositories</li>
                   <li>Click "Add new" button to open setup flow</li>
                   <li>Set Git repository URL to the remote URL above</li>
                   <li>Set Mirror direction to Push</li>
@@ -1711,9 +1730,7 @@ function GitTokenManagementModal({
                     className={`flex items-center justify-between gap-3 px-3 py-2 text-[12px] ${newGitToken?.id === token.id ? "bg-green-500/5" : ""}`}
                   >
                     <div className="min-w-0">
-                      <div className="truncate font-mono text-[11px] text-kumo-default">
-                        {token.id}
-                      </div>
+                      <div className="truncate font-mono text-[11px] text-kumo-default">{token.id}</div>
                       <div className="text-kumo-subtle">
                         expires {new Date(token.expiresAt).toLocaleDateString()}
                       </div>
@@ -1760,7 +1777,10 @@ function isSkillFolder(folder: TreeFolder): boolean {
   return folder.files.some((file) => file.skillName !== undefined);
 }
 
-function buildTree(docs: ContextDocumentSummary[], extraFolders: string[]): TreeFolder {
+function buildTree(
+  docs: ContextDocumentSummary[],
+  extraFolders: string[],
+): TreeFolder {
   const root: TreeFolder = {
     name: "",
     path: "",
@@ -1892,11 +1912,21 @@ function CreateRow({ depth, ctx }: { depth: number; ctx: TreeCtx }) {
   );
 }
 
-function FolderView({ folder, depth, ctx }: { folder: TreeFolder; depth: number; ctx: TreeCtx }) {
+function FolderView({
+  folder,
+  depth,
+  ctx,
+}: {
+  folder: TreeFolder;
+  depth: number;
+  ctx: TreeCtx;
+}) {
   const sortedFolders = [...folder.folders.values()].toSorted((a, b) =>
     a.name.localeCompare(b.name),
   );
-  const sortedFiles = [...folder.files].toSorted((a, b) => a.path.localeCompare(b.path));
+  const sortedFiles = [...folder.files].toSorted((a, b) =>
+    a.path.localeCompare(b.path),
+  );
   const isRoot = folder.path === "";
   const open = isRoot || ctx.expanded.has(folder.path);
   const isDragOver = ctx.dragOverDir === folder.path;
@@ -2029,7 +2059,9 @@ function FolderView({ folder, depth, ctx }: { folder: TreeFolder; depth: number;
       {open && (
         <div
           {...(isRoot ? dropHandlers : {})}
-          className={isRoot && isDragOver ? "rounded-md ring-1 ring-kumo-brand/40" : ""}
+          className={
+            isRoot && isDragOver ? "rounded-md ring-1 ring-kumo-brand/40" : ""
+          }
         >
           {ctx.creating && ctx.creating.dir === folder.path && (
             <CreateRow depth={depth} ctx={ctx} />
@@ -2043,7 +2075,12 @@ function FolderView({ folder, depth, ctx }: { folder: TreeFolder; depth: number;
             />
           ))}
           {sortedFiles.map((doc) => (
-            <FileView key={doc.path} doc={doc} depth={isRoot ? depth : depth + 1} ctx={ctx} />
+            <FileView
+              key={doc.path}
+              doc={doc}
+              depth={isRoot ? depth : depth + 1}
+              ctx={ctx}
+            />
           ))}
         </div>
       )}
@@ -2083,10 +2120,7 @@ function FileView({
       onClick={isRenaming ? undefined : () => ctx.selectFile(doc.path)}
       title={doc.description || undefined}
     >
-      <Icon
-        size={14}
-        className={`shrink-0 ${selected ? "text-kumo-default" : "text-kumo-subtle"}`}
-      />
+      <Icon size={14} className={`shrink-0 ${selected ? "text-kumo-default" : "text-kumo-subtle"}`} />
       {isRenaming ? (
         <TreeInlineInput
           value={ctx.renameValue}
@@ -2152,7 +2186,9 @@ function CollectionEditor({
   const context = useContextApi();
   const toasts = useKumoToastManager();
   const [docs, setDocs] = useState<ContextDocumentSummary[]>([]);
-  const [metadata, setMetadata] = useState<ContextCollectionMetadata | null>(null);
+  const [metadata, setMetadata] = useState<ContextCollectionMetadata | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsMode, setSettingsMode] = useState<"edit" | "delete">("edit");
@@ -2401,7 +2437,9 @@ function CollectionEditor({
     setDeletingPath(true);
     try {
       if (isDir) {
-        const inDir = docs.filter((d) => d.path === path || d.path.startsWith(path + "/"));
+        const inDir = docs.filter(
+          (d) => d.path === path || d.path.startsWith(path + "/"),
+        );
         await runWithConcurrency(inDir, 6, (d) =>
           context.deleteContextDocument(collectionId, d.path),
         );
@@ -2411,7 +2449,8 @@ function CollectionEditor({
 
       afterDeleteExitRef.current = () => {
         if (isDir) {
-          if (selectedPath === path || selectedPath?.startsWith(path + "/")) setSelectedPath(null);
+          if (selectedPath === path || selectedPath?.startsWith(path + "/"))
+            setSelectedPath(null);
         } else if (selectedPath === path) {
           setSelectedPath(null);
         }
@@ -2459,7 +2498,10 @@ function CollectionEditor({
   };
 
   const extraFolders = useMemo(() => [...pendingFolders], [pendingFolders]);
-  const tree = useMemo(() => buildTree(docs, extraFolders), [docs, extraFolders]);
+  const tree = useMemo(
+    () => buildTree(docs, extraFolders),
+    [docs, extraFolders],
+  );
 
   const ctx: TreeCtx = {
     canWrite: canEditDocuments,
@@ -2564,7 +2606,9 @@ function CollectionEditor({
               <DeletePermanentlyDescription
                 name={pendingDelete ? baseName(pendingDelete.path) : ""}
                 documents={
-                  pendingDelete?.isDir && pendingDelete.count > 0 ? pendingDelete.count : undefined
+                  pendingDelete?.isDir && pendingDelete.count > 0
+                    ? pendingDelete.count
+                    : undefined
                 }
               />
             }
@@ -2607,174 +2651,170 @@ function CollectionEditor({
             Context &amp; Skills
           </button>
         </div>
-        {metadata && (
-          <div className="px-3 py-2.5">
-            {/* The collection root doubles as a nav target back to the overview, and sits active
+          {metadata && (
+            <div className="px-3 py-2.5">
+              {/* The collection root doubles as a nav target back to the overview, and sits active
                   when nothing is selected. */}
-            <div
-              className={`flex items-center rounded-lg ${selectedPath ? "hover:bg-kumo-tint" : "bg-kumo-recessed"}`}
-            >
-              <button
-                onClick={() => setSelectedPath(null)}
-                title="Collection overview"
-                aria-current={selectedPath ? undefined : "page"}
-                className="flex min-w-0 flex-1 transform-none items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-kumo-ring/30 active:scale-100"
+              <div
+                className={`flex items-center rounded-lg ${selectedPath ? "hover:bg-kumo-tint" : "bg-kumo-recessed"}`}
               >
-                <CollectionIconTile icon={metadata.icon} size="sm" />
-                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-5 tracking-[-0.25px] text-kumo-default">
-                  {metadata.title}
-                </span>
-              </button>
-              {canWrite && (
-                <div className="pr-1 sm:hidden">
-                  <CollectionOptionsMenu
-                    isSynced={metadata.content.source === "git"}
-                    supportsGitCollections={supportsGitCollections}
-                    onEditDetails={() => openSettings("edit")}
-                    onManageGitTokens={() => setGitTokensOpen(true)}
-                    onDelete={() => openSettings("delete")}
-                  />
-                </div>
-              )}
+                <button
+                  onClick={() => setSelectedPath(null)}
+                  title="Collection overview"
+                  aria-current={selectedPath ? undefined : "page"}
+                  className="flex min-w-0 flex-1 transform-none items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-kumo-ring/30 active:scale-100"
+                >
+                  <CollectionIconTile icon={metadata.icon} size="sm" />
+                  <span className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-5 tracking-[-0.25px] text-kumo-default">
+                    {metadata.title}
+                  </span>
+                </button>
+                {canWrite && (
+                  <div className="pr-1 sm:hidden">
+                    <CollectionOptionsMenu
+                      isSynced={metadata.content.source === "git"}
+                      supportsGitCollections={supportsGitCollections}
+                      onEditDetails={() => openSettings("edit")}
+                      onManageGitTokens={() => setGitTokensOpen(true)}
+                      onDelete={() => openSettings("delete")}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="flex h-8 shrink-0 items-center justify-between gap-2 px-5">
-          <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-kumo-inactive">
-            Files
-          </span>
-          {canEditDocuments && (
-            <>
-              <KebabMenu
-                trigger={
-                  <WorkshopIconButton
-                    aria-label="Add"
-                    title="Add file or folder"
-                    className="!h-6 !w-6 text-kumo-subtle hover:bg-kumo-tint hover:text-kumo-default data-[popup-open]:bg-kumo-tint data-[popup-open]:text-kumo-default"
-                  >
-                    <Plus size={14} weight="bold" />
-                  </WorkshopIconButton>
-                }
+          <div className="flex h-8 shrink-0 items-center justify-between gap-2 px-5">
+            <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-kumo-inactive">
+              Files
+            </span>
+            {canEditDocuments && (
+              <>
+            <KebabMenu
+              trigger={
+                <WorkshopIconButton
+                  aria-label="Add"
+                  title="Add file or folder"
+                  className="!h-6 !w-6 text-kumo-subtle hover:bg-kumo-tint hover:text-kumo-default data-[popup-open]:bg-kumo-tint data-[popup-open]:text-kumo-default"
+                >
+                  <Plus size={14} weight="bold" />
+                </WorkshopIconButton>
+              }
+            >
+              <DropdownMenu.Item
+                icon={<FilePlus size={13} className="mr-2" />}
+                onClick={() => startCreate("", "file")}
+                className={MENU_ITEM}
               >
-                <DropdownMenu.Item
-                  icon={<FilePlus size={13} className="mr-2" />}
-                  onClick={() => startCreate("", "file")}
-                  className={MENU_ITEM}
-                >
-                  New file
-                </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  icon={<FolderPlus size={13} className="mr-2" />}
-                  onClick={() => startCreate("", "folder")}
-                  className={MENU_ITEM}
-                >
-                  New folder
-                </DropdownMenu.Item>
-                <DropdownMenu.Separator />
-                <DropdownMenu.Item
-                  icon={<UploadSimple size={13} className="mr-2" />}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={MENU_ITEM}
-                >
-                  Upload files
-                </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  icon={<Folder size={13} className="mr-2" />}
-                  onClick={() => dirInputRef.current?.click()}
-                  className={MENU_ITEM}
-                >
-                  Upload folder
-                </DropdownMenu.Item>
-              </KebabMenu>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.length) uploadFiles(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-              <input
-                ref={dirInputRef}
-                type="file"
-                multiple
-                // @ts-expect-error non-standard directory upload attribute
-                webkitdirectory=""
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.length) uploadFiles(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-            </>
-          )}
-        </div>
-        <div className="ctx-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3.5 pb-6 pt-0.5">
-          {loading ? (
-            <p className="px-2 py-2 text-[13px] text-kumo-subtle">Loading…</p>
-          ) : docs.length === 0 && pendingFolders.size === 0 && !creating ? (
-            <p className="px-2 py-2 text-[12px] leading-5 text-kumo-inactive">
-              {metadata?.content.source === "git"
-                ? supportsGitCollections
-                  ? "No files yet. Mirror content from git, then refresh."
-                  : "No Git content was cached before synchronization became unavailable."
-                : canWrite
-                  ? "No files yet. Use + to create or upload skills or files."
-                  : "No files yet."}
-            </p>
-          ) : (
-            <FolderView folder={tree} depth={0} ctx={ctx} />
-          )}
-        </div>
+                New file
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                icon={<FolderPlus size={13} className="mr-2" />}
+                onClick={() => startCreate("", "folder")}
+                className={MENU_ITEM}
+              >
+                New folder
+              </DropdownMenu.Item>
+              <DropdownMenu.Separator />
+              <DropdownMenu.Item
+                icon={<UploadSimple size={13} className="mr-2" />}
+                onClick={() => fileInputRef.current?.click()}
+                className={MENU_ITEM}
+              >
+                Upload files
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                icon={<Folder size={13} className="mr-2" />}
+                onClick={() => dirInputRef.current?.click()}
+                className={MENU_ITEM}
+              >
+                Upload folder
+              </DropdownMenu.Item>
+            </KebabMenu>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) uploadFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <input
+              ref={dirInputRef}
+              type="file"
+              multiple
+              // @ts-expect-error non-standard directory upload attribute
+              webkitdirectory=""
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) uploadFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+              </>
+            )}
+          </div>
+          <div className="ctx-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3.5 pb-6 pt-0.5">
+            {loading ? (
+              <p className="px-2 py-2 text-[13px] text-kumo-subtle">Loading…</p>
+            ) : docs.length === 0 && pendingFolders.size === 0 && !creating ? (
+              <p className="px-2 py-2 text-[12px] leading-5 text-kumo-inactive">
+                {metadata?.content.source === "git"
+                  ? supportsGitCollections
+                    ? "No files yet. Mirror content from git, then refresh."
+                    : "No Git content was cached before synchronization became unavailable."
+                  : canWrite ? "No files yet. Use + to create or upload skills or files." : "No files yet."}
+              </p>
+            ) : (
+              <FolderView folder={tree} depth={0} ctx={ctx} />
+            )}
+          </div>
       </aside>
 
       {/* Detail: the selected document, or the collection overview when nothing is selected. */}
-      <section
-        className={`${selectedPath ? "flex" : "hidden sm:flex"} min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-kumo-base`}
-      >
-        {selectedPath ? (
-          <>
-            {/* Mobile-only: return to the file index (desktop shows both panes already). */}
-            <button
-              onClick={() => setSelectedPath(null)}
-              className="flex sm:hidden flex-shrink-0 items-center gap-1 border-b border-kumo-line px-4 py-2.5 text-[13px] text-kumo-subtle transition-colors hover:text-kumo-default"
-            >
-              <CaretLeft size={14} />
-              Files
-            </button>
-            <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-              <DocumentEditor
-                key={selectedPath}
-                collectionId={collectionId}
-                path={selectedPath}
-                readOnly={!canEditDocuments}
-                initialMode={editOnOpenPath === selectedPath ? "edit" : "read"}
-                onDirtyChange={setDirty}
-                onChanged={loadDocs}
-                onRenamed={(newPath) => {
-                  setDirty(false);
-                  setSelectedPath(newPath);
-                  loadDocs();
-                }}
-                onRequestDelete={() => deletePath(selectedPath, false)}
-              />
-            </div>
-          </>
-        ) : metadata ? (
-          <CollectionOverview
-            metadata={metadata}
-            canWrite={canWrite}
-            supportsGitCollections={supportsGitCollections}
-            refreshingSource={refreshingSource}
-            onRefreshSource={handleRefreshArtifactSource}
-            onEditDetails={() => openSettings("edit")}
-            onManageGitTokens={() => setGitTokensOpen(true)}
-            onDelete={() => openSettings("delete")}
-          />
-        ) : null}
+      <section className={`${selectedPath ? "flex" : "hidden sm:flex"} min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-kumo-base`}>
+          {selectedPath ? (
+            <>
+              {/* Mobile-only: return to the file index (desktop shows both panes already). */}
+              <button
+                onClick={() => setSelectedPath(null)}
+                className="flex sm:hidden flex-shrink-0 items-center gap-1 border-b border-kumo-line px-4 py-2.5 text-[13px] text-kumo-subtle transition-colors hover:text-kumo-default"
+              >
+                <CaretLeft size={14} />
+                Files
+              </button>
+              <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+                <DocumentEditor
+                  key={selectedPath}
+                  collectionId={collectionId}
+                  path={selectedPath}
+                  readOnly={!canEditDocuments}
+                  initialMode={editOnOpenPath === selectedPath ? "edit" : "read"}
+                  onDirtyChange={setDirty}
+                  onChanged={loadDocs}
+                  onRenamed={(newPath) => {
+                    setDirty(false);
+                    setSelectedPath(newPath);
+                    loadDocs();
+                  }}
+                  onRequestDelete={() => deletePath(selectedPath, false)}
+                />
+              </div>
+            </>
+          ) : metadata ? (
+            <CollectionOverview
+              metadata={metadata}
+              canWrite={canWrite}
+              supportsGitCollections={supportsGitCollections}
+              refreshingSource={refreshingSource}
+              onRefreshSource={handleRefreshArtifactSource}
+              onEditDetails={() => openSettings("edit")}
+              onManageGitTokens={() => setGitTokensOpen(true)}
+              onDelete={() => openSettings("delete")}
+            />
+          ) : null}
       </section>
     </div>
   );
@@ -2813,8 +2853,7 @@ function MarkdownImage({
       setResolvedSrc(cached);
       return;
     }
-    context
-      .getContextDocument(collectionId, imagePath)
+    context.getContextDocument(collectionId, imagePath)
       .then((doc) => {
         if (!cancelled && doc && isImageContentType(doc.contentType)) {
           const uri = dataUri(doc.contentType, doc.body);
@@ -2918,14 +2957,20 @@ function renderDocumentBody({
   if (!isText) {
     return (
       <div className="p-4 text-[13px] text-kumo-subtle">
-        Binary document ({contentType}, {Math.round((body.length * 3) / 4 / 1024)} KB). Use Replace
-        to update it.
+        Binary document ({contentType}, {Math.round((body.length * 3) / 4 / 1024)} KB). Use Replace to
+        update it.
       </div>
     );
   }
 
   if (isMarkdown && mode === "read") {
-    return <MarkdownPreview body={body} collectionId={collectionId} documentPath={path} />;
+    return (
+      <MarkdownPreview
+        body={body}
+        collectionId={collectionId}
+        documentPath={path}
+      />
+    );
   }
 
   return (
@@ -3003,30 +3048,27 @@ function DocumentEditor({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    context
-      .getContextDocument(collectionId, path)
-      .then((d) => {
-        if (cancelled) return;
-        if (d) {
-          // Self-describing files use extractedDescription below instead.
-          savedDocumentRef.current = { description: d.description, body: d.body };
-          setDescription(d.description);
-          setBody(d.body);
-          setSkillName(d.skillName ?? null);
-          setDirty(false);
-          setMode(readOnly || initialMode !== "edit" ? "read" : "edit");
-        }
-        // Also clears loading for not-found.
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setLoading(false);
-        toasts.add({
-          title: `Failed to load document: ${(err as Error).message}`,
-          variant: "error",
-        });
+    context.getContextDocument(collectionId, path).then((d) => {
+      if (cancelled) return;
+      if (d) {
+        // Self-describing files use extractedDescription below instead.
+        savedDocumentRef.current = { description: d.description, body: d.body };
+        setDescription(d.description);
+        setBody(d.body);
+        setSkillName(d.skillName ?? null);
+        setDirty(false);
+        setMode(readOnly || initialMode !== "edit" ? "read" : "edit");
+      }
+      // Also clears loading for not-found.
+      setLoading(false);
+    }).catch((err) => {
+      if (cancelled) return;
+      setLoading(false);
+      toasts.add({
+        title: `Failed to load document: ${(err as Error).message}`,
+        variant: "error",
       });
+    });
     return () => {
       cancelled = true;
     };
@@ -3122,38 +3164,31 @@ function DocumentEditor({
             value={filename}
             readOnly={readOnly || renaming}
             onChange={(e) => setFilename(e.target.value)}
-            onBlur={() => {
-              if (!readOnly) commitRename();
-            }}
+            onBlur={() => { if (!readOnly) commitRename(); }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                e.currentTarget.blur();
-              } else if (e.key === "Escape") {
-                setFilename(baseName(path));
-                e.currentTarget.blur();
-              }
+              if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+              else if (e.key === "Escape") { setFilename(baseName(path)); e.currentTarget.blur(); }
             }}
             className="w-full bg-transparent text-[18px] font-semibold leading-6 tracking-[-0.4px] text-kumo-default focus:outline-none"
             placeholder="file-name.md"
             title="File name — edit to rename (the extension sets the type)"
           />
+
         </div>
         {/* Contextual actions sit left of the toggle so the always-present toggle/delete cluster
             stays right-anchored — toggling View/Edit never shifts the toggle. */}
-        {!readOnly &&
-          dirty && (
-            // Disabled overrides keep the inactive state grey rather than faded orange.
-            <WorkshopButton
-              tone="primary"
-              className="!h-8 !bg-kumo-contrast !text-kumo-inverse enabled:hover:!bg-kumo-strong disabled:!bg-kumo-fill disabled:!text-kumo-inactive disabled:!opacity-100"
-              onClick={() => save()}
-              loading={saving}
-              disabled={!dirty}
-            >
-              Save
-            </WorkshopButton>
-          )}
+        {!readOnly && dirty && (
+          // Disabled overrides keep the inactive state grey rather than faded orange.
+          <WorkshopButton
+            tone="primary"
+            className="!h-8 !bg-kumo-contrast !text-kumo-inverse enabled:hover:!bg-kumo-strong disabled:!bg-kumo-fill disabled:!text-kumo-inactive disabled:!opacity-100"
+            onClick={() => save()}
+            loading={saving}
+            disabled={!dirty}
+          >
+            Save
+          </WorkshopButton>
+        )}
         {!readOnly && !isText && mode === "edit" && (
           <label className="press flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-kumo-line px-2.5 text-[12px] font-medium text-kumo-subtle transition-colors hover:bg-kumo-tint hover:text-kumo-default">
             <UploadSimple size={14} /> Replace
@@ -3172,11 +3207,7 @@ function DocumentEditor({
           <div className="inline-flex h-8 shrink-0 items-center rounded-lg border border-kumo-line bg-kumo-fill p-0.5">
             {[
               { m: "read" as const, Icon: Eye, label: "View" },
-              {
-                m: "edit" as const,
-                Icon: readOnly ? Code : PencilSimple,
-                label: readOnly ? "Source" : "Edit",
-              },
+              { m: "edit" as const, Icon: readOnly ? Code : PencilSimple, label: readOnly ? "Source" : "Edit" },
             ].map(({ m, Icon, label }) => (
               <button
                 key={m}
@@ -3198,15 +3229,15 @@ function DocumentEditor({
         )}
         {!readOnly && (
           <>
-            {/* Separate the destructive action from Save so it can't be fat-fingered. */}
-            <span className="mx-0.5 h-5 w-px shrink-0 bg-kumo-line" aria-hidden="true" />
-            <button
-              onClick={onRequestDelete}
-              title="Delete document"
-              className="press flex h-8 w-8 items-center justify-center rounded-md text-kumo-subtle transition-colors hover:bg-kumo-tint hover:text-kumo-danger"
-            >
-              <Trash size={16} />
-            </button>
+          {/* Separate the destructive action from Save so it can't be fat-fingered. */}
+          <span className="mx-0.5 h-5 w-px shrink-0 bg-kumo-line" aria-hidden="true" />
+          <button
+            onClick={onRequestDelete}
+            title="Delete document"
+            className="press flex h-8 w-8 items-center justify-center rounded-md text-kumo-subtle transition-colors hover:bg-kumo-tint hover:text-kumo-danger"
+          >
+            <Trash size={16} />
+          </button>
           </>
         )}
       </div>
@@ -3216,7 +3247,9 @@ function DocumentEditor({
       <div className="border-b border-kumo-line px-6 py-3.5 sm:px-10">
         <label className="mb-1.5 block text-[12px] font-medium tracking-[-0.15px] text-kumo-subtle">
           When to use this
-          {skillName && <span className="ml-1 font-mono text-kumo-brand">· /{skillName}</span>}
+          {skillName && (
+            <span className="ml-1 font-mono text-kumo-brand">· /{skillName}</span>
+          )}
           {extractedDescription !== null && (
             <span
               className="ml-1 text-kumo-inactive"
@@ -3245,7 +3278,9 @@ function DocumentEditor({
           />
         ) : (
           <p className="max-w-3xl text-[14px] leading-5 tracking-[-0.2px] text-kumo-default">
-            {description || <span className="italic text-kumo-inactive">No description yet.</span>}
+            {description || (
+              <span className="italic text-kumo-inactive">No description yet.</span>
+            )}
           </p>
         )}
       </div>
@@ -3269,6 +3304,7 @@ function DocumentEditor({
           },
         })}
       </div>
+
     </div>
   );
 }

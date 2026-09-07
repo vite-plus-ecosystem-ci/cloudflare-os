@@ -24,15 +24,16 @@ import {
   type VendorDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
 import type { ToolCatalog } from "@gadgets/mcp-shared/client";
-import { classifyTool, MAX_TOOLS_PER_SERVER, type ServerTrust } from "@gadgets/mcp-shared/tools";
+import {
+  classifyTool,
+  MAX_TOOLS_PER_SERVER,
+  type ServerTrust,
+} from "@gadgets/mcp-shared/tools";
 import { bindingNameFragment, hostOf } from "@gadgets/mcp-shared/util";
 import type { McpLog, McpLogFields } from "@gadgets/mcp-shared/log";
 import { generateSessionTypes, sessionTypeName } from "@gadgets/mcp-shared/schema-to-ts";
-import {
-  McpAccountBase,
-  type ConnectedServer,
-  type ConnectOutcome,
-} from "@gadgets/mcp-shared/account";
+import { McpAccountBase, type ConnectedServer, type ConnectOutcome }
+  from "@gadgets/mcp-shared/account";
 import { generateNonce } from "@gadgets/mcp-shared/connect-nonce";
 import { fetchTools, withClient, type ConnectionAccount } from "@gadgets/mcp-shared/connection";
 import { McpSessionBase } from "@gadgets/mcp-shared/session";
@@ -50,7 +51,11 @@ import {
 } from "@gadgets/mcp-shared/scope";
 import { validateCustomEndpoint } from "@gadgets/mcp-shared/endpoint";
 import { fetchOptions } from "@gadgets/mcp-shared/fetch";
-import { htmlResponse, INVALID_LINK_HTML, SELF_CLOSING_HTML } from "@gadgets/mcp-shared/html";
+import {
+  htmlResponse,
+  INVALID_LINK_HTML,
+  SELF_CLOSING_HTML,
+} from "@gadgets/mcp-shared/html";
 import { handleMcpHttpRequest } from "@gadgets/mcp-shared/http";
 import {
   McpGatekeeperUserBase,
@@ -91,7 +96,8 @@ export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     return handleMcpHttpRequest(req, {
       baseUrl: getBaseUrl(env),
-      accountForId: (id) => ctx.exports.McpAccount.get(ctx.exports.McpAccount.idFromString(id)),
+      accountForId: id => ctx.exports.McpAccount.get(
+        ctx.exports.McpAccount.idFromString(id)),
       log: logger,
       connect: async (request, account, initiationNonce, path) => {
         if (request.method !== "GET" && request.method !== "POST") {
@@ -109,7 +115,8 @@ export default {
           return htmlResponse(connectFormHtml(path));
         }
         const form = await request.formData();
-        return continueConnect(account, initiationNonce, String(form.get("url") ?? ""), env, path);
+        return continueConnect(
+          account, initiationNonce, String(form.get("url") ?? ""), env, path);
       },
     });
   },
@@ -147,10 +154,8 @@ async function continueConnect(
     outcome = await account.beginConnect(initiationNonce, target);
   } catch (err) {
     logger.warn("connect failed", { event: "connect.failed", error: err });
-    return htmlResponse(
-      connectFormHtml(formPath, err instanceof Error ? err.message : String(err)),
-      502,
-    );
+    return htmlResponse(connectFormHtml(
+      formPath, err instanceof Error ? err.message : String(err)), 502);
   }
 
   if (outcome.kind === "invalid") return htmlResponse(INVALID_LINK_HTML, 400);
@@ -235,11 +240,13 @@ export class McpAccount extends McpAccountBase<Env> {
 // Account-facing interface
 
 @validateRpc()
-export class GatekeeperUserImpl extends McpGatekeeperUserBase<Env> implements GatekeeperUser {
+export class GatekeeperUserImpl
+  extends McpGatekeeperUserBase<Env>
+  implements GatekeeperUser {
+
   #account(): DurableObjectStub<McpAccount> {
     return this.ctx.exports.McpAccount.get(
-      this.ctx.exports.McpAccount.idFromString(this.ctx.props.accountObjectId),
-    );
+      this.ctx.exports.McpAccount.idFromString(this.ctx.props.accountObjectId));
   }
 
   protected [mcpGatekeeperUserContext]() {
@@ -263,8 +270,7 @@ export class GatekeeperUserImpl extends McpGatekeeperUserBase<Env> implements Ga
     const requested = new URL(url, server.endpoint);
     if (!sameEndpoint(requested.toString(), server.endpoint)) {
       throw new Error(
-        `This connection is for ${server.endpoint}, not ${endpointOfResourceUrl(requested)}.`,
-      );
+        `This connection is for ${server.endpoint}, not ${endpointOfResourceUrl(requested)}.`);
     }
 
     // The fragment records how much of the endpoint this binding may call; see `scope.ts`. A
@@ -274,8 +280,7 @@ export class GatekeeperUserImpl extends McpGatekeeperUserBase<Env> implements Ga
     if (scope.serverId !== undefined) {
       throw new Error(
         `"${url}" scopes the grant to one server behind a gateway, which this connector does not ` +
-          `do. Connect this endpoint through the MCP Server Portals connector instead.`,
-      );
+        `do. Connect this endpoint through the MCP Server Portals connector instead.`);
     }
     if (scope.tools !== undefined) {
       const selected = new Set(scope.tools);
@@ -283,9 +288,15 @@ export class GatekeeperUserImpl extends McpGatekeeperUserBase<Env> implements Ga
         scope,
         selected.size === 0
           ? { tools: [], truncated: false }
-          : await withClient(this.env, this.#account(), server.endpoint, (client) =>
-              client.listMatchingToolIndex(selected.size, (tool) => selected.has(tool.name)),
+          : await withClient(
+            this.env,
+            this.#account(),
+            server.endpoint,
+            client => client.listMatchingToolIndex(
+              selected.size,
+              tool => selected.has(tool.name),
             ),
+          ),
       );
     }
 
@@ -363,8 +374,8 @@ class McpServerConfiguratorUI extends RpcTarget implements McpServerConfigurator
     const isPortal = looksLikePortal(tools, { truncated, cap: MAX_TOOLS_PER_SERVER });
 
     return tools
-      .filter((tool) => scopeAllows({}, tool.name, isPortal))
-      .map((tool) => ({
+      .filter(tool => scopeAllows({}, tool.name, isPortal))
+      .map(tool => ({
         value: tool.name,
         title: tool.title ?? tool.name,
         subtitle: tool.description?.split(/\r?\n/)[0],
@@ -389,7 +400,10 @@ type McpGatekeeperImplProps = {
   scope: ToolScope;
 };
 
-export class McpGatekeeperImpl extends McpFacetBase<Env, McpGatekeeperImplProps, McpSessionImpl> {
+
+export class McpGatekeeperImpl
+  extends McpFacetBase<Env, McpGatekeeperImplProps, McpSessionImpl> {
+
   protected get log() {
     return logger.with({ serverHost: hostOf(this.ctx.props.endpoint) });
   }
@@ -411,8 +425,7 @@ export class McpGatekeeperImpl extends McpFacetBase<Env, McpGatekeeperImplProps,
 
   protected account(): ConnectionAccount {
     return this.ctx.exports.McpAccount.get(
-      this.ctx.exports.McpAccount.idFromString(this.ctx.props.accountObjectId),
-    );
+      this.ctx.exports.McpAccount.idFromString(this.ctx.props.accountObjectId));
   }
 
   protected get trust(): ServerTrust {
@@ -433,7 +446,7 @@ export class McpGatekeeperImpl extends McpFacetBase<Env, McpGatekeeperImplProps,
 
   async describe(): Promise<ResourceDescription> {
     const tools = await this.tools();
-    const reads = tools.filter((entry) => entry.mode === "read").length;
+    const reads = tools.filter(entry => entry.mode === "read").length;
     const { scope, serverName } = this.ctx.props;
 
     const counts = `${reads} read-only, ${tools.length - reads} requiring approval`;

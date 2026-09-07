@@ -23,7 +23,8 @@ export function insufficientBalanceMessage(minimum: number = MINIMUM_CLOUDFLARE_
 export const LIMIT_ERROR_MESSAGES = {
   USAGE_LIMIT_EXCEEDED:
     "Free usage limit reached. Connect your Cloudflare account or use your own API keys to continue.",
-  NO_CLOUDFLARE_TOKEN: "Free usage limit reached. Connect your Cloudflare account to continue.",
+  NO_CLOUDFLARE_TOKEN:
+    "Free usage limit reached. Connect your Cloudflare account to continue.",
 } as const;
 
 /** The window over which the free-tier limit is measured. */

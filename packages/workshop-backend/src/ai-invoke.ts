@@ -7,11 +7,7 @@ import type { ModelHandle } from "./ai-models.js";
  */
 export function zeroUsage(): Usage {
   return {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    totalTokens: 0,
+    input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
   };
 }
@@ -39,7 +35,8 @@ export class AgentTurnError extends Error {
  * begin with the status code (e.g. "400 {...}"), which is enough for the overseer's triage
  * (report 5xx/unknown, skip expected 4xx).
  */
-export function httpStatusFromError(errorMessage: string, handle: ModelHandle): number | undefined {
+export function httpStatusFromError(errorMessage: string, handle: ModelHandle)
+    : number | undefined {
   const match = /^(\d{3})\b/.exec(errorMessage.trim());
   if (match) return Number(match[1]);
   return handle.lastResponse?.status;
@@ -52,32 +49,24 @@ export function httpStatusFromError(errorMessage: string, handle: ModelHandle): 
  * of them benefit from extended thinking; pre-pi, these calls never configured thinking either).
  * Throws AgentTurnError on provider failure, or the abort reason when `signal` fired.
  */
-export async function completeText(
-  handle: ModelHandle,
-  args: {
-    systemPrompt?: string;
-    /** Convenience: wraps into a single user message. Exactly one of `prompt`/`messages` required. */
-    prompt?: string;
-    messages?: Message[];
-    maxTokens?: number;
-    signal?: AbortSignal;
-  },
-): Promise<string> {
-  const messages: Message[] = args.messages ?? [
-    { role: "user", content: args.prompt ?? "", timestamp: Date.now() },
-  ];
-  const stream = await handle.stream(
-    handle.model,
-    {
-      systemPrompt: args.systemPrompt,
-      messages,
-    },
-    {
-      maxTokens: args.maxTokens,
-      signal: args.signal,
-      thinking: false,
-    },
-  );
+export async function completeText(handle: ModelHandle, args: {
+  systemPrompt?: string;
+  /** Convenience: wraps into a single user message. Exactly one of `prompt`/`messages` required. */
+  prompt?: string;
+  messages?: Message[];
+  maxTokens?: number;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const messages: Message[] = args.messages ??
+      [{ role: "user", content: args.prompt ?? "", timestamp: Date.now() }];
+  const stream = await handle.stream(handle.model, {
+    systemPrompt: args.systemPrompt,
+    messages,
+  }, {
+    maxTokens: args.maxTokens,
+    signal: args.signal,
+    thinking: false,
+  });
   const message = await stream.result();
   if (message.stopReason === "error" || message.stopReason === "aborted") {
     // Surface a cancellation as the abort reason, like a directly-aborted request would.
@@ -86,7 +75,7 @@ export async function completeText(
     throw new AgentTurnError(errorMessage, httpStatusFromError(errorMessage, handle));
   }
   return message.content
-    .filter((block) => block.type === "text")
-    .map((block) => block.text)
-    .join("");
+      .filter(block => block.type === "text")
+      .map(block => block.text)
+      .join("");
 }

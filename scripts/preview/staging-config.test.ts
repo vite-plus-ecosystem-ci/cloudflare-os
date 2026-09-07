@@ -8,10 +8,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  gatekeeperShortName,
-  isGatekeeperPackage,
-  readDeployablePackages,
-  type BindingDecl,
+  gatekeeperShortName, isGatekeeperPackage, readDeployablePackages, type BindingDecl,
 } from "../release/manifest-lib.ts";
 import {
   MAX_PREVIEW_NAME_LENGTH,
@@ -73,28 +70,24 @@ function oauthFor(pkgName: string): Record<string, string> {
  * halves are listed out rather than indexed by one shared key list, because `d1_databases` is a
  * baseline-only key.
  */
-function* declaredResources(configs: Map<string, StagingConfig>): Generator<[string, BindingDecl]> {
+function* declaredResources(
+  configs: Map<string, StagingConfig>,
+): Generator<[string, BindingDecl]> {
   for (const [name, config] of configs) {
     const previews = config.previews ?? {};
     // The binding lists whose entries Wrangler provisions when they carry nothing but a binding.
     const halves: [string, Record<string, BindingDecl[] | undefined>][] = [
-      [
-        "baseline",
-        {
-          kv_namespaces: config.kv_namespaces,
-          r2_buckets: config.r2_buckets,
-          d1_databases: config.d1_databases,
-          worker_loaders: config.worker_loaders,
-        },
-      ],
-      [
-        "preview",
-        {
-          kv_namespaces: previews.kv_namespaces,
-          r2_buckets: previews.r2_buckets,
-          worker_loaders: previews.worker_loaders,
-        },
-      ],
+      ["baseline", {
+        kv_namespaces: config.kv_namespaces,
+        r2_buckets: config.r2_buckets,
+        d1_databases: config.d1_databases,
+        worker_loaders: config.worker_loaders,
+      }],
+      ["preview", {
+        kv_namespaces: previews.kv_namespaces,
+        r2_buckets: previews.r2_buckets,
+        worker_loaders: previews.worker_loaders,
+      }],
     ];
     for (const [half, lists] of halves) {
       for (const [key, resources] of Object.entries(lists)) {
@@ -151,10 +144,8 @@ test("the preview name cap leaves every provisioned bucket inside R2's limit", (
     for (const { binding } of config.previews?.r2_buckets ?? []) {
       // What Wrangler names the bucket it provisions for a preview.
       const name = `${config.name}-${longest}-${binding.toLowerCase().replaceAll("_", "-")}`;
-      assert.ok(
-        name.length <= R2_MAX_BUCKET_NAME_LENGTH,
-        `${name} is ${name.length} characters; lower MAX_PREVIEW_NAME_LENGTH`,
-      );
+      assert.ok(name.length <= R2_MAX_BUCKET_NAME_LENGTH,
+          `${name} is ${name.length} characters; lower MAX_PREVIEW_NAME_LENGTH`);
     }
   }
 });
@@ -176,10 +167,8 @@ test("the preview name carries the pull request number, so look-alike branches c
   // No number is a local run, which keeps the bare slug; neither is anything that is not one, since
   // the workflow interpolates the empty string on a scheduled run.
   assert.equal(resolvePreviewName({ name: "feature/foo", prNumber: "" }), "feature-foo");
-  assert.equal(
-    resolvePreviewName({ name: "feature/foo", prNumber: "not-a-number" }),
-    "feature-foo",
-  );
+  assert.equal(resolvePreviewName({ name: "feature/foo", prNumber: "not-a-number" }),
+      "feature-foo");
 });
 
 test("the pull request number stays inside the name cap, and reads back out of it", () => {
@@ -202,10 +191,8 @@ test("a reserved prefix shrinks the slug budget rather than overflowing it", () 
   const long = "renovate/a-very-long-dependency-branch-name-that-keeps-going";
   for (const reserve of [0, 3, 9]) {
     const slug = slugifyPreviewName(long, { reserve });
-    assert.ok(
-      slug.length <= MAX_PREVIEW_NAME_LENGTH - reserve,
-      `${slug} is ${slug.length} chars with ${reserve} reserved`,
-    );
+    assert.ok(slug.length <= MAX_PREVIEW_NAME_LENGTH - reserve,
+        `${slug} is ${slug.length} chars with ${reserve} reserved`);
   }
   // A ref short enough to survive intact is untouched: the budget only bites when it truncates.
   assert.equal(slugifyPreviewName("feature/foo", { reserve: 9 }), "feature-foo");
@@ -215,10 +202,8 @@ test("every deployable package gets a preview config, on the configured account"
   const { packages, configs } = buildAll();
 
   assert.equal(configs.size, packages.length);
-  assert.ok(
-    configs.has("router") && configs.has("workshop-backend"),
-    "the router and backend are the two non-gatekeeper deployables",
-  );
+  assert.ok(configs.has("router") && configs.has("workshop-backend"),
+      "the router and backend are the two non-gatekeeper deployables");
   for (const [name, config] of configs) {
     assert.equal(config.account_id, ACCOUNT_ID, name);
     assert.equal(config.routes, undefined, `${name}: a preview cannot be served from a zone`);
@@ -301,85 +286,56 @@ test("the backend's secrets are the admin list, the Access pair and the AI gatew
 test("the AI gateway is optional as a group, but not half-configured", () => {
   // No gateway is a BYOK preview, which is a working deployment rather than a broken one.
   assert.deepEqual(resolveAiGateway({}), {});
-  assert.deepEqual(
-    resolveAiGateway({ accountId: AI_GATEWAY.accountId }),
-    {},
-    "orphans are ignored",
-  );
+  assert.deepEqual(resolveAiGateway({ accountId: AI_GATEWAY.accountId }), {}, "orphans are ignored");
 
   // With one, the account is what AiGatewayConfig demands: without it the backend throws on the
   // first chat, so the deploy has to be the thing that fails instead.
-  assert.throws(
-    () => resolveAiGateway({ gateway: "g" }),
-    /CF_AI_GATEWAY_ACCOUNT_ID must be set when CF_AI_GATEWAY is/,
-  );
+  assert.throws(() => resolveAiGateway({ gateway: "g" }),
+      /CF_AI_GATEWAY_ACCOUNT_ID must be set when CF_AI_GATEWAY is/);
 
   // The gateway name and its account are the whole requirement: a preview binds Workers AI, and
   // the binding transport is pre-authenticated in-account, so a tokenless gateway is a complete
   // configuration. Everything below them is independently optional.
-  assert.deepEqual(resolveAiGateway({ gateway: "g", accountId: "a" }), {
-    CF_AI_GATEWAY: "g",
-    CF_AI_GATEWAY_ACCOUNT_ID: "a",
-  });
-  assert.deepEqual(resolveAiGateway({ gateway: "g", accountId: "a", apiToken: "t" }), {
-    CF_AI_GATEWAY: "g",
-    CF_AI_GATEWAY_ACCOUNT_ID: "a",
-    CF_AI_GATEWAY_API_TOKEN: "t",
-  });
+  assert.deepEqual(resolveAiGateway({ gateway: "g", accountId: "a" }),
+      { CF_AI_GATEWAY: "g", CF_AI_GATEWAY_ACCOUNT_ID: "a" });
+  assert.deepEqual(resolveAiGateway({ gateway: "g", accountId: "a", apiToken: "t" }),
+      { CF_AI_GATEWAY: "g", CF_AI_GATEWAY_ACCOUNT_ID: "a", CF_AI_GATEWAY_API_TOKEN: "t" });
 });
 
 test("a preview that cannot use the binding transport needs the gateway token", () => {
   // Both mirror an AiGatewayConfig throw: opting out of the binding leaves only HTTPS, and the
   // google SDK cannot take the binding's fetch. Each is a deploy failure rather than a chat one.
   assert.throws(
-    () => resolveAiGateway({ gateway: "g", accountId: "a", useBinding: "false" }),
-    /CF_AI_GATEWAY_API_TOKEN must be set when CF_AI_GATEWAY_USE_BINDING is false/,
-  );
+      () => resolveAiGateway({ gateway: "g", accountId: "a", useBinding: "false" }),
+      /CF_AI_GATEWAY_API_TOKEN must be set when CF_AI_GATEWAY_USE_BINDING is false/);
   assert.throws(
-    () => resolveAiGateway({ gateway: "g", accountId: "a", providers: "cloudflare,google" }),
-    /CF_AI_GATEWAY_API_TOKEN must be set when the google provider is enabled/,
-  );
+      () => resolveAiGateway({ gateway: "g", accountId: "a", providers: "cloudflare,google" }),
+      /CF_AI_GATEWAY_API_TOKEN must be set when the google provider is enabled/);
 
   // With the token, both are configurations rather than errors.
   assert.deepEqual(
-    resolveAiGateway({ gateway: "g", accountId: "a", apiToken: "t", useBinding: "false" }),
-    {
-      CF_AI_GATEWAY: "g",
-      CF_AI_GATEWAY_ACCOUNT_ID: "a",
-      CF_AI_GATEWAY_API_TOKEN: "t",
-      CF_AI_GATEWAY_USE_BINDING: "false",
-    },
-  );
+      resolveAiGateway({ gateway: "g", accountId: "a", apiToken: "t", useBinding: "false" }),
+      { CF_AI_GATEWAY: "g", CF_AI_GATEWAY_ACCOUNT_ID: "a", CF_AI_GATEWAY_API_TOKEN: "t",
+        CF_AI_GATEWAY_USE_BINDING: "false" });
   // Requiring the binding is the other half of the same knob, and needs no token at all.
-  assert.deepEqual(resolveAiGateway({ gateway: "g", accountId: "a", useBinding: "true" }), {
-    CF_AI_GATEWAY: "g",
-    CF_AI_GATEWAY_ACCOUNT_ID: "a",
-    CF_AI_GATEWAY_USE_BINDING: "true",
-  });
+  assert.deepEqual(resolveAiGateway({ gateway: "g", accountId: "a", useBinding: "true" }),
+      { CF_AI_GATEWAY: "g", CF_AI_GATEWAY_ACCOUNT_ID: "a", CF_AI_GATEWAY_USE_BINDING: "true" });
 
   // Case and padding are normalized before the check, and the canonical form is what is emitted,
   // so the backend never receives a value it would have to normalize itself.
   assert.deepEqual(
-    resolveAiGateway({ gateway: "g", accountId: "a", apiToken: "t", useBinding: " FALSE " }),
-    {
-      CF_AI_GATEWAY: "g",
-      CF_AI_GATEWAY_ACCOUNT_ID: "a",
-      CF_AI_GATEWAY_API_TOKEN: "t",
-      CF_AI_GATEWAY_USE_BINDING: "false",
-    },
-  );
+      resolveAiGateway({ gateway: "g", accountId: "a", apiToken: "t", useBinding: " FALSE " }),
+      { CF_AI_GATEWAY: "g", CF_AI_GATEWAY_ACCOUNT_ID: "a", CF_AI_GATEWAY_API_TOKEN: "t",
+        CF_AI_GATEWAY_USE_BINDING: "false" });
   // A normalized " FALSE " is still the opt-out, so it needs the token like any other.
   assert.throws(
-    () => resolveAiGateway({ gateway: "g", accountId: "a", useBinding: " FALSE " }),
-    /CF_AI_GATEWAY_API_TOKEN must be set when CF_AI_GATEWAY_USE_BINDING is false/,
-  );
+      () => resolveAiGateway({ gateway: "g", accountId: "a", useBinding: " FALSE " }),
+      /CF_AI_GATEWAY_API_TOKEN must be set when CF_AI_GATEWAY_USE_BINDING is false/);
 
   // The backend compares against the two strings and reads anything else as unset, so a value it
   // would silently ignore fails here instead
-  assert.throws(
-    () => resolveAiGateway({ gateway: "g", accountId: "a", useBinding: "yes please" }),
-    /CF_AI_GATEWAY_USE_BINDING must be "true" or "false", not "yes please"/,
-  );
+  assert.throws(() => resolveAiGateway({ gateway: "g", accountId: "a", useBinding: "yes please" }),
+      /CF_AI_GATEWAY_USE_BINDING must be "true" or "false", not "yes please"/);
 });
 
 test("no generated config declares a secret's variable", () => {
@@ -393,10 +349,8 @@ test("no generated config declares a secret's variable", () => {
     const secretNames = [...Object.keys(SECRETS), ...Object.keys(oauthFor("gatekeeper-github"))];
     for (const [half, vars] of halves) {
       for (const key of secretNames) {
-        assert.ok(
-          !Object.hasOwn(vars ?? {}, key),
-          `${name} ${half} vars declare ${key}; upload it as a secret from preview.ts instead`,
-        );
+        assert.ok(!Object.hasOwn(vars ?? {}, key),
+            `${name} ${half} vars declare ${key}; upload it as a secret from preview.ts instead`);
       }
     }
   }
@@ -418,38 +372,29 @@ test("no generated config carries a secret's value anywhere", () => {
     ["an admin's email", ADMIN],
     // A gatekeeper's OAuth app travels the same way, and a client secret in a public log is an app
     // anyone can impersonate until it is rotated.
-    ...Object.entries(oauthFor("gatekeeper-github")).map(([key, value]) => [
-      `gatekeeper-github's ${key}`,
-      value,
-    ]),
+    ...Object.entries(oauthFor("gatekeeper-github"))
+        .map(([key, value]) => [`gatekeeper-github's ${key}`, value]),
   ];
   for (const [name, config] of buildAll().configs) {
     const serialized = JSON.stringify(config);
     for (const [key, value] of sensitive) {
-      assert.ok(
-        !serialized.includes(value),
-        `${name}'s config carries ${key}; upload it as a secret from preview.ts instead`,
-      );
+      assert.ok(!serialized.includes(value),
+          `${name}'s config carries ${key}; upload it as a secret from preview.ts instead`);
     }
   }
 });
 
 test("every gatekeeper is bound to the backend by RPC and to the router by HTTP", () => {
   const { packages, configs } = buildAll();
-  const gatekeepers = packages
-    .map((pkg) => pkg.name)
-    .filter(isGatekeeperPackage)
-    .toSorted();
+  const gatekeepers = packages.map((pkg) => pkg.name).filter(isGatekeeperPackage).toSorted();
   assert.ok(gatekeepers.length >= 16, `only found ${gatekeepers.length} gatekeepers`);
 
   // A service binding names a worker, which is the package name; the binding name — what the
   // router and the backend actually scan for — is the uppercased form.
   const backend = previewsOf(configs, "workshop-backend").services;
   assert.ok(backend, "the backend preview declares no service bindings");
-  assert.deepEqual(
-    backend.map((service) => service.service),
-    gatekeepers,
-  );
+  assert.deepEqual(backend.map((service) => service.service),
+      gatekeepers);
   for (const [index, service] of backend.entries()) {
     assert.equal(service.binding, gatekeeperBindingName(gatekeepers[index]));
     assert.equal(service.entrypoint, "GatekeeperVendor", service.service);
@@ -457,11 +402,9 @@ test("every gatekeeper is bound to the backend by RPC and to the router by HTTP"
 
   const router = previewsOf(configs, "router").services;
   assert.ok(router, "the router preview declares no service bindings");
-  assert.deepEqual(
-    router.map((service) => service.service),
-    ["workshop-backend", ...gatekeepers],
-    "the router fronts the backend and every gatekeeper",
-  );
+  assert.deepEqual(router.map((service) => service.service),
+      ["workshop-backend", ...gatekeepers],
+      "the router fronts the backend and every gatekeeper");
   for (const [index, service] of router.slice(1).entries()) {
     assert.equal(service.binding, gatekeeperBindingName(gatekeepers[index]));
     // The router forwards whole HTTP requests, so it binds the default entrypoint.
@@ -473,10 +416,8 @@ test("every gatekeeper is mounted under the router's origin", () => {
   const { packages, configs } = buildAll();
 
   for (const { name } of packages.filter((pkg) => isGatekeeperPackage(pkg.name))) {
-    assert.equal(
-      previewsOf(configs, name).vars?.BASE_URL,
-      `${BASE_URL}/gatekeeper/${gatekeeperShortName(name)}`,
-    );
+    assert.equal(previewsOf(configs, name).vars?.BASE_URL,
+        `${BASE_URL}/gatekeeper/${gatekeeperShortName(name)}`);
   }
   // The router discovers gatekeepers by lowercasing its GATEKEEPER_* bindings, so the path each
   // gatekeeper is told to serve has to be the one the router will route to it.
@@ -486,9 +427,8 @@ test("every gatekeeper is mounted under the router's origin", () => {
 
 test("each preview's context collections are namespaced to that preview", () => {
   const { configs } = buildAll();
-  const context = previewsOf(configs, "workshop-backend").services?.find(
-    (service) => service.service === "gatekeeper-context",
-  );
+  const context = previewsOf(configs, "workshop-backend").services
+      ?.find((service) => service.service === "gatekeeper-context");
   assert.ok(context, "the backend has no gatekeeper-context binding");
 
   // Previews share one baseline gatekeeper-context worker; the sharingDomain is the only thing
@@ -497,64 +437,45 @@ test("each preview's context collections are namespaced to that preview", () => 
 });
 
 test("a worker whose name diverges from its package directory is rejected", () => {
-  assert.throws(
-    () =>
-      buildPreviewConfigs({
-        previewName: PREVIEW_NAME,
-        accountId: ACCOUNT_ID,
-        workersDevHost: WORKERS_DEV_HOST,
-        packages: [{ name: "gatekeeper-github", config: { name: "github" } }],
-      }),
-    /requires them to match/,
-  );
+  assert.throws(() => buildPreviewConfigs({
+    previewName: PREVIEW_NAME,
+    accountId: ACCOUNT_ID,
+    workersDevHost: WORKERS_DEV_HOST,
+    packages: [{ name: "gatekeeper-github", config: { name: "github" } }],
+  }), /requires them to match/);
 });
 
 test("an unrecognized deployable package is rejected rather than half-configured", () => {
-  assert.throws(
-    () =>
-      buildPreviewConfigs({
-        previewName: PREVIEW_NAME,
-        accountId: ACCOUNT_ID,
-        workersDevHost: WORKERS_DEV_HOST,
-        packages: [{ name: "workshop-frontend", config: { name: "workshop-frontend" } }],
-      }),
-    /cannot build a preview config/,
-  );
+  assert.throws(() => buildPreviewConfigs({
+    previewName: PREVIEW_NAME,
+    accountId: ACCOUNT_ID,
+    workersDevHost: WORKERS_DEV_HOST,
+    packages: [{ name: "workshop-frontend", config: { name: "workshop-frontend" } }],
+  }), /cannot build a preview config/);
 });
 
 test("the target account has no default, in either direction", () => {
   // Defaulting would mean a missing variable deploys somewhere plausible-but-wrong rather than
   // failing, and the two have to move together: BASE_URL comes from the host, the workers from
   // the account.
-  assert.deepEqual(resolveTarget({ accountId: "abc", workersDevHost: "x.workers.dev" }), {
-    accountId: "abc",
-    workersDevHost: "x.workers.dev",
-  });
-  assert.throws(
-    () => resolveTarget({ accountId: "", workersDevHost: "" }),
-    /CLOUDFLARE_ACCOUNT_ID and PREVIEW_WORKERS_DEV_HOST/,
-  );
-  assert.throws(
-    () => resolveTarget({ accountId: "abc", workersDevHost: "" }),
-    /PREVIEW_WORKERS_DEV_HOST must be set/,
-  );
-  assert.throws(
-    () => resolveTarget({ accountId: "", workersDevHost: "x.workers.dev" }),
-    /CLOUDFLARE_ACCOUNT_ID must be set/,
-  );
+  assert.deepEqual(
+      resolveTarget({ accountId: "abc", workersDevHost: "x.workers.dev" }),
+      { accountId: "abc", workersDevHost: "x.workers.dev" });
+  assert.throws(() => resolveTarget({ accountId: "", workersDevHost: "" }),
+      /CLOUDFLARE_ACCOUNT_ID and PREVIEW_WORKERS_DEV_HOST/);
+  assert.throws(() => resolveTarget({ accountId: "abc", workersDevHost: "" }),
+      /PREVIEW_WORKERS_DEV_HOST must be set/);
+  assert.throws(() => resolveTarget({ accountId: "", workersDevHost: "x.workers.dev" }),
+      /CLOUDFLARE_ACCOUNT_ID must be set/);
 
-  assert.throws(
-    () =>
-      buildPreviewConfigs({
-        previewName: PREVIEW_NAME,
-        accountId: ACCOUNT_ID,
-        // The signature requires it; the runtime guard is what this asserts, for the caller who
-        // resolved only half its target.
-        workersDevHost: undefined as unknown as string,
-        packages: [],
-      }),
-    /needs both accountId and workersDevHost/,
-  );
+  assert.throws(() => buildPreviewConfigs({
+    previewName: PREVIEW_NAME,
+    accountId: ACCOUNT_ID,
+    // The signature requires it; the runtime guard is what this asserts, for the caller who
+    // resolved only half its target.
+    workersDevHost: undefined as unknown as string,
+    packages: [],
+  }), /needs both accountId and workersDevHost/);
 });
 
 test("the Access application has no default, in either direction", () => {
@@ -563,7 +484,8 @@ test("the Access application has no default, in either direction", () => {
   // pair moves together, since an audience without an issuer cannot be verified and an issuer
   // without an audience verifies nothing in particular.
   assert.deepEqual(resolveAccess(ACCESS), ACCESS);
-  assert.throws(() => resolveAccess({ aud: "", iss: "" }), /CF_ACCESS_AUD and CF_ACCESS_ISS/);
+  assert.throws(() => resolveAccess({ aud: "", iss: "" }),
+      /CF_ACCESS_AUD and CF_ACCESS_ISS/);
   assert.throws(() => resolveAccess({ aud: ACCESS.aud, iss: "" }), /CF_ACCESS_ISS must be set/);
   assert.throws(() => resolveAccess({ aud: "", iss: ACCESS.iss }), /CF_ACCESS_AUD must be set/);
 });
@@ -581,10 +503,8 @@ test("a gatekeeper's OAuth app is optional, but never half of one", () => {
     { githubClientId: GITHUB_OAUTH.githubClientId, githubClientSecret: "" },
     { githubClientId: "", githubClientSecret: GITHUB_OAUTH.githubClientSecret },
   ]) {
-    assert.throws(
-      () => resolveGatekeeperSecrets(half),
-      /PREVIEW_GITHUB_CLIENT_ID and PREVIEW_GITHUB_CLIENT_SECRET must be set together/,
-    );
+    assert.throws(() => resolveGatekeeperSecrets(half),
+        /PREVIEW_GITHUB_CLIENT_ID and PREVIEW_GITHUB_CLIENT_SECRET must be set together/);
   }
 });
 
@@ -593,14 +513,10 @@ test("every gatekeeper handed an OAuth app is a package that exists, and reads t
   // so a renamed or deleted package makes the upload silently stop happening rather than fail.
   const names = new Set(readDeployablePackages(PACKAGES_DIR).map((pkg) => pkg.name));
   for (const [pkgName, secrets] of GATEKEEPER_SECRETS) {
-    assert.ok(
-      names.has(pkgName),
-      `resolveGatekeeperSecrets names ${pkgName}, which is not a deployable package`,
-    );
-    assert.ok(
-      isGatekeeperPackage(pkgName),
-      `resolveGatekeeperSecrets names ${pkgName}, which is not a gatekeeper`,
-    );
+    assert.ok(names.has(pkgName),
+        `resolveGatekeeperSecrets names ${pkgName}, which is not a deployable package`);
+    assert.ok(isGatekeeperPackage(pkgName),
+        `resolveGatekeeperSecrets names ${pkgName}, which is not a gatekeeper`);
     // The variable names the worker reads (`env.CLIENT_ID` / `env.CLIENT_SECRET`), which is also
     // what the deploy wizard's DEFAULT_CRED_INPUTS asks a real instance for.
     assert.deepEqual(Object.keys(secrets).toSorted(), ["CLIENT_ID", "CLIENT_SECRET"]);

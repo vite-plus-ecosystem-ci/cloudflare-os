@@ -1,7 +1,8 @@
 import type { SlashCommandChoice } from "@gadgets/workshop-shared/api";
 import type { ComposerRange } from "../../../../components/chat/composer-tokens";
 
-const normalizeSearchText = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
+const normalizeSearchText = (value: string) =>
+  value.trim().replace(/\s+/g, " ").toLowerCase();
 
 export type ParsedSlashCommandInput = {
   /** Text between `/` and the first whitespace, lowercased for matching. */
@@ -21,9 +22,7 @@ export type ParsedSlashCommandInput = {
  * skipped back over, so typing `/command ` still resolves the command.
  */
 export function parseSlashCommandInput(
-  input: string,
-  cursorPosition: number,
-): ParsedSlashCommandInput | null {
+    input: string, cursorPosition: number): ParsedSlashCommandInput | null {
   let probe = Math.max(0, Math.min(cursorPosition, input.length));
   while (probe > 0 && /\s/.test(input[probe - 1])) probe--;
 
@@ -52,10 +51,8 @@ export function slashCommandTokenKey(input: string, cursorPosition: number): str
 }
 
 /** Removes the command token from the text sent as the command's arguments. */
-export function stripSlashCommandToken(
-  input: string,
-  token: ComposerRange,
-): { args: string; commandPosition: number } {
+export function stripSlashCommandToken(input: string, token: ComposerRange)
+    : { args: string; commandPosition: number } {
   let before = input.slice(0, token.start);
   let after = input.slice(token.start + token.length);
   if (/\s$/.test(before) && /^\s/.test(after)) after = after.slice(1);
@@ -70,24 +67,17 @@ export function stripSlashCommandToken(
 
 /** Entries whose name exactly equals the parsed token. */
 export function exactSlashCommandMatches(
-  commands: SlashCommandChoice[],
-  parsed: ParsedSlashCommandInput,
-): SlashCommandChoice[] {
-  return commands.filter((command) => command.name.toLowerCase() === parsed.query);
+    commands: SlashCommandChoice[], parsed: ParsedSlashCommandInput): SlashCommandChoice[] {
+  return commands.filter(command => command.name.toLowerCase() === parsed.query);
 }
 
 /** Filters a loaded catalog for display in the picker. */
 export function filterSlashCommandCatalog(
-  catalog: SlashCommandChoice[],
-  query: string,
-): SlashCommandChoice[] {
+    catalog: SlashCommandChoice[], query: string): SlashCommandChoice[] {
   query = normalizeSearchText(query);
-  return catalog.filter(
-    (choice) =>
-      !query ||
-      normalizeSearchText(choice.name).includes(query) ||
-      normalizeSearchText(choice.description).includes(query) ||
-      normalizeSearchText(choice.providerLabel).includes(query) ||
-      (choice.resourceLabel && normalizeSearchText(choice.resourceLabel).includes(query)),
-  );
+  return catalog.filter(choice => !query ||
+    normalizeSearchText(choice.name).includes(query) ||
+    normalizeSearchText(choice.description).includes(query) ||
+    normalizeSearchText(choice.providerLabel).includes(query) ||
+    choice.resourceLabel && normalizeSearchText(choice.resourceLabel).includes(query));
 }

@@ -72,7 +72,7 @@ through logs and errors, then everything else.
 
 These break silently rather than loudly, so they are worth flagging even when the diff looks fine:
 
-- A cached `vp` task sees only a built-in environment. A build that reads an env var must _be_ a
+- A cached `vp` task sees only a built-in environment. A build that reads an env var must *be* a
   task declaring `env`, since `env`/`untrackedEnv` do not exist on a package.json script — and a
   sibling script duplicating a task's command gains nothing from that task's declaration.
 - `env` fingerprints the variable's value, not what it points at. A var naming a path outside the

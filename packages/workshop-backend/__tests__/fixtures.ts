@@ -37,18 +37,11 @@ export const FIXTURE_EPOCH = 1700000000000;
 
 /** Puts a record and keeps nextActionId ahead of it, as the real allocator does. */
 export function putAction(
-  storage: { actions: Collection<ActionRecord, number>; nextActionId: Singleton<number> },
-  id: number,
-  opts: {
-    state?: ActionRecord["state"];
-    type?: ActionRecord["type"];
-    gatekeeperId?: number;
-    actionTag?: string;
-    autoApprovable?: boolean;
-    createdAt?: Date;
-    appliedAt?: Date;
-  } = {},
-) {
+    storage: { actions: Collection<ActionRecord, number>, nextActionId: Singleton<number> },
+    id: number,
+    opts: { state?: ActionRecord["state"], type?: ActionRecord["type"], gatekeeperId?: number,
+            actionTag?: string, autoApprovable?: boolean, createdAt?: Date,
+            appliedAt?: Date } = {}) {
   let base = {
     id,
     gatekeeperId: opts.gatekeeperId ?? 1,
@@ -61,22 +54,14 @@ export function putAction(
   let description = { title: `Action ${id}`, description: `Action ${id} description` };
   let type = opts.type ?? "action";
   storage.actions.put(
-    type === "action"
-      ? {
-          ...base,
-          type,
-          action: id,
-          description: {
-            ...description,
-            implementsRevert: true,
-            actionKind: { tag: opts.actionTag ?? "edit", label: "Edits" },
-            autoApprovable: opts.autoApprovable ?? true,
-          },
-        }
-      : type === "observation"
-        ? { ...base, type, description }
-        : { ...base, type, description, enabled: true },
-  );
+      type === "action" ? { ...base, type, action: id, description: {
+        ...description,
+        implementsRevert: true,
+        actionKind: { tag: opts.actionTag ?? "edit", label: "Edits" },
+        autoApprovable: opts.autoApprovable ?? true,
+      } }
+    : type === "observation" ? { ...base, type, description }
+    : { ...base, type, description, enabled: true });
   if (id >= storage.nextActionId.get()) storage.nextActionId.put(id + 1);
 }
 
@@ -87,9 +72,8 @@ export function putAction(
  * delegate one method to a real OverseerImpl under test).
  */
 export async function openFakeOverseer(
-  storage: object,
-  opts: { role?: "build" | "use"; exports?: object; impl?: object } = {},
-): Promise<Overseer> {
+    storage: object,
+    opts: { role?: "build" | "use", exports?: object, impl?: object } = {}): Promise<Overseer> {
   let role = opts.role ?? "build";
   let ownerId = "owner-id";
   let userId = role === "build" ? ownerId : "viewer-id";

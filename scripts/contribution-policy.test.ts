@@ -73,14 +73,19 @@ describe("getContributionPolicyViolations", () => {
       assert.equal(pullRequestTemplate.split(marker).length - 1, 1);
     }
     assert.deepEqual(
-      getContributionPolicyViolations(makePullRequest({ body: pullRequestTemplate })),
+      getContributionPolicyViolations(
+        makePullRequest({ body: pullRequestTemplate }),
+      ),
       [
         'The "small, concrete change" confirmation is not checked.',
         'The "maintainer assessment" confirmation is not checked.',
         'The "contribution guidelines" confirmation is not checked.',
       ],
     );
-    assert.deepEqual(getContributionPolicyViolations(makePullRequest({ body: compliantBody })), []);
+    assert.deepEqual(
+      getContributionPolicyViolations(makePullRequest({ body: compliantBody })),
+      [],
+    );
   });
 
   it("does not accept a confirmation marker on another line", () => {
@@ -107,7 +112,9 @@ describe("getContributionPolicyViolations", () => {
       makePullRequest({ additions: 20, deletions: 11 }),
     );
 
-    assert.deepEqual(violations, ["The patch changes 31 lines; the automatic limit is 30."]);
+    assert.deepEqual(violations, [
+      "The patch changes 31 lines; the automatic limit is 30.",
+    ]);
   });
 
   for (const authorAssociation of ["OWNER", "MEMBER", "COLLABORATOR"]) {
@@ -129,7 +136,9 @@ describe("getContributionPolicyViolations", () => {
       makePullRequest({ additions: 31, deletions: 0, draft: true }),
     );
 
-    assert.deepEqual(violations, ["The patch changes 31 lines; the automatic limit is 30."]);
+    assert.deepEqual(violations, [
+      "The patch changes 31 lines; the automatic limit is 30.",
+    ]);
   });
 
   const exempt: [string, Partial<FixturePullRequest>][] = [
@@ -184,51 +193,47 @@ describe("enforceContributionPolicy", () => {
 
     await enforceContributionPolicy({ github, context, core });
 
-    assert.deepEqual(
-      calls.map(({ operation }) => operation),
-      ["createComment", "closePullRequest"],
-    );
+    assert.deepEqual(calls.map(({ operation }) => operation), [
+      "createComment",
+      "closePullRequest",
+    ]);
     assert.ok(calls[0].body, "the comment carried no body");
     assert.match(calls[0].body, /patch changes 36 lines/);
   });
 
   it("updates its existing comment before closing again", async () => {
     const calls: RecordedCall[] = [];
-    const comments = [
-      {
-        body: "<!-- contribution-policy-automation -->\nOld explanation",
-        id: 456,
-        user: { login: "github-actions[bot]" },
-      },
-    ];
+    const comments = [{
+      body: "<!-- contribution-policy-automation -->\nOld explanation",
+      id: 456,
+      user: { login: "github-actions[bot]" },
+    }];
     const github = makeGitHub(makePullRequest({ body: "" }), comments, calls);
 
     await enforceContributionPolicy({ github, context, core });
 
-    assert.deepEqual(
-      calls.map(({ operation }) => operation),
-      ["updateComment", "closePullRequest"],
-    );
+    assert.deepEqual(calls.map(({ operation }) => operation), [
+      "updateComment",
+      "closePullRequest",
+    ]);
     assert.equal(calls[0].comment_id, 456);
   });
 
   it("does not trust another author's automation marker", async () => {
     const calls: RecordedCall[] = [];
-    const comments = [
-      {
-        body: "<!-- contribution-policy-automation -->\nSpoofed explanation",
-        id: 789,
-        user: { login: "external-contributor" },
-      },
-    ];
+    const comments = [{
+      body: "<!-- contribution-policy-automation -->\nSpoofed explanation",
+      id: 789,
+      user: { login: "external-contributor" },
+    }];
     const github = makeGitHub(makePullRequest({ body: "" }), comments, calls);
 
     await enforceContributionPolicy({ github, context, core });
 
-    assert.deepEqual(
-      calls.map(({ operation }) => operation),
-      ["createComment", "closePullRequest"],
-    );
+    assert.deepEqual(calls.map(({ operation }) => operation), [
+      "createComment",
+      "closePullRequest",
+    ]);
   });
 
   it("does nothing when the automatic checks pass", async () => {
@@ -264,15 +269,19 @@ describe("enforceContributionPolicy", () => {
 
     await enforceContributionPolicy({ github, context, core });
 
-    assert.deepEqual(
-      calls.map(({ operation }) => operation),
-      ["createComment", "closePullRequest"],
-    );
+    assert.deepEqual(calls.map(({ operation }) => operation), [
+      "createComment",
+      "closePullRequest",
+    ]);
   });
 
   it("does not close a pull request corrected during evaluation", async () => {
     const calls: RecordedCall[] = [];
-    const github = makeGitHub([makePullRequest({ body: "" }), makePullRequest()], [], calls);
+    const github = makeGitHub(
+      [makePullRequest({ body: "" }), makePullRequest()],
+      [],
+      calls,
+    );
 
     await enforceContributionPolicy({ github, context, core });
 
@@ -282,7 +291,10 @@ describe("enforceContributionPolicy", () => {
   it("does not comment on a pull request closed during evaluation", async () => {
     const calls: RecordedCall[] = [];
     const github = makeGitHub(
-      [makePullRequest({ body: "" }), makePullRequest({ body: "", state: "closed" })],
+      [
+        makePullRequest({ body: "" }),
+        makePullRequest({ body: "", state: "closed" }),
+      ],
       [],
       calls,
     );

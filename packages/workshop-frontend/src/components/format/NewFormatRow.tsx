@@ -1,13 +1,13 @@
 // "Start with a format": one click per standard output the deployment offers. Renders nothing when
 // it promotes none, which is the default.
 
-import { FormatGlyph } from "./FormatVisuals";
-import { useOutputFormats } from "./useOutputFormats";
+import { FormatGlyph } from './FormatVisuals'
+import { useOutputFormats } from './useOutputFormats'
 
-export default function NewFormatRow({ label = "Start with" }: { label?: string }) {
-  const { formats, creating, create } = useOutputFormats();
+export default function NewFormatRow({ label = 'Start with' }: { label?: string }) {
+  const { formats, creating, create } = useOutputFormats()
 
-  if (formats.length === 0) return null;
+  if (formats.length === 0) return null
 
   return (
     <div className="flex flex-col items-center gap-2.5">
@@ -27,12 +27,12 @@ export default function NewFormatRow({ label = "Start with" }: { label?: string 
             <FormatGlyph
               output={format.output}
               size="md"
-              className={creating === format.blueprintId ? "animate-pulse" : "text-kumo-subtle"}
+              className={creating === format.blueprintId ? 'animate-pulse' : 'text-kumo-subtle'}
             />
             {creating === format.blueprintId ? `Creating…` : `New ${format.output.noun}`}
           </button>
         ))}
       </div>
     </div>
-  );
+  )
 }

@@ -26,7 +26,6 @@ vendor this one as a submodule:
   overseer's `configure()` calls and answers from a scripted queue.
 
 ## Writing a test here
-
 - **No test may assume a clean slate.** Everything in a file shares one harness, `it.concurrent` runs
   the cases together, and storage is never reset. Take fresh identities from `nextUsernames()` and use
   per-test resource URLs; account labels are allocated for you, so two tests can't pick the same one.
@@ -37,11 +36,11 @@ vendor this one as a submodule:
 
 `fixtures/gatekeeper-test/` is a real Worker speaking the real gatekeeper protocol, whose verification
 outcome the tests set over an HTTP control route. It exists because the overseer cases need a
-gatekeeper that will refuse an observer _on command_, and every shipping one can do that only at a
+gatekeeper that will refuse an observer *on command*, and every shipping one can do that only at a
 cost that would dominate the test:
 
 - The OAuth ones need a whole vendor auth surface mocked before an account exists at all.
-- The Context Library only refuses after an observation has been _recorded_, which takes a gadget read
+- The Context Library only refuses after an observation has been *recorded*, which takes a gadget read
   session, a slash command, or an AI-chat catalog snapshot — and it is a singleton, so it cannot
   produce two simultaneously failing bindings.
 

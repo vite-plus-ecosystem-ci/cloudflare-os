@@ -58,17 +58,27 @@ export type ComposerResourceRefinement = {
 const shiftRangeAfter = <T extends ComposerRange>(range: T, position: number, delta: number): T =>
   range.start >= position ? { ...range, start: range.start + delta } : range;
 
-const overlapsDocumentToken = (document: ComposerDocument, start: number, end: number) =>
-  [...document.capsules, ...document.formats, ...(document.command ? [document.command] : [])].some(
-    (range) => start < range.start + range.length && end > range.start,
-  );
+const overlapsDocumentToken = (
+  document: ComposerDocument,
+  start: number,
+  end: number,
+) => [
+  ...document.capsules,
+  ...document.formats,
+  ...(document.command ? [document.command] : []),
+].some((range) => start < range.start + range.length && end > range.start);
 
-const isInsideDocumentToken = (document: ComposerDocument, position: number) =>
-  [...document.capsules, ...document.formats, ...(document.command ? [document.command] : [])].some(
-    (range) => position > range.start && position < range.start + range.length,
-  );
+const isInsideDocumentToken = (document: ComposerDocument, position: number) => [
+  ...document.capsules,
+  ...document.formats,
+  ...(document.command ? [document.command] : []),
+].some((range) => position > range.start && position < range.start + range.length);
 
-const shiftDocumentRanges = (document: ComposerDocument, position: number, delta: number) => ({
+const shiftDocumentRanges = (
+  document: ComposerDocument,
+  position: number,
+  delta: number,
+) => ({
   capsules: document.capsules.map((capsule) => shiftRangeAfter(capsule, position, delta)),
   formats: document.formats.map((format) => shiftRangeAfter(format, position, delta)),
   command: document.command ? shiftRangeAfter(document.command, position, delta) : null,
@@ -80,12 +90,8 @@ export const insertComposerCapsule = (
   capsule: Omit<ComposerCapsule, "start" | "length">,
   capsuleText: string,
 ): ComposerDocumentCaretTransition | null => {
-  if (
-    !Number.isInteger(position) ||
-    position < 0 ||
-    position > document.text.length ||
-    isInsideDocumentToken(document, position)
-  ) {
+  if (!Number.isInteger(position) || position < 0 || position > document.text.length ||
+      isInsideDocumentToken(document, position)) {
     return null;
   }
   const splice = spliceComposerToken(document.text, position, position, capsuleText);
@@ -94,7 +100,10 @@ export const insertComposerCapsule = (
     document: {
       text: splice.value,
       ...shifted,
-      capsules: [...shifted.capsules, { ...capsule, start: splice.start, length: splice.length }],
+      capsules: [
+        ...shifted.capsules,
+        { ...capsule, start: splice.start, length: splice.length },
+      ],
     },
     caret: splice.caret,
   };
@@ -106,12 +115,8 @@ export const insertComposerFormat = (
   format: Omit<ComposerFormatToken, "start" | "length">,
   formatText: string,
 ): ComposerDocumentCaretTransition | null => {
-  if (
-    !Number.isInteger(position) ||
-    position < 0 ||
-    position > document.text.length ||
-    isInsideDocumentToken(document, position)
-  ) {
+  if (!Number.isInteger(position) || position < 0 || position > document.text.length ||
+      isInsideDocumentToken(document, position)) {
     return null;
   }
   const splice = spliceComposerToken(document.text, position, position, formatText);
@@ -120,7 +125,10 @@ export const insertComposerFormat = (
     document: {
       text: splice.value,
       ...shifted,
-      formats: [...shifted.formats, { ...format, start: splice.start, length: splice.length }],
+      formats: [
+        ...shifted.formats,
+        { ...format, start: splice.start, length: splice.length },
+      ],
     },
     caret: splice.caret,
   };
@@ -132,13 +140,9 @@ export const replaceComposerUrlWithCapsule = (
   capsule: Omit<ComposerCapsule, "start" | "length">,
   capsuleText: string,
 ): ComposerDocumentCaretTransition | null => {
-  if (
-    url.start < 0 ||
-    url.end < url.start ||
-    url.end > document.text.length ||
-    document.text.slice(url.start, url.end) !== url.text ||
-    overlapsDocumentToken(document, url.start, url.end)
-  ) {
+  if (url.start < 0 || url.end < url.start || url.end > document.text.length ||
+      document.text.slice(url.start, url.end) !== url.text ||
+      overlapsDocumentToken(document, url.start, url.end)) {
     return null;
   }
   const splice = spliceComposerToken(document.text, url.start, url.end, capsuleText);
@@ -147,7 +151,10 @@ export const replaceComposerUrlWithCapsule = (
     document: {
       text: splice.value,
       ...shifted,
-      capsules: [...shifted.capsules, { ...capsule, start: splice.start, length: splice.length }],
+      capsules: [
+        ...shifted.capsules,
+        { ...capsule, start: splice.start, length: splice.length },
+      ],
     },
     caret: splice.caret,
   };
@@ -159,16 +166,11 @@ export const refineComposerResourceUrl = (
   newUrl: string,
   placeholder: ComposerSelection,
 ): ComposerResourceRefinement | null => {
-  if (
-    url.start < 0 ||
-    url.end < url.start ||
-    url.end > document.text.length ||
-    document.text.slice(url.start, url.end) !== url.text ||
-    overlapsDocumentToken(document, url.start, url.end) ||
-    placeholder.start < 0 ||
-    placeholder.end < placeholder.start ||
-    placeholder.end > newUrl.length
-  ) {
+  if (url.start < 0 || url.end < url.start || url.end > document.text.length ||
+      document.text.slice(url.start, url.end) !== url.text ||
+      overlapsDocumentToken(document, url.start, url.end) ||
+      placeholder.start < 0 || placeholder.end < placeholder.start ||
+      placeholder.end > newUrl.length) {
     return null;
   }
   const delta = newUrl.length - (url.end - url.start);
@@ -200,10 +202,9 @@ export const removeComposerDocumentToken = (
       formats: document.formats
         .filter((format) => format.start !== range.start)
         .map((format) => shiftRangeAfter(format, rangeEnd, removal.delta)),
-      command:
-        !document.command || document.command.start === range.start
-          ? null
-          : shiftRangeAfter(document.command, rangeEnd, removal.delta),
+      command: !document.command || document.command.start === range.start
+        ? null
+        : shiftRangeAfter(document.command, rangeEnd, removal.delta),
     },
     caret: removal.caret,
   };
@@ -221,9 +222,9 @@ export const resolveComposerSlashCommand = (
     document: {
       text: splice.value,
       capsules: document.capsules.map((capsule) =>
-        shiftRangeAfter(capsule, tokenEnd, splice.delta),
-      ),
-      formats: document.formats.map((format) => shiftRangeAfter(format, tokenEnd, splice.delta)),
+        shiftRangeAfter(capsule, tokenEnd, splice.delta)),
+      formats: document.formats.map((format) =>
+        shiftRangeAfter(format, tokenEnd, splice.delta)),
       command: {
         choice,
         start: splice.start,
@@ -241,17 +242,15 @@ export const applyComposerTextEdit = (
 ): ComposerTextEditTransition => {
   const oldText = document.text;
   let editStart = 0;
-  while (
-    editStart < oldText.length &&
-    editStart < newText.length &&
-    oldText[editStart] === newText[editStart]
-  ) {
+  while (editStart < oldText.length && editStart < newText.length &&
+      oldText[editStart] === newText[editStart]) {
     editStart++;
   }
 
   let oldEnd = oldText.length;
   let newEnd = newText.length;
-  while (oldEnd > editStart && newEnd > editStart && oldText[oldEnd - 1] === newText[newEnd - 1]) {
+  while (oldEnd > editStart && newEnd > editStart &&
+      oldText[oldEnd - 1] === newText[newEnd - 1]) {
     oldEnd--;
     newEnd--;
   }
@@ -270,24 +269,17 @@ export const applyComposerTextEdit = (
   }
 
   const isPureInsertion = oldEnd === editStart;
-  if (
-    isPureInsertion &&
-    document.capsules.some(
-      (capsule) => editStart > capsule.start && editStart < capsule.start + capsule.length,
-    )
-  ) {
+  if (isPureInsertion && document.capsules.some((capsule) =>
+      editStart > capsule.start && editStart < capsule.start + capsule.length)) {
     return { document, caret: editStart, rejected: true };
   }
 
-  const commandEdited =
-    document.command !== null &&
+  const commandEdited = document.command !== null &&
     editStart < document.command.start + document.command.length &&
     oldEnd > document.command.start;
-  const editedFormatStarts = new Set(
-    document.formats
-      .filter((format) => editStart < format.start + format.length && oldEnd > format.start)
-      .map((format) => format.start),
-  );
+  const editedFormatStarts = new Set(document.formats
+    .filter((format) => editStart < format.start + format.length && oldEnd > format.start)
+    .map((format) => format.start));
   const brokenCapsules = document.capsules
     .filter((capsule) => editStart < capsule.start + capsule.length && oldEnd > capsule.start)
     .toSorted((a, b) => b.start - a.start);
@@ -308,8 +300,7 @@ export const applyComposerTextEdit = (
     }
     const removeLength = remainingEnd - remainingStart;
     if (removeLength > 0 && remainingStart < adjustedText.length) {
-      adjustedText =
-        adjustedText.slice(0, remainingStart) +
+      adjustedText = adjustedText.slice(0, remainingStart) +
         adjustedText.slice(Math.min(remainingEnd, adjustedText.length));
       extraShift -= removeLength;
     }

@@ -38,7 +38,9 @@ export class NetworkInterceptor {
   #realFetch: typeof globalThis.fetch | null = null;
   #unmockedCalls: string[] = [];
 
-  constructor({ handlers = [], allow, allowLoopback = true }: NetworkInterceptorOptions = {}) {
+  constructor({
+    handlers = [], allow, allowLoopback = true,
+  }: NetworkInterceptorOptions = {}) {
     this.#handlers = [...handlers];
     this.#allow = allow;
     this.#allowLoopback = allowLoopback;
@@ -46,22 +48,22 @@ export class NetworkInterceptor {
 
   install(): void {
     if (this.#realFetch) return;
-    const realFetch = (this.#realFetch = globalThis.fetch);
+    const realFetch = this.#realFetch = globalThis.fetch;
 
     type FetchInput = Parameters<typeof globalThis.fetch>[0];
     type FetchInit = Parameters<typeof globalThis.fetch>[1];
 
     globalThis.fetch = (async (input: FetchInput, init?: FetchInit) => {
-      const raw =
-        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const raw = typeof input === "string" ? input
+        : input instanceof URL ? input.toString()
+        : input.url;
       const url = new URL(raw);
 
       // Test clients use loopback by default. Security-sensitive callers can route it through
       // their handlers instead so model-authored requests cannot reach host services.
-      if (
-        this.#allowLoopback &&
-        (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]")
-      ) {
+      if (this.#allowLoopback &&
+          (url.hostname === "localhost" || url.hostname === "127.0.0.1" ||
+           url.hostname === "[::1]")) {
         return realFetch(input, init);
       }
 
@@ -102,8 +104,8 @@ export class NetworkInterceptor {
    * than resetting means a concurrently running sibling's escape is still caught.
    */
   takeUnmockedCalls(substring: string): string[] {
-    const taken = this.#unmockedCalls.filter((call) => call.includes(substring));
-    this.#unmockedCalls = this.#unmockedCalls.filter((call) => !call.includes(substring));
+    const taken = this.#unmockedCalls.filter(call => call.includes(substring));
+    this.#unmockedCalls = this.#unmockedCalls.filter(call => !call.includes(substring));
     return taken;
   }
 

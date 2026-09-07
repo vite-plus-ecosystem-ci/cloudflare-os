@@ -10,7 +10,11 @@
 // at the portal's separator and grants issued before portals existed still resolve identically.
 
 import type { ToolCatalog } from "./client.js";
-import { isPortalNativeTool, toolBelongsToServer, type PortalServer } from "./portal.js";
+import {
+  isPortalNativeTool,
+  toolBelongsToServer,
+  type PortalServer,
+} from "./portal.js";
 import { MAX_TOOLS_PER_SERVER } from "./tools.js";
 
 /** The breadth of one binding's grant over its endpoint. */
@@ -71,6 +75,7 @@ export function endpointTag(endpoint: string): string {
   return encodeURIComponent(endpointOfResourceUrl(endpoint));
 }
 
+
 /**
  * Reads the scope out of a resource URL's fragment. Unknown keys are ignored.
  *
@@ -95,8 +100,8 @@ export function parseToolScope(resourceUrl: string | URL): ToolScope {
     tools: params.has("tools")
       ? []
       : params.has("tool")
-        ? rawTools.map((name) => name.trim()).filter(Boolean)
-        : undefined,
+      ? rawTools.map(name => name.trim()).filter(Boolean)
+      : undefined,
   };
 }
 
@@ -132,8 +137,7 @@ export function scopeAllows(scope: ToolScope, toolName: string, isPortal: boolea
 export function requireCompleteCatalogForToolSelection(truncated: boolean): void {
   if (truncated) {
     throw new Error(
-      "This server's tool catalog is too large to select individual tools. Grant all tools instead.",
-    );
+      "This server's tool catalog is too large to select individual tools. Grant all tools instead.");
   }
 }
 
@@ -151,8 +155,8 @@ export function validateToolScopeAgainstCatalog(
   let server: PortalServer | undefined;
   const serverId = scope.serverId;
   if (serverId !== undefined) {
-    server = reportedServers.find((candidate) => candidate.id === serverId);
-    if (!server && catalog.tools.some((tool) => toolBelongsToServer(tool.name, serverId))) {
+    server = reportedServers.find(candidate => candidate.id === serverId);
+    if (!server && catalog.tools.some(tool => toolBelongsToServer(tool.name, serverId))) {
       server = { id: serverId, name: serverId, enabled: true };
     }
     if (!server) {
@@ -160,16 +164,14 @@ export function validateToolScopeAgainstCatalog(
     }
   }
 
-  const names = new Set(catalog.tools.map((tool) => tool.name));
+  const names = new Set(catalog.tools.map(tool => tool.name));
   for (const name of scope.tools ?? []) {
     if (serverId !== undefined && !toolBelongsToServer(name, serverId)) {
       throw new Error(`Tool "${name}" does not belong to portal server "${serverId}".`);
     }
     if (!names.has(name)) {
       if (catalog.truncated) {
-        throw new Error(
-          "The current tool catalog is truncated, so this grant cannot be validated.",
-        );
+        throw new Error("The current tool catalog is truncated, so this grant cannot be validated.");
       }
       throw new Error(`Tool "${name}" is absent from the current tool catalog.`);
     }

@@ -26,8 +26,7 @@ const MAX_SEARCHABLE_FIELD_CHARS = 4000;
 // names are overwhelmingly snake_case or camelCase, and a portal prefixes each with `{server_id}_`,
 // so leaving word boundaries in place would make the obvious query miss the obvious tool.
 function normalize(text: string): string {
-  return text
-    .slice(0, MAX_SEARCHABLE_FIELD_CHARS)
+  return text.slice(0, MAX_SEARCHABLE_FIELD_CHARS)
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .toLowerCase()
     .replace(/[_\-\s]+/g, " ");
@@ -48,5 +47,5 @@ export function matchesToolQuery(
     .filter((value): value is string => typeof value === "string")
     .map(normalize)
     .join(" ");
-  return terms.every((term) => text.includes(term));
+  return terms.every(term => text.includes(term));
 }

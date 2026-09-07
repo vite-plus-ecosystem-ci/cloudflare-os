@@ -24,18 +24,16 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return (
-      <Section>
-        <Field label="Issue" description="Search issues, or type an identifier like ENG-123.">
-          <Autocomplete
-            name="issueIdentifier"
-            value={values.issueIdentifier}
-            placeholder="Search issues..."
-            loadOptions={(query) => ui.listIssues(query)}
-            onChange={(issueIdentifier) => setValues({ issueIdentifier })}
-          />
-        </Field>
-      </Section>
-    );
+    return <Section>
+      <Field label="Issue" description="Search issues, or type an identifier like ENG-123.">
+        <Autocomplete
+          name="issueIdentifier"
+          value={values.issueIdentifier}
+          placeholder="Search issues..."
+          loadOptions={query => ui.listIssues(query)}
+          onChange={issueIdentifier => setValues({ issueIdentifier })}
+        />
+      </Field>
+    </Section>;
   },
 } satisfies ConfiguratorUISpec<LinearIssueConfiguratorRpc, LinearIssueConfiguratorValues>;

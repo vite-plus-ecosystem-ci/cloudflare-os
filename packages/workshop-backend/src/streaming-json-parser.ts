@@ -10,32 +10,26 @@
 //   parser.streamingValue // => "hello world"
 
 const JSON_SIMPLE_ESCAPES: Record<string, string | undefined> = {
-  '"': '"',
-  "\\": "\\",
-  "/": "/",
-  b: "\b",
-  f: "\f",
-  n: "\n",
-  r: "\r",
-  t: "\t",
+  '"': '"', '\\': '\\', '/': '/', 'b': '\b', 'f': '\f',
+  'n': '\n', 'r': '\r', 't': '\t',
 };
 
 function isJsonWhitespace(ch: string): boolean {
-  return ch === " " || ch === "\t" || ch === "\n" || ch === "\r";
+  return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r';
 }
 
 type ToolInputParserPhase =
-  | "initial" // before opening {
-  | "expectKey" // after { or , — expecting a key string
-  | "inKey" // inside a key string
-  | "expectColon" // after key string, expecting :
-  | "expectValue" // after :, expecting a value
-  | "inStringValue" // inside a non-streaming string value (skipping)
-  | "inOtherValue" // inside a non-string value (skipping with depth tracking)
-  | "afterValue" // after a complete value, expecting , or }
-  | "streaming" // decoding the streaming field's string value incrementally
-  | "done" // object closed or streaming field complete
-  | "error"; // parse error
+  | "initial"        // before opening {
+  | "expectKey"      // after { or , — expecting a key string
+  | "inKey"          // inside a key string
+  | "expectColon"    // after key string, expecting :
+  | "expectValue"    // after :, expecting a value
+  | "inStringValue"  // inside a non-streaming string value (skipping)
+  | "inOtherValue"   // inside a non-string value (skipping with depth tracking)
+  | "afterValue"     // after a complete value, expecting , or }
+  | "streaming"      // decoding the streaming field's string value incrementally
+  | "done"           // object closed or streaming field complete
+  | "error";         // parse error
 
 export class StreamingToolInputParser {
   #streamingFieldName: string;
@@ -97,28 +91,14 @@ export class StreamingToolInputParser {
 
       switch (this.#phase) {
         case "initial":
-          if (isJsonWhitespace(ch)) {
-            this.#pos++;
-            break;
-          }
-          if (ch === "{") {
-            this.#phase = "expectKey";
-            this.#pos++;
-            break;
-          }
+          if (isJsonWhitespace(ch)) { this.#pos++; break; }
+          if (ch === "{") { this.#phase = "expectKey"; this.#pos++; break; }
           this.#phase = "error";
           return;
 
         case "expectKey":
-          if (isJsonWhitespace(ch)) {
-            this.#pos++;
-            break;
-          }
-          if (ch === "}") {
-            this.#phase = "done";
-            this.#pos++;
-            return;
-          }
+          if (isJsonWhitespace(ch)) { this.#pos++; break; }
+          if (ch === "}") { this.#phase = "done"; this.#pos++; return; }
           if (ch === '"') {
             this.#keyStartPos = this.#pos;
             this.#currentKey = "";
@@ -130,25 +110,19 @@ export class StreamingToolInputParser {
           return;
 
         case "inKey":
-          if (ch === "\\") {
+          if (ch === '\\') {
             // Leave pos at '\' — retry when more data arrives if incomplete.
             if (this.#pos + 1 >= this.#buffer.length) return;
             let esc = this.#buffer[this.#pos + 1];
-            if (esc === "u") {
+            if (esc === 'u') {
               if (this.#pos + 6 > this.#buffer.length) return;
               let hex = this.#buffer.slice(this.#pos + 2, this.#pos + 6);
-              if (!/^[0-9a-fA-F]{4}$/.test(hex)) {
-                this.#phase = "error";
-                return;
-              }
+              if (!/^[0-9a-fA-F]{4}$/.test(hex)) { this.#phase = "error"; return; }
               this.#currentKey += String.fromCharCode(parseInt(hex, 16));
               this.#pos += 6;
             } else {
               let decoded = JSON_SIMPLE_ESCAPES[esc];
-              if (decoded === undefined) {
-                this.#phase = "error";
-                return;
-              }
+              if (decoded === undefined) { this.#phase = "error"; return; }
               this.#currentKey += decoded;
               this.#pos += 2;
             }
@@ -164,28 +138,15 @@ export class StreamingToolInputParser {
           break;
 
         case "expectColon":
-          if (isJsonWhitespace(ch)) {
-            this.#pos++;
-            break;
-          }
-          if (ch === ":") {
-            this.#phase = "expectValue";
-            this.#pos++;
-            break;
-          }
+          if (isJsonWhitespace(ch)) { this.#pos++; break; }
+          if (ch === ':') { this.#phase = "expectValue"; this.#pos++; break; }
           this.#phase = "error";
           return;
 
         case "expectValue":
-          if (isJsonWhitespace(ch)) {
-            this.#pos++;
-            break;
-          }
+          if (isJsonWhitespace(ch)) { this.#pos++; break; }
           if (this.#currentKey === this.#streamingFieldName) {
-            if (ch !== '"') {
-              this.#phase = "error";
-              return;
-            }
+            if (ch !== '"') { this.#phase = "error"; return; }
             this.#pos++; // skip opening "
             this.#phase = "streaming";
             this.#extractPrefix();
@@ -196,53 +157,37 @@ export class StreamingToolInputParser {
             this.#pos++; // skip opening "
             break;
           }
-          this.#valueDepth = ch === "{" || ch === "[" ? 1 : 0;
+          this.#valueDepth = (ch === '{' || ch === '[') ? 1 : 0;
           this.#valueInString = false;
           this.#phase = "inOtherValue";
           this.#pos++;
           break;
 
         case "inStringValue":
-          if (ch === "\\") {
+          if (ch === '\\') {
             // Leave pos at '\' if we don't have the next char yet.
             if (this.#pos + 1 >= this.#buffer.length) return;
             this.#pos += 2; // skip \ and escaped char
             break;
           }
-          if (ch === '"') {
-            this.#phase = "afterValue";
-            this.#pos++;
-            break;
-          }
+          if (ch === '"') { this.#phase = "afterValue"; this.#pos++; break; }
           this.#pos++;
           break;
 
         case "inOtherValue":
           if (this.#valueInString) {
-            if (ch === "\\") {
+            if (ch === '\\') {
               if (this.#pos + 1 >= this.#buffer.length) return;
               this.#pos += 2;
               break;
             }
-            if (ch === '"') {
-              this.#valueInString = false;
-              this.#pos++;
-              break;
-            }
+            if (ch === '"') { this.#valueInString = false; this.#pos++; break; }
             this.#pos++;
             break;
           }
-          if (ch === '"') {
-            this.#valueInString = true;
-            this.#pos++;
-            break;
-          }
-          if (ch === "{" || ch === "[") {
-            this.#valueDepth++;
-            this.#pos++;
-            break;
-          }
-          if (ch === "}" || ch === "]") {
+          if (ch === '"') { this.#valueInString = true; this.#pos++; break; }
+          if (ch === '{' || ch === '[') { this.#valueDepth++; this.#pos++; break; }
+          if (ch === '}' || ch === ']') {
             if (this.#valueDepth > 0) {
               this.#valueDepth--;
               this.#pos++;
@@ -253,7 +198,7 @@ export class StreamingToolInputParser {
             this.#phase = "afterValue";
             break;
           }
-          if (this.#valueDepth === 0 && (ch === "," || isJsonWhitespace(ch))) {
+          if (this.#valueDepth === 0 && (ch === ',' || isJsonWhitespace(ch))) {
             this.#phase = "afterValue";
             break;
           }
@@ -261,20 +206,9 @@ export class StreamingToolInputParser {
           break;
 
         case "afterValue":
-          if (isJsonWhitespace(ch)) {
-            this.#pos++;
-            break;
-          }
-          if (ch === ",") {
-            this.#phase = "expectKey";
-            this.#pos++;
-            break;
-          }
-          if (ch === "}") {
-            this.#phase = "done";
-            this.#pos++;
-            return;
-          }
+          if (isJsonWhitespace(ch)) { this.#pos++; break; }
+          if (ch === ',') { this.#phase = "expectKey"; this.#pos++; break; }
+          if (ch === '}') { this.#phase = "done"; this.#pos++; return; }
           this.#phase = "error";
           return;
 
@@ -292,8 +226,8 @@ export class StreamingToolInputParser {
   // Parse everything before the streaming field's key as JSON to extract prefix fields.
   #extractPrefix(): void {
     let prefix = this.#buffer.slice(0, this.#keyStartPos).trimEnd();
-    if (prefix.endsWith(",")) prefix = prefix.slice(0, -1);
-    prefix += "}";
+    if (prefix.endsWith(',')) prefix = prefix.slice(0, -1);
+    prefix += '}';
     try {
       this.#prefixFields = JSON.parse(prefix);
     } catch {
@@ -317,7 +251,7 @@ export class StreamingToolInputParser {
         this.#pos++;
         return;
       }
-      if (ch === "\\") {
+      if (ch === '\\') {
         // Flush any plain text accumulated before this escape.
         if (this.#pos > start) {
           this.#decodedValue += this.#buffer.slice(start, this.#pos);
@@ -328,13 +262,10 @@ export class StreamingToolInputParser {
         if (decoded !== undefined) {
           this.#decodedValue += decoded;
           this.#pos += 2;
-        } else if (esc === "u") {
+        } else if (esc === 'u') {
           if (this.#pos + 6 > this.#buffer.length) return;
           let hex = this.#buffer.slice(this.#pos + 2, this.#pos + 6);
-          if (!/^[0-9a-fA-F]{4}$/.test(hex)) {
-            this.#phase = "error";
-            return;
-          }
+          if (!/^[0-9a-fA-F]{4}$/.test(hex)) { this.#phase = "error"; return; }
           this.#decodedValue += String.fromCharCode(parseInt(hex, 16));
           this.#pos += 6;
         } else {

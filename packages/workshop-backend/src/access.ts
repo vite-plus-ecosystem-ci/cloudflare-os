@@ -19,20 +19,17 @@ async function verifyToken(token: string, env: CfAccessEnv): Promise<JWTPayload>
     jwks = createRemoteJWKSet(new URL(`${env.CF_ACCESS_ISS}/cdn-cgi/access/certs`));
     remoteJwkSets.set(env.CF_ACCESS_ISS, jwks);
   }
-  return (
-    await jwtVerify(token, jwks, {
-      issuer: env.CF_ACCESS_ISS,
-      audience: env.CF_ACCESS_AUD,
-    })
-  ).payload;
+  return (await jwtVerify(token, jwks, {
+    issuer: env.CF_ACCESS_ISS,
+    audience: env.CF_ACCESS_AUD,
+  })).payload;
 }
 
 /** Returns verified Cloudflare Access claims, or null when the assertion cannot be trusted. */
 export async function verifyCfAccessJwt(
-  request: Request,
-  env: CfAccessEnv,
-  verifier: AccessTokenVerifier = verifyToken,
-): Promise<JWTPayload | null> {
+    request: Request,
+    env: CfAccessEnv,
+    verifier: AccessTokenVerifier = verifyToken): Promise<JWTPayload | null> {
   const token = request.headers.get("cf-access-jwt-assertion");
   if (!token) return null;
   try {

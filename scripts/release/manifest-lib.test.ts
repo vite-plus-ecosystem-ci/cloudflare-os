@@ -13,10 +13,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { collectAssets, collectModules, stableStringify } from "./hash-lib.ts";
 import {
-  generateManifest,
-  readDeployablePackages,
-  readDeployInputs,
-  releaseShortName,
+  generateManifest, readDeployablePackages, readDeployInputs, releaseShortName,
 } from "./manifest-lib.ts";
 
 const RELEASE = dirname(fileURLToPath(import.meta.url));
@@ -26,16 +23,14 @@ const GOLDEN_PATH = join(TESTDATA, "golden-manifest.json");
 
 // Placeholder syntax the deploy-side renderer understands. Closed list — see manifest-lib.ts.
 const PLACEHOLDER_RE =
-  /^\$(ACCOUNT_ID|PUBLIC_BASE_URL|KV_[A-Z0-9_]+_ID|R2_[A-Z0-9_]+_NAME|WORKER_NAME\([a-z0-9-]+\)|SECRET\([A-Z0-9_]+\))/;
+    /^\$(ACCOUNT_ID|PUBLIC_BASE_URL|KV_[A-Z0-9_]+_ID|R2_[A-Z0-9_]+_NAME|WORKER_NAME\([a-z0-9-]+\)|SECRET\([A-Z0-9_]+\))/;
 
 function readTestWorkerBuilds() {
   return readDeployablePackages(join(ROOT, "packages")).map((pkg) => {
     const bundleDir = join(TESTDATA, "fixture-bundles", pkg.name);
-    assert.ok(
-      existsSync(bundleDir),
-      `missing fixture bundle for new deployable package: add scripts/release/testdata/` +
-        `fixture-bundles/${pkg.name}/ with a single .js module`,
-    );
+    assert.ok(existsSync(bundleDir),
+        `missing fixture bundle for new deployable package: add scripts/release/testdata/` +
+        `fixture-bundles/${pkg.name}/ with a single .js module`);
     const { mainModule, modules } = collectModules(bundleDir);
     return {
       pkgName: pkg.name,
@@ -68,13 +63,10 @@ test("manifest generated from real configs matches the golden file", () => {
     return;
   }
   assert.ok(existsSync(GOLDEN_PATH), "golden manifest missing; run with UPDATE_GOLDEN=1");
-  assert.deepEqual(
-    JSON.parse(rendered),
-    JSON.parse(readFileSync(GOLDEN_PATH, "utf8")),
-    "manifest changed. If the wrangler.jsonc change is intentional, verify the deploy " +
+  assert.deepEqual(JSON.parse(rendered), JSON.parse(readFileSync(GOLDEN_PATH, "utf8")),
+      "manifest changed. If the wrangler.jsonc change is intentional, verify the deploy " +
       "service handles it, then regenerate: UPDATE_GOLDEN=1 node --test " +
-      "scripts/release/manifest-lib.test.ts",
-  );
+      "scripts/release/manifest-lib.test.ts");
 });
 
 test("every $-token in binding templates and vars uses known placeholder syntax", () => {
@@ -108,22 +100,18 @@ test("worker entries carry the deploy contract", () => {
   // Backend: provisioned resources are placeholders; gatekeeper calls use GatekeeperVendor.
   const backend = workers["workshop-backend"];
   assert.deepEqual(
-    backend.bindings.find((b) => b.name === "BLUEPRINTS"),
-    { type: "kv_namespace", name: "BLUEPRINTS", namespace_id: "$KV_BLUEPRINTS_ID" },
-  );
+      backend.bindings.find((b) => b.name === "BLUEPRINTS"),
+      { type: "kv_namespace", name: "BLUEPRINTS", namespace_id: "$KV_BLUEPRINTS_ID" });
   assert.deepEqual(
-    backend.bindings.find((b) => b.name === "BLUEPRINT_CONTENT"),
-    { type: "r2_bucket", name: "BLUEPRINT_CONTENT", bucket_name: "$R2_BLUEPRINT_CONTENT_NAME" },
-  );
+      backend.bindings.find((b) => b.name === "BLUEPRINT_CONTENT"),
+      { type: "r2_bucket", name: "BLUEPRINT_CONTENT", bucket_name: "$R2_BLUEPRINT_CONTENT_NAME" });
   assert.deepEqual(
-    backend.bindings.find((b) => b.name === "LOADER"),
-    { type: "worker_loader", name: "LOADER" },
-  );
+      backend.bindings.find((b) => b.name === "LOADER"),
+      { type: "worker_loader", name: "LOADER" });
   // The Workers AI binding always ships (webFetch's toMarkdown conversion depends on it).
   assert.deepEqual(
-    backend.bindings.find((b) => b.name === "WORKERS_AI"),
-    { type: "ai", name: "WORKERS_AI" },
-  );
+      backend.bindings.find((b) => b.name === "WORKERS_AI"),
+      { type: "ai", name: "WORKERS_AI" });
   assert.ok(backend.gatekeeperBindingExpansion);
   assert.equal(backend.gatekeeperBindingExpansion.entrypoint, "GatekeeperVendor");
   assert.equal(backend.vars.PUBLIC_BASE_URL, "$PUBLIC_BASE_URL");
@@ -134,9 +122,8 @@ test("worker entries carry the deploy contract", () => {
   // Router: serves the access asset variant, binds the backend by templated worker name.
   const router = workers["router"];
   assert.deepEqual(
-    router.bindings.find((b) => b.name === "WORKSHOP_BACKEND"),
-    { type: "service", name: "WORKSHOP_BACKEND", service: "$WORKER_NAME(workshop-backend)" },
-  );
+      router.bindings.find((b) => b.name === "WORKSHOP_BACKEND"),
+      { type: "service", name: "WORKSHOP_BACKEND", service: "$WORKER_NAME(workshop-backend)" });
   assert.ok(router.bindings.some((b) => b.type === "assets" && b.name === "ASSETS"));
   assert.ok(router.assetsConfig);
   assert.ok(router.assetsConfig.run_worker_first?.includes("/gatekeeper/*"));
@@ -155,14 +142,10 @@ test("worker entries carry the deploy contract", () => {
   assert.equal(google.shortName, "google");
   assert.equal(google.vars.BASE_URL, "$PUBLIC_BASE_URL/gatekeeper/google");
   assert.ok(google.installable);
+  assert.deepEqual(google.inputs?.map((i) => i.name), ["CLIENT_ID", "CLIENT_SECRET"]);
   assert.deepEqual(
-    google.inputs?.map((i) => i.name),
-    ["CLIENT_ID", "CLIENT_SECRET"],
-  );
-  assert.deepEqual(
-    google.bindings.find((b) => b.name === "CLIENT_SECRET"),
-    { type: "secret_text", name: "CLIENT_SECRET", text: "$SECRET(CLIENT_SECRET)" },
-  );
+      google.bindings.find((b) => b.name === "CLIENT_SECRET"),
+      { type: "secret_text", name: "CLIENT_SECRET", text: "$SECRET(CLIENT_SECRET)" });
 
   // gatekeeper-email ships in the release but is not installable (needs Email Routing/a zone).
   assert.equal(workers["gatekeeper-email"].installable, false);
@@ -173,13 +156,9 @@ test("worker entries carry the deploy contract", () => {
   const context = workers["gatekeeper-context"];
   assert.ok(!context.bindings.some((b) => b.name === "ARTIFACTS"));
   assert.deepEqual(
-    context.bindings.find((b) => b.name === "CONTEXT_COLLECTIONS"),
-    {
-      type: "kv_namespace",
-      name: "CONTEXT_COLLECTIONS",
-      namespace_id: "$KV_CONTEXT_COLLECTIONS_ID",
-    },
-  );
+      context.bindings.find((b) => b.name === "CONTEXT_COLLECTIONS"),
+      { type: "kv_namespace", name: "CONTEXT_COLLECTIONS",
+        namespace_id: "$KV_CONTEXT_COLLECTIONS_ID" });
   assert.deepEqual(context.inputs, []);
 
   // Ambient gatekeepers are preinstalled on every core deploy; preinstalls must take no
@@ -207,10 +186,8 @@ test("worker entries carry the deploy contract", () => {
 
   // Module blobs are content-addressed.
   for (const [name, entry] of Object.entries(workers)) {
-    assert.ok(
-      entry.modules.some((m) => m.name === entry.mainModule),
-      `${name}: mainModule not in modules list`,
-    );
+    assert.ok(entry.modules.some((m) => m.name === entry.mainModule),
+        `${name}: mainModule not in modules list`);
     for (const mod of entry.modules) {
       assert.equal(mod.r2Key, `blobs/modules/${mod.sha256}`);
     }
@@ -233,21 +210,13 @@ test("every gatekeeper shortName is a legal deploy slug", () => {
   const { workers } = buildTestManifest();
   for (const [name, entry] of Object.entries(workers)) {
     if (entry.kind !== "gatekeeper") continue;
-    assert.match(
-      entry.shortName ?? "",
-      SLUG_RE,
-      `${name}: shortName ${entry.shortName} is not a legal install slug; it must be ` +
-        `lowercase letters and digits starting with a letter (it becomes GATEKEEPER_<SLUG>)`,
-    );
-    assert.ok(
-      (entry.shortName ?? "").length <= MAX_SLUG_LEN,
-      `${name}: shortName ${entry.shortName} exceeds ${MAX_SLUG_LEN} chars`,
-    );
-    assert.equal(
-      entry.vars.BASE_URL,
-      `$PUBLIC_BASE_URL/gatekeeper/${entry.shortName}`,
-      `${name}: BASE_URL path must match shortName`,
-    );
+    assert.match(entry.shortName ?? "", SLUG_RE,
+        `${name}: shortName ${entry.shortName} is not a legal install slug; it must be ` +
+        `lowercase letters and digits starting with a letter (it becomes GATEKEEPER_<SLUG>)`);
+    assert.ok((entry.shortName ?? "").length <= MAX_SLUG_LEN,
+        `${name}: shortName ${entry.shortName} exceeds ${MAX_SLUG_LEN} chars`);
+    assert.equal(entry.vars.BASE_URL, `$PUBLIC_BASE_URL/gatekeeper/${entry.shortName}`,
+        `${name}: BASE_URL path must match shortName`);
   }
 });
 
@@ -260,13 +229,10 @@ test("installable gatekeepers that take no inputs are install-once", () => {
   for (const [name, entry] of Object.entries(buildTestManifest().workers)) {
     if (entry.kind !== "gatekeeper" || !entry.installable) continue;
     if ((entry.inputs ?? []).length > 0) continue;
-    assert.equal(
-      entry.singleton,
-      true,
-      `${name}: takes no deploy inputs, so a second install would be identical to the first ` +
+    assert.equal(entry.singleton, true,
+        `${name}: takes no deploy inputs, so a second install would be identical to the first ` +
         `except for its slug — add it to SINGLETON, or give it an input that distinguishes ` +
-        `installs`,
-    );
+        `installs`);
   }
 });
 
@@ -280,16 +246,13 @@ test("releaseShortName folds package names into the slug charset", () => {
 // The deploy service would reject the install; the release build has to reject it first.
 test("releaseShortName rejects names that don't fold to a legal slug", () => {
   for (const pkgName of [
-    "gatekeeper-", // nothing left
-    "gatekeeper---", // nothing left after the fold
-    "gatekeeper-1password", // digit-leading
-    `gatekeeper-${"a".repeat(21)}`, // over the 20-char cap
+    "gatekeeper-",                        // nothing left
+    "gatekeeper---",                      // nothing left after the fold
+    "gatekeeper-1password",               // digit-leading
+    `gatekeeper-${"a".repeat(21)}`,       // over the 20-char cap
   ]) {
-    assert.throws(
-      () => releaseShortName(pkgName),
-      /is not a legal install slug/,
-      `expected ${pkgName} to be rejected`,
-    );
+    assert.throws(() => releaseShortName(pkgName), /is not a legal install slug/,
+        `expected ${pkgName} to be rejected`);
   }
   // The cap itself is inclusive.
   assert.equal(releaseShortName(`gatekeeper-${"a".repeat(20)}`), "a".repeat(20));
@@ -300,7 +263,8 @@ test("every gatekeeper shortName is unique", () => {
   for (const [name, entry] of Object.entries(buildTestManifest().workers)) {
     if (entry.shortName === undefined) continue;
     const owner = owners.get(entry.shortName);
-    assert.equal(owner, undefined, `${owner} and ${name} both emit shortName ${entry.shortName}`);
+    assert.equal(owner, undefined,
+        `${owner} and ${name} both emit shortName ${entry.shortName}`);
     owners.set(entry.shortName, name);
   }
 });
@@ -315,10 +279,8 @@ test("generateManifest rejects gatekeepers whose folded shortNames collide", () 
   // Folds to "google" too, so it collides with gatekeeper-google.
   const collider = { ...google, pkgName: "gatekeeper-goo-gle" };
 
-  assert.throws(
-    () => buildTestManifest([...builds, collider]),
-    /gatekeeper-google and gatekeeper-goo-gle both emit shortName "google"/,
-  );
+  assert.throws(() => buildTestManifest([...builds, collider]),
+      /gatekeeper-google and gatekeeper-goo-gle both emit shortName "google"/);
 });
 
 test("per-package deploy-inputs.json files are well-formed when present", () => {
@@ -333,24 +295,13 @@ test("per-package deploy-inputs.json files are well-formed when present", () => 
       assert.ok(KINDS.has(input.kind), `${pkg.name}: input.kind ${input.kind}`);
       assert.equal(typeof input.label, "string", `${pkg.name}: input.label`);
       for (const key of Object.keys(input)) {
-        assert.ok(
-          [
-            "name",
-            "kind",
-            "label",
-            "help",
-            "consoleUrl",
-            "setupSteps",
-            "redirectUriTemplate",
-          ].includes(key),
-          `${pkg.name}: unknown input key ${key}`,
-        );
+        assert.ok(["name", "kind", "label", "help", "consoleUrl", "setupSteps",
+          "redirectUriTemplate"].includes(key), `${pkg.name}: unknown input key ${key}`);
       }
       if (input.setupSteps !== undefined) {
-        assert.ok(
-          Array.isArray(input.setupSteps) && input.setupSteps.every((s) => typeof s === "string"),
-          `${pkg.name}: setupSteps must be string[]`,
-        );
+        assert.ok(Array.isArray(input.setupSteps) &&
+            input.setupSteps.every((s) => typeof s === "string"),
+            `${pkg.name}: setupSteps must be string[]`);
       }
     }
   }
@@ -363,8 +314,6 @@ test("per-package deploy-inputs.json files are well-formed when present", () => 
 // would demand CLIENT_ID/CLIENT_SECRET for a library before letting anyone install it.
 test("a gatekeeper-prefixed library is not a deployable worker", () => {
   const deployable = readDeployablePackages(join(ROOT, "packages")).map((pkg) => pkg.name);
-  assert.ok(
-    !deployable.includes("gatekeeper-kit"),
-    "gatekeeper-kit is a library; adding a wrangler.jsonc would publish it as a connector",
-  );
+  assert.ok(!deployable.includes("gatekeeper-kit"),
+      "gatekeeper-kit is a library; adding a wrangler.jsonc would publish it as a connector");
 });

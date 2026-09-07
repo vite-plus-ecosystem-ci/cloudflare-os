@@ -12,5 +12,5 @@ export default function ReconnectingChip() {
     >
       Reconnecting…
     </span>
-  );
+  )
 }

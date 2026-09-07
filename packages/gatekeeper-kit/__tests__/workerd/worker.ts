@@ -12,7 +12,7 @@ type VerifierProps = { allowed: readonly string[]; dropVerdicts?: number };
  */
 export class FixtureVerifier extends WorkerEntrypoint<unknown, VerifierProps> {
   async hasSets(setIds: readonly string[]): Promise<boolean[]> {
-    const verdicts = setIds.map((setId) => this.ctx.props.allowed.includes(setId));
+    const verdicts = setIds.map(setId => this.ctx.props.allowed.includes(setId));
     return verdicts.slice(0, verdicts.length - (this.ctx.props.dropVerdicts ?? 0));
   }
 }

@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 const vitePlusRequire = createRequire(require.resolve("vite-plus/package.json"));
 // Test against Vite+'s pinned oxlint without adding a second direct dependency that can drift.
 const { RuleTester } = await import(
-  pathToFileURL(vitePlusRequire.resolve("oxlint/plugins-dev")).href
+  pathToFileURL(vitePlusRequire.resolve("oxlint/plugins-dev")).href,
 );
 
 RuleTester.describe = describe;
@@ -26,7 +26,7 @@ ruleTester.run("prefer-jsdoc", plugin.rules["prefer-jsdoc"], {
     "/** Documents the public value. */\nexport const value = 1;",
     "// A detached module note.\n\nexport const value = 1;",
     "// oxlint-disable-next-line no-warning-comments\nexport const value = 1;",
-    '/// <reference path="./types.d.ts" />\nexport const value = 1;',
+    "/// <reference path=\"./types.d.ts\" />\nexport const value = 1;",
     "// Re-export the canonical value.\nexport { value };",
     "initialize(); // Explains initialization.\nexport const value = 1;",
     "/*! Retain this license. */\nexport const value = 1;",
@@ -49,8 +49,7 @@ ruleTester.run("prefer-jsdoc", plugin.rules["prefer-jsdoc"], {
     },
     {
       code: "// The public operation.\n// Throws when it cannot finish.\nexport function run(): void {}",
-      output:
-        "/**\n * The public operation.\n * Throws when it cannot finish.\n */\nexport function run(): void {}",
+      output: "/**\n * The public operation.\n * Throws when it cannot finish.\n */\nexport function run(): void {}",
       errors: [{ messageId: "useJsdoc" }],
     },
     {
@@ -95,14 +94,12 @@ ruleTester.run("prefer-jsdoc", plugin.rules["prefer-jsdoc"], {
     },
     {
       code: "export class PublicClass {\n  run(): {\n    // Public result.\n    value: number;\n  } { return { value: 1 }; }\n}",
-      output:
-        "export class PublicClass {\n  run(): {\n    /** Public result. */\n    value: number;\n  } { return { value: 1 }; }\n}",
+      output: "export class PublicClass {\n  run(): {\n    /** Public result. */\n    value: number;\n  } { return { value: 1 }; }\n}",
       errors: [{ messageId: "useJsdoc" }],
     },
     {
       code: "export abstract class PublicClass {\n  // Runs the operation.\n  abstract run(): void;\n  // Public state.\n  abstract value: number;\n}",
-      output:
-        "export abstract class PublicClass {\n  /** Runs the operation. */\n  abstract run(): void;\n  /** Public state. */\n  abstract value: number;\n}",
+      output: "export abstract class PublicClass {\n  /** Runs the operation. */\n  abstract run(): void;\n  /** Public state. */\n  abstract value: number;\n}",
       errors: [{ messageId: "useJsdoc" }, { messageId: "useJsdoc" }],
     },
     {
@@ -112,8 +109,7 @@ ruleTester.run("prefer-jsdoc", plugin.rules["prefer-jsdoc"], {
     },
     {
       code: "export class PublicClass {\n  constructor(\n    // Public state.\n    public value: number,\n  ) {}\n}",
-      output:
-        "export class PublicClass {\n  constructor(\n    /** Public state. */\n    public value: number,\n  ) {}\n}",
+      output: "export class PublicClass {\n  constructor(\n    /** Public state. */\n    public value: number,\n  ) {}\n}",
       errors: [{ messageId: "useJsdoc" }],
     },
   ],

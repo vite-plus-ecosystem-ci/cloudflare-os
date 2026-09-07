@@ -37,9 +37,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawn } from "node:child_process";
 import {
-  gatekeeperShortName,
-  isGatekeeperPackage,
-  type DeployablePackage,
+  gatekeeperShortName, isGatekeeperPackage, type DeployablePackage,
 } from "../release/manifest-lib.ts";
 import {
   ROOT,
@@ -220,10 +218,8 @@ function describe(error: unknown): string {
 // otherwise it serves a password form the backend rejects every password from. The frontend's
 // `build` task already declares `env: ['VITE_*']`.
 function buildWorkspace(): Promise<void> {
-  return runAsync("pnpm", ["run", "build"], {
-    cwd: ROOT,
-    env: { ...process.env, VITE_CF_ACCESS_MODE: "true" },
-  });
+  return runAsync("pnpm", ["run", "build"],
+      { cwd: ROOT, env: { ...process.env, VITE_CF_ACCESS_MODE: "true" } });
 }
 
 function preparePreviewWrangler(): PreviewWrangler {
@@ -234,17 +230,12 @@ function preparePreviewWrangler(): PreviewWrangler {
 
   const installDir = mkdtempSync(join(tmpdir(), "preview-wrangler-"));
   try {
-    writeFileSync(
-      join(installDir, "package.json"),
-      JSON.stringify({
-        private: true,
-        dependencies: { wrangler: WRANGLER_PACKAGE },
-      }),
-    );
-    writeFileSync(
-      join(installDir, "pnpm-workspace.yaml"),
-      "allowBuilds:\n  esbuild: true\n  sharp: true\n  workerd: true\n",
-    );
+    writeFileSync(join(installDir, "package.json"), JSON.stringify({
+      private: true,
+      dependencies: { wrangler: WRANGLER_PACKAGE },
+    }));
+    writeFileSync(join(installDir, "pnpm-workspace.yaml"),
+        "allowBuilds:\n  esbuild: true\n  sharp: true\n  workerd: true\n");
   } catch (error) {
     rmSync(installDir, { recursive: true, force: true });
     throw error;
@@ -252,7 +243,8 @@ function preparePreviewWrangler(): PreviewWrangler {
 
   return {
     command: join(installDir, "node_modules", ".bin", "wrangler"),
-    ready: runAsync("pnpm", ["--config.blockExoticSubdeps=false", "--dir", installDir, "install"]),
+    ready: runAsync("pnpm",
+        ["--config.blockExoticSubdeps=false", "--dir", installDir, "install"]),
     cleanup: () => rmSync(installDir, { recursive: true, force: true }),
   };
 }
@@ -276,10 +268,8 @@ function parseWranglerJson(raw: string): WranglerPreviewJson {
     const parsed = JSON.parse(raw.slice(jsonStart)) as WranglerPreviewJson;
     if (parsed.preview) return parsed;
   }
-  throw new Error(
-    "Failed to parse wrangler JSON output: " +
-      (jsonStart < 0 ? "no JSON payload found" : "no preview JSON payload found"),
-  );
+  throw new Error("Failed to parse wrangler JSON output: " +
+      (jsonStart < 0 ? "no JSON payload found" : "no preview JSON payload found"));
 }
 
 function runWrangler(
@@ -303,15 +293,10 @@ function runWrangler(
     let stderr = "";
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (data: string) => {
-      stdout += data;
-    });
-    child.stderr.on("data", (data: string) => {
-      stderr += data;
-    });
-    child.once("error", (error) =>
-      reject(new Error(`Failed to run Wrangler for ${pkg.name}: ${error.message}`)),
-    );
+    child.stdout.on("data", (data: string) => { stdout += data; });
+    child.stderr.on("data", (data: string) => { stderr += data; });
+    child.once("error",
+        (error) => reject(new Error(`Failed to run Wrangler for ${pkg.name}: ${error.message}`)));
     child.once("close", (status) => resolve({ status, stdout, stderr }));
   });
 }
@@ -327,16 +312,13 @@ async function deployBaselineWorker(
   pkg: DeployablePackage,
   wranglerCommand: string,
 ): Promise<void> {
-  console.log(
-    `baseline worker missing; running in ${pkg.name}: ` +
-      `wrangler deploy -c ${STAGING_CONFIG_NAME}`,
-  );
+  console.log(`baseline worker missing; running in ${pkg.name}: ` +
+      `wrangler deploy -c ${STAGING_CONFIG_NAME}`);
   const result = await runWrangler(pkg, wranglerCommand, ["deploy", "-c", STAGING_CONFIG_NAME]);
   writeCommandOutput(pkg, result);
   if (result.status !== 0) {
     throw new Error(
-      `wrangler deploy failed for baseline worker ${pkg.name} with exit code ${result.status}`,
-    );
+        `wrangler deploy failed for baseline worker ${pkg.name} with exit code ${result.status}`);
   }
 }
 
@@ -358,11 +340,9 @@ async function uploadSecrets(
   secrets: Record<string, string>,
   { previews }: { previews: boolean },
 ): Promise<CommandResult> {
-  const args = [...(previews ? ["preview"] : []), "secret", "bulk", "-c", STAGING_CONFIG_NAME];
-  console.log(
-    `running in ${pkg.name}: wrangler ${args.join(" ")} ` +
-      `(${Object.keys(secrets).join(", ")} on stdin)`,
-  );
+  const args = [...previews ? ["preview"] : [], "secret", "bulk", "-c", STAGING_CONFIG_NAME];
+  console.log(`running in ${pkg.name}: wrangler ${args.join(" ")} ` +
+      `(${Object.keys(secrets).join(", ")} on stdin)`);
   const result = await runWrangler(pkg, wranglerCommand, args, JSON.stringify(secrets));
   writeCommandOutput(pkg, result);
   return result;
@@ -394,17 +374,14 @@ async function uploadPreviewSecrets(
     // router — which is deployed after it, in tier 3, on the same first run.
     const baseline = await uploadSecrets(pkg, wranglerCommand, secrets, { previews: false });
     if (baseline.status !== 0) {
-      throw new Error(
-        `wrangler secret bulk failed for baseline worker ${pkg.name} with exit ` +
-          `code ${baseline.status}`,
-      );
+      throw new Error(`wrangler secret bulk failed for baseline worker ${pkg.name} with exit ` +
+          `code ${baseline.status}`);
     }
     result = await uploadSecrets(pkg, wranglerCommand, secrets, { previews: true });
   }
   if (result.status !== 0) {
-    throw new Error(
-      `wrangler preview secret bulk failed for ${pkg.name} with exit code ` + `${result.status}`,
-    );
+    throw new Error(`wrangler preview secret bulk failed for ${pkg.name} with exit code ` +
+        `${result.status}`);
   }
 }
 
@@ -413,18 +390,10 @@ async function runPreviewCommand(
   previewName: string,
   wranglerCommand: string,
 ): Promise<CommandResult> {
-  console.log(
-    `running in ${pkg.name}: ` +
-      `wrangler preview --name ${previewName} -c ${STAGING_CONFIG_NAME} --json`,
-  );
-  const result = await runWrangler(pkg, wranglerCommand, [
-    "preview",
-    "--name",
-    previewName,
-    "-c",
-    STAGING_CONFIG_NAME,
-    "--json",
-  ]);
+  console.log(`running in ${pkg.name}: ` +
+      `wrangler preview --name ${previewName} -c ${STAGING_CONFIG_NAME} --json`);
+  const result = await runWrangler(pkg, wranglerCommand,
+      ["preview", "--name", previewName, "-c", STAGING_CONFIG_NAME, "--json"]);
   if (result.stderr) process.stderr.write(`[${pkg.name}]\n${result.stderr}`);
   return result;
 }
@@ -461,19 +430,10 @@ async function deletePreview(
   previewName: string,
   wranglerCommand: string,
 ): Promise<void> {
-  console.log(
-    `running in ${pkg.name}: ` +
-      `wrangler preview delete --name ${previewName} -c ${STAGING_CONFIG_NAME} -y`,
-  );
-  const result = await runWrangler(pkg, wranglerCommand, [
-    "preview",
-    "delete",
-    "--name",
-    previewName,
-    "-c",
-    STAGING_CONFIG_NAME,
-    "-y",
-  ]);
+  console.log(`running in ${pkg.name}: ` +
+      `wrangler preview delete --name ${previewName} -c ${STAGING_CONFIG_NAME} -y`);
+  const result = await runWrangler(pkg, wranglerCommand,
+      ["preview", "delete", "--name", previewName, "-c", STAGING_CONFIG_NAME, "-y"]);
   writeCommandOutput(pkg, result);
   if (result.status === 0) return;
 
@@ -484,7 +444,8 @@ async function deletePreview(
     console.warn(`Preview ${previewName} for ${pkg.name} did not exist; continuing.`);
     return;
   }
-  throw new Error(`wrangler preview delete failed for ${pkg.name} with exit code ${result.status}`);
+  throw new Error(
+      `wrangler preview delete failed for ${pkg.name} with exit code ${result.status}`);
 }
 
 /**
@@ -510,10 +471,8 @@ async function deletePreviewFrom(
   const named = (name: string) => workers.filter((pkg) => pkg.name === name);
   for (const pkg of [...named("router"), ...named("workshop-backend")]) await attempt(pkg);
   await mapWithConcurrency(
-    workers.filter((pkg) => !["router", "workshop-backend"].includes(pkg.name)),
-    GATEKEEPER_CONCURRENCY,
-    attempt,
-  );
+      workers.filter((pkg) => !["router", "workshop-backend"].includes(pkg.name)),
+      GATEKEEPER_CONCURRENCY, attempt);
 
   for (const failure of failures.slice(1)) {
     console.error(`Additional failure deleting ${previewName}: ${describe(failure)}`);
@@ -548,10 +507,8 @@ function patchPreviewServiceBindings(
   // baseline worker, so the instance comes up looking healthy and wired to the wrong code.
   const unmatched = Object.keys(previewIds).filter((name) => !matched.has(name));
   if (unmatched.length > 0) {
-    throw new Error(
-      `${pkg.name} has no service binding for ${unmatched.join(", ")}; its ` +
-        `bindings name ${services.map((s) => s.service).join(", ")}`,
-    );
+    throw new Error(`${pkg.name} has no service binding for ${unmatched.join(", ")}; its ` +
+        `bindings name ${services.map((s) => s.service).join(", ")}`);
   }
   writePreviewConfig(pkg.dir, config);
 }
@@ -568,8 +525,7 @@ function assertRouterPreviewUrl(
   const expected = previewUrlFor(pkg.name, previewName, workersDevHost);
   if (actualUrl !== expected) {
     throw new Error(
-      `Expected preview URL ${expected} for ${pkg.name}, but Wrangler returned ${actualUrl}`,
-    );
+        `Expected preview URL ${expected} for ${pkg.name}, but Wrangler returned ${actualUrl}`);
   }
 }
 
@@ -577,17 +533,18 @@ function assertNoPreviewUrl(pkg: DeployablePackage, actualUrl: string | undefine
   if (actualUrl) {
     // Preview URLs are public. Only the router should be reachable directly, so one appearing on
     // a service-bound worker is a routing hole, not a cosmetic surprise.
-    throw new Error(
-      `${pkg.name} was given the public preview URL ${actualUrl}, but only the ` +
-        "router should have one; check that its config still sets preview_urls: false",
-    );
+    throw new Error(`${pkg.name} was given the public preview URL ${actualUrl}, but only the ` +
+        "router should have one; check that its config still sets preview_urls: false");
   }
 }
 
-function writePreviewComment(baseUrl: string, slug: string, accountId: string | undefined): void {
-  const dashboardUrl =
-    `https://dash.cloudflare.com/${accountId}/workers/services/view/` +
-    `router/production/previews/${slug}`;
+function writePreviewComment(
+  baseUrl: string,
+  slug: string,
+  accountId: string | undefined,
+): void {
+  const dashboardUrl = `https://dash.cloudflare.com/${accountId}/workers/services/view/` +
+      `router/production/previews/${slug}`;
   // The slug is the PR number and the branch, so it is worth showing: it is the URL's first label.
   const comment = [
     `### Preview: \`${slug}\``,
@@ -613,9 +570,8 @@ function tiers(packages: readonly DeployablePackage[]): {
     return pkg;
   };
   return {
-    gatekeepers: packages
-      .filter((pkg) => isGatekeeperPackage(pkg.name))
-      .toSorted((a, b) => a.name.localeCompare(b.name)),
+    gatekeepers: packages.filter((pkg) => isGatekeeperPackage(pkg.name))
+        .toSorted((a, b) => a.name.localeCompare(b.name)),
     backend: byName("workshop-backend"),
     router: byName("router"),
   };
@@ -636,18 +592,15 @@ async function deploy({ dryRun }: { dryRun: boolean }): Promise<void> {
     console.log(`  tier 1 (${gatekeepers.length} gatekeepers, concurrently):`);
     for (const pkg of gatekeepers) {
       const oauth = oauthApps.get(pkg.name);
-      console.log(
-        `    ${pkg.name} ` +
+      console.log(`    ${pkg.name} ` +
           `(no hostname; served at ${baseUrl}/gatekeeper/${gatekeeperShortName(pkg.name)})` +
-          (oauth ? `, holding the ${Object.keys(oauth).join(", ")} secrets` : ""),
-      );
+          (oauth ? `, holding the ${Object.keys(oauth).join(", ")} secrets` : ""));
     }
-    console.log(
-      `  tier 2: ${backend.name} (no hostname; served at ` +
+    console.log(`  tier 2: ${backend.name} (no hostname; served at ` +
         `${baseUrl}/api), bound to the tier 1 previews, holding the ` +
-        `${Object.keys(secrets).join(", ")} secrets`,
-    );
-    console.log(`  tier 3: ${router.name} -> ${baseUrl}, ` + "bound to every preview above");
+        `${Object.keys(secrets).join(", ")} secrets`);
+    console.log(`  tier 3: ${router.name} -> ${baseUrl}, ` +
+        "bound to every preview above");
     return;
   }
 
@@ -656,19 +609,16 @@ async function deploy({ dryRun }: { dryRun: boolean }): Promise<void> {
     await waitForAll([wrangler.ready, buildWorkspace()]);
 
     // Keyed by worker name, because that is what a service binding names.
-    const gatekeeperPreviews = await mapWithConcurrency(
-      gatekeepers,
-      GATEKEEPER_CONCURRENCY,
-      async (pkg) => {
-        // Before this gatekeeper's preview, not after, and for the same reason the backend's go
-        // before its own: a preview inherits the Previews settings that exist when it is created.
-        const oauth = oauthApps.get(pkg.name);
-        if (oauth) await uploadPreviewSecrets(pkg, wrangler.command, oauth);
-        const preview = await deployPreview(pkg, previewName, wrangler.command);
-        assertNoPreviewUrl(pkg, preview.url);
-        return [pkg.name, preview.id];
-      },
-    );
+    const gatekeeperPreviews = await mapWithConcurrency(gatekeepers, GATEKEEPER_CONCURRENCY,
+        async (pkg) => {
+          // Before this gatekeeper's preview, not after, and for the same reason the backend's go
+          // before its own: a preview inherits the Previews settings that exist when it is created.
+          const oauth = oauthApps.get(pkg.name);
+          if (oauth) await uploadPreviewSecrets(pkg, wrangler.command, oauth);
+          const preview = await deployPreview(pkg, previewName, wrangler.command);
+          assertNoPreviewUrl(pkg, preview.url);
+          return [pkg.name, preview.id];
+        });
     const gatekeeperIds = Object.fromEntries(gatekeeperPreviews);
 
     patchPreviewServiceBindings(backend, gatekeeperIds);
@@ -686,7 +636,8 @@ async function deploy({ dryRun }: { dryRun: boolean }): Promise<void> {
     assertRouterPreviewUrl(router, previewName, workersDevHost, routerPreview.url);
 
     console.log(`\nPreview "${previewName}" is live at ${routerPreview.url}`);
-    writePreviewComment(routerPreview.url, routerPreview.slug, readConfig(router.dir).account_id);
+    writePreviewComment(routerPreview.url, routerPreview.slug,
+        readConfig(router.dir).account_id);
   } finally {
     wrangler.cleanup();
   }
@@ -700,10 +651,8 @@ async function remove({ dryRun }: { dryRun: boolean }): Promise<void> {
   const { gatekeepers, backend, router } = tiers(packages);
 
   if (dryRun) {
-    console.log(
-      `\ndry-run: would delete preview "${previewName}" for ` +
-        [router, backend, ...gatekeepers].map((pkg) => pkg.name).join(", "),
-    );
+    console.log(`\ndry-run: would delete preview "${previewName}" for ` +
+        [router, backend, ...gatekeepers].map((pkg) => pkg.name).join(", "));
     return;
   }
 
@@ -731,16 +680,11 @@ async function cloudflareApi(path: string): Promise<unknown> {
   const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
     headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}` },
   });
-  const body = (await response.json().catch(() => ({}))) as {
-    success?: boolean;
-    errors?: unknown;
-    result?: unknown;
-  };
+  const body = await response.json().catch(() => ({})) as
+      { success?: boolean; errors?: unknown; result?: unknown };
   if (!response.ok || body.success === false) {
-    throw new Error(
-      `Cloudflare API GET ${path} failed with ${response.status}: ` +
-        JSON.stringify(body.errors ?? body),
-    );
+    throw new Error(`Cloudflare API GET ${path} failed with ${response.status}: ` +
+        JSON.stringify(body.errors ?? body));
   }
   return body.result;
 }
@@ -765,7 +709,7 @@ async function fetchPullRequestState(repo: string, number: number): Promise<Pull
     const response = await fetch(`https://api.github.com${path}`, { headers });
     if (response.status === 404) return "missing";
     if (!response.ok) throw new Error(`GitHub API GET ${path} failed with ${response.status}`);
-    const { state } = (await response.json()) as FetchedPullRequest;
+    const { state } = await response.json() as FetchedPullRequest;
     if (state === "open" || state === "closed") return state;
     throw new Error(`GitHub API GET ${path} reported the state ${JSON.stringify(state)}`);
   } catch (error) {
@@ -785,26 +729,19 @@ async function pullRequestStates(
   repo: string,
   previewNames: readonly string[],
 ): Promise<Map<string, PullRequestState>> {
-  const numbers = [
-    ...new Set(
-      previewNames
-        .map((name) => previewPullRequestNumber(name))
-        .filter((value): value is number => value !== undefined),
-    ),
-  ];
-  const states = await mapWithConcurrency(numbers, API_CONCURRENCY, (number) =>
-    fetchPullRequestState(repo, number),
-  );
+  const numbers = [...new Set(previewNames
+      .map((name) => previewPullRequestNumber(name))
+      .filter((value): value is number => value !== undefined))];
+  const states = await mapWithConcurrency(numbers, API_CONCURRENCY,
+      (number) => fetchPullRequestState(repo, number));
   const byNumber = new Map(numbers.map((number, index) => [number, states[index]]));
 
-  return new Map(
-    previewNames.map((name) => {
-      // A preview with no number in its name was deployed from a local checkout, and is something
-      // this sweep can say nothing about: age alone decides it.
-      const number = previewPullRequestNumber(name);
-      return [name, (number === undefined ? undefined : byNumber.get(number)) ?? "unknown"];
-    }),
-  );
+  return new Map(previewNames.map((name) => {
+    // A preview with no number in its name was deployed from a local checkout, and is something
+    // this sweep can say nothing about: age alone decides it.
+    const number = previewPullRequestNumber(name);
+    return [name, (number === undefined ? undefined : byNumber.get(number)) ?? "unknown"];
+  }));
 }
 
 function daysSince(timestamp: string): number {
@@ -825,7 +762,8 @@ async function listPreviewsByName(
   const lists = await mapWithConcurrency(packages, API_CONCURRENCY, async (pkg) => {
     let previews: unknown;
     try {
-      previews = await cloudflareApi(`/accounts/${accountId}/workers/workers/${pkg.name}/previews`);
+      previews = await cloudflareApi(
+          `/accounts/${accountId}/workers/workers/${pkg.name}/previews`);
     } catch (error) {
       // A worker whose baseline has never been deployed on this account — one added since the last
       // preview ran — carries no previews rather than being a failure.
@@ -834,10 +772,8 @@ async function listPreviewsByName(
       previews = [];
     }
     if (!Array.isArray(previews)) {
-      throw new Error(
-        `Expected a list of previews for ${pkg.name}, got ` +
-          `${JSON.stringify(previews)?.slice(0, 200)}`,
-      );
+      throw new Error(`Expected a list of previews for ${pkg.name}, got ` +
+          `${JSON.stringify(previews)?.slice(0, 200)}`);
     }
     return previews as ListedPreview[];
   });
@@ -886,8 +822,8 @@ async function sweep({ dryRun }: { dryRun: boolean }): Promise<void> {
   const index = await listPreviewsByName(accountId, packages);
   console.log(`\n${index.size} preview(s) across ${packages.length} worker(s).`);
   const states = repo
-    ? await pullRequestStates(repo, [...index.keys()])
-    : new Map<string, PullRequestState>();
+      ? await pullRequestStates(repo, [...index.keys()])
+      : new Map<string, PullRequestState>();
 
   const stale: { name: string; workers: DeployablePackage[]; reasons: string[] }[] = [];
   for (const [name, preview] of index) {
@@ -901,10 +837,8 @@ async function sweep({ dryRun }: { dryRun: boolean }): Promise<void> {
     return;
   }
   for (const { name, workers, reasons } of stale) {
-    console.log(
-      `  ${dryRun ? "dry-run: would delete" : "deleting"} ${name} (${reasons.join(", ")}) ` +
-        `from ${workers.map((pkg) => pkg.name).join(", ")}`,
-    );
+    console.log(`  ${dryRun ? "dry-run: would delete" : "deleting"} ${name} (${reasons.join(", ")}) ` +
+        `from ${workers.map((pkg) => pkg.name).join(", ")}`);
   }
   if (dryRun) return;
 

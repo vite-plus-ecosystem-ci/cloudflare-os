@@ -20,11 +20,7 @@ export function createTracer(getContext: () => Readonly<Record<string, unknown>>
     return tracing.enterSpan(name, (span) => {
       if (span.isTraced) {
         for (const [key, value] of Object.entries(getContext())) {
-          if (
-            typeof value === "boolean" ||
-            typeof value === "number" ||
-            typeof value === "string"
-          ) {
+          if (typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
             span.setAttribute(key, value);
           }
         }
@@ -39,11 +35,8 @@ export function createTracer(getContext: () => Readonly<Record<string, unknown>>
         // .catch-wrapped promise returned here). That wrapper is a new promise, not `result` —
         // fine for data results; don't wrap pipelined RPC stubs in `traced`.
         return result instanceof Promise
-          ? (result.catch((err) => {
-              fail();
-              throw err;
-            }) as Result)
-          : result;
+            ? result.catch((err) => { fail(); throw err; }) as Result
+            : result;
       } catch (err) {
         fail();
         throw err;

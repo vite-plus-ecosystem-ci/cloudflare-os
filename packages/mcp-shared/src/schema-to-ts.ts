@@ -37,8 +37,8 @@ function quote(value: string): string {
 
 // Turns an arbitrary MCP identifier into a PascalCase TypeScript identifier fragment.
 function pascalCase(input: string): string {
-  const parts = input.split(/[^A-Za-z0-9]+/).filter((part) => part.length > 0);
-  const joined = parts.map((part) => part[0].toUpperCase() + part.slice(1)).join("");
+  const parts = input.split(/[^A-Za-z0-9]+/).filter(part => part.length > 0);
+  const joined = parts.map(part => part[0].toUpperCase() + part.slice(1)).join("");
   return /^[A-Za-z]/.test(joined) ? joined : `T${joined}`;
 }
 
@@ -89,9 +89,7 @@ function inlineCommentSafe(text: string): string {
 function docComment(text: string | undefined, indent: string): string {
   if (!text) return "";
   const clipped = text.length > MAX_DOC_LENGTH ? `${text.slice(0, MAX_DOC_LENGTH)}...` : text;
-  const lines = commentSafe(clipped)
-    .split(/\r?\n/)
-    .map((line) => `${indent} * ${line}`.trimEnd());
+  const lines = commentSafe(clipped).split(/\r?\n/).map(line => `${indent} * ${line}`.trimEnd());
   return `${indent}/**\n${lines.join("\n")}\n${indent} */\n`;
 }
 
@@ -107,10 +105,7 @@ function unionTypes(types: string[]): string {
 // Renders one JSON Schema node as a TypeScript type expression. Unsupported constructs degrade to
 // `unknown` rather than a guess, since the agent will trust a wrong type.
 function renderType(
-  schema: JsonSchema | undefined,
-  indent: string,
-  depth: number,
-  budget: RenderBudget,
+  schema: JsonSchema | undefined, indent: string, depth: number, budget: RenderBudget,
 ): string {
   if (!schema || depth > MAX_DEPTH || --budget.remaining < 0) return "unknown";
   if (schema.$ref !== undefined) return "unknown";
@@ -123,20 +118,19 @@ function renderType(
 
   const alternatives = schema.anyOf ?? schema.oneOf;
   if (Array.isArray(alternatives) && alternatives.length > 0) {
-    return unionTypes(alternatives.map((member) => renderType(member, indent, depth + 1, budget)));
+    return unionTypes(alternatives.map(member => renderType(member, indent, depth + 1, budget)));
   }
 
   // allOf is only handled for the common "merge object shapes" case.
   if (Array.isArray(schema.allOf) && schema.allOf.length > 0) {
-    const rendered = schema.allOf.map((member) => renderType(member, indent, depth + 1, budget));
+    const rendered = schema.allOf.map(member => renderType(member, indent, depth + 1, budget));
     return rendered.join(" & ");
   }
 
   if (Array.isArray(schema.type)) {
     if (schema.type.length === 0) return "unknown";
     return unionTypes(
-      schema.type.map((type) => renderType({ ...schema, type }, indent, depth + 1, budget)),
-    );
+      schema.type.map(type => renderType({ ...schema, type }, indent, depth + 1, budget)));
   }
 
   const type = schema.type;
@@ -153,12 +147,13 @@ function renderType(
       return "null";
     case "array": {
       if (Array.isArray(schema.items)) {
-        return `[${schema.items
-          .map((item) => renderType(item, indent, depth + 1, budget))
-          .join(", ")}]`;
+        return `[${schema.items.map(item =>
+          renderType(item, indent, depth + 1, budget)).join(", ")}]`;
       }
       const element = renderType(schema.items, indent, depth + 1, budget);
-      return element.includes("|") || element.includes("&") ? `Array<${element}>` : `${element}[]`;
+      return element.includes("|") || element.includes("&")
+        ? `Array<${element}>`
+        : `${element}[]`;
     }
     case "object":
       return renderObject(schema, indent, depth, budget);
@@ -177,12 +172,11 @@ function quoteLiteral(value: unknown): string {
 }
 
 function renderObject(
-  schema: JsonSchema,
-  indent: string,
-  depth: number,
-  budget: RenderBudget,
+  schema: JsonSchema, indent: string, depth: number, budget: RenderBudget,
 ): string {
-  const properties = isPlainObject(schema.properties) ? schema.properties : undefined;
+  const properties = isPlainObject(schema.properties)
+    ? schema.properties
+    : undefined;
 
   if (!properties || Object.keys(properties).length === 0) {
     // A free-form object: preserve that it is an object without inventing members.
@@ -193,17 +187,14 @@ function renderObject(
   const inner = `${indent}  `;
   const propertyTypes: string[] = [];
   const members = Object.entries(properties).map(([name, property]) => {
-    const propertySchema = isPlainObject(property) ? (property as JsonSchema) : undefined;
+    const propertySchema = isPlainObject(property) ? property as JsonSchema : undefined;
     const optional = required.has(name) ? "" : "?";
     const key = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? name : quote(name);
     const rendered = renderType(propertySchema, inner, depth + 1, budget);
     propertyTypes.push(rendered);
-    const description =
-      typeof propertySchema?.description === "string"
-        ? propertySchema.description
-        : typeof propertySchema?.title === "string"
-          ? propertySchema.title
-          : undefined;
+    const description = typeof propertySchema?.description === "string"
+      ? propertySchema.description
+      : typeof propertySchema?.title === "string" ? propertySchema.title : undefined;
     return `${docComment(description, inner)}${inner}${key}${optional}: ${rendered};`;
   });
 
@@ -211,7 +202,7 @@ function renderObject(
   if (extra === true) {
     members.push(`${inner}[key: string]: unknown;`);
   } else if (isPlainObject(extra)) {
-    const optional = Object.keys(properties).some((name) => !required.has(name));
+    const optional = Object.keys(properties).some(name => !required.has(name));
     const types = [renderType(extra as JsonSchema, inner, depth + 1, budget), ...propertyTypes];
     if (optional) types.push("undefined");
     members.push(`${inner}[key: string]: ${unionTypes(types)};`);
@@ -223,22 +214,20 @@ function renderObject(
 // The JSDoc for one tool: the server's own description, plus what calling it will actually do.
 function toolDoc(entry: ClassifiedTool, all: ClassifiedTool[]): string {
   const { tool, mode, autoApprovable } = entry;
-  const detail =
-    mode === "read"
-      ? 'Read-only: returns `{ status: "ok" }` and is recorded as an observation.'
-      : autoApprovable
-        ? "Action: queued for approval, and may be auto-applied if you have opted in to its kind."
-        : "Action: queued for approval; the result arrives via `getActionResult`.";
+  const detail = mode === "read"
+    ? "Read-only: returns `{ status: \"ok\" }` and is recorded as an observation."
+    : autoApprovable
+      ? "Action: queued for approval, and may be auto-applied if you have opted in to its kind."
+      : "Action: queued for approval; the result arrives via `getActionResult`.";
   const method = toMethodName(tool.name);
   // Say the wire name whenever it is not obvious from the method name, so an agent reading only this
   // comment can still reach the tool through `callTool`.
-  const wire =
-    method === tool.name || !toolMethodNames(all).has(method ?? "")
-      ? undefined
-      : `Calls \`${tool.name}\`.`;
+  const wire = method === tool.name || !toolMethodNames(all).has(method ?? "")
+    ? undefined
+    : `Calls \`${tool.name}\`.`;
   const description = tool.description ?? tool.title;
   return [...(description ? [description, ""] : []), detail, wire]
-    .filter((part) => part !== undefined)
+    .filter(part => part !== undefined)
     .join("\n");
 }
 
@@ -326,13 +315,9 @@ export function generateSessionTypes(args: {
 
   lines.push("// ---------------------------------------------------------------------------");
   lines.push(`// Generated from the tool catalog of "${serverName}" (${endpoint}).`);
-  lines.push(
-    "// Regenerated when the server's catalog revision changes. A grant is a scope -- the",
-  );
+  lines.push("// Regenerated when the server's catalog revision changes. A grant is a scope -- the");
   lines.push("// whole endpoint, one portal server, or a fixed list of tool names -- and not a");
-  lines.push(
-    "// snapshot of this catalog: a tool the server adds later becomes callable too, unless",
-  );
+  lines.push("// snapshot of this catalog: a tool the server adds later becomes callable too, unless");
   lines.push("// the grant named its tools explicitly.");
   lines.push("");
 
@@ -348,41 +333,28 @@ export function generateSessionTypes(args: {
     lines.push("");
   }
 
-  const readTools = args.tools.filter((entry) => entry.mode === "read");
-  const actionTools = args.tools.filter((entry) => entry.mode === "action");
+  const readTools = args.tools.filter(entry => entry.mode === "read");
+  const actionTools = args.tools.filter(entry => entry.mode === "action");
+
 
   lines.push("/**");
   lines.push(` * Session for the "${serverName}" MCP server.`);
   lines.push(" *");
-  lines.push(
-    ` * Of the ${args.tools.length} currently described tool(s), ${readTools.length} are read-only`,
-  );
-  lines.push(
-    " * and return results immediately as observations. The remaining " + actionTools.length,
-  );
+  lines.push(` * Of the ${args.tools.length} currently described tool(s), ${readTools.length} are read-only`);
+  lines.push(" * and return results immediately as observations. The remaining " + actionTools.length);
   lines.push(" * described tool(s) are treated as actions:");
-  lines.push(
-    ' * `callTool` queues them for approval and returns `{ status: "pending" }`; the result',
-  );
+  lines.push(" * `callTool` queues them for approval and returns `{ status: \"pending\" }`; the result");
   lines.push(" * becomes available through `getActionResult` once a human approves.");
-  lines.push(
-    " * When using this session from `executeCode`, return from that executeCode call as soon as",
-  );
-  lines.push(
-    " * an action is pending so its approval can appear in chat. Approval resumes the agent;",
-  );
+  lines.push(" * When using this session from `executeCode`, return from that executeCode call as soon as");
+  lines.push(" * an action is pending so its approval can appear in chat. Approval resumes the agent;");
   lines.push(" * denial ends the turn. Call `getActionResult` after approval.");
   if (args.trust === "byo") {
     lines.push(" *");
-    lines.push(
-      " * This server was supplied by the user, so no action is ever applied automatically.",
-    );
+    lines.push(" * This server was supplied by the user, so no action is ever applied automatically.");
   }
   lines.push(" *");
   // Kept in the agent's view because the agent can otherwise build a share flow that cannot work.
-  lines.push(
-    " * Only the owner can open a workspace using this binding. To give it to someone else,",
-  );
+  lines.push(" * Only the owner can open a workspace using this binding. To give it to someone else,");
   lines.push(" * publish it as a blueprint so they connect their own account.");
   lines.push(" */");
   lines.push(`export interface ${typeName} {`);
@@ -392,9 +364,7 @@ export function generateSessionTypes(args: {
   lines.push("  listTools(options: { search: string; name?: never }): Promise<McpToolSummary[]>;");
   lines.push("  /** Returns zero or one exact granted tool definition by wire name. */");
   lines.push("  listTools(options: { name: string; search?: never }): Promise<McpToolInfo[]>;");
-  lines.push(
-    "  listTools(options: McpToolListOptions): Promise<McpToolInfo[] | McpToolSummary[]>;",
-  );
+  lines.push("  listTools(options: McpToolListOptions): Promise<McpToolInfo[] | McpToolSummary[]>;");
   lines.push("");
 
   // One named method per tool, which is how a Gadget is expected to call them.
@@ -419,27 +389,19 @@ export function generateSessionTypes(args: {
   lines.push("  /**");
   lines.push("   * Calls a tool by its exact name, as the server publishes it.");
   lines.push("   *");
-  lines.push(
-    "   * Equivalent to the named methods above, with static argument checking for tools that",
-  );
+  lines.push("   * Equivalent to the named methods above, with static argument checking for tools that");
   lines.push("   * cannot have a named method.");
   lines.push("   */");
   for (const { tool } of args.tools) {
     switch (argumentStyle(tool.inputSchema)) {
       case "none":
-        lines.push(
-          `  callTool(name: ${quote(tool.name)}, args?: Record<string, never>): Promise<McpCallResult>;`,
-        );
+        lines.push(`  callTool(name: ${quote(tool.name)}, args?: Record<string, never>): Promise<McpCallResult>;`);
         break;
       case "freeform":
-        lines.push(
-          `  callTool(name: ${quote(tool.name)}, args?: Record<string, unknown>): Promise<McpCallResult>;`,
-        );
+        lines.push(`  callTool(name: ${quote(tool.name)}, args?: Record<string, unknown>): Promise<McpCallResult>;`);
         break;
       case "typed": {
-        lines.push(
-          `  callTool(name: ${quote(tool.name)}, args: ${argsNames.get(tool.name)}): Promise<McpCallResult>;`,
-        );
+        lines.push(`  callTool(name: ${quote(tool.name)}, args: ${argsNames.get(tool.name)}): Promise<McpCallResult>;`);
         break;
       }
     }
@@ -457,12 +419,8 @@ export function generateSessionTypes(args: {
   lines.push("  /**");
   lines.push("   * Fetches the result of a queued action.");
   lines.push("   *");
-  lines.push(
-    '   * Returns `{ status: "pending" }` while the action is awaiting review, the completed',
-  );
-  lines.push(
-    '   * result once applied, `{ status: "rejected" }` if denied, or `{ status: "failed" }`',
-  );
+  lines.push("   * Returns `{ status: \"pending\" }` while the action is awaiting review, the completed");
+  lines.push("   * result once applied, `{ status: \"rejected\" }` if denied, or `{ status: \"failed\" }`");
   lines.push("   * if the approved call failed.");
   lines.push("   */");
   lines.push("  getActionResult(actionId: number): Promise<McpCallResult>;");

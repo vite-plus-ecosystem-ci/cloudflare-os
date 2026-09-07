@@ -23,6 +23,7 @@ export const IDENTITY_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
 ];
 
+
 /** A whole Gmail mailbox, optionally narrowed to one search or label. */
 export const GMAIL_RESOURCE: SupportedResource = {
   urlPattern: "https://mail.google.com/*",
@@ -52,10 +53,10 @@ export const GOOGLE_CALENDAR_RESOURCE: SupportedResource = {
   urlPattern: "https://calendar.google.com/calendar/:calendarId/*",
   title: "Google Calendar",
   description:
-    "Read and manage one selected calendar. For scheduling across people, request one connection " +
-    "using https://calendar.google.com/calendar/primary/?availability=allVisible, then call " +
-    "checkAvailability once with up to 50 attendee email addresses. Do not request each " +
-    "attendee's calendar.",
+      "Read and manage one selected calendar. For scheduling across people, request one connection " +
+      "using https://calendar.google.com/calendar/primary/?availability=allVisible, then call " +
+      "checkAvailability once with up to 50 attendee email addresses. Do not request each " +
+      "attendee's calendar.",
   grantable: true,
 };
 
@@ -64,7 +65,7 @@ export const BIGQUERY_RESOURCE: SupportedResource = {
   urlPattern: `https://${BIGQUERY_HOST}/:projectId/*`,
   title: "BigQuery",
   description:
-    "Choose a Google Cloud project, then optionally narrow access to a dataset or table.",
+      "Choose a Google Cloud project, then optionally narrow access to a dataset or table.",
   grantable: true,
 };
 
@@ -78,9 +79,9 @@ export const GOOGLE_DRIVE_RESOURCE: SupportedResource = {
   urlPattern: "https://drive.google.com/drive/my-drive",
   title: "Google Drive Account",
   description:
-    "Find files and folders anywhere this Google account can read in Drive, including shared " +
-    "drives. Full-text search examines indexed file content, descriptions, and OCR text; search " +
-    "results contain metadata only, while native Google Docs and Sheets can be opened read-only.",
+      "Find files and folders anywhere this Google account can read in Drive, including shared " +
+      "drives. Full-text search examines indexed file content, descriptions, and OCR text; search " +
+      "results contain metadata only, while native Google Docs and Sheets can be opened read-only.",
   grantable: true,
 };
 
@@ -88,8 +89,7 @@ export const GOOGLE_DRIVE_RESOURCE: SupportedResource = {
 export const GOOGLE_SHARED_DRIVE_RESOURCE: SupportedResource = {
   urlPattern: "https://drive.google.com/drive/folders/:driveId",
   title: "Google Workspace Shared Drive",
-  description:
-    "Find files and folders, and read native Google Docs and Sheets, in one organization-owned shared drive.",
+  description: "Find files and folders, and read native Google Docs and Sheets, in one organization-owned shared drive.",
   grantable: true,
 };
 
@@ -133,7 +133,7 @@ export const SCOPE_DERIVED_RESOURCE_URL_PATTERNS = [
 ];
 
 /** The OAuth scopes each grantable resource needs. */
-export const RESOURCE_SCOPES: { resource: SupportedResource; scopes: string[] }[] = [
+export const RESOURCE_SCOPES: {resource: SupportedResource, scopes: string[]}[] = [
   {
     resource: GMAIL_RESOURCE,
     scopes: [
@@ -209,19 +209,17 @@ const DRIVE_RESOURCE_PATTERNS = new Set([
 ]);
 
 /** Every grantable resource, in declaration order. */
-export const SUPPORTED_RESOURCES: SupportedResource[] = RESOURCE_SCOPES.map(
-  (entry) => entry.resource,
-);
-const KNOWN_RESOURCE_PATTERNS = new Set(SUPPORTED_RESOURCES.map((resource) => resource.urlPattern));
+export const SUPPORTED_RESOURCES: SupportedResource[] = RESOURCE_SCOPES.map(entry => entry.resource);
+const KNOWN_RESOURCE_PATTERNS = new Set(SUPPORTED_RESOURCES.map(resource => resource.urlPattern));
 
 /** Whether an account's recorded grant includes any Google Drive resource. */
 export function hasDriveResourceGrant(resourceUrlPatterns: readonly string[]): boolean {
-  return resourceUrlPatterns.some((pattern) => DRIVE_RESOURCE_PATTERNS.has(pattern));
+  return resourceUrlPatterns.some(pattern => DRIVE_RESOURCE_PATTERNS.has(pattern));
 }
 
 /** Rejects any pattern that is not a known grantable resource. */
 export function validateResourceUrlPatterns(resourceUrlPatterns: readonly string[]): void {
-  let unknown = resourceUrlPatterns.filter((pattern) => !KNOWN_RESOURCE_PATTERNS.has(pattern));
+  let unknown = resourceUrlPatterns.filter(pattern => !KNOWN_RESOURCE_PATTERNS.has(pattern));
   if (unknown.length > 0) {
     throw new Error(`Unknown grantable resource URL pattern(s): ${unknown.join(", ")}`);
   }
@@ -247,15 +245,14 @@ export function resourceUrlPatternsToOAuthScopes(resourceUrlPatterns: readonly s
  * reconnect, retracts the grant that needed it.
  */
 export function resourcesCoveredByScopes(
-  resourceUrlPatterns: readonly string[],
-  grantedOAuthScopes: readonly string[],
-): string[] {
+    resourceUrlPatterns: readonly string[],
+    grantedOAuthScopes: readonly string[]): string[] {
   let granted = new Set(grantedOAuthScopes);
   let requested = new Set(resourceUrlPatterns);
-  return RESOURCE_SCOPES.filter(
-    (entry) =>
-      requested.has(entry.resource.urlPattern) && entry.scopes.every((scope) => granted.has(scope)),
-  ).map((entry) => entry.resource.urlPattern);
+  return RESOURCE_SCOPES
+      .filter(entry => requested.has(entry.resource.urlPattern) &&
+                       entry.scopes.every(scope => granted.has(scope)))
+      .map(entry => entry.resource.urlPattern);
 }
 
 /**
@@ -348,16 +345,11 @@ export function parseResourceUrl(url: string): ResourceTarget {
   }
 
   switch (parsed.hostname) {
-    case "mail.google.com":
-      return parseGmailUrl(parsed);
-    case "docs.google.com":
-      return parseDocsUrl(parsed);
-    case "calendar.google.com":
-      return parseCalendarUrl(parsed);
-    case BIGQUERY_HOST:
-      return parseBigQueryUrl(parsed);
-    case "drive.google.com":
-      return parseDriveUrl(parsed);
+    case "mail.google.com": return parseGmailUrl(parsed);
+    case "docs.google.com": return parseDocsUrl(parsed);
+    case "calendar.google.com": return parseCalendarUrl(parsed);
+    case BIGQUERY_HOST: return parseBigQueryUrl(parsed);
+    case "drive.google.com": return parseDriveUrl(parsed);
   }
   throw new Error(`Unsupported Google resource URL host: ${parsed.hostname}`);
 }
@@ -396,8 +388,7 @@ function parseGmailUrl(parsed: URL): ResourceTarget {
   }
   if (hash && hash !== "#inbox") {
     throw new Error(
-      "Unsupported Gmail view. Connect the inbox, an explicit search, or an explicit label.",
-    );
+      "Unsupported Gmail view. Connect the inbox, an explicit search, or an explicit label.");
   }
   return { kind: "gmail" };
 }
@@ -427,12 +418,11 @@ function parseCalendarUrl(parsed: URL): ResourceTarget {
   if (calendarId === "primary") {
     throw new Error(
       "Google Calendar bindings must use a stable calendar ID, not the account-relative " +
-        '"primary" alias.',
-    );
+      "\"primary\" alias.");
   }
   // Least privilege unless the URL explicitly opts into all calendars.
   let availabilityMode: CalendarAvailabilityMode =
-    parsed.searchParams.get("availability") === "allVisible" ? "allVisible" : "thisCalendar";
+      parsed.searchParams.get("availability") === "allVisible" ? "allVisible" : "thisCalendar";
   return { kind: "calendar", calendarId, availabilityMode };
 }
 
@@ -454,15 +444,11 @@ function parseBigQueryUrl(parsed: URL): ResourceTarget {
   }
 
   // Synthetic path: /<projectId>/<datasetId>/<tableId> (each segment optional after the first).
-  let segments = parsed.pathname
-    .split("/")
-    .filter(Boolean)
-    .map((s) => decodeURIComponent(s));
+  let segments = parsed.pathname.split("/").filter(Boolean).map(s => decodeURIComponent(s));
   if (segments.length > 3) {
     throw new Error(
-      "BigQuery resource URLs must be /<projectId>, /<projectId>/<datasetId>, " +
-        "or /<projectId>/<datasetId>/<tableId>.",
-    );
+        "BigQuery resource URLs must be /<projectId>, /<projectId>/<datasetId>, " +
+        "or /<projectId>/<datasetId>/<tableId>.");
   }
   let [projectId, datasetId, tableId] = segments;
   if (!projectId) {

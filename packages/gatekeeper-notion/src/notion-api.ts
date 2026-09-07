@@ -272,7 +272,7 @@ function iconInputToNotion(icon: NotionIconInput): NotionIcon {
 
 function richTextToPlain(rich: NotionRichText[] | undefined): string {
   if (!rich) return "";
-  return rich.map((r) => r.plain_text ?? r.text?.content ?? "").join("");
+  return rich.map(r => r.plain_text ?? r.text?.content ?? "").join("");
 }
 
 // A signature of the styling applied to a rich-text run, used to merge adjacent runs.
@@ -316,7 +316,7 @@ function richTextToMarkdown(rich: NotionRichText[] | undefined): string {
     }
   }
   return merged
-    .map((r) => {
+    .map(r => {
       const text = r.plain_text ?? r.text?.content ?? "";
       return text ? wrapInline(text, r) : "";
     })
@@ -329,7 +329,7 @@ function plainToRichText(text: string): unknown[] {
   if (!text) return [];
   const chunks: string[] = [];
   for (let i = 0; i < text.length; i += 2000) chunks.push(text.slice(i, i + 2000));
-  return chunks.map((content) => ({ type: "text", text: { content } }));
+  return chunks.map(content => ({ type: "text", text: { content } }));
 }
 
 function titleOf(properties: Record<string, NotionPropertyResponse> | undefined): string {
@@ -391,15 +391,11 @@ export function propertyResponseToValue(prop: NotionPropertyResponse): NotionPro
     case "formula": {
       const f = p.formula ?? {};
       const value =
-        f.type === "string"
-          ? (f.string ?? null)
-          : f.type === "number"
-            ? (f.number ?? null)
-            : f.type === "boolean"
-              ? (f.boolean ?? null)
-              : f.type === "date"
-                ? (f.date?.start ?? null)
-                : null;
+        f.type === "string" ? f.string ?? null
+        : f.type === "number" ? f.number ?? null
+        : f.type === "boolean" ? f.boolean ?? null
+        : f.type === "date" ? f.date?.start ?? null
+        : null;
       return { type: "formula", value };
     }
     case "rollup": {
@@ -446,32 +442,19 @@ export function propertyResponseToValue(prop: NotionPropertyResponse): NotionPro
 // Render a single item inside an array rollup to a short string (email, name, title text, etc.).
 function rollupItemText(item: Record<string, any>): string {
   switch (item?.type) {
-    case "email":
-      return item.email ?? "";
-    case "phone_number":
-      return item.phone_number ?? "";
-    case "url":
-      return item.url ?? "";
-    case "number":
-      return item.number == null ? "" : String(item.number);
-    case "checkbox":
-      return item.checkbox ? "true" : "false";
-    case "date":
-      return item.date?.start ?? "";
-    case "select":
-      return item.select?.name ?? "";
-    case "status":
-      return item.status?.name ?? "";
-    case "multi_select":
-      return (item.multi_select ?? []).map((o: any) => o.name).join(", ");
-    case "title":
-      return richTextToPlain(item.title);
-    case "rich_text":
-      return richTextToPlain(item.rich_text);
-    case "people":
-      return (item.people ?? []).map((u: any) => u.name ?? u.id).join(", ");
-    default:
-      return "";
+    case "email": return item.email ?? "";
+    case "phone_number": return item.phone_number ?? "";
+    case "url": return item.url ?? "";
+    case "number": return item.number == null ? "" : String(item.number);
+    case "checkbox": return item.checkbox ? "true" : "false";
+    case "date": return item.date?.start ?? "";
+    case "select": return item.select?.name ?? "";
+    case "status": return item.status?.name ?? "";
+    case "multi_select": return (item.multi_select ?? []).map((o: any) => o.name).join(", ");
+    case "title": return richTextToPlain(item.title);
+    case "rich_text": return richTextToPlain(item.rich_text);
+    case "people": return (item.people ?? []).map((u: any) => u.name ?? u.id).join(", ");
+    default: return "";
   }
 }
 
@@ -500,7 +483,7 @@ export function propertyInputToNotion(input: NotionPropertyInput): unknown {
     case "select":
       return { select: input.option === null ? null : { name: input.option } };
     case "multi_select":
-      return { multi_select: input.options.map((name) => ({ name })) };
+      return { multi_select: input.options.map(name => ({ name })) };
     case "status":
       return { status: input.status === null ? null : { name: input.status } };
     case "date":
@@ -516,12 +499,12 @@ export function propertyInputToNotion(input: NotionPropertyInput): unknown {
     case "phone_number":
       return { phone_number: input.phoneNumber };
     case "people":
-      return { people: input.userIds.map((id) => ({ object: "user", id })) };
+      return { people: input.userIds.map(id => ({ object: "user", id })) };
     case "relation":
-      return { relation: input.pageIds.map((id) => ({ id })) };
+      return { relation: input.pageIds.map(id => ({ id })) };
     case "files":
       return {
-        files: input.files.map((f) => ({
+        files: input.files.map(f => ({
           name: f.name,
           type: "external",
           external: { url: f.url },
@@ -569,7 +552,7 @@ export function propertyValueToInput(value: NotionPropertyValue): NotionProperty
     case "phone_number":
       return { type: "phone_number", phoneNumber: value.phoneNumber };
     case "people":
-      return { type: "people", userIds: value.people.map((u) => u.id) };
+      return { type: "people", userIds: value.people.map(u => u.id) };
     case "relation":
       return { type: "relation", pageIds: value.pageIds };
     case "files":
@@ -658,9 +641,7 @@ export function itemResponseToSummary(
 }
 
 /** Build the simplified schema from a data source (or anything exposing a Notion `properties` map). */
-export function databaseSchema(source: {
-  properties?: Record<string, NotionPropertyResponse>;
-}): NotionDatabaseSchema {
+export function databaseSchema(source: { properties?: Record<string, NotionPropertyResponse> }): NotionDatabaseSchema {
   const properties: Record<string, NotionPropertySchema> = {};
   for (const [name, prop] of Object.entries(source.properties ?? {})) {
     properties[name] = propertySchemaOf(prop);
@@ -698,8 +679,7 @@ function formatUuid(hex: string): string {
 // separates the slug from the ID with `-`/`/`).
 function findNotionId(text: string): string | undefined {
   const dashed = text.match(
-    /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g,
-  );
+    /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g);
   if (dashed && dashed.length > 0) {
     return formatUuid(dashed[dashed.length - 1].replace(/-/g, ""));
   }
@@ -785,9 +765,7 @@ export function blocksToMarkdown(blocks: BlockWithChildren[], depth = 0): string
         lines.push(indent + "- " + richTextToMarkdown(b.bulleted_list_item?.rich_text));
         break;
       case "numbered_list_item":
-        lines.push(
-          indent + `${numberedIndex}. ` + richTextToMarkdown(b.numbered_list_item?.rich_text),
-        );
+        lines.push(indent + `${numberedIndex}. ` + richTextToMarkdown(b.numbered_list_item?.rich_text));
         break;
       case "to_do":
         lines.push(
@@ -814,15 +792,10 @@ export function blocksToMarkdown(blocks: BlockWithChildren[], depth = 0): string
         lines.push(indent + "---");
         break;
       case "child_page":
-        lines.push(
-          indent + `- [${b.child_page?.title ?? "Untitled"}](${notionUrlFromId(block.block.id)})`,
-        );
+        lines.push(indent + `- [${b.child_page?.title ?? "Untitled"}](${notionUrlFromId(block.block.id)})`);
         break;
       case "child_database":
-        lines.push(
-          indent +
-            `- [${b.child_database?.title ?? "Untitled database"}](${notionUrlFromId(block.block.id)})`,
-        );
+        lines.push(indent + `- [${b.child_database?.title ?? "Untitled database"}](${notionUrlFromId(block.block.id)})`);
         break;
       case "table":
         lines.push(indent + "_[table omitted — read the page in Notion]_");
@@ -891,10 +864,7 @@ export function markdownToBlocks(markdown: string): unknown[] {
       blocks.push({
         object: "block",
         type: "code",
-        code: {
-          language: normalizeCodeLanguage(lang),
-          rich_text: plainToRichText(codeLines.join("\n")),
-        },
+        code: { language: normalizeCodeLanguage(lang), rich_text: plainToRichText(codeLines.join("\n")) },
       });
       continue;
     }
@@ -998,56 +968,13 @@ function isBlockStart(trimmed: string): boolean {
 // Notion only accepts a fixed set of code-block language identifiers; fall back to plain text.
 function normalizeCodeLanguage(lang: string): string {
   const known = new Set([
-    "abap",
-    "bash",
-    "c",
-    "c#",
-    "c++",
-    "css",
-    "diff",
-    "docker",
-    "go",
-    "graphql",
-    "html",
-    "java",
-    "javascript",
-    "json",
-    "kotlin",
-    "less",
-    "lua",
-    "makefile",
-    "markdown",
-    "matlab",
-    "objective-c",
-    "ocaml",
-    "perl",
-    "php",
-    "plain text",
-    "powershell",
-    "python",
-    "r",
-    "ruby",
-    "rust",
-    "sass",
-    "scala",
-    "scss",
-    "shell",
-    "sql",
-    "swift",
-    "typescript",
-    "xml",
-    "yaml",
+    "abap", "bash", "c", "c#", "c++", "css", "diff", "docker", "go", "graphql", "html", "java",
+    "javascript", "json", "kotlin", "less", "lua", "makefile", "markdown", "matlab", "objective-c",
+    "ocaml", "perl", "php", "plain text", "powershell", "python", "r", "ruby", "rust", "sass",
+    "scala", "scss", "shell", "sql", "swift", "typescript", "xml", "yaml",
   ]);
   const normalized = lang.toLowerCase();
-  const aliases: Record<string, string> = {
-    js: "javascript",
-    ts: "typescript",
-    py: "python",
-    sh: "shell",
-    "c++": "c++",
-    cpp: "c++",
-    cs: "c#",
-  };
+  const aliases: Record<string, string> = { js: "javascript", ts: "typescript", py: "python", sh: "shell", "c++": "c++", cpp: "c++", cs: "c#" };
   const resolved = aliases[normalized] ?? normalized;
   return known.has(resolved) ? resolved : "plain text";
 }
@@ -1070,29 +997,13 @@ function inlineMarkdownToRichText(text: string): unknown[] {
       const m = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/)!;
       out.push({ type: "text", text: { content: m[1], link: { url: m[2] } } });
     } else if (token.startsWith("**")) {
-      out.push({
-        type: "text",
-        text: { content: token.slice(2, -2) },
-        annotations: { bold: true },
-      });
+      out.push({ type: "text", text: { content: token.slice(2, -2) }, annotations: { bold: true } });
     } else if (token.startsWith("~~")) {
-      out.push({
-        type: "text",
-        text: { content: token.slice(2, -2) },
-        annotations: { strikethrough: true },
-      });
+      out.push({ type: "text", text: { content: token.slice(2, -2) }, annotations: { strikethrough: true } });
     } else if (token.startsWith("`")) {
-      out.push({
-        type: "text",
-        text: { content: token.slice(1, -1) },
-        annotations: { code: true },
-      });
+      out.push({ type: "text", text: { content: token.slice(1, -1) }, annotations: { code: true } });
     } else if (token.startsWith("*")) {
-      out.push({
-        type: "text",
-        text: { content: token.slice(1, -1) },
-        annotations: { italic: true },
-      });
+      out.push({ type: "text", text: { content: token.slice(1, -1) }, annotations: { italic: true } });
     }
     lastIndex = tokenRe.lastIndex;
   }
@@ -1130,10 +1041,9 @@ export class NotionApi {
     }
 
     if (!response.ok) {
-      const parsed = (await response.json().catch(() => null)) as {
-        code?: string;
-        message?: string;
-      } | null;
+      const parsed = (await response.json().catch(() => null)) as
+        | { code?: string; message?: string }
+        | null;
       throw new NotionApiError(
         response.status,
         parsed?.message ?? `${response.status} ${response.statusText}`,
@@ -1144,13 +1054,7 @@ export class NotionApi {
     return (await response.json()) as T;
   }
 
-  async #send(
-    method: string,
-    path: string,
-    token: string,
-    body: unknown,
-    version?: string,
-  ): Promise<Response> {
+  async #send(method: string, path: string, token: string, body: unknown, version?: string): Promise<Response> {
     const headers = new Headers({
       Accept: "application/json",
       "Notion-Version": version ?? NOTION_VERSION,
@@ -1189,21 +1093,13 @@ export class NotionApi {
    */
   async retrieveDatabase(id: string): Promise<NotionDatabaseResponse> {
     return await this.#request<NotionDatabaseResponse>(
-      "GET",
-      `/v1/databases/${id}`,
-      undefined,
-      DATA_SOURCE_VERSION,
-    );
+      "GET", `/v1/databases/${id}`, undefined, DATA_SOURCE_VERSION);
   }
 
   /** Get a data source (its row schema lives here, including rollups). */
   async retrieveDataSource(dataSourceId: string): Promise<NotionDataSourceResponse> {
     return await this.#request<NotionDataSourceResponse>(
-      "GET",
-      `/v1/data_sources/${dataSourceId}`,
-      undefined,
-      DATA_SOURCE_VERSION,
-    );
+      "GET", `/v1/data_sources/${dataSourceId}`, undefined, DATA_SOURCE_VERSION);
   }
 
   /** Determine whether an ID refers to a page or a database (tries database first, then page). */
@@ -1240,11 +1136,7 @@ export class NotionApi {
     },
   ): Promise<NotionListResponse<NotionPageResponse>> {
     return await this.#request(
-      "POST",
-      `/v1/data_sources/${dataSourceId}/query`,
-      body,
-      DATA_SOURCE_VERSION,
-    );
+      "POST", `/v1/data_sources/${dataSourceId}/query`, body, DATA_SOURCE_VERSION);
   }
 
   async listBlockChildren(
@@ -1278,14 +1170,7 @@ export class NotionApi {
     blockId: string,
     startCursor?: string,
     pageSize?: number,
-  ): Promise<
-    NotionListResponse<{
-      id: string;
-      rich_text: NotionRichText[];
-      created_time: string;
-      created_by?: NotionUserResponse;
-    }>
-  > {
+  ): Promise<NotionListResponse<{ id: string; rich_text: NotionRichText[]; created_time: string; created_by?: NotionUserResponse }>> {
     const params = new URLSearchParams({ block_id: blockId });
     if (startCursor) params.set("start_cursor", startCursor);
     if (pageSize) params.set("page_size", String(pageSize));
@@ -1308,7 +1193,7 @@ export class NotionApi {
         }
         out.push(node);
       }
-      cursor = page.has_more ? (page.next_cursor ?? undefined) : undefined;
+      cursor = page.has_more ? page.next_cursor ?? undefined : undefined;
     } while (cursor);
     return out;
   }
@@ -1330,7 +1215,7 @@ export class NotionApi {
       `/v1/blocks/${blockId}/children`,
       { children },
     );
-    return result.results.map((b) => b.id);
+    return result.results.map(b => b.id);
   }
 
   /** Archives (deletes) a single block. Used to revert appendContent. */

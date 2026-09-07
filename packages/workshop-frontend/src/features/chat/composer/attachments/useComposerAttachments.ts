@@ -3,7 +3,10 @@ import type { RpcStub } from "capnweb";
 import type { ChatAttachmentHandle, Overseer } from "@gadgets/workshop-shared/api";
 import { reportIssue } from "../../../../errorReporting";
 import { formatAttachmentSize } from "../../attachmentFormatting";
-import { MAX_CHAT_ATTACHMENT_TOTAL_BYTES, prepareChatAttachment } from "./prepareChatAttachment";
+import {
+  MAX_CHAT_ATTACHMENT_TOTAL_BYTES,
+  prepareChatAttachment,
+} from "./prepareChatAttachment";
 
 export const MAX_COMPOSER_ATTACHMENTS = 5;
 
@@ -41,7 +44,9 @@ export const useComposerAttachments = ({
   getOverseerRef.current = getOverseer;
   onErrorRef.current = onError;
 
-  const updateAttachments = (update: (current: ComposerAttachment[]) => ComposerAttachment[]) => {
+  const updateAttachments = (
+    update: (current: ComposerAttachment[]) => ComposerAttachment[],
+  ) => {
     const next = update(attachmentsRef.current);
     attachmentsRef.current = next;
     setAttachments(next);
@@ -84,19 +89,15 @@ export const useComposerAttachments = ({
         return;
       }
       stagedCleanupRef.current.set(id, deleteUpload);
-      updateAttachments((current) =>
-        current.map((item) => (item.id === id ? { ...item, uploadState: "ready", ref } : item)),
-      );
+      updateAttachments((current) => current.map((item) =>
+        item.id === id ? { ...item, uploadState: "ready", ref } : item));
     } catch (error) {
       if (!mountedRef.current || !attachmentsRef.current.some((item) => item.id === id)) return;
       console.error("Failed to upload chat attachment:", error);
       reportIssue("chat.attachment-upload", error);
       const message = errorMessage(error, "Upload failed");
-      updateAttachments((current) =>
-        current.map((item) =>
-          item.id === id ? { ...item, uploadState: "error", error: message } : item,
-        ),
-      );
+      updateAttachments((current) => current.map((item) =>
+        item.id === id ? { ...item, uploadState: "error", error: message } : item));
       onErrorRef.current(errorMessage(error, "Failed to upload attachment"));
     }
   };
@@ -110,19 +111,15 @@ export const useComposerAttachments = ({
     }
     const accepted = candidates.slice(0, initialRoom);
     if (candidates.length > initialRoom) {
-      onErrorRef.current(
-        initialRoom === 1
-          ? "Only the first attachment was attached"
-          : `Only the first ${initialRoom} attachments were attached`,
-      );
+      onErrorRef.current(initialRoom === 1
+        ? "Only the first attachment was attached"
+        : `Only the first ${initialRoom} attachments were attached`);
     }
 
-    const prepared = await Promise.allSettled(
-      accepted.map(async (file) => ({
-        file,
-        ...(await prepareChatAttachment(file)),
-      })),
-    );
+    const prepared = await Promise.allSettled(accepted.map(async (file) => ({
+      file,
+      ...(await prepareChatAttachment(file)),
+    })));
     if (!mountedRef.current) return;
 
     for (const result of prepared) {

@@ -25,9 +25,7 @@ const VP = join(ROOT, "node_modules", "vite-plus", "bin", "vp");
 
 const vpArgs = process.argv.slice(2);
 
-const child = spawn(process.execPath, [VP, "run", ...vpArgs], {
-  stdio: "inherit",
-  env: vpRunEnv({ vpArgs }),
-});
+const child = spawn(process.execPath, [VP, "run", ...vpArgs],
+    { stdio: "inherit", env: vpRunEnv({ vpArgs }) });
 
 relayTermination(child);

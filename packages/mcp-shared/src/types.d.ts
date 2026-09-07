@@ -10,10 +10,7 @@ export type McpContent =
   | { type: "image"; data: string; mimeType: string }
   | { type: "audio"; data: string; mimeType: string }
   | { type: "resource_link"; uri: string; name?: string; description?: string; mimeType?: string }
-  | {
-      type: "resource";
-      resource: { uri: string; mimeType?: string; text?: string; blob?: string };
-    };
+  | { type: "resource"; resource: { uri: string; mimeType?: string; text?: string; blob?: string } };
 
 /**
  * Outcome of `callTool` or `getActionResult`.

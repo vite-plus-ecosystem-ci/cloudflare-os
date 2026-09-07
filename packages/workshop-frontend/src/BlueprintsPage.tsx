@@ -1,6 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { useKumoToastManager } from "@cloudflare/kumo";
-import { Blueprint as BlueprintIcon, BookOpen, MagnifyingGlass } from "@phosphor-icons/react";
+import {
+  Blueprint as BlueprintIcon,
+  BookOpen,
+  MagnifyingGlass,
+} from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { BlueprintPublicInfo } from "@gadgets/workshop-shared/api";
 import { VendorDescription } from "@gadgets/workshop-shared/gatekeeper";
@@ -109,7 +113,11 @@ export default function BlueprintsPage() {
           <LoadingSkeleton view={view} />
         ) : filtered.length === 0 ? (
           <EmptySection
-            title={search ? "No blueprints match" : "No featured blueprints yet"}
+            title={
+              search
+                ? "No blueprints match"
+                : "No featured blueprints yet"
+            }
             message={
               search
                 ? "Try a different search term."
@@ -269,7 +277,10 @@ function LoadingSkeleton({ view }: { view: "grid" | "list" }) {
   return (
     <div className="grid grid-cols-1 gap-4 px-3 sm:grid-cols-2 lg:grid-cols-3">
       {[1, 2, 3, 4, 5, 6].map((i) => (
-        <div key={i} className="overflow-hidden rounded-xl border border-kumo-line bg-kumo-base">
+        <div
+          key={i}
+          className="overflow-hidden rounded-xl border border-kumo-line bg-kumo-base"
+        >
           <div className="aspect-[16/9] w-full animate-pulse bg-kumo-elevated" />
           <div className="flex items-start gap-2.5 px-3 py-2.5">
             <div className="h-8 w-8 shrink-0 animate-pulse rounded-lg bg-kumo-elevated" />

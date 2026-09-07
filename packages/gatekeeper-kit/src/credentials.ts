@@ -38,7 +38,8 @@ const IDENTITY_KEY = `${CREDENTIALS_KEY}:identity`;
 const MIGRATED_KEY = `${CREDENTIALS_KEY}:migrated`;
 const CONNECTION_KEY = `${CREDENTIALS_KEY}:connection`;
 
-const OWNED_KEYS: readonly string[] = [CREDENTIALS_KEY, IDENTITY_KEY, MIGRATED_KEY, CONNECTION_KEY];
+const OWNED_KEYS: readonly string[] =
+  [CREDENTIALS_KEY, IDENTITY_KEY, MIGRATED_KEY, CONNECTION_KEY];
 
 // Coalesce refreshes across coordinators sharing the same storage object.
 const refreshes = perStorage(() => new SingleFlight());
@@ -265,7 +266,8 @@ export class CredentialCoordinator<Creds> {
 }
 
 /** One fetch of credentials, tagged with their identity and connection generation. */
-export type CredentialsWithIdentity<Creds> = { creds: Creds; identity: string; generation: string };
+export type CredentialsWithIdentity<Creds> =
+  { creds: Creds; identity: string; generation: string };
 
 /** Account-side RPC shape. See `CredentialSourceOptions.account` for stub ownership. */
 export type AccountCredentialStub<Creds> = {
@@ -373,14 +375,10 @@ export class CredentialSource<Creds> {
       // A newer fetch adopted a live grant: this failure is stale, so that grant is neither
       // reported dead nor its cache authority dropped. An adopted identity that is itself dead is
       // no successor — then this failure is the freshest evidence, however old its read.
-      if (
-        identity !== this.#identity &&
-        this.#identity !== undefined &&
-        !this.#dead.has(this.#identity)
-      ) {
-        throw new Error("This account's credentials changed during the operation; retry it.", {
-          cause: error,
-        });
+      if (identity !== this.#identity
+        && this.#identity !== undefined && !this.#dead.has(this.#identity)) {
+        throw new Error("This account's credentials changed during the operation; retry it.",
+          { cause: error });
       }
       // Drop the in-flight fetch: it was started against the credentials just reported dead, and
       // leaving it would hand them to the next caller anyway. The generation goes with it, or a
@@ -399,9 +397,8 @@ export class CredentialSource<Creds> {
     const fence = this.#clearFence;
     let current: CredentialsWithIdentity<Creds>;
     try {
-      current = await this.#fetches.run(CREDENTIALS_FLIGHT, () =>
-        this.#options.account().getCredentials(),
-      );
+      current = await this.#fetches.run(
+        CREDENTIALS_FLIGHT, () => this.#options.account().getCredentials());
     } catch (error) {
       // A fetch rejecting with confirmed expiry (a failed refresh) reports the grant as dead as a
       // 401 does. Fenced like adoption: a straggler's stale rejection must not clear a revival.

@@ -4,11 +4,7 @@
 
 import { AccountDescription } from "@gadgets/workshop-shared/gatekeeper";
 import {
-  EmailAddress,
-  GmailAttachmentInfo,
-  GmailComposeOptions,
-  GmailHeader,
-  GmailReplyOptions,
+  EmailAddress, GmailAttachmentInfo, GmailComposeOptions, GmailHeader, GmailReplyOptions,
 } from "./types";
 import { createMimeMessage } from "mimetext/browser";
 import PostalMime, { addressParser } from "postal-mime";
@@ -98,12 +94,9 @@ export type GoogleOAuthGrant = {
 
 /** `signal` lets the caller bound the round trip; UserAccount holds the credential mutex across this. */
 export async function exchangeAuthCode(
-  code: string,
-  clientId: string,
-  clientSecret: string,
-  redirectUri: string,
-  signal?: AbortSignal,
-): Promise<GoogleOAuthGrant> {
+    code: string, clientId: string, clientSecret: string, redirectUri: string,
+    signal?: AbortSignal)
+    : Promise<GoogleOAuthGrant> {
   let params = new URLSearchParams();
   params.set("code", code);
   params.set("client_id", clientId);
@@ -111,11 +104,9 @@ export async function exchangeAuthCode(
   params.set("redirect_uri", redirectUri);
   params.set("grant_type", "authorization_code");
 
-  let response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    body: params,
-    ...(signal ? { signal } : {}),
-  });
+  let response = await fetch(
+      "https://oauth2.googleapis.com/token",
+      {method: "POST", body: params, ...(signal ? { signal } : {})});
 
   let contentType = response.headers.get("Content-Type");
   let isJson = contentType && contentType.startsWith("application/json");
@@ -125,7 +116,8 @@ export async function exchangeAuthCode(
       let body = await response.json<any>();
       throw new Error(`Failed to obtain refresh token: ${body.error} ${body.error_description}`);
     } else {
-      throw new Error(`Failed to obtain refresh token: ${response.status} ${response.statusText}`);
+      throw new Error(
+          `Failed to obtain refresh token: ${response.status} ${response.statusText}`);
     }
   }
 
@@ -141,7 +133,9 @@ export async function exchangeAuthCode(
       expires: new Date(Date.now() + body.expires_in * 1000),
     },
     refreshToken: body.refresh_token,
-    grantedScopes: typeof body.scope === "string" ? body.scope.split(" ").filter(Boolean) : [],
+    grantedScopes: typeof body.scope === "string"
+        ? body.scope.split(" ").filter(Boolean)
+        : [],
   };
 }
 
@@ -153,21 +147,18 @@ export type AccessTokenResult = { ok: true; token: GoogleAccessToken } | Refresh
 
 /** Exchange a refresh token for an access token. `signal` lets the caller bound the round trip */
 export async function getAccessToken(
-  refreshToken: string,
-  clientId: string,
-  clientSecret: string,
-  signal?: AbortSignal,
-): Promise<AccessTokenResult> {
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
+    refreshToken: string, clientId: string, clientSecret: string, signal?: AbortSignal)
+    : Promise<AccessTokenResult> {
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
       refresh_token: refreshToken,
-      grant_type: "refresh_token",
+      grant_type: 'refresh_token',
     }),
     ...(signal ? { signal } : {}),
   });
@@ -177,25 +168,23 @@ export async function getAccessToken(
     let isJson = contentType && contentType.startsWith("application/json");
 
     if (isJson) {
-      let body = await response.json<{ error?: string; error_description?: string }>();
+      let body = await response.json<{error?: string, error_description?: string}>();
       if (body.error === "invalid_grant") {
         return { ok: false, reason: "revoked" };
       }
       if (body.error === "admin_policy_enforced") {
-        return {
-          ok: false,
-          reason: "policyBlocked",
-          detail: body.error_description ?? "admin_policy_enforced",
-        };
+        return { ok: false, reason: "policyBlocked",
+                 detail: body.error_description ?? "admin_policy_enforced" };
       }
-      throw new Error(`Failed to refresh access token: ${body.error} ${body.error_description}`);
+      throw new Error(
+          `Failed to refresh access token: ${body.error} ${body.error_description}`);
     }
 
     let errorText = await readErrorText(response);
     throw new Error(`Failed to refresh access token: ${response.status} ${errorText}`);
   }
 
-  const data = (await response.json()) as {
+  const data = await response.json() as {
     access_token: string;
     expires_in: number;
   };
@@ -217,11 +206,11 @@ type GoogleAccountProfile = {
 };
 
 async function getGoogleAccountProfile(accessToken: string): Promise<GoogleAccountProfile> {
-  const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-    method: "GET",
+  const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    method: 'GET',
     headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
+      'Authorization': `Bearer ${accessToken}`,
+      'Accept': 'application/json',
     },
   });
 
@@ -230,7 +219,7 @@ async function getGoogleAccountProfile(accessToken: string): Promise<GoogleAccou
     throw new Error(`Failed to fetch user info: ${response.status} ${response.statusText}`);
   }
 
-  const data = (await response.json()) as Partial<GoogleAccountProfile>;
+  const data = await response.json() as Partial<GoogleAccountProfile>;
   if (!data.sub) throw new Error("Google user info did not include a stable account ID.");
   return data as GoogleAccountProfile;
 }
@@ -240,16 +229,15 @@ export async function getGoogleAccountSubject(accessToken: string): Promise<stri
   return (await getGoogleAccountProfile(accessToken)).sub;
 }
 
-export async function getGoogleAccountDescription(
-  accessToken: string,
-): Promise<AccountDescription> {
+export async function getGoogleAccountDescription(accessToken: string)
+    : Promise<AccountDescription> {
   const data = await getGoogleAccountProfile(accessToken);
 
   // Mapping the response to our specific interface
   return {
     displayName: data.name,
     uniqueName: data.email,
-    avatar: { url: data.picture ?? "" },
+    avatar: {url: data.picture ?? ""},
   };
 }
 
@@ -259,11 +247,11 @@ export async function getGoogleAccountDescription(
  * unverified address.
  */
 export async function getGoogleVerifiedEmail(accessToken: string): Promise<string | null> {
-  const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-    method: "GET",
+  const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    method: 'GET',
     headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
+      'Authorization': `Bearer ${accessToken}`,
+      'Accept': 'application/json',
     },
   });
 
@@ -278,16 +266,17 @@ export async function getGoogleVerifiedEmail(accessToken: string): Promise<strin
 }
 
 /** `signal` lets the caller bound the round trip; UserAccount holds the credential mutex across this. */
-export async function revokeGoogleToken(refreshToken: string, signal?: AbortSignal): Promise<void> {
+export async function revokeGoogleToken(
+    refreshToken: string, signal?: AbortSignal): Promise<void> {
   // Although we are revoking the token anyway, it's nice to avoid ever putting tokens in the
   // URL, so we instead use the format where the URL is in the POST body.
   const body = new URLSearchParams();
-  body.append("token", refreshToken);
+  body.append('token', refreshToken);
 
-  const response = await fetch("https://oauth2.googleapis.com/revoke", {
-    method: "POST",
+  const response = await fetch('https://oauth2.googleapis.com/revoke', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: body.toString(),
     ...(signal ? { signal } : {}),
@@ -300,7 +289,7 @@ export async function revokeGoogleToken(refreshToken: string, signal?: AbortSign
     // Read response body to be polite, but we don't really need it.
     await response.text();
   } else if (isJson) {
-    let body = await response.json<{ error: string }>();
+    let body = await response.json<{error: string}>();
     if (response.status === 400 && body.error === "invalid_token") {
       // Token may have been revoked previously, or may have never been valid. We don't really
       // know. But for the sake of idempotency, treat this as success.
@@ -346,8 +335,8 @@ export type GmailPayloadPart = {
   partId?: string;
   mimeType?: string;
   filename?: string;
-  headers?: Array<{ name: string; value: string }>;
-  body?: { attachmentId?: string; size?: number; data?: string };
+  headers?: Array<{name: string; value: string}>;
+  body?: {attachmentId?: string; size?: number; data?: string};
   parts?: GmailPayloadPart[];
 };
 
@@ -381,7 +370,7 @@ export type GmailDraftFull = {
 
 export type GmailDraftRef = {
   id: string;
-  message?: { id: string; threadId?: string };
+  message?: {id: string; threadId?: string};
 };
 
 export type GmailLabelRaw = {
@@ -407,10 +396,7 @@ export const MAX_GMAIL_FORWARD_SOURCE_BYTES = 25 * 1024 * 1024;
 const MAX_GMAIL_MESSAGE_HEADERS = 256;
 const MAX_GMAIL_MESSAGE_HEADER_BYTES = 128 * 1024;
 
-function boundedGmailHeaders<T>(
-  headers: Iterable<T>,
-  convert: (header: T) => GmailHeader,
-): GmailHeader[] {
+function boundedGmailHeaders<T>(headers: Iterable<T>, convert: (header: T) => GmailHeader): GmailHeader[] {
   const encoder = new TextEncoder();
   const result: GmailHeader[] = [];
   let totalBytes = 0;
@@ -424,15 +410,13 @@ function boundedGmailHeaders<T>(
     // before TextEncoder allocates an equally unbounded byte array.
     if (header.name.length + header.value.length > remainingBytes) {
       throw new Error(
-        `Gmail message headers exceed the ${MAX_GMAIL_MESSAGE_HEADER_BYTES}-byte safe-read limit.`,
-      );
+        `Gmail message headers exceed the ${MAX_GMAIL_MESSAGE_HEADER_BYTES}-byte safe-read limit.`);
     }
-    const encodedBytes =
-      encoder.encode(header.name).byteLength + encoder.encode(header.value).byteLength;
+    const encodedBytes = encoder.encode(header.name).byteLength +
+      encoder.encode(header.value).byteLength;
     if (encodedBytes > remainingBytes) {
       throw new Error(
-        `Gmail message headers exceed the ${MAX_GMAIL_MESSAGE_HEADER_BYTES}-byte safe-read limit.`,
-      );
+        `Gmail message headers exceed the ${MAX_GMAIL_MESSAGE_HEADER_BYTES}-byte safe-read limit.`);
     }
     totalBytes += encodedBytes;
     result.push(header);
@@ -447,22 +431,19 @@ export function base64UrlDecodedByteLength(data: string): number {
   const contentLength = match[1].length;
   const paddingLength = match[2].length;
   const remainder = contentLength % 4;
-  if (
-    remainder === 1 ||
-    (paddingLength > 0 && (data.length % 4 !== 0 || paddingLength !== 4 - remainder))
-  ) {
+  if (remainder === 1 || (paddingLength > 0 &&
+      (data.length % 4 !== 0 || paddingLength !== 4 - remainder))) {
     throw new Error("Invalid base64url padding.");
   }
   if (remainder === 2 || remainder === 3) {
-    const sextet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".indexOf(
-      match[1].at(-1)!,
-    );
+    const sextet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+      .indexOf(match[1].at(-1)!);
     const unusedBits = remainder === 2 ? 4 : 2;
     if ((sextet & ((1 << unusedBits) - 1)) !== 0) {
       throw new Error("Invalid base64url padding bits.");
     }
   }
-  return Math.floor((contentLength * 3) / 4);
+  return Math.floor(contentLength * 3 / 4);
 }
 
 function base64UrlToBase64(data: string): string {
@@ -473,7 +454,7 @@ function base64UrlToBase64(data: string): string {
 
 export function decodeBase64UrlToBytes(data: string): Uint8Array {
   const binary = atob(base64UrlToBase64(data));
-  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  return Uint8Array.from(binary, c => c.charCodeAt(0));
 }
 
 class UnsafeMimeReconstructionError extends Error {}
@@ -489,17 +470,13 @@ export async function parseMimeMessage(raw: string): Promise<import("postal-mime
     const parsed = await PostalMime.parse(bytes);
     try {
       const metadata = extractMimeAttachmentMetadata(bytes);
-      if (
-        metadata.length === parsed.attachments.length &&
-        metadata.every((item, index) => {
-          const attachment = parsed.attachments[index];
-          return (
-            baseMimeType(item.contentType) === baseMimeType(attachment.mimeType) &&
-            item.disposition === (attachment.disposition?.toLowerCase() ?? null) &&
-            item.contentId === normalizeMimeContentId(attachment.contentId)
-          );
-        })
-      ) {
+      if (metadata.length === parsed.attachments.length &&
+          metadata.every((item, index) => {
+            const attachment = parsed.attachments[index];
+            return baseMimeType(item.contentType) === baseMimeType(attachment.mimeType) &&
+              item.disposition === (attachment.disposition?.toLowerCase() ?? null) &&
+              item.contentId === normalizeMimeContentId(attachment.contentId);
+          })) {
         parsedAttachmentMetadata.set(parsed, metadata);
       }
     } catch (error) {
@@ -516,9 +493,7 @@ export async function parseMimeMessage(raw: string): Promise<import("postal-mime
 }
 
 function parseAddressList(
-  value: string,
-  options?: import("postal-mime").AddressParserOptions,
-): import("postal-mime").Address[] {
+    value: string, options?: import("postal-mime").AddressParserOptions): import("postal-mime").Address[] {
   try {
     return addressParser(value, options);
   } catch {
@@ -536,19 +511,15 @@ function postalAddressToEmailAddress(addr: import("postal-mime").Address): Email
   if (first?.address) {
     return first.name ? { address: first.address, name: first.name } : { address: first.address };
   }
-  return { address: "", name: addr.name };
+  return { address: '', name: addr.name };
 }
 
-function postalAddressListToEmailAddresses(
-  addrs: import("postal-mime").Address[] | undefined,
-): EmailAddress[] {
+function postalAddressListToEmailAddresses(addrs: import("postal-mime").Address[] | undefined): EmailAddress[] {
   if (!addrs) return [];
   const result: EmailAddress[] = [];
   for (const addr of addrs) {
     if (addr.address) {
-      result.push(
-        addr.name ? { address: addr.address, name: addr.name } : { address: addr.address },
-      );
+      result.push(addr.name ? { address: addr.address, name: addr.name } : { address: addr.address });
     } else if (addr.group) {
       for (const mb of addr.group) {
         result.push(mb.name ? { address: mb.address, name: mb.name } : { address: mb.address });
@@ -568,12 +539,12 @@ function parseEmailRecipient(input: string): EmailAddress {
     throw new Error("Expected exactly one recipient mailbox.");
   }
   const address = parsed[0].address.trim();
-  const at = address.lastIndexOf("@");
+  const at = address.lastIndexOf('@');
   if (at <= 0 || at === address.length - 1 || address.length > 320 || /[<>\s,;]/.test(address)) {
     throw new Error("Invalid recipient mailbox.");
   }
   const name = parsed[0].name?.trim();
-  return name ? { address, name } : { address };
+  return name ? {address, name} : {address};
 }
 
 function formatEmailAddress(value: EmailAddress): string {
@@ -609,20 +580,14 @@ export function normalizeEmailRecipients(inputs: string[]): string[] {
  * Earlier fields win, so an address can never be emitted in To and again in CC/BCC.
  */
 export function normalizeAggregateRecipients(
-  to: string[] = [],
-  cc: string[] = [],
-  bcc: string[] = [],
-): GmailNormalizedRecipients {
+    to: string[] = [], cc: string[] = [], bcc: string[] = []): GmailNormalizedRecipients {
   const seen = new Set<string>();
-  const normalizeField = (values: string[]) =>
-    parseEmailRecipients(values)
-      .filter((recipient) => {
-        const key = recipient.address.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .map(formatEmailAddress);
+  const normalizeField = (values: string[]) => parseEmailRecipients(values).filter(recipient => {
+    const key = recipient.address.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map(formatEmailAddress);
   return {
     to: normalizeField(to),
     cc: normalizeField(cc),
@@ -642,10 +607,7 @@ const MAX_GMAIL_DRAFT_LOOKUP_PAGES = 20;
 
 function validateMessageId(value: string, label: string): string {
   const trimmed = value.trim();
-  if (
-    !MESSAGE_ID_RE.test(trimmed) ||
-    new TextEncoder().encode(trimmed).byteLength > MAX_SUBJECT_BYTES
-  ) {
+  if (!MESSAGE_ID_RE.test(trimmed) || new TextEncoder().encode(trimmed).byteLength > MAX_SUBJECT_BYTES) {
     throw new Error(`Invalid ${label}.`);
   }
   return trimmed;
@@ -662,7 +624,7 @@ export function gmailMessageIdQueryValue(value: string): string {
 
 function foldReferenceTokens(tokens: string[]): string {
   let lines: string[] = [];
-  let current = "";
+  let current = '';
   for (const token of tokens) {
     if (current && current.length + 1 + token.length > 76) {
       lines.push(current);
@@ -672,7 +634,7 @@ function foldReferenceTokens(tokens: string[]): string {
     }
   }
   if (current) lines.push(current);
-  return lines.join("\r\n ");
+  return lines.join('\r\n ');
 }
 
 function parseReferenceTokens(references: string, enforceBudget = true): string[] {
@@ -691,11 +653,8 @@ function parseReferenceTokens(references: string, enforceBudget = true): string[
       throw new Error("Invalid References header.");
     }
   }
-  if (
-    tokens.length === 0 ||
-    (enforceBudget &&
-      new TextEncoder().encode(foldReferenceTokens(tokens)).byteLength > MAX_REFERENCES_BYTES)
-  ) {
+  if (tokens.length === 0 || (enforceBudget &&
+      new TextEncoder().encode(foldReferenceTokens(tokens)).byteLength > MAX_REFERENCES_BYTES)) {
     throw new Error("Invalid References header.");
   }
   return tokens;
@@ -715,8 +674,10 @@ function foldReferences(references: string | undefined, parentId: string): strin
       // thread the reply safely.
     }
   }
-  const bounded = valid.length > 20 ? [valid[0], ...valid.slice(-18)] : valid;
-  const tokens = [...bounded.filter((token) => token !== parentId), parentId];
+  const bounded = valid.length > 20
+    ? [valid[0], ...valid.slice(-18)]
+    : valid;
+  const tokens = [...bounded.filter(token => token !== parentId), parentId];
   while (new TextEncoder().encode(foldReferenceTokens(tokens)).byteLength > MAX_REFERENCES_BYTES) {
     if (tokens.length === 1) throw new Error("Invalid source Message-ID.");
     // Retain the oldest reference and newest context for as long as the byte budget permits.
@@ -726,17 +687,17 @@ function foldReferences(references: string | undefined, parentId: string): strin
 }
 
 function normalizeTextBody(body: string): string {
-  if (body.includes("\0")) throw new Error("Email body must not contain NUL bytes.");
-  return body.replace(/\r\n|\r|\n/g, "\r\n");
+  if (body.includes('\0')) throw new Error("Email body must not contain NUL bytes.");
+  return body.replace(/\r\n|\r|\n/g, '\r\n');
 }
 
 function foldBase64(value: string): string {
-  return value.match(/.{1,76}/g)?.join("\r\n") ?? "";
+  return value.match(/.{1,76}/g)?.join('\r\n') ?? '';
 }
 
 function utf8ToBase64(value: string): string {
   const bytes = new TextEncoder().encode(value);
-  let binary = "";
+  let binary = '';
   const chunkSize = 0x8000;
   for (let i = 0; i < bytes.length; i += chunkSize) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
@@ -748,7 +709,7 @@ function encodeHeaderWords(value: string): string[] {
   // Keep each encoded-word comfortably under RFC 2047's 75-character limit,
   // splitting only between Unicode code points.
   const chunks: string[] = [];
-  let chunk = "";
+  let chunk = '';
   for (const char of value) {
     if (chunk && new TextEncoder().encode(chunk + char).byteLength > 36) {
       chunks.push(chunk);
@@ -758,26 +719,21 @@ function encodeHeaderWords(value: string): string[] {
     }
   }
   if (chunk || chunks.length === 0) chunks.push(chunk);
-  return chunks.map((chunkValue) => `=?utf-8?B?${utf8ToBase64(chunkValue)}?=`);
+  return chunks.map(chunkValue => `=?utf-8?B?${utf8ToBase64(chunkValue)}?=`);
 }
 
 function encodeSubjectHeader(subject: string): string {
   const words = encodeHeaderWords(subject);
-  return `Subject: ${words[0]}${words
-    .slice(1)
-    .map((word) => `\r\n ${word}`)
-    .join("")}`;
+  return `Subject: ${words[0]}${words.slice(1).map(word => `\r\n ${word}`).join('')}`;
 }
 
 function encodeMailboxHeader(values: string[]): string {
-  return normalizeEmailRecipients(values)
-    .map((value) => {
-      const mailbox = parseEmailRecipient(value);
-      return mailbox.name
-        ? `${encodeHeaderWords(mailbox.name).join("\r\n ")} <${mailbox.address}>`
-        : mailbox.address;
-    })
-    .join(",\r\n ");
+  return normalizeEmailRecipients(values).map(value => {
+    const mailbox = parseEmailRecipient(value);
+    return mailbox.name
+      ? `${encodeHeaderWords(mailbox.name).join("\r\n ")} <${mailbox.address}>`
+      : mailbox.address;
+  }).join(",\r\n ");
 }
 
 function replaceMailboxHeader(raw: string, name: string, values: string[]): string {
@@ -789,10 +745,8 @@ function replaceMailboxHeader(raw: string, name: string, values: string[]): stri
 
 function validateAttachmentHeaderValue(value: string, label: string): string {
   // oxlint-disable-next-line no-control-regex -- guards MIME attachment header construction
-  if (
-    /[\x00-\x1f\x7f]/.test(value) ||
-    new TextEncoder().encode(value).byteLength > MAX_SUBJECT_BYTES
-  ) {
+  if (/[\x00-\x1f\x7f]/.test(value) ||
+      new TextEncoder().encode(value).byteLength > MAX_SUBJECT_BYTES) {
     throw new Error(`Invalid attachment ${label}.`);
   }
   return value;
@@ -800,11 +754,8 @@ function validateAttachmentHeaderValue(value: string, label: string): string {
 
 function validateDateHeader(value: string): string {
   // oxlint-disable-next-line no-control-regex -- guards RFC 5322 header construction
-  if (
-    /[^\t\x20-\x7e]/.test(value) ||
-    new TextEncoder().encode(value).byteLength > 998 ||
-    !Number.isFinite(new Date(value).valueOf())
-  ) {
+  if (/[^\t\x20-\x7e]/.test(value) || new TextEncoder().encode(value).byteLength > 998 ||
+      !Number.isFinite(new Date(value).valueOf())) {
     throw new Error("Invalid email Date header.");
   }
   return value;
@@ -818,12 +769,13 @@ function baseMimeType(value: string): string {
   return value.split(";", 1)[0].trim().toLowerCase();
 }
 
-type MimeParameter = { name: string; value: string };
-type ParameterizedMimeHeader = { value: string; parameters: MimeParameter[] };
+type MimeParameter = {name: string; value: string};
+type ParameterizedMimeHeader = {value: string; parameters: MimeParameter[]};
 
 const MIME_TOKEN_RE = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 
-function parseParameterizedMimeHeader(input: string, contentType = false): ParameterizedMimeHeader {
+function parseParameterizedMimeHeader(
+    input: string, contentType = false): ParameterizedMimeHeader {
   // oxlint-disable-next-line no-control-regex -- MIME headers must never carry injected line breaks
   if (/[^\t\x20-\x7e]/.test(input) || input.length > 8192) {
     throw new Error("Invalid attachment content type.");
@@ -839,13 +791,8 @@ function parseParameterizedMimeHeader(input: string, contentType = false): Param
   const value = input.slice(valueStart, offset).trim().toLowerCase();
   if (contentType) {
     const [type, subtype, extra] = value.split("/");
-    if (
-      !type ||
-      !subtype ||
-      extra !== undefined ||
-      !MIME_TOKEN_RE.test(type) ||
-      !MIME_TOKEN_RE.test(subtype)
-    ) {
+    if (!type || !subtype || extra !== undefined ||
+        !MIME_TOKEN_RE.test(type) || !MIME_TOKEN_RE.test(subtype)) {
       throw new Error("Invalid attachment content type.");
     }
   } else if (!MIME_TOKEN_RE.test(value)) {
@@ -857,20 +804,14 @@ function parseParameterizedMimeHeader(input: string, contentType = false): Param
     offset++;
     skipWhitespace();
     const nameStart = offset;
-    while (
-      offset < input.length &&
-      input[offset] !== "=" &&
-      input[offset] !== ";" &&
-      input[offset] !== " " &&
-      input[offset] !== "\t"
-    )
-      offset++;
+    while (offset < input.length && input[offset] !== "=" && input[offset] !== ";" &&
+        input[offset] !== " " && input[offset] !== "\t") offset++;
     const name = input.slice(nameStart, offset).toLowerCase();
     skipWhitespace();
     if (!MIME_TOKEN_RE.test(name) || input[offset] !== "=") {
-      throw new Error(
-        contentType ? "Invalid attachment content type." : "Invalid MIME structured header.",
-      );
+      throw new Error(contentType
+        ? "Invalid attachment content type."
+        : "Invalid MIME structured header.");
     }
     offset++;
     skipWhitespace();
@@ -891,40 +832,31 @@ function parseParameterizedMimeHeader(input: string, contentType = false): Param
           parsedParameterValue += char;
         }
       }
-      if (!closed)
-        throw new Error(
-          contentType ? "Invalid attachment content type." : "Invalid MIME structured header.",
-        );
+      if (!closed) throw new Error(contentType
+        ? "Invalid attachment content type."
+        : "Invalid MIME structured header.");
       skipWhitespace();
       if (offset < input.length && input[offset] !== ";") {
-        throw new Error(
-          contentType ? "Invalid attachment content type." : "Invalid MIME structured header.",
-        );
+        throw new Error(contentType
+          ? "Invalid attachment content type."
+          : "Invalid MIME structured header.");
       }
     } else {
       const parameterStart = offset;
-      while (
-        offset < input.length &&
-        input[offset] !== ";" &&
-        input[offset] !== " " &&
-        input[offset] !== "\t"
-      )
-        offset++;
+      while (offset < input.length && input[offset] !== ";" &&
+          input[offset] !== " " && input[offset] !== "\t") offset++;
       parsedParameterValue = input.slice(parameterStart, offset);
       skipWhitespace();
-      if (
-        !parsedParameterValue ||
-        !MIME_TOKEN_RE.test(parsedParameterValue) ||
-        (offset < input.length && input[offset] !== ";")
-      ) {
-        throw new Error(
-          contentType ? "Invalid attachment content type." : "Invalid MIME structured header.",
-        );
+      if (!parsedParameterValue || !MIME_TOKEN_RE.test(parsedParameterValue) ||
+          (offset < input.length && input[offset] !== ";")) {
+        throw new Error(contentType
+          ? "Invalid attachment content type."
+          : "Invalid MIME structured header.");
       }
     }
-    parameters.push({ name, value: parsedParameterValue });
+    parameters.push({name, value: parsedParameterValue});
   }
-  return { value, parameters };
+  return {value, parameters};
 }
 
 function stripMimeComments(input: string): string {
@@ -962,39 +894,34 @@ function stripMimeComments(input: string): string {
 }
 
 function serializeParameterizedMimeHeader(header: ParameterizedMimeHeader): string {
-  return (
-    header.value +
-    header.parameters
-      .map(({ name, value }) => {
-        if (MIME_TOKEN_RE.test(value)) return `; ${name}=${value}`;
-        return `; ${name}="${value.replace(/(["\\])/g, "\\$1")}"`;
-      })
-      .join("")
-  );
+  return header.value + header.parameters.map(({name, value}) => {
+    if (MIME_TOKEN_RE.test(value)) return `; ${name}=${value}`;
+    return `; ${name}="${value.replace(/(["\\])/g, "\\$1")}"`;
+  }).join("");
 }
 
 function encodeMimeParameter(value: string): string {
-  return encodeURIComponent(value).replace(
-    /[!'()*]/g,
-    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
-  );
+  return encodeURIComponent(value).replace(/[!'()*]/g, char =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
 function normalizeContentId(value: string): string {
   const trimmed = value.trim();
-  const id = trimmed.startsWith("<") && trimmed.endsWith(">") ? trimmed.slice(1, -1) : trimmed;
+  const id = trimmed.startsWith("<") && trimmed.endsWith(">")
+    ? trimmed.slice(1, -1)
+    : trimmed;
   if (!id || /[<>\s]/.test(id)) throw new Error("Invalid attachment Content-ID.");
   validateAttachmentHeaderValue(id, "Content-ID");
   return `<${id}>`;
 }
 
 function base64UrlEncodeUtf8(value: string): string {
-  return utf8ToBase64(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return utf8ToBase64(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
 function base64ToBytes(value: string): Uint8Array {
   try {
-    return Uint8Array.from(atob(value.replace(/\s/g, "")), (char) => char.charCodeAt(0));
+    return Uint8Array.from(atob(value.replace(/\s/g, "")), char => char.charCodeAt(0));
   } catch {
     throw new Error("Invalid attachment base64 data.");
   }
@@ -1020,9 +947,8 @@ function byteSequenceIndex(haystack: Uint8Array, needle: Uint8Array, from = 0): 
 }
 
 function replaceByteSequences(
-  haystack: Uint8Array,
-  replacements: readonly { index: number; length: number; replacement: Uint8Array }[],
-): Uint8Array {
+    haystack: Uint8Array,
+    replacements: readonly {index: number; length: number; replacement: Uint8Array}[]): Uint8Array {
   const located = replacements.toSorted((left, right) => left.index - right.index);
   for (let i = 1; i < located.length; i++) {
     if (located[i].index < located[i - 1].index + located[i - 1].length) {
@@ -1030,9 +956,7 @@ function replaceByteSequences(
     }
   }
   const size = located.reduce(
-    (total, item) => total - item.length + item.replacement.length,
-    haystack.length,
-  );
+    (total, item) => total - item.length + item.replacement.length, haystack.length);
   const result = new Uint8Array(size);
   let sourceOffset = 0;
   let resultOffset = 0;
@@ -1053,7 +977,7 @@ function uniqueMimeToken(prefix: string, sources: readonly Uint8Array[]): string
   for (;;) {
     const token = `${prefix}-${crypto.randomUUID()}`;
     const encoded = encoder.encode(token);
-    if (sources.every((source) => byteSequenceIndex(source, encoded) < 0)) return token;
+    if (sources.every(source => byteSequenceIndex(source, encoded) < 0)) return token;
   }
 }
 
@@ -1080,8 +1004,7 @@ function nestedMessageEncoding(bytes: Uint8Array): "7bit" | "8bit" {
     if (byte > 127) {
       if (i < headerEnd) {
         throw new Error(
-          "A nested email message with UTF-8 headers cannot be labeled message/rfc822.",
-        );
+          "A nested email message with UTF-8 headers cannot be labeled message/rfc822.");
       }
       encoding = "8bit";
     }
@@ -1100,15 +1023,13 @@ function mimeHeaderValue(bytes: Uint8Array, name: string): string | undefined {
     }
   }
   const prefix = `${name.toLowerCase()}:`;
-  const header = unfolded.find((line) => line.toLowerCase().startsWith(prefix));
+  const header = unfolded.find(line => line.toLowerCase().startsWith(prefix));
   return header?.slice(prefix.length).trim();
 }
 
 function mimeParameter(
-  value: string | undefined,
-  name: string,
-  headerKind: "content-type" | "content-disposition",
-): string | undefined {
+    value: string | undefined, name: string,
+    headerKind: "content-type" | "content-disposition"): string | undefined {
   if (!value) return undefined;
   const parsed = parseParameterizedMimeHeader(value, headerKind === "content-type");
   const extended = parameterValue(parsed, `${name.toLowerCase()}*`);
@@ -1128,20 +1049,17 @@ function mimeTransferEncoding(value: string | undefined): string | undefined {
   if (!value) return undefined;
   try {
     const parsed = parseParameterizedMimeHeader(value);
-    if (
-      parsed.parameters.length > 0 ||
-      !["7bit", "8bit", "binary", "base64", "quoted-printable"].includes(parsed.value)
-    ) {
+    if (parsed.parameters.length > 0 || ![
+      "7bit", "8bit", "binary", "base64", "quoted-printable",
+    ].includes(parsed.value)) {
       throw new UnsafeMimeReconstructionError(
-        "Cannot safely edit a draft with an unsupported MIME transfer encoding.",
-      );
+        "Cannot safely edit a draft with an unsupported MIME transfer encoding.");
     }
     return parsed.value;
   } catch (error) {
     if (error instanceof UnsafeMimeReconstructionError) throw error;
     throw new UnsafeMimeReconstructionError(
-      "Cannot safely edit a draft with an unsupported MIME transfer encoding.",
-    );
+      "Cannot safely edit a draft with an unsupported MIME transfer encoding.");
   }
 }
 
@@ -1163,29 +1081,27 @@ type MimeAttachmentMetadata = {
   exactBytes?: Uint8Array;
 };
 
-type MimeMetadataBudget = { remainingWork: number; entities: number };
+type MimeMetadataBudget = {remainingWork: number; entities: number};
 
 const MAX_MIME_METADATA_ENTITIES = 2048;
 const MAX_MIME_METADATA_DEPTH = 256;
 const MIME_METADATA_WORK_FACTOR = 8;
 
 const parsedAttachmentMetadata = new WeakMap<
-  import("postal-mime").Email,
-  readonly MimeAttachmentMetadata[]
->();
+  import("postal-mime").Email, readonly MimeAttachmentMetadata[]>();
 
-function mimeHeaderSeparator(bytes: Uint8Array): { index: number; length: number } | undefined {
-  if (bytes[0] === 13 && bytes[1] === 10) return { index: 0, length: 2 };
-  if (bytes[0] === 10 || bytes[0] === 13) return { index: 0, length: 1 };
+function mimeHeaderSeparator(bytes: Uint8Array): {index: number; length: number} | undefined {
+  if (bytes[0] === 13 && bytes[1] === 10) return {index: 0, length: 2};
+  if (bytes[0] === 10 || bytes[0] === 13) return {index: 0, length: 1};
   const crlf = byteSequenceIndex(bytes, new Uint8Array([13, 10, 13, 10]));
   const lf = byteSequenceIndex(bytes, new Uint8Array([10, 10]));
-  if (crlf < 0) return lf >= 0 ? { index: lf, length: 2 } : undefined;
-  if (lf < 0 || crlf < lf) return { index: crlf, length: 4 };
-  return { index: lf, length: 2 };
+  if (crlf < 0) return lf >= 0 ? {index: lf, length: 2} : undefined;
+  if (lf < 0 || crlf < lf) return {index: crlf, length: 4};
+  return {index: lf, length: 2};
 }
 
 function parameterValue(header: ParameterizedMimeHeader, name: string): string | undefined {
-  return header.parameters.find((parameter) => parameter.name === name)?.value;
+  return header.parameters.find(parameter => parameter.name === name)?.value;
 }
 
 function validateMimeBoundary(boundary: string | undefined): string {
@@ -1195,13 +1111,13 @@ function validateMimeBoundary(boundary: string | undefined): string {
   return boundary;
 }
 
-function mimeLine(bytes: Uint8Array, start: number): { end: number; next: number } {
+function mimeLine(bytes: Uint8Array, start: number): {end: number; next: number} {
   let end = start;
   while (end < bytes.length && bytes[end] !== 10 && bytes[end] !== 13) end++;
   let next = end;
   if (bytes[next] === 13) next++;
   if (bytes[next] === 10) next++;
-  return { end, next };
+  return {end, next};
 }
 
 function splitMultipartBody(bytes: Uint8Array, boundary: string): Uint8Array[] {
@@ -1210,7 +1126,7 @@ function splitMultipartBody(bytes: Uint8Array, boundary: string): Uint8Array[] {
   const parts: Uint8Array[] = [];
   let partStart: number | undefined;
   for (let offset = 0; offset < bytes.length;) {
-    const { end, next } = mimeLine(bytes, offset);
+    const {end, next} = mimeLine(bytes, offset);
     const line = new TextDecoder().decode(bytes.subarray(offset, end));
     if (line.startsWith(marker)) {
       const suffix = line.slice(marker.length);
@@ -1240,9 +1156,7 @@ function hexNibble(byte: number | undefined): number {
     ? byte - 48
     : byte !== undefined && byte >= 65 && byte <= 70
       ? byte - 55
-      : byte !== undefined && byte >= 97 && byte <= 102
-        ? byte - 87
-        : -1;
+      : byte !== undefined && byte >= 97 && byte <= 102 ? byte - 87 : -1;
 }
 
 function decodeQuotedPrintableBytes(bytes: Uint8Array, budget: MimeMetadataBudget): Uint8Array {
@@ -1299,20 +1213,17 @@ function decodeMimeBase64Bytes(bytes: Uint8Array, budget: MimeMetadataBudget): U
     if (sawPadding) throw new Error("Invalid attachment base64 data.");
     const value = alphabet.indexOf(String.fromCharCode(byte));
     if (value < 0) throw new Error("Invalid attachment base64 data.");
-    buffer = (buffer << 6) | value;
+    buffer = buffer << 6 | value;
     bits += 6;
     sextets++;
     if (bits >= 8) {
       bits -= 8;
-      result[outputOffset++] = (buffer >> bits) & 0xff;
+      result[outputOffset++] = buffer >> bits & 0xff;
       buffer = bits === 0 ? 0 : buffer & ((1 << bits) - 1);
     }
   }
-  if (
-    sextets % 4 === 1 ||
-    (padding > 0 && (sextets + padding) % 4 !== 0) ||
-    (padding > 0 && padding !== (4 - (sextets % 4)) % 4)
-  ) {
+  if (sextets % 4 === 1 || (padding > 0 && (sextets + padding) % 4 !== 0) ||
+      (padding > 0 && padding !== (4 - sextets % 4) % 4)) {
     throw new Error("Invalid attachment base64 data.");
   }
   return result.subarray(0, outputOffset);
@@ -1324,17 +1235,10 @@ function normalizeMimeContentId(value: string | undefined): string | null {
 }
 
 function parseMimeMetadataEntity(
-  bytes: Uint8Array,
-  budget: MimeMetadataBudget,
-  depth = 0,
-  defaultContentType = "text/plain",
-  messageRoot = true,
-): MimeMetadataEntity {
-  if (
-    depth > MAX_MIME_METADATA_DEPTH ||
-    ++budget.entities > MAX_MIME_METADATA_ENTITIES ||
-    bytes.byteLength > budget.remainingWork
-  ) {
+    bytes: Uint8Array, budget: MimeMetadataBudget, depth = 0,
+    defaultContentType = "text/plain", messageRoot = true): MimeMetadataEntity {
+  if (depth > MAX_MIME_METADATA_DEPTH || ++budget.entities > MAX_MIME_METADATA_ENTITIES ||
+      bytes.byteLength > budget.remainingWork) {
     throw new Error("Gmail MIME metadata exceeds safe parsing limits.");
   }
   budget.remainingWork -= bytes.byteLength;
@@ -1346,18 +1250,11 @@ function parseMimeMetadataEntity(
       if (!line || /^[ \t]/.test(line)) continue;
       const colon = line.indexOf(":");
       const name = colon > 0 ? line.slice(0, colon).trim().toLowerCase() : "";
-      if (
-        name.startsWith("content-") &&
-        ![
-          "content-type",
-          "content-transfer-encoding",
-          "content-disposition",
-          "content-id",
-        ].includes(name)
-      ) {
+      if (name.startsWith("content-") && ![
+        "content-type", "content-transfer-encoding", "content-disposition", "content-id",
+      ].includes(name)) {
         throw new UnsafeMimeReconstructionError(
-          `Cannot safely edit a draft with unsupported MIME part header ${name}.`,
-        );
+          `Cannot safely edit a draft with unsupported MIME part header ${name}.`);
       }
     }
   }
@@ -1365,22 +1262,22 @@ function parseMimeMetadataEntity(
   const contentType = validateAttachmentContentType(rawContentType);
   const parsedContentType = parseParameterizedMimeHeader(contentType, true);
   const rawDisposition = mimeHeaderValue(headers, "Content-Disposition");
-  const disposition = rawDisposition ? parseParameterizedMimeHeader(rawDisposition).value : null;
+  const disposition = rawDisposition
+    ? parseParameterizedMimeHeader(rawDisposition).value
+    : null;
   const contentId = normalizeMimeContentId(mimeHeaderValue(headers, "Content-ID"));
   const body = bytes.subarray(separator.index + separator.length);
   const transferEncoding = mimeTransferEncoding(
-    mimeHeaderValue(headers, "Content-Transfer-Encoding"),
-  );
+    mimeHeaderValue(headers, "Content-Transfer-Encoding"));
   const boundary = parameterValue(parsedContentType, "boundary");
-  const childDefault =
-    parsedContentType.value === "multipart/digest" ? "message/rfc822" : "text/plain";
+  const childDefault = parsedContentType.value === "multipart/digest"
+    ? "message/rfc822"
+    : "text/plain";
   const children = parsedContentType.value.startsWith("multipart/")
-    ? splitMultipartBody(body, boundary ?? "").map((part) =>
-        parseMimeMetadataEntity(part, budget, depth + 1, childDefault, false),
-      )
+    ? splitMultipartBody(body, boundary ?? "").map(part =>
+        parseMimeMetadataEntity(part, budget, depth + 1, childDefault, false))
     : [];
-  const isInlineRfc822 =
-    parsedContentType.value === "message/rfc822" &&
+  const isInlineRfc822 = parsedContentType.value === "message/rfc822" &&
     (disposition === null || disposition === "inline");
   return {
     contentType,
@@ -1389,12 +1286,10 @@ function parseMimeMetadataEntity(
     children,
     depth,
     body,
-    ...(transferEncoding ? { transferEncoding } : {}),
-    ...(isInlineRfc822
-      ? {
-          rfc822Body: body,
-        }
-      : {}),
+    ...(transferEncoding ? {transferEncoding} : {}),
+    ...(isInlineRfc822 ? {
+      rfc822Body: body,
+    } : {}),
   };
 }
 
@@ -1419,48 +1314,38 @@ function extractMimeAttachmentMetadata(bytes: Uint8Array): MimeAttachmentMetadat
       const mediaType = baseMimeType(part.contentType);
       if (mediaType.startsWith("multipart/")) {
         for (const child of part.children) visit(child);
-      } else if (
-        mediaType === "message/rfc822" &&
-        (part.disposition === null || part.disposition === "inline") &&
-        !forceRfc822
-      ) {
+      } else if (mediaType === "message/rfc822" &&
+          (part.disposition === null || part.disposition === "inline") && !forceRfc822) {
         if (rfc822Depth >= 10 || !part.rfc822Body) {
           result.push(part);
         } else {
-          const decoded =
-            part.transferEncoding === "base64"
-              ? decodeMimeBase64Bytes(part.rfc822Body, budget)
-              : part.transferEncoding === "quoted-printable"
-                ? decodeQuotedPrintableBytes(part.rfc822Body, budget)
-                : part.rfc822Body;
-          collectMessage(parseMimeMetadataEntity(decoded, budget, part.depth + 1), rfc822Depth + 1);
+          const decoded = part.transferEncoding === "base64"
+            ? decodeMimeBase64Bytes(part.rfc822Body, budget)
+            : part.transferEncoding === "quoted-printable"
+              ? decodeQuotedPrintableBytes(part.rfc822Body, budget)
+              : part.rfc822Body;
+          collectMessage(
+            parseMimeMetadataEntity(decoded, budget, part.depth + 1), rfc822Depth + 1);
         }
-      } else if (
-        (mediaType !== "text/plain" && mediaType !== "text/html") ||
-        part.disposition === "attachment"
-      ) {
+      } else if ((mediaType !== "text/plain" && mediaType !== "text/html") ||
+          part.disposition === "attachment") {
         result.push(part);
       }
     };
     visit(entity);
   };
   collectMessage(root, 0);
-  return result.map(({ contentType, disposition, contentId, transferEncoding, body }) => ({
+  return result.map(({contentType, disposition, contentId, transferEncoding, body}) => ({
     contentType,
     disposition,
     contentId,
-    ...(!transferEncoding ||
-    transferEncoding === "7bit" ||
-    transferEncoding === "8bit" ||
-    transferEncoding === "binary"
-      ? { exactBytes: body }
-      : {}),
+    ...(!transferEncoding || transferEncoding === "7bit" || transferEncoding === "8bit" ||
+        transferEncoding === "binary" ? {exactBytes: body} : {}),
   }));
 }
 
 function requireAttachmentMetadata(
-  parsed: import("postal-mime").Email,
-): readonly MimeAttachmentMetadata[] {
+    parsed: import("postal-mime").Email): readonly MimeAttachmentMetadata[] {
   if (parsed.attachments.length === 0) return [];
   const metadata = parsedAttachmentMetadata.get(parsed);
   if (!metadata) {
@@ -1520,32 +1405,28 @@ export function extractRfc822Attachments(raw: string): ExtractedRfc822Attachment
     const rawContentType = mimeHeaderValue(partHeaders, "Content-Type");
     const partContentType = rawContentType?.toLowerCase();
     if (partContentType?.startsWith("message/rfc822")) {
-      const transferEncoding =
-        mimeTransferEncoding(mimeHeaderValue(partHeaders, "Content-Transfer-Encoding")) ?? "7bit";
+      const transferEncoding = mimeTransferEncoding(
+        mimeHeaderValue(partHeaders, "Content-Transfer-Encoding")) ?? "7bit";
       if (transferEncoding === "base64" || transferEncoding === "quoted-printable") {
         cursor = partEnd + 2;
         continue;
       }
-      if (
-        transferEncoding !== "7bit" &&
-        transferEncoding !== "8bit" &&
-        transferEncoding !== "binary"
-      ) {
+      if (transferEncoding !== "7bit" && transferEncoding !== "8bit" &&
+          transferEncoding !== "binary") {
         throw new Error("A message/rfc822 draft attachment uses an unsupported transfer encoding.");
       }
       const rawDisposition = mimeHeaderValue(partHeaders, "Content-Disposition");
       const contentId = mimeHeaderValue(partHeaders, "Content-ID")?.replace(/^<|>$/g, "");
-      const filename =
-        mimeParameter(rawDisposition, "filename", "content-disposition") ??
+      const filename = mimeParameter(rawDisposition, "filename", "content-disposition") ??
         mimeParameter(rawContentType, "name", "content-type");
       const disposition = rawDisposition
         ? parseParameterizedMimeHeader(rawDisposition).value
         : undefined;
       attachments.push({
         bytes: bytes.slice(partHeaderEnd + headerSeparator.length, partEnd),
-        ...(filename ? { filename } : {}),
-        ...(disposition ? { disposition } : {}),
-        ...(contentId ? { contentId } : {}),
+        ...(filename ? {filename} : {}),
+        ...(disposition ? {disposition} : {}),
+        ...(contentId ? {contentId} : {}),
       });
     }
     cursor = partEnd + 2;
@@ -1561,13 +1442,9 @@ export function buildEncodedEmail(options: GmailOutboundSpec): string {
   const msg = createMimeMessage();
 
   // oxlint-disable-next-line no-control-regex -- intentionally rejecting control chars (header-injection guard)
-  if (
-    /[\x00-\x1f\x7f]/.test(options.subject) ||
-    new TextEncoder().encode(options.subject).byteLength > MAX_SUBJECT_BYTES
-  ) {
-    throw new Error(
-      `Email subject must be at most ${MAX_SUBJECT_BYTES} UTF-8 bytes and contain no control characters.`,
-    );
+  if (/[\x00-\x1f\x7f]/.test(options.subject) ||
+      new TextEncoder().encode(options.subject).byteLength > MAX_SUBJECT_BYTES) {
+    throw new Error(`Email subject must be at most ${MAX_SUBJECT_BYTES} UTF-8 bytes and contain no control characters.`);
   }
 
   const from = parseEmailRecipient(normalizeEmailRecipients([options.from])[0]);
@@ -1576,9 +1453,9 @@ export function buildEncodedEmail(options: GmailOutboundSpec): string {
   const bcc = normalizeEmailRecipients(options.bcc);
   const mimeAddress = (value: string) => {
     const parsed = parseEmailRecipient(value);
-    return { addr: parsed.address, ...(parsed.name ? { name: parsed.name } : {}) };
+    return {addr: parsed.address, ...(parsed.name ? {name: parsed.name} : {})};
   };
-  msg.setSender({ addr: from.address, ...(from.name ? { name: from.name } : {}) });
+  msg.setSender({addr: from.address, ...(from.name ? {name: from.name} : {})});
   if (to.length > 0) msg.setTo(to.map(mimeAddress));
   if (cc.length > 0) msg.setCc(cc.map(mimeAddress));
   if (bcc.length > 0) msg.setBcc(bcc.map(mimeAddress));
@@ -1587,51 +1464,54 @@ export function buildEncodedEmail(options: GmailOutboundSpec): string {
   if (options.date !== undefined) msg.setHeader("Date", validateDateHeader(options.date));
 
   if (options.inReplyTo) {
-    msg.setHeader("In-Reply-To", validateMessageId(options.inReplyTo, "In-Reply-To"));
+    msg.setHeader('In-Reply-To', validateMessageId(options.inReplyTo, 'In-Reply-To'));
   }
   if (options.references) {
-    msg.setHeader("References", normalizeReferences(options.references));
+    msg.setHeader('References', normalizeReferences(options.references));
   }
   msg.addMessage({
-    contentType: "text/plain",
+    contentType: 'text/plain',
     data: foldBase64(utf8ToBase64(normalizeTextBody(options.text))),
-    encoding: "base64",
+    encoding: 'base64',
   });
 
   if (options.html !== undefined) {
     msg.addMessage({
-      contentType: "text/html",
+      contentType: 'text/html',
       data: foldBase64(utf8ToBase64(normalizeTextBody(options.html))),
-      encoding: "base64",
+      encoding: 'base64',
     });
   }
 
-  const nestedMessageBytes = new Map<number, { bytes: Uint8Array; encoding: "7bit" | "8bit" }>();
+  const nestedMessageBytes = new Map<number, {bytes: Uint8Array; encoding: "7bit" | "8bit"}>();
   for (let index = 0; index < options.attachments.length; index++) {
     if (baseMimeType(options.attachments[index].contentType) === "message/rfc822") {
       const bytes = base64ToBytes(options.attachments[index].data);
-      nestedMessageBytes.set(index, { bytes, encoding: nestedMessageEncoding(bytes) });
+      nestedMessageBytes.set(index, {bytes, encoding: nestedMessageEncoding(bytes)});
     }
   }
-  const nestedSources = [...nestedMessageBytes.values()].map((item) => item.bytes);
-  const nestedNamespace =
-    nestedSources.length > 0 ? uniqueMimeToken("gadgets-mime", nestedSources) : undefined;
+  const nestedSources = [...nestedMessageBytes.values()].map(item => item.bytes);
+  const nestedNamespace = nestedSources.length > 0
+    ? uniqueMimeToken("gadgets-mime", nestedSources)
+    : undefined;
   const nestedReplacements: Array<{
     attachmentIndex: number;
     placeholder: string;
     bytes: Uint8Array;
   }> = [];
-  const attachmentFilenames: Array<{ token: string; encoded: string }> = [];
+  const attachmentFilenames: Array<{token: string; encoded: string}> = [];
   for (let index = 0; index < options.attachments.length; index++) {
     const attachment = options.attachments[index];
     validateAttachmentHeaderValue(attachment.filename, "filename");
     const contentType = validateAttachmentContentType(attachment.contentType);
     const token = `gadgets-attachment-${index}`;
-    attachmentFilenames.push({ token, encoded: encodeMimeParameter(attachment.filename) });
+    attachmentFilenames.push({token, encoded: encodeMimeParameter(attachment.filename)});
     const nestedMessage = nestedMessageBytes.get(index);
-    const placeholder = nestedMessage ? `${nestedNamespace}-nested-${index}` : undefined;
+    const placeholder = nestedMessage
+      ? `${nestedNamespace}-nested-${index}`
+      : undefined;
     if (placeholder) {
-      nestedReplacements.push({ attachmentIndex: index, placeholder, bytes: nestedMessage!.bytes });
+      nestedReplacements.push({attachmentIndex: index, placeholder, bytes: nestedMessage!.bytes});
     }
     const part = msg.addAttachment({
       filename: token,
@@ -1640,15 +1520,14 @@ export function buildEncodedEmail(options: GmailOutboundSpec): string {
       encoding: nestedMessage?.encoding ?? "base64",
       inline: attachment.disposition === "inline",
       headers: attachment.contentId
-        ? { "Content-ID": normalizeContentId(attachment.contentId) }
+        ? {"Content-ID": normalizeContentId(attachment.contentId)}
         : undefined,
     });
     // MIMEText appends its own name parameter. Preserve a source name when present, otherwise keep
     // the established filename-derived parameter that the replacement pass below RFC 2231-encodes.
     const parsedContentType = parseParameterizedMimeHeader(contentType, true);
-    const hasName = parsedContentType.parameters.some(
-      (parameter) => parameter.name === "name" || parameter.name.startsWith("name*"),
-    );
+    const hasName = parsedContentType.parameters.some(parameter =>
+      parameter.name === "name" || parameter.name.startsWith("name*"));
     part.setHeader("Content-Type", hasName ? contentType : `${contentType}; name="${token}"`);
   }
 
@@ -1666,31 +1545,20 @@ export function buildEncodedEmail(options: GmailOutboundSpec): string {
   if (cc.length > 0) raw = replaceMailboxHeader(raw, "Cc", cc);
   if (bcc.length > 0) raw = replaceMailboxHeader(raw, "Bcc", bcc);
   if (options.replyTo?.length) {
-    const fromHeader = /^From:[^\r\n]*(?:\r\n[ \t][^\r\n]*)*/im;
+    const fromHeader = /^From:[^\r\n]*(?:\r\n[ \t][^\r\n]*)*/mi;
     if (!fromHeader.test(raw)) throw new Error("Unable to insert the Reply-To header safely.");
     raw = raw.replace(
-      fromHeader,
-      (value) => `${value}\r\nReply-To: ${encodeMailboxHeader(options.replyTo!)}`,
-    );
+      fromHeader, value => `${value}\r\nReply-To: ${encodeMailboxHeader(options.replyTo!)}`);
   }
   raw = raw.replace(
-    /^Subject:[^\r\n]*(?:\r\n[ \t][^\r\n]*)*/m,
-    encodeSubjectHeader(options.subject),
-  );
-  for (const { token, encoded } of attachmentFilenames) {
-    raw = raw
-      .replaceAll(`name="${token}"`, `name*=UTF-8''${encoded}`)
+    /^Subject:[^\r\n]*(?:\r\n[ \t][^\r\n]*)*/m, encodeSubjectHeader(options.subject));
+  for (const {token, encoded} of attachmentFilenames) {
+    raw = raw.replaceAll(`name="${token}"`, `name*=UTF-8''${encoded}`)
       .replaceAll(`filename="${token}"`, `filename*=UTF-8''${encoded}`);
   }
-  if (
-    raw
-      .split("\r\n")
-      .some(
-        (line) =>
-          /(?:^|;)\s*(?:name|filename)\*=UTF-8''/i.test(line) &&
-          new TextEncoder().encode(line).byteLength > 998,
-      )
-  ) {
+  if (raw.split("\r\n").some(line =>
+    /(?:^|;)\s*(?:name|filename)\*=UTF-8''/i.test(line) &&
+    new TextEncoder().encode(line).byteLength > 998)) {
     throw new Error("Attachment filename is too long to encode safely in a MIME header.");
   }
   if (nestedReplacements.length > 0) {
@@ -1698,9 +1566,8 @@ export function buildEncodedEmail(options: GmailOutboundSpec): string {
     const rawBytes = encoder.encode(raw);
     const prefix = encoder.encode(`${nestedNamespace}-nested-`);
     const byAttachmentIndex = new Map(
-      nestedReplacements.map((replacement) => [replacement.attachmentIndex, replacement]),
-    );
-    const replacements: Array<{ index: number; length: number; replacement: Uint8Array }> = [];
+      nestedReplacements.map(replacement => [replacement.attachmentIndex, replacement]));
+    const replacements: Array<{index: number; length: number; replacement: Uint8Array}> = [];
     let searchFrom = 0;
     for (;;) {
       const index = byteSequenceIndex(rawBytes, prefix, searchFrom);
@@ -1715,13 +1582,11 @@ export function buildEncodedEmail(options: GmailOutboundSpec): string {
       }
       const replacement = hasDigit ? byAttachmentIndex.get(attachmentIndex) : undefined;
       if (replacement) {
-        if (
-          replacements.some((item) => item.replacement === replacement.bytes) ||
-          end - index !== encoder.encode(replacement.placeholder).length
-        ) {
+        if (replacements.some(item => item.replacement === replacement.bytes) ||
+            end - index !== encoder.encode(replacement.placeholder).length) {
           throw new Error("Unable to assemble nested message attachment.");
         }
-        replacements.push({ index, length: end - index, replacement: replacement.bytes });
+        replacements.push({index, length: end - index, replacement: replacement.bytes});
       }
       searchFrom = Math.max(end, index + prefix.length);
     }
@@ -1748,9 +1613,7 @@ function validateGmailId(id: string, label: string): void {
 }
 
 function parseGmailLabelResponse(
-  value: unknown,
-  operation: "create" | "get" | "update",
-): GmailLabelRaw {
+    value: unknown, operation: "create" | "get" | "update"): GmailLabelRaw {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`Gmail labels.${operation} returned a non-object response.`);
   }
@@ -1764,42 +1627,34 @@ function parseGmailLabelResponse(
   if (label.type !== undefined && label.type !== "user") {
     throw new Error(`Gmail labels.${operation} returned a non-user label.`);
   }
-  return { id: label.id, name: label.name, type: "user" };
+  return {id: label.id, name: label.name, type: "user"};
 }
 
 function parseGmailDraftWriteResult(
-  value: unknown,
-  operation: "creation" | "update",
-): { id: string; message: { id: string; threadId?: string } } {
-  const result =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
-  const message =
-    result?.message && typeof result.message === "object"
-      ? (result.message as Record<string, unknown>)
-      : undefined;
-  if (
-    typeof result?.id !== "string" ||
-    !GMAIL_ID_RE.test(result.id) ||
-    typeof message?.id !== "string" ||
-    !GMAIL_ID_RE.test(message.id) ||
-    (message.threadId !== undefined &&
-      (typeof message.threadId !== "string" || !GMAIL_ID_RE.test(message.threadId)))
-  ) {
+    value: unknown, operation: "creation" | "update"):
+    {id: string; message: {id: string; threadId?: string}} {
+  const result = value && typeof value === "object" ? value as Record<string, unknown> : undefined;
+  const message = result?.message && typeof result.message === "object"
+    ? result.message as Record<string, unknown>
+    : undefined;
+  if (typeof result?.id !== "string" || !GMAIL_ID_RE.test(result.id) ||
+      typeof message?.id !== "string" || !GMAIL_ID_RE.test(message.id) ||
+      (message.threadId !== undefined &&
+        (typeof message.threadId !== "string" || !GMAIL_ID_RE.test(message.threadId)))) {
     throw new Error(`Gmail accepted the draft ${operation} but returned an invalid response.`);
   }
   return {
     id: result.id,
     message: {
       id: message.id,
-      ...(typeof message.threadId === "string" ? { threadId: message.threadId } : {}),
+      ...(typeof message.threadId === "string" ? {threadId: message.threadId} : {}),
     },
   };
 }
 
 async function readGmailDraftWriteResult(
-  response: Response,
-  operation: "creation" | "update",
-): Promise<{ id: string; message: { id: string; threadId?: string } }> {
+    response: Response, operation: "creation" | "update"):
+    Promise<{id: string; message: {id: string; threadId?: string}}> {
   let value: unknown;
   try {
     value = await response.json();
@@ -1810,7 +1665,7 @@ async function readGmailDraftWriteResult(
 }
 
 function shouldIncludeSpamTrash(query?: string, labelIds?: string[]): boolean {
-  if (labelIds?.some((id) => id === "SPAM" || id === "TRASH")) return true;
+  if (labelIds?.some(id => id === "SPAM" || id === "TRASH")) return true;
   const operators = new Set(["in:anywhere", "in:spam", "in:trash", "label:spam", "label:trash"]);
   let token = "";
   let tokenContainsQuote = false;
@@ -1818,8 +1673,8 @@ function shouldIncludeSpamTrash(query?: string, labelIds?: string[]): boolean {
   let escaped = false;
   const disabledGroups = [false];
   const flushToken = () => {
-    const matched =
-      !disabledGroups.at(-1) && !tokenContainsQuote && operators.has(token.toLowerCase());
+    const matched = !disabledGroups.at(-1) && !tokenContainsQuote &&
+      operators.has(token.toLowerCase());
     token = "";
     tokenContainsQuote = false;
     return matched;
@@ -1836,8 +1691,7 @@ function shouldIncludeSpamTrash(query?: string, labelIds?: string[]): boolean {
       const quotedPrefix = tokenContainsQuote;
       tokenContainsQuote = false;
       disabledGroups.push(
-        disabledGroups.at(-1)! || quotedPrefix || prefix.startsWith("-") || prefix.endsWith(":"),
-      );
+        disabledGroups.at(-1)! || quotedPrefix || prefix.startsWith("-") || prefix.endsWith(":"));
     } else if (!quoted && (char === ")" || char === "}")) {
       if (flushToken()) return true;
       if (disabledGroups.length > 1) disabledGroups.pop();
@@ -1856,7 +1710,7 @@ async function readErrorText(response: Response, maxBytes = 4096): Promise<strin
   const chunks: Uint8Array[] = [];
   let total = 0;
   while (total < maxBytes) {
-    const { done, value } = await reader.read();
+    const {done, value} = await reader.read();
     if (done) break;
     const remaining = maxBytes - total;
     const chunk = value.subarray(0, remaining);
@@ -1876,10 +1730,7 @@ async function readErrorText(response: Response, maxBytes = 4096): Promise<strin
 
 /** A status-only provider error that is safe to use for retry decisions and server logs. */
 export class GmailApiError extends Error {
-  constructor(
-    public readonly status: number,
-    operation: string,
-  ) {
+  constructor(public readonly status: number, operation: string) {
     super(`Gmail API ${operation} failed [http=${status}]`);
   }
 }
@@ -1895,10 +1746,8 @@ async function gmailApiFailure(operation: string, response: Response): Promise<n
 }
 
 function headerValue(
-  headers: Array<{ name: string; value: string }> | undefined,
-  name: string,
-): string | undefined {
-  return headers?.find((header) => header.name.toLowerCase() === name.toLowerCase())?.value;
+    headers: Array<{name: string; value: string}> | undefined, name: string): string | undefined {
+  return headers?.find(header => header.name.toLowerCase() === name.toLowerCase())?.value;
 }
 
 function parseAddressHeader(value: string | undefined): EmailAddress[] {
@@ -1908,7 +1757,7 @@ function parseAddressHeader(value: string | undefined): EmailAddress[] {
 /** Convert Gmail metadata headers to the public message metadata shape without reading a body. */
 export function parseGmailMessageMetadata(message: GmailMessageFull): GmailMessageInfoRaw {
   const headers = message.payload?.headers;
-  const from = parseAddressHeader(headerValue(headers, "From"))[0] ?? { address: "" };
+  const from = parseAddressHeader(headerValue(headers, "From"))[0] ?? {address: ""};
   const timestampNumber = Number(message.internalDate);
   return {
     id: message.id,
@@ -1925,10 +1774,8 @@ export function parseGmailMessageMetadata(message: GmailMessageFull): GmailMessa
 
 /** Aggregate message metadata into a thread summary without reading message bodies. */
 export function summarizeGmailThread(
-  id: string,
-  snippet: string | undefined,
-  messages: readonly GmailMessageInfoRaw[],
-): GmailThreadInfoRaw {
+    id: string, snippet: string | undefined,
+    messages: readonly GmailMessageInfoRaw[]): GmailThreadInfoRaw {
   const participants: EmailAddress[] = [];
   const participantAddresses = new Set<string>();
   const labelIds: string[] = [];
@@ -1954,7 +1801,7 @@ export function summarizeGmailThread(
   }
   return {
     id,
-    ...(snippet !== undefined ? { snippet } : {}),
+    ...(snippet !== undefined ? {snippet} : {}),
     subject: messages[0]?.subject ?? "",
     messageCount: messages.length,
     timestamp: new Date(timestamp),
@@ -1967,15 +1814,17 @@ export function summarizeGmailThread(
 function cleanContentId(value: string | undefined): string | undefined {
   if (!value) return undefined;
   const trimmed = value.trim();
-  return trimmed.startsWith("<") && trimmed.endsWith(">") ? trimmed.slice(1, -1) : trimmed;
+  return trimmed.startsWith("<") && trimmed.endsWith(">")
+    ? trimmed.slice(1, -1)
+    : trimmed;
 }
 
 function assertGmailPayloadTreeIsBounded(payload: GmailPayloadPart | undefined): void {
   if (!payload) return;
-  const pending = [{ part: payload, depth: 0 }];
+  const pending = [{part: payload, depth: 0}];
   let entities = 0;
   while (pending.length > 0) {
-    const { part, depth } = pending.pop()!;
+    const {part, depth} = pending.pop()!;
     if (depth > MAX_MIME_METADATA_DEPTH || ++entities > MAX_MIME_METADATA_ENTITIES) {
       throw new Error("Gmail payload exceeds safe parsing limits.");
     }
@@ -1983,14 +1832,11 @@ function assertGmailPayloadTreeIsBounded(payload: GmailPayloadPart | undefined):
     if (children.length > MAX_MIME_METADATA_ENTITIES - entities - pending.length) {
       throw new Error("Gmail payload exceeds safe parsing limits.");
     }
-    for (const child of children) pending.push({ part: child, depth: depth + 1 });
+    for (const child of children) pending.push({part: child, depth: depth + 1});
   }
 }
 
-function classifyGmailPart(
-  part: GmailPayloadPart,
-  isRelatedRepresentation = false,
-): {
+function classifyGmailPart(part: GmailPayloadPart, isRelatedRepresentation = false): {
   disposition: "attachment" | "inline" | null;
   contentId?: string;
   filename: string | null;
@@ -1999,29 +1845,24 @@ function classifyGmailPart(
 } {
   const dispositionHeader = headerValue(part.headers, "Content-Disposition")?.toLowerCase();
   const disposition = dispositionHeader?.startsWith("attachment")
-    ? ("attachment" as const)
+    ? "attachment" as const
     : dispositionHeader?.startsWith("inline")
-      ? ("inline" as const)
+      ? "inline" as const
       : null;
   const contentId = cleanContentId(headerValue(part.headers, "Content-ID"));
   const filename = part.filename?.trim() || null;
   const mimeType = part.mimeType?.toLowerCase();
   const isText = mimeType === "text/plain" || mimeType === "text/html";
-  const isBody =
-    isText && !filename && disposition !== "attachment" && (!contentId || isRelatedRepresentation);
-  const isRelatedRootContainer =
-    isRelatedRepresentation &&
-    mimeType?.startsWith("multipart/") &&
-    !filename &&
-    disposition !== "attachment";
+  const isBody = isText && !filename && disposition !== "attachment" &&
+    (!contentId || isRelatedRepresentation);
+  const isRelatedRootContainer = isRelatedRepresentation && mimeType?.startsWith("multipart/") &&
+    !filename && disposition !== "attachment";
   return {
     disposition,
-    ...(contentId ? { contentId } : {}),
+    ...(contentId ? {contentId} : {}),
     filename,
     isBody,
-    isAttachmentBoundary:
-      !isBody &&
-      !isRelatedRootContainer &&
+    isAttachmentBoundary: !isBody && !isRelatedRootContainer &&
       (!!filename || dispositionHeader !== undefined || contentId !== undefined),
   };
 }
@@ -2035,9 +1876,8 @@ function relatedRootPart(part: GmailPayloadPart): GmailPayloadPart | undefined {
   try {
     const start = cleanContentId(mimeParameter(contentType, "start", "content-type"));
     return start
-      ? part.parts.find(
-          (child) => cleanContentId(headerValue(child.headers, "Content-ID")) === start,
-        )
+      ? part.parts.find(child =>
+          cleanContentId(headerValue(child.headers, "Content-ID")) === start)
       : part.parts[0];
   } catch {
     // An invalid related root must not turn a CID resource into body content.
@@ -2046,11 +1886,8 @@ function relatedRootPart(part: GmailPayloadPart): GmailPayloadPart | undefined {
 }
 
 function isRelatedChildRepresentation(
-  parent: GmailPayloadPart,
-  child: GmailPayloadPart,
-  inherited: boolean,
-  selectedRoot: GmailPayloadPart | undefined,
-): boolean {
+    parent: GmailPayloadPart, child: GmailPayloadPart,
+    inherited: boolean, selectedRoot: GmailPayloadPart | undefined): boolean {
   return parent.mimeType?.toLowerCase() === "multipart/related"
     ? child === selectedRoot
     : inherited;
@@ -2058,36 +1895,31 @@ function isRelatedChildRepresentation(
 
 /** Enumerate attachment and inline leaves without downloading attachment bodies. */
 export function enumerateGmailAttachments(
-  messageId: string,
-  payload: GmailPayloadPart | undefined,
-): GmailAttachmentSnapshot[] {
+    messageId: string, payload: GmailPayloadPart | undefined): GmailAttachmentSnapshot[] {
   assertGmailPayloadTreeIsBounded(payload);
   const result: GmailAttachmentSnapshot[] = [];
   const visit = (part: GmailPayloadPart, path: string, isRelatedRepresentation = false) => {
-    const { contentId, disposition, filename, isBody, isAttachmentBoundary } = classifyGmailPart(
-      part,
-      isRelatedRepresentation,
-    );
-    const size =
-      Number.isSafeInteger(part.body?.size) && (part.body?.size ?? -1) >= 0
-        ? part.body!.size!
-        : part.body?.data !== undefined
-          ? base64UrlDecodedByteLength(part.body.data)
-          : 0;
+    const {contentId, disposition, filename, isBody, isAttachmentBoundary} =
+      classifyGmailPart(part, isRelatedRepresentation);
+    const size = Number.isSafeInteger(part.body?.size) && (part.body?.size ?? -1) >= 0
+      ? part.body!.size!
+      : part.body?.data !== undefined
+        ? base64UrlDecodedByteLength(part.body.data)
+        : 0;
     const hasContent = part.body?.attachmentId !== undefined || part.body?.data !== undefined;
     if (!isBody && hasContent) {
       const readable = hasContent && size <= MAX_GMAIL_ATTACHMENT_BYTES;
       result.push({
         key: part.partId ?? path,
         messageId,
-        ...(part.body?.attachmentId ? { attachmentId: part.body.attachmentId } : {}),
-        ...(part.body?.data !== undefined ? { inlineData: part.body.data } : {}),
+        ...(part.body?.attachmentId ? {attachmentId: part.body.attachmentId} : {}),
+        ...(part.body?.data !== undefined ? {inlineData: part.body.data} : {}),
         info: {
           filename,
           mimeType: part.mimeType || "application/octet-stream",
           size,
           disposition,
-          ...(contentId ? { contentId } : {}),
+          ...(contentId ? {contentId} : {}),
           readable,
         },
       });
@@ -2096,11 +1928,8 @@ export function enumerateGmailAttachments(
     const relatedRoot = relatedRootPart(part);
     for (let i = 0; i < (part.parts?.length ?? 0); i++) {
       const child = part.parts![i];
-      visit(
-        child,
-        `${path}.${i}`,
-        isRelatedChildRepresentation(part, child, isRelatedRepresentation, relatedRoot),
-      );
+      visit(child, `${path}.${i}`, isRelatedChildRepresentation(
+        part, child, isRelatedRepresentation, relatedRoot));
     }
   };
   if (payload) visit(payload, "0");
@@ -2116,17 +1945,11 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 function postalAttachmentBytes(
-  content: ArrayBuffer | Uint8Array | string,
-  contentType: string,
-  exactBytes?: Uint8Array,
-): Uint8Array {
-  const bytes =
-    exactBytes ??
-    (typeof content === "string"
-      ? new TextEncoder().encode(content)
-      : content instanceof Uint8Array
-        ? content
-        : new Uint8Array(content));
+    content: ArrayBuffer | Uint8Array | string, contentType: string,
+    exactBytes?: Uint8Array): Uint8Array {
+  const bytes = exactBytes ?? (typeof content === "string"
+    ? new TextEncoder().encode(content)
+    : content instanceof Uint8Array ? content : new Uint8Array(content));
   const mediaType = baseMimeType(contentType);
   if (mediaType !== "text/calendar" && mediaType !== "application/ics") return bytes;
   if (exactBytes) return normalizeMimeLineEndings(bytes);
@@ -2158,17 +1981,9 @@ function normalizeMimeLineEndings(bytes: Uint8Array): Uint8Array {
 }
 
 function htmlEscape(value: string): string {
-  return value.replace(
-    /[&<>"']/g,
-    (char) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[char]!,
-  );
+  return value.replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[char]!));
 }
 
 function forwardedAddress(value: import("postal-mime").Address | undefined): string {
@@ -2208,14 +2023,10 @@ function htmlForwardedHeaderBlock(original: import("postal-mime").Email): string
 }
 
 function attachmentFromPostal(
-  attachment: import("postal-mime").Attachment,
-  metadata: MimeAttachmentMetadata,
-): GmailOutboundAttachment {
+    attachment: import("postal-mime").Attachment,
+    metadata: MimeAttachmentMetadata): GmailOutboundAttachment {
   const contentType = postalAttachmentContentType(
-    attachment,
-    metadata.contentType,
-    metadata.exactBytes !== undefined,
-  );
+    attachment, metadata.contentType, metadata.exactBytes !== undefined);
   const bytes = postalAttachmentBytes(attachment.content, contentType, metadata.exactBytes);
   const filename = attachment.filename ?? "";
   const disposition = postalAttachmentDisposition(attachment);
@@ -2223,45 +2034,38 @@ function attachmentFromPostal(
     filename,
     contentType,
     data: foldBase64(bytesToBase64(bytes)),
-    ...(disposition ? { disposition } : {}),
-    ...(attachment.contentId ? { contentId: attachment.contentId } : {}),
+    ...(disposition ? {disposition} : {}),
+    ...(attachment.contentId ? {contentId: attachment.contentId} : {}),
     description: `${filename || "(unnamed)"} (${contentType}, ${bytes.byteLength} bytes)`,
   };
 }
 
 function postalAttachmentDisposition(
-  attachment: import("postal-mime").Attachment,
-): "inline" | "attachment" | undefined {
+    attachment: import("postal-mime").Attachment): "inline" | "attachment" | undefined {
   if (attachment.related === true || attachment.disposition === "inline") return "inline";
   return attachment.disposition ? "attachment" : undefined;
 }
 
 function postalAttachmentContentType(
-  attachment: import("postal-mime").Attachment,
-  original: string,
-  preserveCharset = false,
-): string {
+    attachment: import("postal-mime").Attachment, original: string,
+    preserveCharset = false): string {
   const contentType = parseParameterizedMimeHeader(original, true);
   if (contentType.value !== baseMimeType(attachment.mimeType || "application/octet-stream")) {
     throw new Error("Unable to correlate Gmail attachment Content-Type metadata.");
   }
   // Filename is modeled separately and MIMEText emits an RFC 2231 name matching it. Excluding the
   // redundant source parameter keeps provider-normalized fingerprints stable across reconstruction.
-  contentType.parameters = contentType.parameters.filter(
-    (parameter) => parameter.name !== "name" && !parameter.name.startsWith("name*"),
-  );
+  contentType.parameters = contentType.parameters.filter(parameter =>
+    parameter.name !== "name" && !parameter.name.startsWith("name*"));
   if (contentType.value === "text/calendar" || contentType.value === "application/ics") {
     if (!preserveCharset) {
-      contentType.parameters = contentType.parameters.filter(
-        (parameter) => parameter.name !== "charset" && !parameter.name.startsWith("charset*"),
-      );
-      contentType.parameters.push({ name: "charset", value: "utf-8" });
+      contentType.parameters = contentType.parameters.filter(parameter =>
+        parameter.name !== "charset" && !parameter.name.startsWith("charset*"));
+      contentType.parameters.push({name: "charset", value: "utf-8"});
     }
-    if (
-      attachment.method !== undefined &&
-      !contentType.parameters.some((parameter) => parameter.name === "method")
-    ) {
-      contentType.parameters.push({ name: "method", value: attachment.method });
+    if (attachment.method !== undefined &&
+        !contentType.parameters.some(parameter => parameter.name === "method")) {
+      contentType.parameters.push({name: "method", value: attachment.method});
     }
   }
   return validateAttachmentContentType(serializeParameterizedMimeHeader(contentType));
@@ -2285,27 +2089,11 @@ export type GmailParsedDraftSnapshot = Omit<GmailParsedDraft, "attachments"> & {
 };
 
 const MODELED_DRAFT_HEADERS = new Set([
-  "from",
-  "reply-to",
-  "to",
-  "cc",
-  "bcc",
-  "date",
-  "subject",
-  "message-id",
-  "in-reply-to",
-  "references",
+  "from", "reply-to", "to", "cc", "bcc", "date", "subject", "message-id", "in-reply-to", "references",
 ]);
 const SAFE_UNMODELED_DRAFT_HEADERS = new Set([
-  "mime-version",
-  "content-type",
-  "content-transfer-encoding",
-  "return-path",
-  "received",
-  "delivered-to",
-  "authentication-results",
-  "received-spf",
-  "dkim-signature",
+  "mime-version", "content-type", "content-transfer-encoding", "return-path", "received", "delivered-to",
+  "authentication-results", "received-spf", "dkim-signature",
 ]);
 
 function assertDraftHeadersAreModeled(headers: readonly string[]): void {
@@ -2314,25 +2102,17 @@ function assertDraftHeadersAreModeled(headers: readonly string[]): void {
     const name = originalName.toLowerCase();
     if (MODELED_DRAFT_HEADERS.has(name)) {
       if (modeled.has(name)) {
-        throw new Error(
-          `Cannot safely edit a draft with duplicate modeled header ${originalName}.`,
-        );
+        throw new Error(`Cannot safely edit a draft with duplicate modeled header ${originalName}.`);
       }
       modeled.add(name);
       continue;
     }
-    if (
-      SAFE_UNMODELED_DRAFT_HEADERS.has(name) ||
-      name.startsWith("arc-") ||
-      name === "x-received" ||
-      name.startsWith("x-google-") ||
-      name.startsWith("x-gm-")
-    ) {
+    if (SAFE_UNMODELED_DRAFT_HEADERS.has(name) || name.startsWith("arc-") ||
+        name === "x-received" || name.startsWith("x-google-") || name.startsWith("x-gm-")) {
       continue;
     }
     throw new Error(
-      `Cannot safely edit a draft with unsupported top-level header ${originalName}.`,
-    );
+      `Cannot safely edit a draft with unsupported top-level header ${originalName}.`);
   }
 }
 
@@ -2350,14 +2130,13 @@ function inlineGmailBodyByteLength(payload: GmailPayloadPart | undefined): numbe
   assertGmailPayloadTreeIsBounded(payload);
   let totalBytes = 0;
   const visit = (part: GmailPayloadPart, isRelatedRepresentation = false) => {
-    const { isBody, isAttachmentBoundary } = classifyGmailPart(part, isRelatedRepresentation);
+    const {isBody, isAttachmentBoundary} = classifyGmailPart(part, isRelatedRepresentation);
     if (isAttachmentBoundary) return;
     if (isBody && part.body?.data !== undefined) {
       totalBytes += base64UrlDecodedByteLength(part.body.data);
       if (totalBytes > MAX_GMAIL_ATTACHMENT_BYTES) {
         throw new Error(
-          `Gmail message bodies exceed the ${MAX_GMAIL_ATTACHMENT_BYTES}-byte safe-read limit.`,
-        );
+          `Gmail message bodies exceed the ${MAX_GMAIL_ATTACHMENT_BYTES}-byte safe-read limit.`);
       }
     }
     const relatedRoot = relatedRootPart(part);
@@ -2378,7 +2157,7 @@ export function parseGmailPayloadContent(payload: GmailPayloadPart | undefined):
   const html: string[] = [];
   inlineGmailBodyByteLength(payload);
   const visit = (part: GmailPayloadPart, isRelatedRepresentation = false) => {
-    const { isBody, isAttachmentBoundary } = classifyGmailPart(part, isRelatedRepresentation);
+    const {isBody, isAttachmentBoundary} = classifyGmailPart(part, isRelatedRepresentation);
     if (isAttachmentBoundary) return;
     if (isBody) {
       let value: string | undefined;
@@ -2396,8 +2175,8 @@ export function parseGmailPayloadContent(payload: GmailPayloadPart | undefined):
   };
   if (payload) visit(payload);
   return {
-    ...(text.length ? { text: text.join("\n") } : {}),
-    ...(html.length ? { html: html.join("\n") } : {}),
+    ...(text.length ? {text: text.join("\n")} : {}),
+    ...(html.length ? {html: html.join("\n")} : {}),
   };
 }
 
@@ -2407,7 +2186,7 @@ export function parseGmailDraftSnapshot(message: GmailMessageFull): GmailParsedD
   const content = parseGmailPayloadContent(message.payload);
   return {
     ...(parseAddressHeader(headerValue(headers, "From"))[0]
-      ? { from: formatEmailAddress(parseAddressHeader(headerValue(headers, "From"))[0]) }
+      ? {from: formatEmailAddress(parseAddressHeader(headerValue(headers, "From"))[0])}
       : {}),
     replyTo: parseAddressHeader(headerValue(headers, "Reply-To")).map(formatEmailAddress),
     to: parseAddressHeader(headerValue(headers, "To")).map(formatEmailAddress),
@@ -2415,16 +2194,10 @@ export function parseGmailDraftSnapshot(message: GmailMessageFull): GmailParsedD
     bcc: parseAddressHeader(headerValue(headers, "Bcc")).map(formatEmailAddress),
     subject: headerValue(headers, "Subject") ?? "",
     text: content.text ?? "",
-    ...(content.html !== undefined ? { html: content.html } : {}),
-    ...(headerValue(headers, "Message-ID")
-      ? { messageId: headerValue(headers, "Message-ID") }
-      : {}),
-    ...(headerValue(headers, "In-Reply-To")
-      ? { inReplyTo: headerValue(headers, "In-Reply-To") }
-      : {}),
-    ...(headerValue(headers, "References")
-      ? { references: headerValue(headers, "References") }
-      : {}),
+    ...(content.html !== undefined ? {html: content.html} : {}),
+    ...(headerValue(headers, "Message-ID") ? {messageId: headerValue(headers, "Message-ID")} : {}),
+    ...(headerValue(headers, "In-Reply-To") ? {inReplyTo: headerValue(headers, "In-Reply-To")} : {}),
+    ...(headerValue(headers, "References") ? {references: headerValue(headers, "References")} : {}),
     attachments: enumerateGmailAttachments(message.id, message.payload),
   };
 }
@@ -2432,43 +2205,37 @@ export function parseGmailDraftSnapshot(message: GmailMessageFull): GmailParsedD
 /** Parse a draft's editable content and attachment bytes for drift checks and lossless updates. */
 export async function parseGmailDraft(message: GmailMessageRaw): Promise<GmailParsedDraft> {
   const parsed = await parseMimeMessage(message.raw);
-  assertDraftHeadersAreModeled(parsed.headers.map((header) => header.originalKey));
+  assertDraftHeadersAreModeled(parsed.headers.map(header => header.originalKey));
   const reconstructionError = parsedMimeReconstructionErrors.get(parsed);
   if (reconstructionError) throw new Error(reconstructionError);
   const metadata = requireAttachmentMetadata(parsed);
-  const date = parsed.headers.find((header) => header.key === "date")?.value;
+  const date = parsed.headers.find(header => header.key === "date")?.value;
   return {
-    ...(parsed.from ? { from: formatEmailAddress(postalAddressToEmailAddress(parsed.from)) } : {}),
+    ...(parsed.from ? {from: formatEmailAddress(postalAddressToEmailAddress(parsed.from))} : {}),
     replyTo: postalAddressListToEmailAddresses(parsed.replyTo).map(formatEmailAddress),
     to: postalAddressListToEmailAddresses(parsed.to).map(formatEmailAddress),
     cc: postalAddressListToEmailAddresses(parsed.cc).map(formatEmailAddress),
     bcc: postalAddressListToEmailAddresses(parsed.bcc).map(formatEmailAddress),
-    ...(date !== undefined ? { date: validateDateHeader(date) } : {}),
+    ...(date !== undefined ? {date: validateDateHeader(date)} : {}),
     subject: parsed.subject ?? "",
     text: parsed.text ?? "",
-    ...(parsed.html !== undefined ? { html: parsed.html } : {}),
-    ...(parsed.messageId ? { messageId: parsed.messageId } : {}),
-    ...(parsed.inReplyTo ? { inReplyTo: parsed.inReplyTo } : {}),
-    ...(parsed.references ? { references: parsed.references } : {}),
+    ...(parsed.html !== undefined ? {html: parsed.html} : {}),
+    ...(parsed.messageId ? {messageId: parsed.messageId} : {}),
+    ...(parsed.inReplyTo ? {inReplyTo: parsed.inReplyTo} : {}),
+    ...(parsed.references ? {references: parsed.references} : {}),
     attachments: parsed.attachments.map((attachment, index) => {
       const contentType = postalAttachmentContentType(
-        attachment,
-        metadata[index].contentType,
-        metadata[index].exactBytes !== undefined,
-      );
+        attachment, metadata[index].contentType, metadata[index].exactBytes !== undefined);
       const bytes = postalAttachmentBytes(
-        attachment.content,
-        contentType,
-        metadata[index].exactBytes,
-      );
+        attachment.content, contentType, metadata[index].exactBytes);
       const disposition = postalAttachmentDisposition(attachment);
       return {
         // MIMEText requires a string; an empty filename round-trips as unnamed.
         filename: attachment.filename ?? "",
         contentType,
         data: foldBase64(bytesToBase64(bytes)),
-        ...(disposition ? { disposition } : {}),
-        ...(attachment.contentId ? { contentId: attachment.contentId } : {}),
+        ...(disposition ? {disposition} : {}),
+        ...(attachment.contentId ? {contentId: attachment.contentId} : {}),
         description: `${attachment.filename ?? "(unnamed)"} (${contentType}, ${bytes.byteLength} bytes)`,
       };
     }),
@@ -2476,10 +2243,10 @@ export async function parseGmailDraft(message: GmailMessageRaw): Promise<GmailPa
 }
 
 function messageInfoFromParsed(
-  message: GmailMessageRaw,
-  parsed: import("postal-mime").Email,
-): GmailMessageInfoRaw {
-  const from = parsed.from ? postalAddressToEmailAddress(parsed.from) : { address: "" };
+    message: GmailMessageRaw, parsed: import("postal-mime").Email): GmailMessageInfoRaw {
+  const from = parsed.from
+    ? postalAddressToEmailAddress(parsed.from)
+    : {address: ""};
   return {
     id: message.id,
     threadId: message.threadId,
@@ -2496,10 +2263,7 @@ function messageInfoFromParsed(
 export class GmailApi {
   private selfEmail: string;
 
-  constructor(
-    selfEmail: string,
-    private getAccessToken: AccessTokenProvider,
-  ) {
+  constructor(selfEmail: string, private getAccessToken: AccessTokenProvider) {
     this.selfEmail = selfEmail;
   }
 
@@ -2518,12 +2282,8 @@ export class GmailApi {
    * List threads. Gmail returns only IDs and snippets here; getThreadInfo()
    * fetches the metadata needed for public thread summaries.
    */
-  async listThreads(
-    count: number,
-    query?: string,
-    pageToken?: string,
-    labelIds?: string[],
-  ): Promise<{ threads: Array<{ id: string; snippet?: string }>; nextPageToken?: string }> {
+  async listThreads(count: number, query?: string, pageToken?: string, labelIds?: string[]):
+      Promise<{ threads: Array<{ id: string; snippet?: string }>; nextPageToken?: string }> {
     let url = `https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=${count}`;
     if (query) {
       url += `&q=${encodeURIComponent(query)}`;
@@ -2543,7 +2303,7 @@ export class GmailApi {
       await gmailApiFailure("threads.list", response);
     }
 
-    const data = (await response.json()) as {
+    const data = await response.json() as {
       threads?: Array<{ id: string; snippet?: string }>;
       nextPageToken?: string;
     };
@@ -2568,18 +2328,18 @@ export class GmailApi {
       await gmailApiFailure("threads.get", response);
     }
 
-    const thread = (await response.json()) as {
+    const thread = await response.json() as {
       id: string;
       snippet?: string;
       messages?: Array<{ id: string }>;
     };
 
-    const messages = (thread.messages ?? []).map((message) => ({
+    const messages = (thread.messages ?? []).map(message => ({
       id: message.id,
       threadId: thread.id,
     }));
 
-    return { id: thread.id, snippet: thread.snippet ?? "", messages };
+    return { id: thread.id, snippet: thread.snippet ?? '', messages };
   }
 
   /**
@@ -2600,10 +2360,9 @@ export class GmailApi {
       await gmailApiFailure("threads.get", response);
     }
 
-    const thread = (await response.json()) as GmailThreadMetadata;
+    const thread = await response.json() as GmailThreadMetadata;
     return summarizeGmailThread(
-      threadId,
-      thread.snippet,
+      threadId, thread.snippet,
       (thread.messages ?? []).map(parseGmailMessageMetadata),
     );
   }
@@ -2612,22 +2371,22 @@ export class GmailApi {
   async modifyThread(
     threadId: string,
     addLabelIds?: string[],
-    removeLabelIds?: string[],
+    removeLabelIds?: string[]
   ): Promise<void> {
     validateGmailId(threadId, "thread ID");
 
     const response = await this.authedFetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/modify`,
       {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           addLabelIds: addLabelIds || [],
           removeLabelIds: removeLabelIds || [],
         }),
-      },
+      }
     );
 
     if (!response.ok) {
@@ -2642,7 +2401,7 @@ export class GmailApi {
 
     const response = await this.authedFetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/trash`,
-      { method: "POST" },
+      { method: 'POST' }
     );
 
     if (!response.ok) {
@@ -2656,8 +2415,7 @@ export class GmailApi {
     validateGmailId(threadId, "thread ID");
     const response = await this.authedFetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}/untrash`,
-      { method: "POST" },
-    );
+      {method: "POST"});
     if (!response.ok) await gmailApiFailure("threads.untrash", response);
     await response.body?.cancel();
   }
@@ -2667,14 +2425,10 @@ export class GmailApi {
   // ─────────────────────────────────────────────────────────────────
 
   async listMessages(
-    count: number,
-    query?: string,
-    pageToken?: string,
-    labelIds?: string[],
-  ): Promise<{
-    messages: GmailMessageRef[];
-    nextPageToken?: string;
-  }> {
+      count: number, query?: string, pageToken?: string, labelIds?: string[]): Promise<{
+        messages: GmailMessageRef[];
+        nextPageToken?: string;
+      }> {
     const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
     url.searchParams.set("maxResults", String(count));
     if (query) url.searchParams.set("q", query);
@@ -2688,43 +2442,37 @@ export class GmailApi {
     }
     const response = await this.authedFetch(url.toString());
     if (!response.ok) await gmailApiFailure("messages.list", response);
-    const data = (await response.json()) as {
+    const data = await response.json() as {
       messages?: GmailMessageRef[];
       nextPageToken?: string;
     };
     return {
       messages: data.messages ?? [],
-      ...(data.nextPageToken ? { nextPageToken: data.nextPageToken } : {}),
+      ...(data.nextPageToken ? {nextPageToken: data.nextPageToken} : {}),
     };
   }
 
   /** Find a message by the stable RFC Message-ID assigned before an approved write. */
   async findMessageByRfcMessageId(
-    messageId: string,
-    location: "any" | "drafts" | "delivered" = "any",
-  ): Promise<GmailMessageRef | undefined> {
+      messageId: string, location: "any" | "drafts" | "delivered" = "any"):
+      Promise<GmailMessageRef | undefined> {
     const id = gmailMessageIdQueryValue(messageId);
     const normalizedMessageId = `<${id}>`;
-    const locationQuery =
-      location === "drafts"
-        ? "in:drafts"
-        : location === "delivered"
-          ? "in:anywhere -in:drafts"
-          : undefined;
+    const locationQuery = location === "drafts"
+      ? "in:drafts"
+      : location === "delivered"
+        ? "in:anywhere -in:drafts"
+        : undefined;
     const page = await this.listMessages(
-      10,
-      [locationQuery, `rfc822msgid:${id}`].filter(Boolean).join(" "),
-    );
+      10, [locationQuery, `rfc822msgid:${id}`].filter(Boolean).join(" "));
     // A duplicate Message-ID is not enough to prove that an ambiguous write happened. Treat both
     // multiple results and an unexpectedly paginated result as inconclusive.
     if (page.messages.length !== 1 || page.nextPageToken !== undefined) return undefined;
     const candidate = page.messages[0];
     const metadata = await this.getMessageMetadata(candidate.id);
-    if (
-      metadata.id !== candidate.id ||
-      headerValue(metadata.payload?.headers, "Message-ID")?.trim() !== normalizedMessageId ||
-      (location === "delivered" && !metadata.labelIds?.includes("SENT"))
-    ) {
+    if (metadata.id !== candidate.id ||
+        headerValue(metadata.payload?.headers, "Message-ID")?.trim() !== normalizedMessageId ||
+        (location === "delivered" && !metadata.labelIds?.includes("SENT"))) {
       return undefined;
     }
     return candidate;
@@ -2747,10 +2495,7 @@ export class GmailApi {
         if (!draft.message) {
           const full = await this.getDraft(draft.id);
           if (full.message.id === message.id) {
-            return {
-              id: draft.id,
-              message: { id: full.message.id, threadId: full.message.threadId },
-            };
+            return {id: draft.id, message: {id: full.message.id, threadId: full.message.threadId}};
           }
         }
       }
@@ -2766,51 +2511,42 @@ export class GmailApi {
   /** Fetch message headers and labels without downloading bodies or attachments. */
   async getMessageMetadata(messageId: string): Promise<GmailMessageFull> {
     validateGmailId(messageId, "message ID");
-    const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}`);
+    const url = new URL(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}`);
     url.searchParams.set("format", "metadata");
     for (const header of [
-      "From",
-      "Reply-To",
-      "Delivered-To",
-      "To",
-      "Cc",
-      "Bcc",
-      "Subject",
-      "Message-ID",
+      "From", "Reply-To", "Delivered-To", "To", "Cc", "Bcc", "Subject", "Message-ID",
       "References",
     ]) {
       url.searchParams.append("metadataHeaders", header);
     }
     const response = await this.authedFetch(url.toString());
     if (!response.ok) await gmailApiFailure("messages.get", response);
-    return (await response.json()) as GmailMessageFull;
+    return await response.json() as GmailMessageFull;
   }
 
   /** Fetch the MIME tree while leaving detached attachment data lazy. */
   async getMessageFull(messageId: string): Promise<GmailMessageFull> {
     validateGmailId(messageId, "message ID");
     const response = await this.authedFetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
-    );
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`);
     if (!response.ok) await gmailApiFailure("messages.get", response);
-    return (await response.json()) as GmailMessageFull;
+    return await response.json() as GmailMessageFull;
   }
 
   async getAttachmentContent(snapshot: GmailAttachmentSnapshot): Promise<ArrayBuffer> {
     if (!snapshot.info.readable || snapshot.info.size > MAX_GMAIL_ATTACHMENT_BYTES) {
       throw new Error(
-        `Attachment content is unavailable or exceeds the ${MAX_GMAIL_ATTACHMENT_BYTES}-byte safe limit.`,
-      );
+        `Attachment content is unavailable or exceeds the ${MAX_GMAIL_ATTACHMENT_BYTES}-byte safe limit.`);
     }
     let encoded = snapshot.inlineData;
     if (snapshot.attachmentId) {
       validateGmailId(snapshot.messageId, "message ID");
       validateGmailId(snapshot.attachmentId, "attachment ID");
       const response = await this.authedFetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${snapshot.messageId}/attachments/${snapshot.attachmentId}`,
-      );
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${snapshot.messageId}/attachments/${snapshot.attachmentId}`);
       if (!response.ok) await gmailApiFailure("attachments.get", response);
-      encoded = ((await response.json()) as { data?: string }).data;
+      encoded = (await response.json() as {data?: string}).data;
     }
     if (encoded === undefined) throw new Error("Attachment content is no longer available.");
     const bytes = decodeBase64UrlToBytes(encoded);
@@ -2821,16 +2557,13 @@ export class GmailApi {
   }
 
   /** Decode body alternatives, fetching detached text parts within the attachment safety limit. */
-  async getMessageContent(message: GmailMessageFull): Promise<{ text?: string; html?: string }> {
+  async getMessageContent(message: GmailMessageFull): Promise<{text?: string; html?: string}> {
     const text: string[] = [];
     const html: string[] = [];
     let totalBytes = inlineGmailBodyByteLength(message.payload);
     const visit = async (
-      part: GmailPayloadPart,
-      path: string,
-      isRelatedRepresentation = false,
-    ): Promise<void> => {
-      const { isBody, isAttachmentBoundary } = classifyGmailPart(part, isRelatedRepresentation);
+        part: GmailPayloadPart, path: string, isRelatedRepresentation = false): Promise<void> => {
+      const {isBody, isAttachmentBoundary} = classifyGmailPart(part, isRelatedRepresentation);
       if (isAttachmentBoundary) return;
       if (isBody) {
         let value: string | undefined;
@@ -2841,8 +2574,7 @@ export class GmailApi {
           const size = part.body.size ?? 0;
           if (size > MAX_GMAIL_ATTACHMENT_BYTES || totalBytes + size > MAX_GMAIL_ATTACHMENT_BYTES) {
             throw new Error(
-              `Gmail message bodies exceed the ${MAX_GMAIL_ATTACHMENT_BYTES}-byte safe-read limit.`,
-            );
+              `Gmail message bodies exceed the ${MAX_GMAIL_ATTACHMENT_BYTES}-byte safe-read limit.`);
           }
           const content = await this.getAttachmentContent({
             key: part.partId ?? path,
@@ -2866,17 +2598,14 @@ export class GmailApi {
       const relatedRoot = relatedRootPart(part);
       for (let i = 0; i < (part.parts?.length ?? 0); i++) {
         const child = part.parts![i];
-        await visit(
-          child,
-          `${path}.${i}`,
-          isRelatedChildRepresentation(part, child, isRelatedRepresentation, relatedRoot),
-        );
+        await visit(child, `${path}.${i}`, isRelatedChildRepresentation(
+          part, child, isRelatedRepresentation, relatedRoot));
       }
     };
     if (message.payload) await visit(message.payload, "0");
     return {
-      ...(text.length ? { text: text.join("\n") } : {}),
-      ...(html.length ? { html: html.join("\n") } : {}),
+      ...(text.length ? {text: text.join("\n")} : {}),
+      ...(html.length ? {html: html.join("\n")} : {}),
     };
   }
 
@@ -2887,7 +2616,7 @@ export class GmailApi {
     return {
       ...snapshot,
       text: content.text ?? "",
-      ...(content.html !== undefined ? { html: content.html } : { html: undefined }),
+      ...(content.html !== undefined ? {html: content.html} : {html: undefined}),
     };
   }
 
@@ -2897,7 +2626,8 @@ export class GmailApi {
    */
   async getMessageParticipants(messageId: string): Promise<Set<string>> {
     validateGmailId(messageId, "message ID");
-    const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}`);
+    const url = new URL(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}`);
     url.searchParams.set("format", "metadata");
     for (const header of ["From", "To", "Cc", "Bcc"]) {
       url.searchParams.append("metadataHeaders", header);
@@ -2908,8 +2638,8 @@ export class GmailApi {
       await gmailApiFailure("messages.get", response);
     }
 
-    const data = (await response.json()) as {
-      payload?: { headers?: Array<{ name: string; value: string }> };
+    const data = await response.json() as {
+      payload?: { headers?: Array<{name: string; value: string}> };
     };
     const participants = new Set<string>();
     for (const header of data.payload?.headers ?? []) {
@@ -2933,24 +2663,19 @@ export class GmailApi {
       await gmailApiFailure("messages.get", response);
     }
 
-    return (await response.json()) as GmailMessageRaw;
+    return await response.json() as GmailMessageRaw;
   }
 
   async modifyMessage(
-    messageId: string,
-    addLabelIds: string[] = [],
-    removeLabelIds: string[] = [],
-  ): Promise<void> {
+      messageId: string, addLabelIds: string[] = [], removeLabelIds: string[] = []): Promise<void> {
     validateGmailId(messageId, "message ID");
     for (const id of [...addLabelIds, ...removeLabelIds]) validateGmailId(id, "label ID");
     const response = await this.authedFetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`,
-      {
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ addLabelIds, removeLabelIds }),
-      },
-    );
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({addLabelIds, removeLabelIds}),
+      });
     if (!response.ok) await gmailApiFailure("messages.modify", response);
     await response.body?.cancel();
   }
@@ -2958,9 +2683,7 @@ export class GmailApi {
   async trashMessage(messageId: string): Promise<void> {
     validateGmailId(messageId, "message ID");
     const response = await this.authedFetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/trash`,
-      { method: "POST" },
-    );
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/trash`, {method: "POST"});
     if (!response.ok) await gmailApiFailure("messages.trash", response);
     await response.body?.cancel();
   }
@@ -2970,8 +2693,7 @@ export class GmailApi {
     validateGmailId(messageId, "message ID");
     const response = await this.authedFetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/untrash`,
-      { method: "POST" },
-    );
+      {method: "POST"});
     if (!response.ok) await gmailApiFailure("messages.untrash", response);
     await response.body?.cancel();
   }
@@ -3002,14 +2724,14 @@ export class GmailApi {
 
   async parseMessageHeaders(message: GmailMessageRaw): Promise<GmailHeader[]> {
     const parsed = await parseMimeMessage(message.raw);
-    return boundedGmailHeaders(parsed.headers, (header) => ({
+    return boundedGmailHeaders(parsed.headers, header => ({
       name: header.originalKey,
       value: header.value,
     }));
   }
 
   collectMessageHeaders(headers: Iterable<GmailHeader>): GmailHeader[] {
-    return boundedGmailHeaders(headers, (header) => ({ name: header.name, value: header.value }));
+    return boundedGmailHeaders(headers, header => ({name: header.name, value: header.value}));
   }
 
   // ─────────────────────────────────────────────────────────────────
@@ -3025,19 +2747,15 @@ export class GmailApi {
    * used to generate it, for approval display.
    */
   buildSendRaw(
-    to: string[],
-    subject: string,
-    body: string,
-    options: GmailComposeOptions = {},
-    messageId = newGmailMessageId(),
-  ): GmailOutboundMessage {
+      to: string[], subject: string, body: string, options: GmailComposeOptions = {},
+      messageId = newGmailMessageId()): GmailOutboundMessage {
     const recipients = normalizeAggregateRecipients(to, options.cc, options.bcc);
     const message = this.buildOutbound({
       from: this.selfEmail,
       ...recipients,
       subject,
       text: body,
-      ...(options.html !== undefined ? { html: options.html } : {}),
+      ...(options.html !== undefined ? {html: options.html} : {}),
       messageId,
       attachments: [],
     });
@@ -3052,7 +2770,7 @@ export class GmailApi {
       bcc: normalizeEmailRecipients(spec.bcc),
     };
     const replyTo = normalizeEmailRecipients(spec.replyTo ?? []);
-    const normalized: GmailOutboundSpec = { ...spec, ...recipients, replyTo };
+    const normalized: GmailOutboundSpec = {...spec, ...recipients, replyTo};
     return {
       raw: buildEncodedEmail(normalized),
       from: normalized.from,
@@ -3060,10 +2778,10 @@ export class GmailApi {
       ...recipients,
       subject: normalized.subject,
       body: normalized.text,
-      ...(normalized.html !== undefined ? { html: normalized.html } : {}),
+      ...(normalized.html !== undefined ? {html: normalized.html} : {}),
       messageId: normalized.messageId,
-      ...(normalized.inReplyTo ? { inReplyTo: normalized.inReplyTo } : {}),
-      ...(normalized.references ? { references: normalized.references } : {}),
+      ...(normalized.inReplyTo ? {inReplyTo: normalized.inReplyTo} : {}),
+      ...(normalized.references ? {references: normalized.references} : {}),
       attachments: normalized.attachments,
     };
   }
@@ -3076,43 +2794,32 @@ export class GmailApi {
    * can describe exactly what will be sent in the approval prompt.
    */
   async buildReplyFromMetadata(
-    originalMessage: GmailMessageFull,
-    body: string,
-    replyAll: boolean,
-    options: GmailReplyOptions = {},
-    messageId = newGmailMessageId(),
-  ): Promise<GmailOutboundMessage> {
+      originalMessage: GmailMessageFull, body: string, replyAll: boolean,
+      options: GmailReplyOptions = {}, messageId = newGmailMessageId()): Promise<GmailOutboundMessage> {
     const headers = originalMessage.payload?.headers ?? [];
     const raw = base64UrlEncodeUtf8(
-      headers.map((header) => `${header.name}: ${header.value}`).join("\r\n") + "\r\n\r\n",
-    );
-    return this.buildReplyRaw(
-      {
-        id: originalMessage.id,
-        threadId: originalMessage.threadId,
-        labelIds: originalMessage.labelIds,
-        internalDate: originalMessage.internalDate,
-        raw,
-      },
-      body,
-      replyAll,
-      options,
-      messageId,
-    );
+      headers.map(header => `${header.name}: ${header.value}`).join("\r\n") + "\r\n\r\n");
+    return this.buildReplyRaw({
+      id: originalMessage.id,
+      threadId: originalMessage.threadId,
+      labelIds: originalMessage.labelIds,
+      internalDate: originalMessage.internalDate,
+      raw,
+    }, body, replyAll, options, messageId);
   }
 
   async buildReplyRaw(
-    originalMessage: GmailMessageRaw,
-    body: string,
-    replyAll: boolean,
-    options: GmailReplyOptions = {},
-    messageId = newGmailMessageId(),
+      originalMessage: GmailMessageRaw,
+      body: string,
+      replyAll: boolean,
+      options: GmailReplyOptions = {},
+      messageId = newGmailMessageId(),
   ): Promise<GmailOutboundMessage> {
     const original = await parseMimeMessage(originalMessage.raw);
 
     const originalFrom = original.from ? postalAddressToEmailAddress(original.from) : undefined;
-    const originalFromAddr = originalFrom?.address ?? "";
-    const originalSubject = original.subject ?? "";
+    const originalFromAddr = originalFrom?.address ?? '';
+    const originalSubject = original.subject ?? '';
     const self = this.selfEmail.toLowerCase();
     const ownAddresses = new Set([self]);
     for (const header of original.headers) {
@@ -3121,12 +2828,11 @@ export class GmailApi {
         if (address.address) ownAddresses.add(address.address.toLowerCase());
       }
     }
-    const sentBySelf = originalMessage.labelIds?.includes("SENT") === true;
+    const sentBySelf = originalMessage.labelIds?.includes('SENT') === true;
     if (sentBySelf && originalFromAddr) ownAddresses.add(originalFromAddr.toLowerCase());
-    const withoutSelf = (values: EmailAddress[]) =>
-      values
-        .filter((value) => value.address && !ownAddresses.has(value.address.toLowerCase()))
-        .map(formatEmailAddress);
+    const withoutSelf = (values: EmailAddress[]) => values
+      .filter(value => value.address && !ownAddresses.has(value.address.toLowerCase()))
+      .map(formatEmailAddress);
     const originalTo = withoutSelf(postalAddressListToEmailAddresses(original.to));
     const originalCc = withoutSelf(postalAddressListToEmailAddresses(original.cc));
     // For an incoming message, Reply-To overrides From per normal email
@@ -3135,20 +2841,18 @@ export class GmailApi {
     const sourceReplyTo = postalAddressListToEmailAddresses(original.replyTo);
     const replyTo = withoutSelf(sourceReplyTo);
     let to = sentBySelf
-      ? replyAll
-        ? originalTo
-        : originalTo.slice(0, 1)
-      : sourceReplyTo.length > 0
-        ? replyTo
-        : originalFrom && !ownAddresses.has(originalFromAddr.toLowerCase())
-          ? [formatEmailAddress(originalFrom)]
-          : [];
+      ? (replyAll ? originalTo : originalTo.slice(0, 1))
+      : (sourceReplyTo.length > 0
+          ? replyTo
+          : originalFrom && !ownAddresses.has(originalFromAddr.toLowerCase())
+            ? [formatEmailAddress(originalFrom)]
+            : []);
     let cc: string[] = [];
 
     if (replyAll) {
-      const seen = new Set(to.map((value) => parseEmailRecipient(value).address.toLowerCase()));
+      const seen = new Set(to.map(value => parseEmailRecipient(value).address.toLowerCase()));
       const candidates = sentBySelf ? originalCc : [...originalTo, ...originalCc];
-      cc = candidates.filter((addr) => {
+      cc = candidates.filter(addr => {
         const lower = parseEmailRecipient(addr).address.toLowerCase();
         if (lower === self || seen.has(lower)) return false;
         seen.add(lower);
@@ -3156,8 +2860,8 @@ export class GmailApi {
       });
     }
 
-    const hasRecipientOverride =
-      options.to !== undefined || options.cc !== undefined || options.bcc !== undefined;
+    const hasRecipientOverride = options.to !== undefined || options.cc !== undefined ||
+      options.bcc !== undefined;
     const recipients = hasRecipientOverride
       ? normalizeAggregateRecipients(options.to, options.cc, options.bcc)
       : normalizeAggregateRecipients(to, cc, []);
@@ -3166,18 +2870,16 @@ export class GmailApi {
     }
 
     // Build subject (add Re: if not already present)
-    const subject = originalSubject.toLowerCase().startsWith("re:")
+    const subject = originalSubject.toLowerCase().startsWith('re:')
       ? originalSubject
       : `Re: ${originalSubject}`;
 
     // Build References header
     const originalMsgId = original.messageId?.trim();
     if (!originalMsgId) {
-      throw new Error(
-        "Cannot construct a threaded reply: source message has no Message-ID header.",
-      );
+      throw new Error("Cannot construct a threaded reply: source message has no Message-ID header.");
     }
-    const parentId = validateMessageId(originalMsgId, "source Message-ID");
+    const parentId = validateMessageId(originalMsgId, 'source Message-ID');
     const references = foldReferences(original.references, parentId);
 
     const message = this.buildOutbound({
@@ -3185,7 +2887,7 @@ export class GmailApi {
       ...recipients,
       subject,
       text: body,
-      ...(options.html !== undefined ? { html: options.html } : {}),
+      ...(options.html !== undefined ? {html: options.html} : {}),
       messageId,
       inReplyTo: parentId,
       references,
@@ -3213,87 +2915,65 @@ export class GmailApi {
     if (sourceBytes > MAX_GMAIL_FORWARD_SOURCE_BYTES) {
       throw new Error(
         `Cannot forward this message: the original is ${sourceBytes} bytes, exceeding the ` +
-          `${MAX_GMAIL_FORWARD_SOURCE_BYTES}-byte safe forwarding limit.`,
-      );
+        `${MAX_GMAIL_FORWARD_SOURCE_BYTES}-byte safe forwarding limit.`);
     }
 
     const recipients = normalizeAggregateRecipients(to, options.cc, options.bcc);
     const original = await parseMimeMessage(originalMessage.raw);
-    const originalSubject = original.subject ?? "";
-    const subject = originalSubject.toLowerCase().startsWith("fwd:")
+    const originalSubject = original.subject ?? '';
+    const subject = originalSubject.toLowerCase().startsWith('fwd:')
       ? originalSubject
       : `Fwd: ${originalSubject}`;
     const headerBlock = forwardedHeaderBlock(original);
     const sourceHtml = original.html;
     const sourceText = original.text ?? "";
-    const forwardBody = body
-      ? `${body}\r\n\r\n${headerBlock}\r\n\r\n${sourceText}`
+    const forwardBody = body ? `${body}\r\n\r\n${headerBlock}\r\n\r\n${sourceText}`
       : `${headerBlock}\r\n\r\n${sourceText}`;
-    const htmlQuoteSource = sourceHtml ?? `<pre>${htmlEscape(sourceText)}</pre>`;
-    const htmlQuote =
-      `<div class="gmail_quote gmail_quote_container">` +
+    const htmlQuoteSource = sourceHtml ??
+      `<pre>${htmlEscape(sourceText)}</pre>`;
+    const htmlQuote = `<div class="gmail_quote gmail_quote_container">` +
       `---------- Forwarded message ---------<br>${htmlForwardedHeaderBlock(original)}` +
       `<br><br>${htmlQuoteSource}</div>`;
-    const htmlIntro =
-      options.html !== undefined
-        ? options.html
-        : body
-          ? htmlEscape(body).replace(/\r\n|\r|\n/g, "<br>")
-          : undefined;
-    const forwardHtml =
-      htmlIntro !== undefined
-        ? `${htmlIntro}<br><br>${htmlQuote}`
-        : original.html !== undefined
-          ? htmlQuote
-          : undefined;
+    const htmlIntro = options.html !== undefined
+      ? options.html
+      : body
+        ? htmlEscape(body).replace(/\r\n|\r|\n/g, "<br>")
+        : undefined;
+    const forwardHtml = htmlIntro !== undefined
+      ? `${htmlIntro}<br><br>${htmlQuote}`
+      : original.html !== undefined ? htmlQuote : undefined;
     const metadata = requireAttachmentMetadata(original);
     const attachments = original.attachments.map((attachment, index) =>
-      attachmentFromPostal(attachment, metadata[index]),
-    );
+      attachmentFromPostal(attachment, metadata[index]));
 
     const message = this.buildOutbound({
       from: this.selfEmail,
       ...recipients,
       subject: subjectOverride ?? subject,
       text: forwardBody,
-      ...(forwardHtml !== undefined ? { html: forwardHtml } : {}),
+      ...(forwardHtml !== undefined ? {html: forwardHtml} : {}),
       messageId,
-      ...(date !== undefined ? { date } : {}),
+      ...(date !== undefined ? {date} : {}),
       attachments,
     });
     if (base64UrlDecodedByteLength(message.raw) > MAX_GMAIL_FORWARD_SOURCE_BYTES) {
       throw new Error(
         `Cannot forward this message: the generated message exceeds the ` +
-          `${MAX_GMAIL_FORWARD_SOURCE_BYTES}-byte safe forwarding limit.`,
-      );
+        `${MAX_GMAIL_FORWARD_SOURCE_BYTES}-byte safe forwarding limit.`);
     }
     return message;
   }
 
   /** Build an inline forward from an exact source snapshot held by the gatekeeper. */
   async buildForwardFromBytes(
-    sourceBytes: Uint8Array,
-    to: string[],
-    body?: string,
-    options: GmailComposeOptions = {},
-    messageId = newGmailMessageId(),
-    subjectOverride?: string,
-    date?: string,
-  ): Promise<GmailOutboundMessage> {
-    return this.buildForwardRaw(
-      {
-        id: "forward-snapshot",
-        threadId: "forward-snapshot",
-        internalDate: "0",
-        raw: base64UrlEncodeBytes(sourceBytes),
-      },
-      to,
-      body,
-      options,
-      messageId,
-      subjectOverride,
-      date,
-    );
+      sourceBytes: Uint8Array, to: string[], body?: string,
+      options: GmailComposeOptions = {}, messageId = newGmailMessageId(), subjectOverride?: string,
+      date?: string):
+      Promise<GmailOutboundMessage> {
+    return this.buildForwardRaw({
+      id: "forward-snapshot", threadId: "forward-snapshot", internalDate: "0",
+      raw: base64UrlEncodeBytes(sourceBytes),
+    }, to, body, options, messageId, subjectOverride, date);
   }
 
   /**
@@ -3310,35 +2990,32 @@ export class GmailApi {
       threadId !== undefined ? { raw, threadId } : { raw };
 
     const response = await this.authedFetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
       {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(message),
-      },
+      }
     );
 
     if (!response.ok) {
       await gmailApiFailure("messages.send", response);
     }
 
-    const result = (await response.json()) as { id?: string; threadId?: string };
+    const result = await response.json() as { id?: string; threadId?: string };
     if (!result.id || !result.threadId) {
       throw new Error("Gmail accepted the send request but returned an invalid response.");
     }
-    return { id: result.id, threadId: result.threadId };
+    return {id: result.id, threadId: result.threadId};
   }
 
   // ─────────────────────────────────────────────────────────────────
   // Drafts
   // ─────────────────────────────────────────────────────────────────
 
-  async listDrafts(
-    count: number,
-    pageToken?: string,
-  ): Promise<{
+  async listDrafts(count: number, pageToken?: string): Promise<{
     drafts: GmailDraftRef[];
     nextPageToken?: string;
   }> {
@@ -3347,20 +3024,19 @@ export class GmailApi {
     if (pageToken) url.searchParams.set("pageToken", pageToken);
     const response = await this.authedFetch(url.toString());
     if (!response.ok) await gmailApiFailure("drafts.list", response);
-    const data = (await response.json()) as { drafts?: GmailDraftRef[]; nextPageToken?: string };
+    const data = await response.json() as {drafts?: GmailDraftRef[]; nextPageToken?: string};
     return {
       drafts: data.drafts ?? [],
-      ...(data.nextPageToken ? { nextPageToken: data.nextPageToken } : {}),
+      ...(data.nextPageToken ? {nextPageToken: data.nextPageToken} : {}),
     };
   }
 
   async getDraft(draftId: string): Promise<GmailDraftRaw> {
     validateGmailId(draftId, "draft ID");
     const response = await this.authedFetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}?format=raw`,
-    );
+      `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}?format=raw`);
     if (!response.ok) await gmailApiFailure("drafts.get", response);
-    const draft = (await response.json()) as GmailDraftRaw;
+    const draft = await response.json() as GmailDraftRaw;
     if (!draft.id || !draft.message?.id || !draft.message.raw) {
       throw new Error("Gmail returned an invalid draft resource.");
     }
@@ -3371,47 +3047,37 @@ export class GmailApi {
   async getDraftFull(draftId: string): Promise<GmailDraftFull> {
     validateGmailId(draftId, "draft ID");
     const response = await this.authedFetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}?format=full`,
-    );
+      `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}?format=full`);
     if (!response.ok) await gmailApiFailure("drafts.get", response);
-    const draft = (await response.json()) as GmailDraftFull;
-    if (!draft.id || !draft.message?.id)
-      throw new Error("Gmail returned an invalid draft resource.");
+    const draft = await response.json() as GmailDraftFull;
+    if (!draft.id || !draft.message?.id) throw new Error("Gmail returned an invalid draft resource.");
     return draft;
   }
 
   async createDraft(
-    raw: string,
-    threadId?: string,
-  ): Promise<{ id: string; message: { id: string; threadId?: string } }> {
+      raw: string, threadId?: string): Promise<{id: string; message: {id: string; threadId?: string}}> {
     if (threadId) validateGmailId(threadId, "thread ID");
     const response = await this.authedFetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
-      {
+      "https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: { raw, ...(threadId ? { threadId } : {}) } }),
-      },
-    );
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({message: {raw, ...(threadId ? {threadId} : {})}}),
+    });
     if (!response.ok) await gmailApiFailure("drafts.create", response);
     return readGmailDraftWriteResult(response, "creation");
   }
 
   async updateDraft(
-    draftId: string,
-    raw: string,
-    threadId?: string,
-  ): Promise<{ id: string; message: { id: string; threadId?: string } }> {
+      draftId: string, raw: string, threadId?: string):
+      Promise<{id: string; message: {id: string; threadId?: string}}> {
     validateGmailId(draftId, "draft ID");
     if (threadId) validateGmailId(threadId, "thread ID");
     const response = await this.authedFetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}`,
-      {
+      `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: { raw, ...(threadId ? { threadId } : {}) } }),
-      },
-    );
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({message: {raw, ...(threadId ? {threadId} : {})}}),
+    });
     if (!response.ok) await gmailApiFailure("drafts.update", response);
     return readGmailDraftWriteResult(response, "update");
   }
@@ -3419,36 +3085,28 @@ export class GmailApi {
   async deleteDraft(draftId: string): Promise<void> {
     validateGmailId(draftId, "draft ID");
     const response = await this.authedFetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}`,
-      { method: "DELETE" },
-    );
+      `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}`, {method: "DELETE"});
     if (!response.ok) await gmailApiFailure("drafts.delete", response);
     await response.body?.cancel();
   }
 
   async sendDraft(
-    draftId: string,
-    raw: string,
-    threadId?: string,
-  ): Promise<{ id: string; threadId: string }> {
+      draftId: string, raw: string, threadId?: string): Promise<{id: string; threadId: string}> {
     validateGmailId(draftId, "draft ID");
     if (threadId) validateGmailId(threadId, "thread ID");
     const response = await this.authedFetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/drafts/send",
-      {
+      "https://gmail.googleapis.com/gmail/v1/users/me/drafts/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           id: draftId,
-          message: { raw, ...(threadId ? { threadId } : {}) },
+          message: {raw, ...(threadId ? {threadId} : {})},
         }),
-      },
-    );
+      });
     if (!response.ok) await gmailApiFailure("drafts.send", response);
-    const sent = (await response.json()) as { id?: string; threadId?: string };
-    if (!sent.id || !sent.threadId)
-      throw new Error("Gmail returned an invalid sent draft resource.");
-    return { id: sent.id, threadId: sent.threadId };
+    const sent = await response.json() as {id?: string; threadId?: string};
+    if (!sent.id || !sent.threadId) throw new Error("Gmail returned an invalid sent draft resource.");
+    return {id: sent.id, threadId: sent.threadId};
   }
 
   // ─────────────────────────────────────────────────────────────────
@@ -3457,29 +3115,25 @@ export class GmailApi {
 
   async listLabelRecords(): Promise<GmailLabelRaw[]> {
     const response = await this.authedFetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/labels",
+      'https://gmail.googleapis.com/gmail/v1/users/me/labels',
     );
 
     if (!response.ok) {
       await gmailApiFailure("labels.list", response);
     }
 
-    const data = (await response.json()) as {
+    const data = await response.json() as {
       labels?: GmailLabelRaw[];
     };
-    return (data.labels ?? []).filter(
-      (label) =>
-        typeof label.id === "string" &&
-        typeof label.name === "string" &&
-        (label.type === "system" || label.type === "user"),
-    );
+    return (data.labels ?? []).filter(label =>
+      typeof label.id === "string" && typeof label.name === "string" &&
+      (label.type === "system" || label.type === "user"));
   }
 
   async getLabel(labelId: string): Promise<GmailLabelRaw> {
     validateGmailId(labelId, "label ID");
     const response = await this.authedFetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/labels/${labelId}`,
-    );
+      `https://gmail.googleapis.com/gmail/v1/users/me/labels/${labelId}`);
     if (!response.ok) await gmailApiFailure("labels.get", response);
     const label = parseGmailLabelResponse(await response.json(), "get");
     if (label.id !== labelId) throw new Error("Gmail labels.get returned a different label ID.");
@@ -3488,13 +3142,11 @@ export class GmailApi {
 
   async createLabel(name: string): Promise<GmailLabelRaw> {
     const response = await this.authedFetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/labels",
-      {
+      "https://gmail.googleapis.com/gmail/v1/users/me/labels", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      },
-    );
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name}),
+    });
     if (!response.ok) await gmailApiFailure("labels.create", response);
     let value: unknown;
     try {
@@ -3508,13 +3160,11 @@ export class GmailApi {
   async renameLabel(labelId: string, name: string): Promise<GmailLabelRaw> {
     validateGmailId(labelId, "label ID");
     const response = await this.authedFetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/labels/${labelId}`,
-      {
+      `https://gmail.googleapis.com/gmail/v1/users/me/labels/${labelId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      },
-    );
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name}),
+    });
     if (!response.ok) await gmailApiFailure("labels.update", response);
     let value: unknown;
     try {
@@ -3532,9 +3182,7 @@ export class GmailApi {
   async deleteLabel(labelId: string): Promise<void> {
     validateGmailId(labelId, "label ID");
     const response = await this.authedFetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/labels/${labelId}`,
-      { method: "DELETE" },
-    );
+      `https://gmail.googleapis.com/gmail/v1/users/me/labels/${labelId}`, {method: "DELETE"});
     if (!response.ok) await gmailApiFailure("labels.delete", response);
     await response.body?.cancel();
   }

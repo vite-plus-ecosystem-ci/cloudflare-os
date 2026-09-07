@@ -1,16 +1,16 @@
-import { Dialog } from "@cloudflare/kumo";
-import { X } from "@phosphor-icons/react";
-import { WorkshopButton, WorkshopIconButton } from "./WorkshopControls";
+import { Dialog } from '@cloudflare/kumo'
+import { X } from '@phosphor-icons/react'
+import { WorkshopButton, WorkshopIconButton } from './WorkshopControls'
 
 interface AutoApproveConfirmDialogProps {
-  open: boolean;
+  open: boolean
   // Human-readable label of the action kind, e.g. "Append to Google Doc".
-  actionLabel: string;
+  actionLabel: string
   // Title of the connection (gatekeeper) the rule applies to, e.g. "My Google Doc".
-  resourceTitle: string;
-  isProcessing?: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
+  resourceTitle: string
+  isProcessing?: boolean
+  onOpenChange: (open: boolean) => void
+  onConfirm: () => void
 }
 
 /**
@@ -29,7 +29,7 @@ export default function AutoApproveConfirmDialog({
     <Dialog.Root
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!isProcessing) onOpenChange(nextOpen);
+        if (!isProcessing) onOpenChange(nextOpen)
       }}
     >
       <Dialog
@@ -42,7 +42,7 @@ export default function AutoApproveConfirmDialog({
               Always approve “{actionLabel}”?
             </Dialog.Title>
             <Dialog.Description className="mt-1 text-[12px] leading-4 font-normal tracking-[-0.2px] text-kumo-subtle">
-              Future <span className="font-medium text-kumo-default">{actionLabel}</span> actions on{" "}
+              Future <span className="font-medium text-kumo-default">{actionLabel}</span> actions on{' '}
               <span className="font-medium text-kumo-default">{resourceTitle}</span> will be applied
               automatically, without asking for approval. This action will be applied now too.
             </Dialog.Description>
@@ -75,10 +75,10 @@ export default function AutoApproveConfirmDialog({
             disabled={isProcessing}
             className="!h-9 min-w-[64px]"
           >
-            {isProcessing ? "Enabling..." : "Always approve"}
+            {isProcessing ? 'Enabling...' : 'Always approve'}
           </WorkshopButton>
         </div>
       </Dialog>
     </Dialog.Root>
-  );
+  )
 }

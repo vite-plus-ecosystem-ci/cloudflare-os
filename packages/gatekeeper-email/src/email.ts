@@ -16,7 +16,7 @@ import {
   SupportedResource,
   ResourceConfiguratorFrame,
   stripTrailingSlashes,
-} from "@gadgets/workshop-shared/gatekeeper";
+} from '@gadgets/workshop-shared/gatekeeper';
 import {
   EmailSession,
   EmailHook,
@@ -35,15 +35,14 @@ import { obsContext } from "./observability.js";
 const VENDOR_ID = "email";
 
 const logger = obsContext.createLogger({
-  component: "gatekeeper.email",
-  vendorId: VENDOR_ID,
+  component: "gatekeeper.email", vendorId: VENDOR_ID,
 });
 
 const NONCE_BYTES = 32;
-const NONCE_LIFETIME_MS = 10 * 60 * 1000; // 10 minutes
+const NONCE_LIFETIME_MS = 10 * 60 * 1000;  // 10 minutes
 
 function hexEncode(bytes: Uint8Array): string {
-  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 function generateNonce(): string {
@@ -62,8 +61,8 @@ function constantTimeEqual(a: string, b: string): boolean {
 type Env = Cloudflare.Env & {
   // Base URL (protocol+host+optional path) at which the default fetch handler is served. Should
   // NOT include a trailing slash. Omit for localhost dev server.
-  BASE_URL?: string;
-};
+  BASE_URL?: string,
+}
 
 function getBaseUrl(env: Env) {
   return stripTrailingSlashes(env.BASE_URL || "http://localhost:8787/gatekeeper/email");
@@ -97,22 +96,14 @@ function getEmailHost(env: Env) {
   return new URL(getBaseUrl(env)).hostname;
 }
 
-function validateEmailName(
-  value: string | undefined,
-): { ok: true; emailName: string } | { ok: false; message: string } {
+function validateEmailName(value: string | undefined): { ok: true, emailName: string } | { ok: false, message: string } {
   let emailName = value?.trim().toLowerCase();
   if (!emailName) return { ok: false, message: "Choose an email address." };
   if (!/^[a-z0-9._+-]{1,64}$/.test(emailName)) {
-    return {
-      ok: false,
-      message: "Use letters, numbers, dots, underscores, plus signs, or hyphens.",
-    };
+    return { ok: false, message: "Use letters, numbers, dots, underscores, plus signs, or hyphens." };
   }
   if (emailName.startsWith(".") || emailName.endsWith(".") || emailName.includes("..")) {
-    return {
-      ok: false,
-      message: "Email names cannot start or end with a dot or contain consecutive dots.",
-    };
+    return { ok: false, message: "Email names cannot start or end with a dot or contain consecutive dots." };
   }
   return { ok: true, emailName };
 }
@@ -181,15 +172,15 @@ export default {
       // This is a connectAccount completion URL. Route to the UserAccount DO.
       let userObjectId = ctx.exports.UserAccount.idFromString(path[0]);
       let stub: DurableObjectStub<UserAccount> = ctx.exports.UserAccount.get(userObjectId);
-      if (!(await stub.complete(path[1]))) {
+      if (!await stub.complete(path[1])) {
         return new Response(INVALID_LINK_HTML, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
+          headers: { "Content-Type": "text/html; charset=utf-8" }
         });
       }
       return new Response(SELF_CLOSING_HTML, {
         headers: {
-          "Content-Type": "text/html; charset=utf-8",
-        },
+          "Content-Type": "text/html; charset=utf-8"
+        }
       });
     } else {
       return new Response("Not Found", { status: 404 });
@@ -207,27 +198,28 @@ export default {
     let name = toAddress.slice(0, atIndex);
 
     // Route to the EmailAddress DO for this username.
-    let stub: DurableObjectStub<EmailAddress> = ctx.exports.EmailAddress.getByName(name);
+    let stub: DurableObjectStub<EmailAddress> =
+        ctx.exports.EmailAddress.getByName(name);
 
     // Parse the email using postal-mime.
     let parsed: Email = await PostalMime.parse(message.raw);
 
     // Build the structured IncomingEmail.
     let from: EmailAddressType = parsed.from
-      ? { name: parsed.from.name || "", address: parsed.from.address || "" }
-      : { name: "", address: message.from };
+        ? { name: parsed.from.name || "", address: parsed.from.address || "" }
+        : { name: "", address: message.from };
 
-    let to: EmailAddressType[] = (parsed.to || []).map((addr) => ({
+    let to: EmailAddressType[] = (parsed.to || []).map(addr => ({
       name: addr.name || "",
       address: addr.address || "",
     }));
 
-    let cc: EmailAddressType[] = (parsed.cc || []).map((addr) => ({
+    let cc: EmailAddressType[] = (parsed.cc || []).map(addr => ({
       name: addr.name || "",
       address: addr.address || "",
     }));
 
-    let attachments: EmailAttachment[] = (parsed.attachments || []).map((att) => ({
+    let attachments: EmailAttachment[] = (parsed.attachments || []).map(att => ({
       filename: att.filename || null,
       mimeType: att.mimeType,
       disposition: att.disposition || null,
@@ -249,13 +241,12 @@ export default {
       await stub.receiveEmail(incomingEmail);
     } catch (err) {
       logger.error("email delivery failed", {
-        event: "email.delivery.failed",
-        error: err,
+        event: "email.delivery.failed", error: err,
       });
       // If no hook is configured or delivery fails, reject the email.
       message.setReject("Delivery failed: " + err);
     }
-  },
+  }
 };
 
 // =======================================================================================
@@ -275,19 +266,19 @@ export class GatekeeperVendor extends WorkerEntrypoint<Env> implements Gatekeepe
       color: "#fff5df",
       tagline: "Trigger gadgets from incoming email",
       description:
-        "Give Cloudflare OS an email address it can receive messages from. Useful for triage " +
-        "agents, ticket-from-email workflows, or anything driven by mail.",
+          "Give Cloudflare OS an email address it can receive messages from. Useful for triage " +
+          "agents, ticket-from-email workflows, or anything driven by mail.",
     };
   }
 
-  async connectAccount(callback: Fetcher<GatekeeperConnectCallback>): Promise<{ url: string }> {
+  async connectAccount(callback: Fetcher<GatekeeperConnectCallback>): Promise<{url: string}> {
     let userObjectId = this.ctx.exports.UserAccount.newUniqueId();
     let nonce = generateNonce();
 
     await this.ctx.exports.UserAccount.get(userObjectId).setCallback(callback, nonce);
 
     return {
-      url: `${getBaseUrl(this.env)}/${userObjectId.toString()}/${nonce}`,
+      url: `${getBaseUrl(this.env)}/${userObjectId.toString()}/${nonce}`
     };
   }
 
@@ -318,7 +309,7 @@ export class UserAccount extends DurableObject<Env> {
 
   /** Returns false if the nonce is invalid or expired. */
   async complete(nonce: string): Promise<boolean> {
-    let stored = this.ctx.storage.kv.get<{ value: string; expiresAt: number }>("nonce");
+    let stored = this.ctx.storage.kv.get<{value: string, expiresAt: number}>("nonce");
     if (!stored || Date.now() >= stored.expiresAt || !constantTimeEqual(stored.value, nonce)) {
       return false;
     }
@@ -363,14 +354,12 @@ type GatekeeperUserImplProps = {
 };
 
 @validateRpc()
-export class GatekeeperUserImpl
-  extends WorkerEntrypoint<Env, GatekeeperUserImplProps>
-  implements GatekeeperUser
-{
+export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImplProps>
+                                implements GatekeeperUser {
   async describe(): Promise<AccountDescription> {
     return {
       displayName: "Email Receiver",
-      avatar: { url: "" }, // TODO: email icon
+      avatar: { url: "" },  // TODO: email icon
     };
   }
 
@@ -404,9 +393,7 @@ export class GatekeeperUserImpl
     let parsed = new URL(url);
     let baseUrl = new URL(getBaseUrl(this.env));
     if (parsed.origin !== baseUrl.origin) {
-      throw new Error(
-        `URL origin ${parsed.origin} does not match email gatekeeper origin ${baseUrl.origin}`,
-      );
+      throw new Error(`URL origin ${parsed.origin} does not match email gatekeeper origin ${baseUrl.origin}`);
     }
     let basePath = getBasePath(this.env);
     if (!parsed.pathname.startsWith(basePath + "/") && parsed.pathname !== basePath) {
@@ -448,10 +435,7 @@ export class GatekeeperUserImpl
     }
 
     let props: EmailGatekeeperImplProps = { emailName, userAccountId };
-    return {
-      class: this.ctx.exports.EmailGatekeeperImpl({ props }),
-      resource: getEmailMailboxResource(this.env),
-    };
+    return {class: this.ctx.exports.EmailGatekeeperImpl({ props }), resource: getEmailMailboxResource(this.env)};
   }
 
   async revoke(): Promise<void> {
@@ -459,19 +443,17 @@ export class GatekeeperUserImpl
     let userAccountId = this.ctx.props.userAccountId;
     let userAccountDOId = this.ctx.exports.UserAccount.idFromString(userAccountId);
     let emails = await this.ctx.exports.UserAccount.get(userAccountDOId).getEmails();
-    await Promise.all(
-      emails.map((emailName) =>
-        this.ctx.exports.EmailAddress.getByName(emailName).setHook(null, userAccountId),
-      ),
-    );
+    await Promise.all(emails.map(emailName =>
+      this.ctx.exports.EmailAddress.getByName(emailName).setHook(null, userAccountId)
+    ));
   }
 
-  async reconnect(): Promise<{ url: string }> {
+  async reconnect(): Promise<{url: string}> {
     // Email connections do not use OAuth and never expire.
     throw new Error("Email connections do not require re-authentication.");
   }
 
-  async ensureResources(_resourceUrlPatterns: string[]): Promise<{ url?: string }> {
+  async ensureResources(_resourceUrlPatterns: string[]): Promise<{url?: string}> {
     return {};
   }
 
@@ -503,12 +485,9 @@ class EmailSessionImpl extends RpcTarget implements EmailSession {
   #ctx: DurableObjectState<EmailGatekeeperImplProps>;
   #approvalQueue: RpcStub<ApprovalQueue>;
 
-  constructor(
-    emailName: string,
-    emailHost: string,
-    ctx: DurableObjectState<EmailGatekeeperImplProps>,
-    approvalQueue: RpcStub<ApprovalQueue>,
-  ) {
+  constructor(emailName: string, emailHost: string,
+      ctx: DurableObjectState<EmailGatekeeperImplProps>,
+      approvalQueue: RpcStub<ApprovalQueue>) {
     super();
     this.#emailName = emailName;
     this.#emailHost = emailHost;
@@ -528,7 +507,7 @@ class EmailSessionImpl extends RpcTarget implements EmailSession {
     // Construct the HookController at bind time, so its props carry the specifics of this
     // registration (here, just the gatekeeper props). The controller needs no other state.
     let hookController: Fetcher<HookController<EmailHookTarget>> =
-      this.#ctx.exports.EmailHookControllerImpl({ props: this.#ctx.props });
+        this.#ctx.exports.EmailHookControllerImpl({props: this.#ctx.props});
 
     // @ts-ignore TS insists hookController is the wrong type... why? It looks identical to me.
     await this.#approvalQueue.bindHook(hookController, callback, {
@@ -550,10 +529,9 @@ type EmailGatekeeperImplProps = {
 type EmailHookTarget = RpcTarget & EmailHook;
 
 @validateRpc()
-export class EmailGatekeeperImpl
-  extends DurableObject<Env, EmailGatekeeperImplProps>
-  implements Gatekeeper<EmailSession>
-{
+export class EmailGatekeeperImpl extends DurableObject<Env, EmailGatekeeperImplProps>
+    implements Gatekeeper<EmailSession> {
+
   async describe(): Promise<ResourceDescription> {
     let emailName = this.ctx.props.emailName;
     let host = getEmailHost(this.env);
@@ -591,9 +569,8 @@ export class EmailGatekeeperImpl
     // No actions to reject.
   }
 
-  revertAction(
-    action: number,
-  ): Promise<void | { message?: string; canRetry?: boolean; restart?: boolean }> {
+  revertAction(action: number):
+      Promise<void | {message?: string, canRetry?: boolean, restart?: boolean}> {
     throw new Error("Email gatekeeper has no actions to revert");
   }
 
@@ -609,19 +586,15 @@ export class EmailGatekeeperImpl
 }
 
 @validateRpc()
-export class EmailHookControllerImpl
-  extends WorkerEntrypoint<Env, EmailGatekeeperImplProps>
-  implements HookController<EmailHookTarget>
-{
+export class EmailHookControllerImpl extends WorkerEntrypoint<Env, EmailGatekeeperImplProps>
+    implements HookController<EmailHookTarget> {
   /**
    * `_target` is unused -- email doesn't display its hooks. It no longer strictly needs to be
    * declared (since capnweb-validate 0.3.0, extra arguments to a validated method are dropped
    * rather than rejected), but declaring it keeps the signature aligned with the interface.
    */
-  async enable(
-    initiator: Fetcher<HookInitiator<EmailHookTarget>>,
-    _target: HookTargetMetadata,
-  ): Promise<void> {
+  async enable(initiator: Fetcher<HookInitiator<EmailHookTarget>>,
+               _target: HookTargetMetadata): Promise<void> {
     return this.#setHook(initiator);
   }
 
@@ -633,7 +606,8 @@ export class EmailHookControllerImpl
     // Forward the hook initiator to the EmailAddress DO for this email name.
     let emailName = this.ctx.props.emailName;
     let userAccountId = this.ctx.props.userAccountId;
-    let stub: DurableObjectStub<EmailAddress> = this.ctx.exports.EmailAddress.getByName(emailName);
+    let stub: DurableObjectStub<EmailAddress> =
+        this.ctx.exports.EmailAddress.getByName(emailName);
     await stub.setHook(initiator, userAccountId);
   }
 }
@@ -671,9 +645,8 @@ export class EmailAddress extends DurableObject<Env> {
   }
 
   async setHook(
-    hook: Fetcher<HookInitiator<EmailHookTarget>> | null,
-    userAccountId: string,
-  ): Promise<void> {
+      hook: Fetcher<HookInitiator<EmailHookTarget>> | null,
+      userAccountId: string): Promise<void> {
     let owner = this.ctx.storage.kv.get<string>("owner");
     if (owner !== userAccountId) {
       throw new Error("This email address is not owned by this user account");
@@ -687,7 +660,8 @@ export class EmailAddress extends DurableObject<Env> {
   }
 
   async receiveEmail(email: IncomingEmail): Promise<void> {
-    let hookInitiator = this.ctx.storage.kv.get<Fetcher<HookInitiator<EmailHookTarget>>>("hook");
+    let hookInitiator =
+        this.ctx.storage.kv.get<Fetcher<HookInitiator<EmailHookTarget>>>("hook");
     if (!hookInitiator) {
       throw new Error("No hook configured for this email address");
     }
@@ -700,16 +674,19 @@ export class EmailAddress extends DurableObject<Env> {
 
     // Pipeline: access approvalQueue on the not-yet-resolved promise and call through it.
     let sender = email.from.name
-      ? `${email.from.name} <${email.from.address}>`
-      : email.from.address;
+        ? `${email.from.name} <${email.from.address}>`
+        : email.from.address;
     await startHookResult.approvalQueue.authorizeObservation({
       title: `Email from ${email.from.address}: ${email.subject}`,
-      description:
-        `Received email from ${sender}\n\n` +
-        `**Subject:** ${email.subject}\n` +
-        `**Date:** ${email.date}\n` +
-        (email.to.length > 0 ? `**To:** ${email.to.map((a) => a.address).join(", ")}\n` : "") +
-        (email.cc.length > 0 ? `**CC:** ${email.cc.map((a) => a.address).join(", ")}\n` : ""),
+      description: `Received email from ${sender}\n\n`
+          + `**Subject:** ${email.subject}\n`
+          + `**Date:** ${email.date}\n`
+          + (email.to.length > 0
+              ? `**To:** ${email.to.map(a => a.address).join(", ")}\n`
+              : "")
+          + (email.cc.length > 0
+              ? `**CC:** ${email.cc.map(a => a.address).join(", ")}\n`
+              : ""),
     });
 
     // Deliver the email to the gadget's hook entrypoint.

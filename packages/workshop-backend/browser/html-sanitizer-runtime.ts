@@ -15,8 +15,7 @@ declare global {
 }
 
 const purifier = createDOMPurify(window);
-globalThis.__workshopExportSanitizeHtml = (html) =>
-  purifier.sanitize(html, {
-    WHOLE_DOCUMENT: true,
-    RETURN_DOM: true,
-  }) as HTMLHtmlElement;
+globalThis.__workshopExportSanitizeHtml = html => purifier.sanitize(html, {
+  WHOLE_DOCUMENT: true,
+  RETURN_DOM: true,
+}) as HTMLHtmlElement;

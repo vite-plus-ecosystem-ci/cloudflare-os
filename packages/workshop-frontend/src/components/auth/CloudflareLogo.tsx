@@ -3,11 +3,11 @@
 
 interface CloudflareLogoProps {
   // Height in px; width scales to preserve the logomark's aspect ratio.
-  size?: number;
-  className?: string;
+  size?: number
+  className?: string
 }
 
-const ASPECT = 209.51 / 94.74;
+const ASPECT = 209.51 / 94.74
 
 export default function CloudflareLogo({ size = 18, className }: CloudflareLogoProps) {
   return (
@@ -29,5 +29,5 @@ export default function CloudflareLogo({ size = 18, className }: CloudflareLogoP
         d="M168.22,41.15q-1,0-2.1.06a.88.88,0,0,0-.32.07,1.17,1.17,0,0,0-.76.8l-3,10.26c-1.28,4.41-.81,8.48,1.34,11.48a11.65,11.65,0,0,0,9.24,4.57l16.11,1a1.44,1.44,0,0,1,1.14.62,1.5,1.5,0,0,1,.17,1.37,2,2,0,0,1-1.75,1.34l-16.73,1c-9.09.42-18.88,7.75-22.31,16.7l-1.21,3.16a.9.9,0,0,0,.79,1.22h57.63A1.55,1.55,0,0,0,208,93.63a41.34,41.34,0,0,0-39.76-52.48Z"
       />
     </svg>
-  );
+  )
 }

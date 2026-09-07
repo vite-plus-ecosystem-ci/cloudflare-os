@@ -1,31 +1,12 @@
 import type { RpcPromise, RpcStub } from "capnweb";
 import type {
-  ActionHistoryFilter,
-  ActionHistoryPage,
-  AiChatAuthorInfo,
-  AiChatHistoryPage,
-  AiChatMessage,
-  AiChatMetadata,
-  AiChatStreamEvent,
-  AiChatSubscriber,
-  AiModelConfig,
-  AuthenticatedApi,
-  GadgetClient,
-  Overseer,
-  PublicApi,
-  WorkpieceId,
-  WorkpieceSummary,
-  WorkpiecesSubscriber,
+  ActionHistoryFilter, ActionHistoryPage, AiChatAuthorInfo, AiChatHistoryPage, AiChatMessage,
+  AiChatMetadata, AiChatStreamEvent, AiChatSubscriber, AiModelConfig, AuthenticatedApi, GadgetClient,
+  Overseer, PublicApi, WorkpieceId, WorkpieceSummary, WorkpiecesSubscriber,
 } from "@gadgets/workshop-shared/api";
 import type { CodeChange } from "@gadgets/workshop-shared/code-change";
 import {
-  type ConnectedAccount,
-  connect,
-  listConnectedAccounts,
-  nextUsernames,
-  signUp,
-  stubFor,
-  waitFor,
+  type ConnectedAccount, connect, listConnectedAccounts, nextUsernames, signUp, stubFor, waitFor,
   RpcTarget,
 } from "./rpc-client.js";
 
@@ -85,9 +66,7 @@ export interface WorkshopAgentSession extends AsyncDisposable {
   readonly username: string;
   runTurn(prompt: string, options?: AgentTurnOptions): Promise<AgentTurnResult>;
   approveActionsAndWait(
-    ids: readonly [number, ...number[]],
-    options?: AgentTurnOptions,
-  ): Promise<AgentTurnResult>;
+      ids: readonly [number, ...number[]], options?: AgentTurnOptions): Promise<AgentTurnResult>;
   listActions(options?: ActionListOptions): Promise<ActionHistoryPage>;
   connectedAccount(vendorId: string): ConnectedAccount;
   openGadget(id: WorkpieceId): Promise<ProvisionalGadget>;
@@ -110,12 +89,10 @@ class TurnObserver {
   #promptSeen: boolean;
   #deferredMetadata: { chat: AiChatMetadata; latestSequence: number } | undefined;
   #sawActive = false;
-  #error:
-    | {
-        outcome: Extract<AgentTurnOutcome, { status: "error" }>;
-        sequence: number;
-      }
-    | undefined;
+  #error: {
+    outcome: Extract<AgentTurnOutcome, { status: "error" }>;
+    sequence: number;
+  } | undefined;
   #startSequence = -1;
   #endSequence: number | undefined;
   #outcome: AgentTurnOutcome | undefined;
@@ -128,12 +105,8 @@ class TurnObserver {
   };
 
   constructor(
-    chatId: number | undefined,
-    timeoutMs: number,
-    signal?: AbortSignal,
-    expectedPrompt?: string,
-    holdUntilAdmitted = false,
-  ) {
+      chatId: number | undefined, timeoutMs: number, signal?: AbortSignal,
+      expectedPrompt?: string, holdUntilAdmitted = false) {
     this.#chatId = chatId;
     this.#signal = signal;
     this.#expectedPrompt = expectedPrompt;
@@ -212,24 +185,15 @@ class TurnObserver {
       return;
     }
     if (entry.chatId !== this.#chatId) return;
-    if (
-      !this.#promptSeen &&
-      entry.type === "message" &&
-      entry.author.type === "user" &&
-      entry.message === this.#expectedPrompt
-    ) {
+    if (!this.#promptSeen && entry.type === "message" && entry.author.type === "user" &&
+        entry.message === this.#expectedPrompt) {
       this.admit(entry.sequence);
     }
-    if (
-      entry.type !== "error" ||
-      this.#outcome !== undefined ||
-      (this.#sawActive && entry.sequence <= this.#startSequence)
-    )
-      return;
-    const outcome: Extract<AgentTurnOutcome, { status: "error" }> =
-      entry.code === undefined
-        ? { status: "error", message: entry.message }
-        : { status: "error", message: entry.message, code: entry.code };
+    if (entry.type !== "error" || this.#outcome !== undefined ||
+        (this.#sawActive && entry.sequence <= this.#startSequence)) return;
+    const outcome: Extract<AgentTurnOutcome, { status: "error" }> = entry.code === undefined
+      ? { status: "error", message: entry.message }
+      : { status: "error", message: entry.message, code: entry.code };
     this.#error = { outcome, sequence: entry.sequence };
   }
 
@@ -271,50 +235,36 @@ class ChatSubscriber extends RpcTarget implements AiChatSubscriber {
   readonly #latestSequence = new Map<number, number>();
   readonly #metadata = new Map<number, AiChatMetadata>();
   readonly #costUpdates = new Map<number, number>();
-  #costWaiter:
-    | {
-        chatId: number;
-        minimumUpdates: number;
-        resolve: (metadata: AiChatMetadata | undefined) => void;
-      }
-    | undefined;
+  #costWaiter: {
+    chatId: number;
+    minimumUpdates: number;
+    resolve: (metadata: AiChatMetadata | undefined) => void;
+  } | undefined;
 
   streamGeneration(_generation: number): void {}
   metadata(chat: AiChatMetadata): void {
     const previous = this.#metadata.get(chat.id);
     this.#metadata.set(chat.id, chat);
-    if (
-      chat.totalCost !== undefined &&
-      (previous === undefined ? chat.totalCost > 0 : chat.totalCost !== previous.totalCost)
-    ) {
+    if (chat.totalCost !== undefined &&
+        (previous === undefined ? chat.totalCost > 0 : chat.totalCost !== previous.totalCost)) {
       this.#costUpdates.set(chat.id, this.costUpdateCount(chat.id) + 1);
     }
     this.observer?.metadata(chat, this.latestSequence(chat.id));
     const waiter = this.#costWaiter;
-    if (
-      waiter !== undefined &&
-      waiter.chatId === chat.id &&
-      this.costUpdateCount(chat.id) >= waiter.minimumUpdates
-    ) {
+    if (waiter !== undefined && waiter.chatId === chat.id &&
+        this.costUpdateCount(chat.id) >= waiter.minimumUpdates) {
       waiter.resolve(chat);
     }
   }
   deleted(_chatId: number): void {}
   message(entry: AiChatMessage): void {
     this.#latestSequence.set(
-      entry.chatId,
-      Math.max(this.latestSequence(entry.chatId), entry.sequence),
-    );
+        entry.chatId, Math.max(this.latestSequence(entry.chatId), entry.sequence));
     this.observer?.message(entry);
   }
   changeApplied(
-    _chatId: number,
-    _generation: number,
-    _revision: number,
-    _author: AiChatAuthorInfo,
-    _change: CodeChange,
-    _submission?: { clientId: string; seq: number },
-  ): void {}
+      _chatId: number, _generation: number, _revision: number, _author: AiChatAuthorInfo,
+      _change: CodeChange, _submission?: { clientId: string; seq: number }): void {}
   stream(_chatId: number, _event: AiChatStreamEvent): void {}
 
   latestSequence(chatId: number): number {
@@ -330,10 +280,8 @@ class ChatSubscriber extends RpcTarget implements AiChatSubscriber {
   }
 
   async waitForCostUpdates(
-    chatId: number,
-    minimumUpdates: number,
-    timeoutMs: number,
-  ): Promise<AiChatMetadata | undefined> {
+      chatId: number, minimumUpdates: number,
+      timeoutMs: number): Promise<AiChatMetadata | undefined> {
     const current = this.#metadata.get(chatId);
     if (this.costUpdateCount(chatId) >= minimumUpdates) return current;
     const settled = Promise.withResolvers<AiChatMetadata | undefined>();
@@ -360,15 +308,9 @@ class WorkpieceSubscriber extends RpcTarget implements WorkpiecesSubscriber {
     this.#resolveReady = ready.resolve;
   }
 
-  entry(summary: WorkpieceSummary): void {
-    this.entries.set(summary.id, summary);
-  }
-  removed(id: WorkpieceId): void {
-    this.entries.delete(id);
-  }
-  ready(): void {
-    this.#resolveReady();
-  }
+  entry(summary: WorkpieceSummary): void { this.entries.set(summary.id, summary); }
+  removed(id: WorkpieceId): void { this.entries.delete(id); }
+  ready(): void { this.#resolveReady(); }
 }
 
 class WorkshopAgentSessionImpl implements WorkshopAgentSession {
@@ -426,35 +368,22 @@ class WorkshopAgentSessionImpl implements WorkshopAgentSession {
     }
     const chatId = this.#chatId;
     if (options.signal?.aborted) {
-      return Promise.resolve(
-        this.#resultWithLastState({
-          status: "cancelled",
-          message: "Agent activation was cancelled",
-        }),
-      );
+      return Promise.resolve(this.#resultWithLastState({
+        status: "cancelled",
+        message: "Agent activation was cancelled",
+      }));
     }
     const observer = new TurnObserver(
-      chatId,
-      options.timeoutMs ?? this.#turnTimeoutMs,
-      options.signal,
-      prompt,
-    );
-    const operation =
-      chatId === undefined
-        ? () => this.#startChat(prompt, observer)
-        : () =>
-            this.#awaitRpc(
-              this.#workspace.sendChatMessage(chatId, prompt, this.#modelId),
-              chatId,
-              observer,
-            );
+        chatId, options.timeoutMs ?? this.#turnTimeoutMs, options.signal, prompt);
+    const operation = chatId === undefined
+      ? () => this.#startChat(prompt, observer)
+      : () => this.#awaitRpc(
+          this.#workspace.sendChatMessage(chatId, prompt, this.#modelId), chatId, observer);
     return this.#observeOperation(observer, operation);
   }
 
   async approveActionsAndWait(
-    ids: readonly [number, ...number[]],
-    options: AgentTurnOptions = {},
-  ): Promise<AgentTurnResult> {
+      ids: readonly [number, ...number[]], options: AgentTurnOptions = {}): Promise<AgentTurnResult> {
     this.#assertOpen();
     const chatId = this.#chatId;
     if (chatId === undefined) throw new Error("The session has no chat to resume");
@@ -470,12 +399,7 @@ class WorkshopAgentSessionImpl implements WorkshopAgentSession {
     }
     this.#reserved = true;
     const observer = new TurnObserver(
-      chatId,
-      options.timeoutMs ?? this.#turnTimeoutMs,
-      options.signal,
-      undefined,
-      true,
-    );
+        chatId, options.timeoutMs ?? this.#turnTimeoutMs, options.signal, undefined, true);
     let observationStarted = false;
     try {
       const preflight = this.#assertActionsPending(ids);
@@ -552,79 +476,50 @@ class WorkshopAgentSessionImpl implements WorkshopAgentSession {
   async #startChat(prompt: string, observer: TurnObserver): Promise<void> {
     const creating = this.#workspace.newChat(prompt, this.#modelId);
     this.#pendingRpcs.add(creating);
-    creating
-      .then(
-        (chatId) => {
-          const status = observer.outcome?.status;
-          if (this.#closed || status === "timedOut" || status === "cancelled") {
-            Promise.resolve(this.#workspace.stopAgent(chatId)).catch(() => {});
-            return;
-          }
-          this.#chatId = chatId;
-          observer.attach(chatId);
-        },
-        () => {},
-      )
-      .finally(() => {
-        if (this.#pendingRpcs.delete(creating)) creating[Symbol.dispose]();
-      })
-      .catch(() => {});
+    creating.then(chatId => {
+      const status = observer.outcome?.status;
+      if (this.#closed || status === "timedOut" || status === "cancelled") {
+        Promise.resolve(this.#workspace.stopAgent(chatId)).catch(() => {});
+        return;
+      }
+      this.#chatId = chatId;
+      observer.attach(chatId);
+    }, () => {}).finally(() => {
+      if (this.#pendingRpcs.delete(creating)) creating[Symbol.dispose]();
+    }).catch(() => {});
     this.#chatId = await creating;
     observer.attach(this.#chatId);
   }
 
   async #awaitRpc(
-    operation: RpcPromise<void>,
-    chatId: number,
-    observer: TurnObserver,
-  ): Promise<void> {
+      operation: RpcPromise<void>, chatId: number, observer: TurnObserver): Promise<void> {
     this.#pendingRpcs.add(operation);
-    operation
-      .then(
-        () => {
-          const status = observer.outcome?.status;
-          if (this.#closed || status === "timedOut" || status === "cancelled") {
-            Promise.resolve(this.#workspace.stopAgent(chatId)).catch(() => {});
-          }
-        },
-        () => {},
-      )
-      .finally(() => {
-        if (this.#pendingRpcs.delete(operation)) operation[Symbol.dispose]();
-      })
-      .catch(() => {});
+    operation.then(() => {
+      const status = observer.outcome?.status;
+      if (this.#closed || status === "timedOut" || status === "cancelled") {
+        Promise.resolve(this.#workspace.stopAgent(chatId)).catch(() => {});
+      }
+    }, () => {}).finally(() => {
+      if (this.#pendingRpcs.delete(operation)) operation[Symbol.dispose]();
+    }).catch(() => {});
     await operation;
   }
 
   async #stopAndWaitForIdle(
-    chatId: number,
-    deadline = Date.now() + CANCELLATION_TIMEOUT_MS,
-  ): Promise<void> {
+      chatId: number, deadline = Date.now() + CANCELLATION_TIMEOUT_MS): Promise<void> {
     await this.#beforeCancellationDeadline(
-      () => this.#workspace.stopAgent(chatId),
-      deadline,
-      "Stopping the agent timed out",
-    );
-    await waitFor(
-      "timed-out agent cancellation",
-      async () => {
-        const chats = await this.#beforeCancellationDeadline(
-          () => this.#workspace.listChats(),
-          deadline,
-          "Reading chat state during cancellation timed out",
-        );
-        const chat = chats.find((entry) => entry.id === chatId);
-        return chat === undefined || chat.activeAgent === undefined ? true : null;
-      },
-      Math.max(1, deadline - Date.now()),
-    );
+        () => this.#workspace.stopAgent(chatId), deadline, "Stopping the agent timed out");
+    await waitFor("timed-out agent cancellation", async () => {
+      const chats = await this.#beforeCancellationDeadline(
+          () => this.#workspace.listChats(), deadline,
+          "Reading chat state during cancellation timed out");
+      const chat = chats.find(entry => entry.id === chatId);
+      return chat === undefined || chat.activeAgent === undefined ? true : null;
+    }, Math.max(1, deadline - Date.now()));
   }
 
   async #beforeCancellationDeadline<T>(
-    start: () => Promise<T>,
-    deadline: number,
-    message: string,
-  ): Promise<T> {
+      start: () => Promise<T>, deadline: number, message: string): Promise<T> {
     const remaining = deadline - Date.now();
     if (remaining <= 0) throw new Error(message);
     const operation = start();
@@ -639,22 +534,23 @@ class WorkshopAgentSessionImpl implements WorkshopAgentSession {
   }
 
   async #observeOperation(
-    observer: TurnObserver,
-    start: () => Promise<void>,
-  ): Promise<AgentTurnResult> {
+      observer: TurnObserver, start: () => Promise<void>): Promise<AgentTurnResult> {
     this.#activeTurn = observer;
     this.#chatSubscriber.observer = observer;
     const operation = start();
     operation.catch(() => {});
     try {
-      const acknowledgementOrOutcome = Promise.race([operation, observer.result.then(() => {})]);
+      const acknowledgementOrOutcome = Promise.race([
+        operation,
+        observer.result.then(() => {}),
+      ]);
       try {
         await observer.race(acknowledgementOrOutcome);
       } catch (error) {
         const status = observer.outcome?.status;
         if (status !== "timedOut" && status !== "cancelled") throw error;
       }
-      const outcome = observer.outcome ?? (await observer.result);
+      const outcome = observer.outcome ?? await observer.result;
       let cancellationDeadline: number | undefined;
       if (outcome.status === "timedOut" || outcome.status === "cancelled") {
         this.#terminal = true;
@@ -662,24 +558,14 @@ class WorkshopAgentSessionImpl implements WorkshopAgentSession {
         const initialChatId = this.#chatId;
         if (initialChatId !== undefined) {
           await this.#beforeCancellationDeadline(
-            () => this.#workspace.stopAgent(initialChatId),
-            cancellationDeadline,
-            "Stopping the agent timed out",
-          );
+              () => this.#workspace.stopAgent(initialChatId), cancellationDeadline,
+              "Stopping the agent timed out");
         }
         const dispatchSettled = Promise.withResolvers<void>();
         const timer = setTimeout(
-          dispatchSettled.resolve,
-          Math.max(0, cancellationDeadline - Date.now()),
-        );
+            dispatchSettled.resolve, Math.max(0, cancellationDeadline - Date.now()));
         try {
-          await Promise.race([
-            operation.then(
-              () => {},
-              () => {},
-            ),
-            dispatchSettled.promise,
-          ]);
+          await Promise.race([operation.then(() => {}, () => {}), dispatchSettled.promise]);
         } finally {
           clearTimeout(timer);
         }
@@ -688,11 +574,7 @@ class WorkshopAgentSessionImpl implements WorkshopAgentSession {
         }
       }
       const snapshot = this.#snapshot(
-        outcome,
-        observer.startSequence,
-        observer.endSequence,
-        cancellationDeadline,
-      );
+          outcome, observer.startSequence, observer.endSequence, cancellationDeadline);
       if (outcome.status === "timedOut" || outcome.status === "cancelled") return await snapshot;
       try {
         return await observer.race(snapshot);
@@ -712,58 +594,40 @@ class WorkshopAgentSessionImpl implements WorkshopAgentSession {
   }
 
   async #snapshot(
-    observedOutcome: AgentTurnOutcome,
-    startSequence: number,
-    endSequence: number | undefined,
-    cancellationDeadline?: number,
-  ): Promise<AgentTurnResult> {
+      observedOutcome: AgentTurnOutcome, startSequence: number,
+      endSequence: number | undefined, cancellationDeadline?: number): Promise<AgentTurnResult> {
     const chatId = this.#chatId;
     if (chatId === undefined) {
       return { outcome: observedOutcome, history: [], workpieces: [], usage: {} };
     }
-    const loadState = () =>
-      Promise.all([
-        loadAllChatHistory((before) => this.#workspace.getChatHistory(chatId, before)),
-        this.#workspace.listChats(),
-        this.#loadWorkpieces(),
-      ]);
-    const [loadedHistory, chats, workpieces] =
-      cancellationDeadline === undefined
-        ? await loadState()
-        : await this.#beforeCancellationDeadline(
-            loadState,
-            cancellationDeadline,
-            "Reading cancelled turn state timed out",
-          );
-    const history =
-      endSequence === undefined
-        ? loadedHistory
-        : loadedHistory.filter((message) => message.sequence <= endSequence);
-    const newMessages = history.filter((message) => message.sequence > startSequence);
-    const error = newMessages.find((message) => message.type === "error");
+    const loadState = () => Promise.all([
+      loadAllChatHistory(before => this.#workspace.getChatHistory(chatId, before)),
+      this.#workspace.listChats(),
+      this.#loadWorkpieces(),
+    ]);
+    const [loadedHistory, chats, workpieces] = cancellationDeadline === undefined
+      ? await loadState()
+      : await this.#beforeCancellationDeadline(
+          loadState, cancellationDeadline, "Reading cancelled turn state timed out");
+    const history = endSequence === undefined
+      ? loadedHistory
+      : loadedHistory.filter(message => message.sequence <= endSequence);
+    const newMessages = history.filter(message => message.sequence > startSequence);
+    const error = newMessages.find(message => message.type === "error");
     let outcome: AgentTurnOutcome = observedOutcome;
-    if (
-      error !== undefined &&
-      observedOutcome.status !== "timedOut" &&
-      observedOutcome.status !== "cancelled"
-    ) {
-      outcome =
-        error.code === undefined
-          ? { status: "error", message: error.message }
-          : { status: "error", message: error.message, code: error.code };
+    if (error !== undefined && observedOutcome.status !== "timedOut" &&
+        observedOutcome.status !== "cancelled") {
+      outcome = error.code === undefined
+        ? { status: "error", message: error.message }
+        : { status: "error", message: error.message, code: error.code };
     }
-    let metadata = chats.find((chat) => chat.id === chatId);
+    let metadata = chats.find(chat => chat.id === chatId);
     if (metadata === undefined) throw new Error(`Chat ${chatId} disappeared`);
     const modelSteps = history.filter(
-      (message) => message.type === "message" && message.author.type === "agent",
-    ).length;
+        message => message.type === "message" && message.author.type === "agent").length;
     if (outcome.status === "completed" && this.#costAccountingTimeoutMs > 0 && modelSteps > 0) {
-      metadata =
-        (await this.#chatSubscriber.waitForCostUpdates(
-          chatId,
-          modelSteps,
-          this.#costAccountingTimeoutMs,
-        )) ?? metadata;
+      metadata = await this.#chatSubscriber.waitForCostUpdates(
+          chatId, modelSteps, this.#costAccountingTimeoutMs) ?? metadata;
     }
     const usage: AgentTurnResult["usage"] = {};
     if (metadata.totalTokens !== undefined) usage.lastStepTokens = metadata.totalTokens;
@@ -818,22 +682,19 @@ class WorkshopAgentSessionImpl implements WorkshopAgentSession {
           await this.#stopAndWaitForIdle(this.#chatId, deadline);
         }
         if (this.#pendingRpcs.size > 0) {
-          const pendingDeadline = Math.min(deadline, Date.now() + PENDING_RPC_GRACE_MS);
-          await waitFor(
-            "pending agent RPC cleanup",
-            () => Promise.resolve(this.#pendingRpcs.size === 0 ? true : null),
-            Math.max(1, pendingDeadline - Date.now()),
-          );
+          const pendingDeadline = Math.min(
+              deadline, Date.now() + PENDING_RPC_GRACE_MS);
+          await waitFor("pending agent RPC cleanup", () =>
+            Promise.resolve(this.#pendingRpcs.size === 0 ? true : null),
+          Math.max(1, pendingDeadline - Date.now()));
         }
       } catch (error) {
         stopError = error instanceof Error ? error : new Error(String(error));
       }
       try {
         await this.#beforeCancellationDeadline(
-          () => this.#workspace.deleteSelf(),
-          Date.now() + CANCELLATION_TIMEOUT_MS,
-          "Workspace deletion timed out",
-        );
+            () => this.#workspace.deleteSelf(), Date.now() + CANCELLATION_TIMEOUT_MS,
+            "Workspace deletion timed out");
       } catch (error) {
         deleteError = error instanceof Error ? error : new Error(String(error));
       }
@@ -847,10 +708,7 @@ class WorkshopAgentSessionImpl implements WorkshopAgentSession {
       this.#publicApi[Symbol.dispose]();
     }
     if (stopError !== undefined && deleteError !== undefined) {
-      throw new AggregateError(
-        [stopError, deleteError],
-        "Agent shutdown and workspace deletion failed",
-      );
+      throw new AggregateError([stopError, deleteError], "Agent shutdown and workspace deletion failed");
     }
     if (stopError !== undefined) throw stopError;
     if (deleteError !== undefined) throw deleteError;
@@ -868,9 +726,7 @@ class WorkshopAgentSessionImpl implements WorkshopAgentSession {
 
 /** Open one fresh local account and workspace for deterministic tests or real-model evals. */
 export async function openAgentSession(
-  baseUrl: URL,
-  options: AgentSessionOptions,
-): Promise<WorkshopAgentSession> {
+    baseUrl: URL, options: AgentSessionOptions): Promise<WorkshopAgentSession> {
   const publicApi = connect(baseUrl);
   let authenticatedApi: RpcStub<AuthenticatedApi> | undefined;
   let workspace: RpcStub<Overseer> | undefined;
@@ -878,12 +734,12 @@ export async function openAgentSession(
   try {
     const username = nextUsernames(options.usernamePrefix ?? "agent").at(0);
     if (username === undefined) throw new Error("Failed to allocate an agent-session username");
-    const authenticated = (authenticatedApi = await signUp(publicApi, username));
+    const authenticated = authenticatedApi = await signUp(publicApi, username);
     if (options.userModel !== undefined) {
       await authenticated.addModel(options.userModel.profile, options.userModel.config);
     }
     const models = await authenticated.listModels();
-    if (!models.some((model) => model.id === options.modelId)) {
+    if (!models.some(model => model.id === options.modelId)) {
       throw new Error(`Model "${options.modelId}" is not available to the test account`);
     }
     await authenticated.setQuickModel(null);
@@ -893,13 +749,9 @@ export async function openAgentSession(
     const accounts = new Map<string, ConnectedAccount>();
     for (const vendorId of options.ambientVendorIds ?? []) {
       await authenticated.provisionAmbientAccount(vendorId);
-      const account = await waitFor(
-        `the ${vendorId} account to be provisioned`,
-        async () =>
-          (await listConnectedAccounts(authenticated)).find(
-            (entry) => entry.vendorId === vendorId,
-          ) ?? null,
-      );
+      const account = await waitFor(`the ${vendorId} account to be provisioned`, async () =>
+        (await listConnectedAccounts(authenticated)).find(entry => entry.vendorId === vendorId)
+          ?? null);
       accounts.set(vendorId, account);
     }
 
@@ -931,9 +783,8 @@ export async function openAgentSession(
       cleanupError = cleanup instanceof Error ? cleanup : new Error(String(cleanup));
     }
     if (cleanupError !== undefined) {
-      throw new Error(`Agent session setup failed; cleanup also failed: ${cleanupError.message}`, {
-        cause: error,
-      });
+      throw new Error(`Agent session setup failed; cleanup also failed: ${cleanupError.message}`,
+          { cause: error });
     }
     throw setupError;
   }
@@ -941,8 +792,7 @@ export async function openAgentSession(
 
 /** Load every compacted page of one canonical chat history in ascending sequence order. */
 export async function loadAllChatHistory(
-  loadPage: (beforeSequence?: number) => Promise<AiChatHistoryPage>,
-): Promise<AiChatMessage[]> {
+    loadPage: (beforeSequence?: number) => Promise<AiChatHistoryPage>): Promise<AiChatMessage[]> {
   let page = await loadPage();
   let messages = page.messages;
   const boundaries = new Set<number>();

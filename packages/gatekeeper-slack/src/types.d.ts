@@ -28,7 +28,11 @@ export type SlackReaction = {
 };
 
 /** The kind of conversation a channel/DM represents. */
-export type SlackConversationKind = "public_channel" | "private_channel" | "im" | "mpim";
+export type SlackConversationKind =
+  | "public_channel"
+  | "private_channel"
+  | "im"
+  | "mpim";
 
 /** Metadata describing a conversation (channel, DM, or group DM). */
 export type SlackConversationInfo = {

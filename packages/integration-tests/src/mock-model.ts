@@ -37,9 +37,8 @@ const AUXILIARY_COMPLETIONS: AuxiliaryCompletion[] = [
 function auxiliaryCompletion(body: unknown): AuxiliaryCompletion | undefined {
   const parsed = AUXILIARY_REQUEST.safeParse(body);
   if (!parsed.success) return undefined;
-  return AUXILIARY_COMPLETIONS.find((completion) =>
-    parsed.data.messages[0].content.startsWith(completion.promptPrefix),
-  );
+  return AUXILIARY_COMPLETIONS.find(
+      completion => parsed.data.messages[0].content.startsWith(completion.promptPrefix));
 }
 
 export const SCRIPTED_MODEL_ID = "@cf/zai-org/glm-5.2";
@@ -62,10 +61,9 @@ type ToolCall = {
 };
 
 type StreamedCompletionStep = { text: string } | { toolCall: ToolCall };
-export type ChatCompletionStep =
-  | StreamedCompletionStep
-  | { error: { status: number; message: string } }
-  | { pending: true };
+export type ChatCompletionStep = StreamedCompletionStep |
+  { error: { status: number; message: string } } |
+  { pending: true };
 
 export type ScriptedChatCompletions = {
   handler: Handler;
@@ -85,42 +83,35 @@ function stream(step: StreamedCompletionStep, index: number): Response {
     created: 0,
     model: "mock",
   };
-  const delta =
-    "text" in step
-      ? { role: "assistant", content: step.text }
-      : {
-          role: "assistant",
-          tool_calls: [
-            {
-              index: 0,
-              id: step.toolCall.id,
-              type: "function",
-              function: {
-                name: step.toolCall.name,
-                arguments: JSON.stringify(step.toolCall.arguments),
-              },
-            },
-          ],
-        };
+  const delta = "text" in step
+    ? { role: "assistant", content: step.text }
+    : {
+        role: "assistant",
+        tool_calls: [{
+          index: 0,
+          id: step.toolCall.id,
+          type: "function",
+          function: {
+            name: step.toolCall.name,
+            arguments: JSON.stringify(step.toolCall.arguments),
+          },
+        }],
+      };
   const finishReason = "text" in step ? "stop" : "tool_calls";
-  const body =
-    event({
-      ...base,
-      choices: [{ index: 0, delta, finish_reason: null }],
-    }) +
-    event({
-      ...base,
-      choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
-      usage: USAGE,
-    }) +
-    "data: [DONE]\n\n";
+  const body = event({
+    ...base,
+    choices: [{ index: 0, delta, finish_reason: null }],
+  }) + event({
+    ...base,
+    choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
+    usage: USAGE,
+  }) + "data: [DONE]\n\n";
   return new Response(body, { headers: { "content-type": "text/event-stream" } });
 }
 
 /** Answer matching model requests with scripted text or tool-call responses, in order. */
-export function scriptedChatCompletions(
-  script: readonly ChatCompletionStep[],
-): ScriptedChatCompletions {
+export function scriptedChatCompletions(script: readonly ChatCompletionStep[])
+    : ScriptedChatCompletions {
   const requests: unknown[] = [];
   const auxiliaryRequests: { kind: AuxiliaryRequestKind; body: unknown }[] = [];
   const steps = [...script];
@@ -139,8 +130,7 @@ export function scriptedChatCompletions(
       }
       requests.push(body);
       const step = steps.shift();
-      if (step === undefined)
-        throw new Error("The fake model received more requests than scripted");
+      if (step === undefined) throw new Error("The fake model received more requests than scripted");
       if ("pending" in step) {
         const response = Promise.withResolvers<Response>();
         const onAbort = () => {
@@ -149,7 +139,8 @@ export function scriptedChatCompletions(
         };
         if (request.signal.aborted) onAbort();
         else request.signal.addEventListener("abort", onAbort, { once: true });
-        return response.promise.finally(() => request.signal.removeEventListener("abort", onAbort));
+        return response.promise.finally(() =>
+          request.signal.removeEventListener("abort", onAbort));
       }
       if ("error" in step) {
         return new Response(step.error.message, { status: step.error.status });
@@ -161,8 +152,6 @@ export function scriptedChatCompletions(
 
 /** Answer an OpenAI-compatible streaming chat request with one fixed text response. */
 export function mockChatCompletion(text: string): Handler {
-  return (url, method) =>
-    method === "POST" && url.pathname.endsWith(CHAT_COMPLETIONS_SUFFIX)
-      ? stream({ text }, 0)
-      : null;
+  return (url, method) => method === "POST" && url.pathname.endsWith(CHAT_COMPLETIONS_SUFFIX)
+    ? stream({ text }, 0) : null;
 }

@@ -7,19 +7,11 @@
 //   - Connected + balance below minimum (incl. $0), or not connected -> platform free tier; the
 //     daily counter is consumed and, once exhausted, the request is blocked.
 
-import {
-  canProceedWithRequest,
-  hasMinimumBalance,
-  LimitWindowKind,
-} from "@gadgets/workshop-shared/limits";
+import { canProceedWithRequest, hasMinimumBalance, LimitWindowKind } from "@gadgets/workshop-shared/limits";
 import { CloudflareUsageInfo } from "@gadgets/workshop-shared/api";
 import { isCloudflareLimitsEnabled, getMinimumCloudflareBalance } from "../config.js";
 import { getDailyLlmCallLimit } from "./config.js";
-import {
-  getConnectionStatus,
-  resolveConnection,
-  ByokGatewayRouting,
-} from "../cloudflare/connection-service.js";
+import { getConnectionStatus, resolveConnection, ByokGatewayRouting } from "../cloudflare/connection-service.js";
 import type { UserDurableObject } from "../../user.js";
 
 export interface UsageCheckResult {

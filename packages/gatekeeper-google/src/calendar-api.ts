@@ -115,11 +115,9 @@ export function googleEventFromDraft(event: CalendarEventDraft): Partial<GoogleC
     ...(event.attendees ? { attendees: event.attendees } : {}),
     ...(event.transparency ? { transparency: event.transparency } : {}),
     ...(event.visibility ? { visibility: event.visibility } : {}),
-    ...(event.reminders
-      ? {
-          reminders: { useDefault: false, overrides: event.reminders },
-        }
-      : {}),
+    ...(event.reminders ? {
+      reminders: { useDefault: false, overrides: event.reminders },
+    } : {}),
   };
 }
 
@@ -146,10 +144,7 @@ function eventTimeMillis(value: CalendarTime): number {
 }
 
 export function calendarEventOverlaps(event: CalendarEvent, timeMin: Date, timeMax: Date): boolean {
-  return (
-    eventTimeMillis(event.end) > timeMin.valueOf() &&
-    eventTimeMillis(event.start) < timeMax.valueOf()
-  );
+  return eventTimeMillis(event.end) > timeMin.valueOf() && eventTimeMillis(event.start) < timeMax.valueOf();
 }
 
 export function calendarEventSortKey(event: CalendarEvent): number {
@@ -184,14 +179,10 @@ export class GoogleCalendarApi {
       headers.set("Content-Type", "application/json");
     }
 
-    let response = await fetchWithAuthRetry(
-      `${CALENDAR_API_BASE}${path}`,
-      {
-        ...init,
-        headers,
-      },
-      this.getAccessToken,
-    );
+    let response = await fetchWithAuthRetry(`${CALENDAR_API_BASE}${path}`, {
+      ...init,
+      headers,
+    }, this.getAccessToken);
 
     if (!response.ok) {
       let text = await response.text();
@@ -216,19 +207,16 @@ export class GoogleCalendarApi {
       });
       if (pageToken) params.set("pageToken", pageToken);
 
-      let body = await this.#fetch<{ items?: GoogleCalendarInfo[]; nextPageToken?: string }>(
-        `/users/me/calendarList?${params}`,
-      );
+      let body = await this.#fetch<{items?: GoogleCalendarInfo[]; nextPageToken?: string}>(
+        `/users/me/calendarList?${params}`);
       calendars.push(...(body.items ?? []));
       pageToken = body.nextPageToken;
     } while (pageToken && calendars.length < cap);
 
     return calendars
-      .toSorted(
-        (a, b) =>
-          calendarPickerRank(a) - calendarPickerRank(b) ||
-          (a.summary ?? a.id).localeCompare(b.summary ?? b.id),
-      )
+      .toSorted((a, b) =>
+        calendarPickerRank(a) - calendarPickerRank(b) ||
+        (a.summary ?? a.id).localeCompare(b.summary ?? b.id))
       .slice(0, cap);
   }
 
@@ -261,21 +249,17 @@ export class GoogleCalendarApi {
       });
       if (pageToken) params.set("pageToken", pageToken);
 
-      let body = await this.#fetch<{ items?: GoogleCalendarEvent[]; nextPageToken?: string }>(
-        `/calendars/${encodeCalendarId(calendarId)}/events?${params}`,
-      );
+      let body = await this.#fetch<{items?: GoogleCalendarEvent[]; nextPageToken?: string}>(
+        `/calendars/${encodeCalendarId(calendarId)}/events?${params}`);
       let items = body.items ?? [];
       if (events.length + items.length > MAX_LIST_EVENTS) {
         throw new Error(
-          "Too many events in the requested window. Narrow timeMin/timeMax and try again.",
-        );
+          "Too many events in the requested window. Narrow timeMin/timeMax and try again.");
       }
       for (let event of items) {
-        events.push(
-          calendarEventFromGoogle(event, {
-            includeDescriptions: opts.includeDescriptions,
-          }),
-        );
+        events.push(calendarEventFromGoogle(event, {
+          includeDescriptions: opts.includeDescriptions,
+        }));
       }
       pageToken = body.nextPageToken;
     } while (pageToken);
@@ -290,29 +274,26 @@ export class GoogleCalendarApi {
     timeZone?: string;
   }): Promise<PersonAvailability[]> {
     let body = await this.#fetch<{
-      calendars?: Record<
-        string,
-        { busy?: { start: string; end: string }[]; errors?: { reason?: string; domain?: string }[] }
-      >;
+      calendars?: Record<string, { busy?: { start: string; end: string }[]; errors?: {reason?: string; domain?: string}[] }>;
     }>("/freeBusy", {
       method: "POST",
       body: JSON.stringify({
         timeMin: opts.timeMin.toISOString(),
         timeMax: opts.timeMax.toISOString(),
         ...(opts.timeZone ? { timeZone: opts.timeZone } : {}),
-        items: opts.people.map((id) => ({ id })),
+        items: opts.people.map(id => ({ id })),
       }),
     });
 
     let calendars = body.calendars ?? {};
-    return opts.people.map((email) => {
+    return opts.people.map(email => {
       let entry = calendars[email];
       let error = entry
-        ? entry.errors?.map((item) => item.reason ?? item.domain ?? "unknown").join(", ")
-        : "notFound";
+          ? entry.errors?.map(item => item.reason ?? item.domain ?? "unknown").join(", ")
+          : "notFound";
       return {
         email,
-        busy: (entry?.busy ?? []).map((block) => ({
+        busy: (entry?.busy ?? []).map(block => ({
           start: new Date(block.start),
           end: new Date(block.end),
         })),
@@ -331,8 +312,7 @@ export class GoogleCalendarApi {
     if (!availability || availability.error === "notFound") return false;
     if (availability.error) {
       throw new Error(
-        `Google Calendar free/busy access check failed for ${calendarId}: ${availability.error}`,
-      );
+        `Google Calendar free/busy access check failed for ${calendarId}: ${availability.error}`);
     }
     return true;
   }

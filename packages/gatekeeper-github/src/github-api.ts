@@ -340,9 +340,8 @@ async function request<T>(
     if (typeof parsed === "string" && parsed.length > 0) {
       message = parsed;
     } else if (parsed && typeof parsed === "object") {
-      const errorMessage =
-        (parsed as { message?: string; error?: string }).message ??
-        (parsed as { message?: string; error?: string }).error;
+      const errorMessage = (parsed as { message?: string; error?: string }).message
+        ?? (parsed as { message?: string; error?: string }).error;
       if (errorMessage) {
         message = errorMessage;
       }
@@ -402,19 +401,14 @@ export async function exchangeAuthCode(
     error_description?: string;
   };
   if (!result.access_token || !result.token_type || result.error) {
-    const message =
-      [result.error, result.error_description].filter(Boolean).join(": ") ||
-      "GitHub OAuth token exchange failed";
+    const message = [result.error, result.error_description].filter(Boolean).join(": ")
+      || "GitHub OAuth token exchange failed";
     throw new GitHubApiError(400, message, parsed);
   }
 
   return {
     accessToken: result.access_token,
-    scopes:
-      result.scope
-        ?.split(",")
-        .map((scope: string) => scope.trim())
-        .filter(Boolean) ?? [],
+    scopes: result.scope?.split(",").map((scope: string) => scope.trim()).filter(Boolean) ?? [],
     tokenType: result.token_type,
   };
 }
@@ -424,16 +418,20 @@ export async function revokeOAuthGrant(
   clientId: string,
   clientSecret: string,
 ): Promise<void> {
-  await request<void>("DELETE", `/applications/${encodeURIComponent(clientId)}/grant`, {
-    auth: "basic",
-    basicAuth: {
-      username: clientId,
-      password: clientSecret,
+  await request<void>(
+    "DELETE",
+    `/applications/${encodeURIComponent(clientId)}/grant`,
+    {
+      auth: "basic",
+      basicAuth: {
+        username: clientId,
+        password: clientSecret,
+      },
+      body: {
+        access_token: accessToken,
+      },
     },
-    body: {
-      access_token: accessToken,
-    },
-  });
+  );
 }
 
 export class GitHubApi {
@@ -485,12 +483,11 @@ export class GitHubApi {
       throw new Error("GitHub unexpectedly returned 304 for an unconditional viewer request.");
     }
     const user = result.data;
-    const scopes =
-      result.headers
-        .get("x-oauth-scopes")
-        ?.split(",")
-        .map((scope: string) => scope.trim())
-        .filter(Boolean) ?? [];
+    const scopes = result.headers
+      .get("x-oauth-scopes")
+      ?.split(",")
+      .map((scope: string) => scope.trim())
+      .filter(Boolean) ?? [];
 
     return {
       user,
@@ -509,16 +506,12 @@ export class GitHubApi {
    * account has no verified email. Requires the `user:email` scope.
    */
   async getPrimaryVerifiedEmail(): Promise<string | null> {
-    const result = await this.#request<
-      Array<{
-        email: string;
-        primary: boolean;
-        verified: boolean;
-      }>
-    >("GET", "/user/emails", {});
+    const result = await this.#request<Array<{
+      email: string; primary: boolean; verified: boolean;
+    }>>("GET", "/user/emails", {});
     const emails = result.data ?? [];
-    const primary = emails.find((e) => e.primary && e.verified);
-    const verified = primary ?? emails.find((e) => e.verified);
+    const primary = emails.find(e => e.primary && e.verified);
+    const verified = primary ?? emails.find(e => e.verified);
     return verified?.email ?? null;
   }
 
@@ -549,9 +542,7 @@ export class GitHubApi {
     per_page: number;
     page: number;
   }): Promise<GitHubRepoResponse[]> {
-    const result = await this.#request<GitHubRepoResponse[]>("GET", "/user/repos", {
-      query: options,
-    });
+    const result = await this.#request<GitHubRepoResponse[]>("GET", "/user/repos", { query: options });
     return result.data;
   }
 
@@ -567,11 +558,7 @@ export class GitHubApi {
     sort?: "stars" | "forks" | "help-wanted-issues" | "updated";
     order?: "asc" | "desc";
   }): Promise<GitHubRepoResponse[]> {
-    const result = await this.#request<{ items: GitHubRepoResponse[] }>(
-      "GET",
-      "/search/repositories",
-      { query: options },
-    );
+    const result = await this.#request<{ items: GitHubRepoResponse[] }>("GET", "/search/repositories", { query: options });
     return result.data.items;
   }
 
@@ -603,9 +590,7 @@ export class GitHubApi {
   ): Promise<GitHubPullRequestResponse> {
     const result = await this.getPullRequestConditional(owner, repo, pullNumber);
     if (result.status === 304) {
-      throw new Error(
-        "GitHub unexpectedly returned 304 for an unconditional pull request request.",
-      );
+      throw new Error("GitHub unexpectedly returned 304 for an unconditional pull request request.");
     }
     return result.data;
   }
@@ -675,9 +660,7 @@ export class GitHubApi {
   ): Promise<GitHubIssueResponse[]> {
     const result = await this.searchIssuesConditional(query, page, perPage, sort, order);
     if (result.status === 304) {
-      throw new Error(
-        "GitHub unexpectedly returned 304 for an unconditional issue search request.",
-      );
+      throw new Error("GitHub unexpectedly returned 304 for an unconditional issue search request.");
     }
     return result.data.items;
   }
@@ -719,9 +702,7 @@ export class GitHubApi {
   ): Promise<GitHubPullRequestResponse[]> {
     const result = await this.listPullRequestsConditional(owner, repo, options);
     if (result.status === 304) {
-      throw new Error(
-        "GitHub unexpectedly returned 304 for an unconditional pull request list request.",
-      );
+      throw new Error("GitHub unexpectedly returned 304 for an unconditional pull request list request.");
     }
     return result.data;
   }
@@ -755,19 +736,17 @@ export class GitHubApi {
     perPage: number,
     since?: string,
   ): Promise<GitHubIssueCommentResponse[]> {
-    return (
-      await this.#request<GitHubIssueCommentResponse[]>(
-        "GET",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments`,
-        {
-          query: {
-            page,
-            per_page: perPage,
-            since,
-          },
+    return (await this.#request<GitHubIssueCommentResponse[]>(
+      "GET",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments`,
+      {
+        query: {
+          page,
+          per_page: perPage,
+          since,
         },
-      )
-    ).data;
+      },
+    )).data;
   }
 
   async createIssue(
@@ -780,13 +759,11 @@ export class GitHubApi {
       assignees?: string[];
     },
   ): Promise<GitHubIssueResponse> {
-    return (
-      await this.#request<GitHubIssueResponse>(
-        "POST",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`,
-        { body: options },
-      )
-    ).data;
+    return (await this.#request<GitHubIssueResponse>(
+      "POST",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`,
+      { body: options },
+    )).data;
   }
 
   async createPullRequest(
@@ -800,13 +777,11 @@ export class GitHubApi {
       draft?: boolean;
     },
   ): Promise<GitHubPullRequestResponse> {
-    return (
-      await this.#request<GitHubPullRequestResponse>(
-        "POST",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`,
-        { body: options },
-      )
-    ).data;
+    return (await this.#request<GitHubPullRequestResponse>(
+      "POST",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`,
+      { body: options },
+    )).data;
   }
 
   async updateIssue(
@@ -820,13 +795,11 @@ export class GitHubApi {
       state_reason?: "completed" | "not_planned" | null;
     },
   ): Promise<GitHubIssueResponse> {
-    return (
-      await this.#request<GitHubIssueResponse>(
-        "PATCH",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}`,
-        { body: patch },
-      )
-    ).data;
+    return (await this.#request<GitHubIssueResponse>(
+      "PATCH",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}`,
+      { body: patch },
+    )).data;
   }
 
   async addLabels(
@@ -835,15 +808,13 @@ export class GitHubApi {
     issueNumber: number,
     labels: string[],
   ): Promise<GitHubLabelResponse[]> {
-    return (
-      await this.#request<GitHubLabelResponse[]>(
-        "POST",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/labels`,
-        {
-          body: { labels },
-        },
-      )
-    ).data;
+    return (await this.#request<GitHubLabelResponse[]>(
+      "POST",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/labels`,
+      {
+        body: { labels },
+      },
+    )).data;
   }
 
   async removeLabel(
@@ -864,15 +835,13 @@ export class GitHubApi {
     issueNumber: number,
     labels: string[],
   ): Promise<GitHubLabelResponse[]> {
-    return (
-      await this.#request<GitHubLabelResponse[]>(
-        "PUT",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/labels`,
-        {
-          body: { labels },
-        },
-      )
-    ).data;
+    return (await this.#request<GitHubLabelResponse[]>(
+      "PUT",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/labels`,
+      {
+        body: { labels },
+      },
+    )).data;
   }
 
   async createIssueComment(
@@ -881,15 +850,13 @@ export class GitHubApi {
     issueNumber: number,
     body: string,
   ): Promise<GitHubIssueCommentResponse> {
-    return (
-      await this.#request<GitHubIssueCommentResponse>(
-        "POST",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments`,
-        {
-          body: { body },
-        },
-      )
-    ).data;
+    return (await this.#request<GitHubIssueCommentResponse>(
+      "POST",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments`,
+      {
+        body: { body },
+      },
+    )).data;
   }
 
   async updateIssueComment(
@@ -898,15 +865,13 @@ export class GitHubApi {
     commentId: number,
     body: string,
   ): Promise<GitHubIssueCommentResponse> {
-    return (
-      await this.#request<GitHubIssueCommentResponse>(
-        "PATCH",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/comments/${commentId}`,
-        {
-          body: { body },
-        },
-      )
-    ).data;
+    return (await this.#request<GitHubIssueCommentResponse>(
+      "PATCH",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/comments/${commentId}`,
+      {
+        body: { body },
+      },
+    )).data;
   }
 
   async deleteIssueComment(owner: string, repo: string, commentId: number): Promise<void> {
@@ -923,17 +888,9 @@ export class GitHubApi {
     page: number,
     perPage: number,
   ): Promise<GitHubPullRequestReviewResponse[]> {
-    const result = await this.listPullRequestReviewsConditional(
-      owner,
-      repo,
-      pullNumber,
-      page,
-      perPage,
-    );
+    const result = await this.listPullRequestReviewsConditional(owner, repo, pullNumber, page, perPage);
     if (result.status === 304) {
-      throw new Error(
-        "GitHub unexpectedly returned 304 for an unconditional pull request review list request.",
-      );
+      throw new Error("GitHub unexpectedly returned 304 for an unconditional pull request review list request.");
     }
     return result.data;
   }
@@ -964,19 +921,17 @@ export class GitHubApi {
     perPage: number,
     since?: string,
   ): Promise<GitHubPullRequestReviewCommentResponse[]> {
-    return (
-      await this.#request<GitHubPullRequestReviewCommentResponse[]>(
-        "GET",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/comments`,
-        {
-          query: {
-            page,
-            per_page: perPage,
-            since,
-          },
+    return (await this.#request<GitHubPullRequestReviewCommentResponse[]>(
+      "GET",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/comments`,
+      {
+        query: {
+          page,
+          per_page: perPage,
+          since,
         },
-      )
-    ).data;
+      },
+    )).data;
   }
 
   async listReviewCommentsForReview(
@@ -996,9 +951,7 @@ export class GitHubApi {
       perPage,
     );
     if (result.status === 304) {
-      throw new Error(
-        "GitHub unexpectedly returned 304 for an unconditional review comment list request.",
-      );
+      throw new Error("GitHub unexpectedly returned 304 for an unconditional review comment list request.");
     }
     return result.data;
   }
@@ -1029,9 +982,7 @@ export class GitHubApi {
   ): Promise<GitHubPullRequestReviewCommentResponse> {
     const result = await this.getPullRequestReviewCommentConditional(owner, repo, commentId);
     if (result.status === 304) {
-      throw new Error(
-        "GitHub unexpectedly returned 304 for an unconditional review comment request.",
-      );
+      throw new Error("GitHub unexpectedly returned 304 for an unconditional review comment request.");
     }
     return result.data;
   }
@@ -1068,15 +1019,13 @@ export class GitHubApi {
       }>;
     },
   ): Promise<GitHubPullRequestReviewResponse> {
-    return (
-      await this.#request<GitHubPullRequestReviewResponse>(
-        "POST",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/reviews`,
-        {
-          body,
-        },
-      )
-    ).data;
+    return (await this.#request<GitHubPullRequestReviewResponse>(
+      "POST",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/reviews`,
+      {
+        body,
+      },
+    )).data;
   }
 
   async updatePullRequestReview(
@@ -1086,15 +1035,13 @@ export class GitHubApi {
     reviewId: number,
     body: string,
   ): Promise<GitHubPullRequestReviewResponse> {
-    return (
-      await this.#request<GitHubPullRequestReviewResponse>(
-        "PUT",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/reviews/${reviewId}`,
-        {
-          body: { body },
-        },
-      )
-    ).data;
+    return (await this.#request<GitHubPullRequestReviewResponse>(
+      "PUT",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/reviews/${reviewId}`,
+      {
+        body: { body },
+      },
+    )).data;
   }
 
   async replyToPullRequestReviewComment(
@@ -1104,15 +1051,13 @@ export class GitHubApi {
     commentId: number,
     body: string,
   ): Promise<GitHubPullRequestReviewCommentResponse> {
-    return (
-      await this.#request<GitHubPullRequestReviewCommentResponse>(
-        "POST",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/comments/${commentId}/replies`,
-        {
-          body: { body },
-        },
-      )
-    ).data;
+    return (await this.#request<GitHubPullRequestReviewCommentResponse>(
+      "POST",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/comments/${commentId}/replies`,
+      {
+        body: { body },
+      },
+    )).data;
   }
 
   async updatePullRequestReviewComment(
@@ -1121,15 +1066,13 @@ export class GitHubApi {
     commentId: number,
     body: string,
   ): Promise<GitHubPullRequestReviewCommentResponse> {
-    return (
-      await this.#request<GitHubPullRequestReviewCommentResponse>(
-        "PATCH",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/comments/${commentId}`,
-        {
-          body: { body },
-        },
-      )
-    ).data;
+    return (await this.#request<GitHubPullRequestReviewCommentResponse>(
+      "PATCH",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/comments/${commentId}`,
+      {
+        body: { body },
+      },
+    )).data;
   }
 
   async deletePullRequestReviewComment(
@@ -1150,17 +1093,9 @@ export class GitHubApi {
     page: number,
     perPage: number,
   ): Promise<GitHubPullFileResponse[]> {
-    const result = await this.listPullRequestFilesConditional(
-      owner,
-      repo,
-      pullNumber,
-      page,
-      perPage,
-    );
+    const result = await this.listPullRequestFilesConditional(owner, repo, pullNumber, page, perPage);
     if (result.status === 304) {
-      throw new Error(
-        "GitHub unexpectedly returned 304 for an unconditional pull request files request.",
-      );
+      throw new Error("GitHub unexpectedly returned 304 for an unconditional pull request files request.");
     }
     return result.data;
   }
@@ -1194,15 +1129,13 @@ export class GitHubApi {
       sha?: string;
     },
   ): Promise<{ sha: string; merged: boolean; message: string }> {
-    return (
-      await this.#request<{ sha: string; merged: boolean; message: string }>(
-        "PUT",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/merge`,
-        {
-          body: options,
-        },
-      )
-    ).data;
+    return (await this.#request<{ sha: string; merged: boolean; message: string }>(
+      "PUT",
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/merge`,
+      {
+        body: options,
+      },
+    )).data;
   }
 
   /**
@@ -1220,9 +1153,7 @@ export class GitHubApi {
   ): Promise<GitHubCompareResponse> {
     const result = await this.compareBranchesConditional(owner, repo, base, head, {}, paging);
     if (result.status === 304) {
-      throw new Error(
-        "GitHub unexpectedly returned 304 for an unconditional branch compare request.",
-      );
+      throw new Error("GitHub unexpectedly returned 304 for an unconditional branch compare request.");
     }
     return result.data;
   }
@@ -1268,10 +1199,8 @@ export class GitHubApi {
     try {
       const result = await this.#request<GitHubBranchResponse>(
         "GET",
-        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches/${branch
-          .split("/")
-          .map(encodeURIComponent)
-          .join("/")}`,
+        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches/${
+          branch.split("/").map(encodeURIComponent).join("/")}`,
       );
       return result.data.commit.sha;
     } catch (error) {
@@ -1340,18 +1269,12 @@ export class GitHubApi {
    * GitHub. Used to enumerate the on-remote side of a simulated pull request diff when the tree
    * object is not in the workspace git cache.
    */
-  async getGitTree(
-    owner: string,
-    repo: string,
-    sha: string,
-  ): Promise<GitHubGitTreeResponse | null> {
+  async getGitTree(owner: string, repo: string, sha: string): Promise<GitHubGitTreeResponse | null> {
     try {
-      return (
-        await this.#request<GitHubGitTreeResponse>(
-          "GET",
-          `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(sha)}`,
-        )
-      ).data;
+      return (await this.#request<GitHubGitTreeResponse>(
+        "GET",
+        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(sha)}`,
+      )).data;
     } catch (error) {
       if (error instanceof GitHubApiError && error.status === 404) {
         return null;
@@ -1373,12 +1296,10 @@ export class GitHubApi {
   ): Promise<Uint8Array | "oversized" | null> {
     let response: GitHubGitBlobResponse;
     try {
-      response = (
-        await this.#request<GitHubGitBlobResponse>(
-          "GET",
-          `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs/${encodeURIComponent(sha)}`,
-        )
-      ).data;
+      response = (await this.#request<GitHubGitBlobResponse>(
+        "GET",
+        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs/${encodeURIComponent(sha)}`,
+      )).data;
     } catch (error) {
       if (error instanceof GitHubApiError && error.status === 404) {
         return null;
@@ -1388,9 +1309,7 @@ export class GitHubApi {
     if (response.size > maxBytes || response.encoding !== "base64") {
       return "oversized";
     }
-    return Uint8Array.from(atob(response.content.replace(/\s+/g, "")), (char) =>
-      char.charCodeAt(0),
-    );
+    return Uint8Array.from(atob(response.content.replace(/\s+/g, "")), char => char.charCodeAt(0));
   }
 
   async listCommitsConditional(
@@ -1441,11 +1360,7 @@ export class GitHubApi {
    * status (401 marks it an auth error, like every other method here), so callers get the same
    * credential-expiry handling as REST calls.
    */
-  async fetchGitUploadPack(
-    owner: string,
-    repo: string,
-    requestBody: Uint8Array,
-  ): Promise<Response> {
+  async fetchGitUploadPack(owner: string, repo: string, requestBody: Uint8Array): Promise<Response> {
     const url = `${LOGIN_BASE_URL}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}.git/git-upload-pack`;
     const response = await fetch(url, {
       method: "POST",
@@ -1480,9 +1395,7 @@ export class GitHubApi {
    * sent chunked. Auth and error handling mirror `fetchGitUploadPack`.
    */
   async fetchGitReceivePack(
-    owner: string,
-    repo: string,
-    requestBody: ReadableStream<Uint8Array>,
+    owner: string, repo: string, requestBody: ReadableStream<Uint8Array>,
   ): Promise<Response> {
     const url = `${LOGIN_BASE_URL}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}.git/git-receive-pack`;
     const response = await fetch(url, {

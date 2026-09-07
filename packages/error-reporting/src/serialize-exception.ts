@@ -53,10 +53,9 @@ export function serializeException(caught: unknown): ErrorExceptionV1 {
     const boundedType = clipped(type || "Error", MAX_STRING_CHARS);
     const boundedMessage = message === undefined ? undefined : clipped(message, MAX_MESSAGE_CHARS);
     const boundedStack = stack === undefined ? undefined : clipped(stack, MAX_STACK_CHARS);
-    const truncated =
-      boundedType.truncated ||
-      boundedMessage?.truncated === true ||
-      boundedStack?.truncated === true;
+    const truncated = boundedType.truncated
+      || boundedMessage?.truncated === true
+      || boundedStack?.truncated === true;
     return {
       type: boundedType.value,
       ...(boundedMessage && { message: boundedMessage.value }),

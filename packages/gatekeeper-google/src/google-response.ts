@@ -4,8 +4,7 @@ const MAX_PROVIDER_ERROR_BYTES = 64 * 1024;
 const MAX_PROVIDER_REASONS = 8;
 const PROVIDER_CODE_PATTERN = /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/;
 const logger = obsContext.createLogger({
-  component: "gatekeeper.google.api",
-  vendorId: "google",
+  component: "gatekeeper.google.api", vendorId: "google",
 });
 
 type GoogleProviderDiagnostics = {
@@ -48,10 +47,8 @@ function parseProviderDiagnostics(text: string): GoogleProviderDiagnostics {
   if (!isRecord(payload) || !isRecord(payload.error)) return {};
 
   let providerError = payload.error;
-  let providerCode =
-    typeof providerError.code === "number" && Number.isSafeInteger(providerError.code)
-      ? providerError.code
-      : undefined;
+  let providerCode = typeof providerError.code === "number" &&
+      Number.isSafeInteger(providerError.code) ? providerError.code : undefined;
   let providerStatus = safeProviderCode(providerError.status);
   let reasons = new Set<string>();
   addProviderReasons(providerError.errors, reasons);
@@ -65,8 +62,7 @@ function parseProviderDiagnostics(text: string): GoogleProviderDiagnostics {
 }
 
 async function readProviderDiagnostics(
-  response: Response,
-  provider: string,
+  response: Response, provider: string,
 ): Promise<GoogleProviderDiagnostics> {
   try {
     let text = await readBoundedText(response, MAX_PROVIDER_ERROR_BYTES, provider);
@@ -127,10 +123,7 @@ export async function readGoogleJson<T>(
   if (!response.ok) {
     let diagnostics = await readProviderDiagnostics(response, provider);
     logger.warn("Google provider request failed", {
-      event: "google.api.request.failed",
-      provider,
-      operation,
-      httpStatus: response.status,
+      event: "google.api.request.failed", provider, operation, httpStatus: response.status,
       ...diagnostics,
     });
     throw new Error(`${provider} ${operation} failed [http=${response.status}]`);

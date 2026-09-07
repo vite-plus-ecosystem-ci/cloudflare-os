@@ -6,14 +6,8 @@
 // `dryRun: true`; BigQuery's parser metadata is the authority for read-only and scope checks.
 
 import type {
-  BigQueryDataset,
-  BigQueryDryRunResult,
-  BigQueryField,
-  BigQueryParam,
-  BigQueryProject,
-  BigQueryQueryOptions,
-  BigQueryQueryResult,
-  BigQueryTable,
+  BigQueryDataset, BigQueryDryRunResult, BigQueryField, BigQueryParam, BigQueryProject,
+  BigQueryQueryOptions, BigQueryQueryResult, BigQueryTable,
 } from "./bigquery-types";
 import { AccessTokenProvider, fetchWithAuthRetry } from "./auth-retry";
 
@@ -23,7 +17,7 @@ const REQUEST_TIMEOUT_MS = 60_000;
 // finishes long-poll responses cleanly instead of racing into an AbortError.
 const REQUEST_ABORT_TIMEOUT_MS = REQUEST_TIMEOUT_MS + 10_000;
 const DEFAULT_MAX_RESULTS = 1000;
-export const DEFAULT_MAX_BYTES_BILLED = 100 * 1024 * 1024 * 1024; // 100 GB
+export const DEFAULT_MAX_BYTES_BILLED = 100 * 1024 * 1024 * 1024;  // 100 GB
 
 // Hard cap on pagination for list* methods: bounds memory and subrequest budget against
 // accounts with very large numbers of projects/datasets/tables. Page size is 1000, so this
@@ -41,12 +35,7 @@ function listPageLimit(options?: ListOptions): number {
 }
 
 function listMaxResults(options?: ListOptions): string {
-  return String(
-    Math.max(
-      1,
-      Math.min(DEFAULT_MAX_RESULTS, Math.floor(options?.maxResults ?? DEFAULT_MAX_RESULTS)),
-    ),
-  );
+  return String(Math.max(1, Math.min(DEFAULT_MAX_RESULTS, Math.floor(options?.maxResults ?? DEFAULT_MAX_RESULTS))));
 }
 
 // =============================================================================
@@ -185,7 +174,7 @@ function convertCell(value: RestCellValue, field: RestField): unknown {
     // same field but treating it as scalar-of-element-type for each entry.
     if (!Array.isArray(value)) return null;
     let elementField = { ...field, mode: "NULLABLE" as const };
-    return value.map((entry) => {
+    return value.map(entry => {
       // Each entry is { v: ... }
       let entryV = (entry as { v: RestCellValue }).v;
       return convertCell(entryV, elementField);
@@ -221,9 +210,7 @@ function convertRow(row: RestRow, schema: RestField[]): Record<string, unknown> 
   return out;
 }
 
-function buildQueryParameters(
-  params: Record<string, BigQueryParam> | undefined,
-): unknown[] | undefined {
+function buildQueryParameters(params: Record<string, BigQueryParam> | undefined): unknown[] | undefined {
   if (!params) return undefined;
   return Object.entries(params).map(([name, raw]) => {
     let value: string;
@@ -260,15 +247,10 @@ async function callRest<T>(
   // retries: 1 — no transient retry. query() promises a single absolute deadline covering the submit
   // and every poll, and a retried submit would burn it before the first poll, leaving the caller
   // with "query took too long" for a query that never ran.
-  let response = await fetchWithAuthRetry(
-    url,
-    {
-      ...init,
-      headers,
-    },
-    getAccessToken,
-    { timeoutMs: REQUEST_ABORT_TIMEOUT_MS, retries: 1 },
-  );
+  let response = await fetchWithAuthRetry(url, {
+    ...init,
+    headers,
+  }, getAccessToken, { timeoutMs: REQUEST_ABORT_TIMEOUT_MS, retries: 1 });
 
   let contentType = response.headers.get("Content-Type") ?? "";
   let isJson = contentType.includes("application/json");
@@ -279,18 +261,16 @@ async function callRest<T>(
       rawBody = (await response.json().catch(() => ({}))) as GoogleErrorResponse;
       detail = rawBody.error?.message ?? `${response.status} ${response.statusText}`;
     } else {
-      detail =
-        (await response.text().catch(() => "")).slice(0, 500) ||
-        `${response.status} ${response.statusText}`;
+      detail = (await response.text().catch(() => "")).slice(0, 500)
+          || `${response.status} ${response.statusText}`;
     }
     detail += ` [http=${response.status}]`;
     if (rawBody.error?.status) {
       detail += ` [status=${rawBody.error.status}]`;
     }
     if (rawBody.error?.errors && rawBody.error.errors.length > 0) {
-      detail += ` [errors=${rawBody.error.errors
-        .map((e) => `${e.reason ?? "?"}:${e.message ?? "?"}`)
-        .join(" | ")}]`;
+      detail += ` [errors=${rawBody.error.errors.map(
+          e => `${e.reason ?? "?"}:${e.message ?? "?"}`).join(" | ")}]`;
     }
     throw new Error(`BigQuery API error: ${detail}`);
   }
@@ -316,10 +296,7 @@ export class BigQueryApi {
       url.searchParams.set("maxResults", listMaxResults(options));
       if (pageToken) url.searchParams.set("pageToken", pageToken);
       let resp = await callRest<RestProjectsListResponse>(
-        url.toString(),
-        { method: "GET" },
-        this.getAccessToken,
-      );
+        url.toString(), { method: "GET" }, this.getAccessToken);
       for (let p of resp.projects ?? []) {
         projects.push({
           projectId: p.projectReference?.projectId ?? p.id,
@@ -341,24 +318,19 @@ export class BigQueryApi {
     timeoutMs: number,
   ): Promise<RestQueryResultsResponse> {
     let url = new URL(
-      `${API_BASE}/projects/${encodeURIComponent(projectId)}` +
-        `/queries/${encodeURIComponent(jobId)}`,
-    );
+        `${API_BASE}/projects/${encodeURIComponent(projectId)}` +
+        `/queries/${encodeURIComponent(jobId)}`);
     url.searchParams.set("timeoutMs", String(timeoutMs));
     if (location) url.searchParams.set("location", location);
     if (maxResults !== undefined) url.searchParams.set("maxResults", String(maxResults));
     return callRest<RestQueryResultsResponse>(
-      url.toString(),
-      { method: "GET" },
-      this.getAccessToken,
-    );
+      url.toString(), { method: "GET" }, this.getAccessToken);
   }
 
   async #cancelJob(projectId: string, jobId: string, location?: string): Promise<void> {
     let url = new URL(
-      `${API_BASE}/projects/${encodeURIComponent(projectId)}` +
-        `/jobs/${encodeURIComponent(jobId)}/cancel`,
-    );
+        `${API_BASE}/projects/${encodeURIComponent(projectId)}` +
+        `/jobs/${encodeURIComponent(jobId)}/cancel`);
     if (location) url.searchParams.set("location", location);
     await callRest<unknown>(url.toString(), { method: "POST" }, this.getAccessToken);
   }
@@ -393,15 +365,11 @@ export class BigQueryApi {
     }
 
     let url = `${API_BASE}/projects/${encodeURIComponent(billingProject)}/queries`;
-    let resp = await callRest<RestQueryResultsResponse>(
-      url,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      },
-      this.getAccessToken,
-    );
+    let resp = await callRest<RestQueryResultsResponse>(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }, this.getAccessToken);
 
     if (resp.errors && resp.errors.length > 0) {
       throw new Error(`BigQuery query failed: ${resp.errors[0].message ?? "unknown error"}`);
@@ -418,7 +386,8 @@ export class BigQueryApi {
         remaining,
       );
       if (resp.errors && resp.errors.length > 0) {
-        throw new Error(`BigQuery query failed: ${resp.errors[0].message ?? "unknown error"}`);
+        throw new Error(
+          `BigQuery query failed: ${resp.errors[0].message ?? "unknown error"}`);
       }
     }
 
@@ -429,13 +398,12 @@ export class BigQueryApi {
         resp.jobReference.location,
       ).catch(() => {});
       throw new Error(
-        "Query took too long to complete. Try a more selective WHERE clause or a smaller LIMIT.",
-      );
+        "Query took too long to complete. Try a more selective WHERE clause or a smaller LIMIT.");
     }
 
     let schema = convertSchema(resp.schema);
     let restFields = resp.schema?.fields ?? [];
-    let rows = (resp.rows ?? []).map((r) => convertRow(r, restFields));
+    let rows = (resp.rows ?? []).map(r => convertRow(r, restFields));
 
     return {
       schema,
@@ -451,15 +419,13 @@ export class BigQueryApi {
     billingProject: string,
     sql: string,
     opts: Pick<BigQueryQueryOptions, "defaultDataset" | "params"> = {},
-  ): Promise<
-    BigQueryDryRunResult & {
-      statementType?: string;
-      ddlOperationPerformed?: string;
-      hasScript: boolean;
-      hasDmlStats: boolean;
-      referencedRoutines: string[];
-    }
-  > {
+  ): Promise<BigQueryDryRunResult & {
+    statementType?: string;
+    ddlOperationPerformed?: string;
+    hasScript: boolean;
+    hasDmlStats: boolean;
+    referencedRoutines: string[];
+  }> {
     let queryConfig: Record<string, unknown> = {
       query: sql,
       useLegacySql: false,
@@ -484,29 +450,22 @@ export class BigQueryApi {
     };
 
     let url = `${API_BASE}/projects/${encodeURIComponent(billingProject)}/jobs`;
-    let resp = await callRest<RestJob>(
-      url,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      },
-      this.getAccessToken,
-    );
+    let resp = await callRest<RestJob>(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }, this.getAccessToken);
 
     if (resp.status?.errorResult) {
       throw new Error(
-        `BigQuery dry run failed: ${resp.status.errorResult.message ?? "unknown error"}`,
-      );
+        `BigQuery dry run failed: ${resp.status.errorResult.message ?? "unknown error"}`);
     }
 
     let stats = resp.statistics?.query;
     let referencedTables = (stats?.referencedTables ?? []).map(
-      (t) => `${t.projectId}.${t.datasetId}.${t.tableId}`,
-    );
+        t => `${t.projectId}.${t.datasetId}.${t.tableId}`);
     let referencedRoutines = (stats?.referencedRoutines ?? []).map(
-      (r) => `${r.projectId}.${r.datasetId}.${r.routineId}`,
-    );
+        r => `${r.projectId}.${r.datasetId}.${r.routineId}`);
 
     return {
       bytesProcessed: stats?.totalBytesProcessed ? Number(stats.totalBytesProcessed) : 0,
@@ -526,14 +485,12 @@ export class BigQueryApi {
     let pages = 0;
     let pageLimit = listPageLimit(options);
     do {
-      let url = new URL(`${API_BASE}/projects/${encodeURIComponent(projectId)}/datasets`);
+      let url = new URL(
+          `${API_BASE}/projects/${encodeURIComponent(projectId)}/datasets`);
       url.searchParams.set("maxResults", listMaxResults(options));
       if (pageToken) url.searchParams.set("pageToken", pageToken);
       let resp = await callRest<RestDatasetsListResponse & { nextPageToken?: string }>(
-        url.toString(),
-        { method: "GET" },
-        this.getAccessToken,
-      );
+        url.toString(), { method: "GET" }, this.getAccessToken);
       for (let d of resp.datasets ?? []) {
         datasets.push({
           datasetId: d.datasetReference.datasetId,
@@ -550,8 +507,8 @@ export class BigQueryApi {
 
   async getDataset(projectId: string, datasetId: string): Promise<BigQueryDataset> {
     let url =
-      `${API_BASE}/projects/${encodeURIComponent(projectId)}` +
-      `/datasets/${encodeURIComponent(datasetId)}`;
+        `${API_BASE}/projects/${encodeURIComponent(projectId)}` +
+        `/datasets/${encodeURIComponent(datasetId)}`;
     let resp = await callRest<RestDatasetResource>(url, { method: "GET" }, this.getAccessToken);
     return {
       datasetId: resp.datasetReference.datasetId,
@@ -562,27 +519,19 @@ export class BigQueryApi {
     };
   }
 
-  async listTables(
-    projectId: string,
-    datasetId: string,
-    options?: ListOptions,
-  ): Promise<BigQueryTable[]> {
+  async listTables(projectId: string, datasetId: string, options?: ListOptions): Promise<BigQueryTable[]> {
     let tables: BigQueryTable[] = [];
     let pageToken: string | undefined;
     let pages = 0;
     let pageLimit = listPageLimit(options);
     do {
       let url = new URL(
-        `${API_BASE}/projects/${encodeURIComponent(projectId)}` +
-          `/datasets/${encodeURIComponent(datasetId)}/tables`,
-      );
+          `${API_BASE}/projects/${encodeURIComponent(projectId)}` +
+          `/datasets/${encodeURIComponent(datasetId)}/tables`);
       url.searchParams.set("maxResults", listMaxResults(options));
       if (pageToken) url.searchParams.set("pageToken", pageToken);
       let resp = await callRest<RestTablesListResponse & { nextPageToken?: string }>(
-        url.toString(),
-        { method: "GET" },
-        this.getAccessToken,
-      );
+        url.toString(), { method: "GET" }, this.getAccessToken);
       for (let t of resp.tables ?? []) {
         tables.push({
           tableId: t.tableReference.tableId,
@@ -599,15 +548,12 @@ export class BigQueryApi {
     return tables;
   }
 
-  async getTable(
-    projectId: string,
-    datasetId: string,
-    tableId: string,
-  ): Promise<{ table: BigQueryTable; schema: BigQueryField[] }> {
+  async getTable(projectId: string, datasetId: string, tableId: string):
+      Promise<{ table: BigQueryTable; schema: BigQueryField[] }> {
     let url =
-      `${API_BASE}/projects/${encodeURIComponent(projectId)}` +
-      `/datasets/${encodeURIComponent(datasetId)}` +
-      `/tables/${encodeURIComponent(tableId)}`;
+        `${API_BASE}/projects/${encodeURIComponent(projectId)}` +
+        `/datasets/${encodeURIComponent(datasetId)}` +
+        `/tables/${encodeURIComponent(tableId)}`;
     let resp = await callRest<RestTableResource>(url, { method: "GET" }, this.getAccessToken);
     return {
       table: {

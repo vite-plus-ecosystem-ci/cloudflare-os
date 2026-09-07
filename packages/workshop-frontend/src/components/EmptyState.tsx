@@ -1,5 +1,5 @@
-import { PlugsConnected, type Icon } from "@phosphor-icons/react";
-import { WorkshopButton } from "./WorkshopControls";
+import { PlugsConnected, type Icon } from '@phosphor-icons/react'
+import { WorkshopButton } from './WorkshopControls'
 
 export function EmptyState({
   title,
@@ -8,18 +8,18 @@ export function EmptyState({
   onAction,
   icon: EmptyIcon = PlugsConnected,
 }: {
-  title: string;
-  description: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  icon?: Icon;
+  title: string
+  description: string
+  actionLabel?: string
+  onAction?: () => void
+  icon?: Icon
 }) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-dashed border-kumo-line bg-kumo-base px-6 py-9 text-center">
       <div
         className="themed-accent-glow pointer-events-none absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full"
         style={{
-          filter: "blur(14px)",
+          filter: 'blur(14px)',
         }}
       />
       <div className="themed-user-bubble-shadow relative mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-kumo-line bg-kumo-elevated text-kumo-subtle">
@@ -34,10 +34,13 @@ export function EmptyState({
         </p>
       </div>
       {actionLabel && onAction && (
-        <WorkshopButton className="relative mx-auto mt-4" onClick={onAction}>
+        <WorkshopButton
+          className="relative mx-auto mt-4"
+          onClick={onAction}
+        >
           {actionLabel}
         </WorkshopButton>
       )}
     </div>
-  );
+  )
 }

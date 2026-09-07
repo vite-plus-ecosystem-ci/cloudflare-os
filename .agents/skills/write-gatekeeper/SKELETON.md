@@ -11,9 +11,9 @@ import {
   GatekeeperUserVerifier,
   GatekeeperVendor as GatekeeperVendorIface,
   Gatekeeper,
-  HookController, // Remove if no hooks
-  HookInitiator, // Remove if no hooks
-  HookTargetMetadata, // Remove if no hooks
+  HookController,        // Remove if no hooks
+  HookInitiator,         // Remove if no hooks
+  HookTargetMetadata,    // Remove if no hooks
   ResourceDescription,
   ApprovalQueue,
   ObservationDescription,
@@ -22,16 +22,16 @@ import {
   AccountDescription,
   SupportedResource,
   ResourceConfiguratorFrame,
-} from "@gadgets/workshop-shared/gatekeeper";
-import { MySession, MyHook as MyHookIface } from "./types"; // Remove MyHook if no hooks
+} from '@gadgets/workshop-shared/gatekeeper';
+import { MySession, MyHook as MyHookIface } from "./types";  // Remove MyHook if no hooks
 import TYPES_CODE from "./types.txt";
 import MY_CONFIGURATOR_HTML from "./generated/my-configurator-ui.txt";
 
 const NONCE_BYTES = 32;
-const NONCE_LIFETIME_MS = 10 * 60 * 1000; // 10 minutes
+const NONCE_LIFETIME_MS = 10 * 60 * 1000;  // 10 minutes
 
 function hexEncode(bytes: Uint8Array): string {
-  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 function generateNonce(): string {
@@ -47,7 +47,7 @@ function constantTimeEqual(a: string, b: string): boolean {
 }
 
 type Env = Cloudflare.Env & {
-  BASE_URL?: string;
+  BASE_URL?: string,
 };
 
 function getBaseUrl(env: Env) {
@@ -92,10 +92,10 @@ export default {
       let doId = path[0];
       let nonce = path[1];
       let stub = ctx.exports.UserAccount.get(ctx.exports.UserAccount.idFromString(doId));
-      if (!(await stub.verifyNonce(nonce))) {
+      if (!await stub.verifyNonce(nonce)) {
         // Show a friendly error page for expired/replayed links.
         return new Response("TODO: error HTML", {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
+          headers: { "Content-Type": "text/html; charset=utf-8" }
         });
       }
 
@@ -104,9 +104,9 @@ export default {
       // see gatekeeper-google for the full pattern.
       throw new Error("TODO: implement auth initiation");
     } else {
-      return new Response("Not Found", { status: 404 });
+      return new Response("Not Found", {status: 404});
     }
-  },
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,8 @@ export class GatekeeperVendor extends WorkerEntrypoint<Env> implements Gatekeepe
       logo: { url: "TODO: data URL or hosted image URL" },
       color: "#f0f4ff",
       tagline: "Short summary of what this connector enables",
-      description: "Explain what Gadgets can do with this connector in plain language.",
+      description:
+          "Explain what Gadgets can do with this connector in plain language.",
     };
   }
 
@@ -128,9 +129,8 @@ export class GatekeeperVendor extends WorkerEntrypoint<Env> implements Gatekeepe
   // `options.resourceUrlPatterns` and stores an empty requested-resource list. Gatekeepers with
   // grantable resources should follow gatekeeper-google.
   async connectAccount(
-    callback: Fetcher<GatekeeperConnectCallback>,
-    _options?: { resourceUrlPatterns?: string[] },
-  ): Promise<{ url: string }> {
+      callback: Fetcher<GatekeeperConnectCallback>,
+      _options?: {resourceUrlPatterns?: string[]}): Promise<{url: string}> {
     let userObjectId = this.ctx.exports.UserAccount.newUniqueId();
     let nonce = generateNonce();
     await this.ctx.exports.UserAccount.get(userObjectId).setCallback(callback, nonce, []);
@@ -152,10 +152,9 @@ export class GatekeeperVendor extends WorkerEntrypoint<Env> implements Gatekeepe
 // see gatekeeper-google.
 export class UserAccount extends DurableObject<Env> {
   async setCallback(
-    callback: Fetcher<GatekeeperConnectCallback>,
-    nonce: string,
-    requestedResourceUrlPatterns: string[],
-  ) {
+      callback: Fetcher<GatekeeperConnectCallback>,
+      nonce: string,
+      requestedResourceUrlPatterns: string[]) {
     // Self-destruct if the connect flow is never completed.
     if (!this.ctx.storage.kv.get<string>("credentials")) {
       this.ctx.storage.setAlarm(Date.now() + 3600 * 1000);
@@ -168,7 +167,7 @@ export class UserAccount extends DurableObject<Env> {
   // Verify and consume the nonce from the initiation URL. Prevents replay.
   // Returns false if the nonce is invalid or expired.
   async verifyNonce(nonce: string): Promise<boolean> {
-    let stored = this.ctx.storage.kv.get<{ value: string; expiresAt: number }>("nonce");
+    let stored = this.ctx.storage.kv.get<{value: string, expiresAt: number}>("nonce");
     if (!stored || Date.now() >= stored.expiresAt || !constantTimeEqual(stored.value, nonce)) {
       return false;
     }
@@ -222,7 +221,8 @@ type MyUserImplProps = {
   userObjectId: string;
 };
 
-export class MyUserImpl extends WorkerEntrypoint<Env, MyUserImplProps> implements GatekeeperUser {
+export class MyUserImpl extends WorkerEntrypoint<Env, MyUserImplProps>
+                         implements GatekeeperUser {
   async describe(): Promise<AccountDescription> {
     // TODO: Fetch account info from external service using stored credentials
     return {
@@ -274,7 +274,7 @@ export class MyUserImpl extends WorkerEntrypoint<Env, MyUserImplProps> implement
     await this.ctx.exports.UserAccount.get(id).revoke();
   }
 
-  async ensureResources(_resourceUrlPatterns: string[]): Promise<{ url?: string }> {
+  async ensureResources(_resourceUrlPatterns: string[]): Promise<{url?: string}> {
     return {};
   }
 
@@ -302,13 +302,12 @@ export interface MyVerifierApi extends GatekeeperUserVerifier {
   hasResourceAccess(resourceId: string): Promise<boolean>;
 }
 
-export class MyVerifier extends WorkerEntrypoint<Env, MyVerifierProps> implements MyVerifierApi {
+export class MyVerifier extends WorkerEntrypoint<Env, MyVerifierProps>
+    implements MyVerifierApi {
   async hasResourceAccess(resourceId: string): Promise<boolean> {
     let account = this.ctx.exports.UserAccount.get(
-      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
-    );
-    void account;
-    void resourceId;
+        this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
+    void account; void resourceId;
     // TODO: query the service with the observer's own token. Return true on success; return false
     // for access errors (e.g. 401/403/404); rethrow anything else so the open fails loudly rather
     // than silently denying.
@@ -335,6 +334,7 @@ class MyConfiguratorUI extends RpcTarget {
     // TODO: Call read-only external APIs and return bounded search results.
     return [{ value: query || "example", title: query || "Example" }];
   }
+
 }
 
 // ---------------------------------------------------------------------------
@@ -359,18 +359,17 @@ type MyGatekeeperImplProps = {
   // ... resource-specific fields (e.g., documentId, repoOwner)
 };
 
-export class MyGatekeeperImpl
-  extends DurableObject<Env, MyGatekeeperImplProps>
-  implements Gatekeeper<MySession>
-{
+export class MyGatekeeperImpl extends DurableObject<Env, MyGatekeeperImplProps>
+    implements Gatekeeper<MySession> {
+
   async describe(): Promise<ResourceDescription> {
     return {
       url: "TODO: canonical resource URL",
       title: "TODO",
       snippet: "TODO",
-      suggestedBindingName: "MY_RESOURCE", // Based on type, not instance
+      suggestedBindingName: "MY_RESOURCE",  // Based on type, not instance
       tsType: "MySession",
-      hookTsType: "MyHook", // Remove if hooks are not supported
+      hookTsType: "MyHook",  // Remove if hooks are not supported
     };
   }
 
@@ -380,7 +379,7 @@ export class MyGatekeeperImpl
 
   async startSession(approvalQueue: RpcStub<ApprovalQueue>): Promise<MySession> {
     return new MySessionImpl(
-      approvalQueue.dup(), // Always dup() before storing
+      approvalQueue.dup(),  // Always dup() before storing
       this.ctx,
       // ... API client, props, etc.
     );
@@ -398,9 +397,8 @@ export class MyGatekeeperImpl
     // Return { restart: true } if the session can't recover from rejection.
   }
 
-  revertAction(
-    actionId: number,
-  ): Promise<void | { message?: string; canRetry?: boolean; restart?: boolean }> {
+  revertAction(actionId: number):
+      Promise<void | { message?: string; canRetry?: boolean; restart?: boolean }> {
     // TODO: Undo the action (look up what was done from own storage)
     throw new Error("Revert not implemented");
   }
@@ -417,8 +415,7 @@ export class MyGatekeeperImpl
     if (!(await verifier.hasResourceAccess(/* this.ctx.props.resourceId */ "TODO"))) {
       throw new Error(
         "This collaborator does not have access to the bound resource, so they cannot observe " +
-          "data the Gadget read from it.",
-      );
+        "data the Gadget read from it.");
     }
   }
 
@@ -443,10 +440,8 @@ type MyHookProps = {
 
 type MyHookControllerImplProps = MyGatekeeperImplProps & MyHookProps;
 
-export class MyHookControllerImpl
-  extends WorkerEntrypoint<Env, MyHookControllerImplProps>
-  implements HookController<MyHook>
-{
+export class MyHookControllerImpl extends WorkerEntrypoint<Env, MyHookControllerImplProps>
+    implements HookController<MyHook> {
   // Called when the user enables the hook. Store `initiator` somewhere it can be reached when an
   // event arrives — typically an event-source DO. Don't store other state until now; everything
   // else is already in `this.ctx.props`. If already enabled, replace the previous initiator.
@@ -454,10 +449,7 @@ export class MyHookControllerImpl
   // `target` identifies where the hook delivers (workspace, and gadget when pinned to one). Store
   // it too if you display or link to the target; otherwise ignore it, but keep the parameter
   // declared — RPC argument validation rejects arguments the receiver doesn't declare.
-  async enable(
-    initiator: Fetcher<HookInitiator<MyHook>>,
-    target: HookTargetMetadata,
-  ): Promise<void> {
+  async enable(initiator: Fetcher<HookInitiator<MyHook>>, target: HookTargetMetadata): Promise<void> {
     // TODO: persist `initiator` (e.g. forward it to an event-source DO keyed by props).
   }
 
@@ -495,9 +487,8 @@ class MySessionImpl extends RpcTarget implements MySession {
   #ctx: DurableObjectState<MyGatekeeperImplProps>;
 
   constructor(
-    approvalQueue: RpcStub<ApprovalQueue>,
-    ctx: DurableObjectState<MyGatekeeperImplProps>,
-  ) {
+      approvalQueue: RpcStub<ApprovalQueue>,
+      ctx: DurableObjectState<MyGatekeeperImplProps>) {
     super();
     this.#approvalQueue = approvalQueue;
     this.#ctx = ctx;
@@ -563,9 +554,9 @@ class MySessionImpl extends RpcTarget implements MySession {
   "migrations": [
     {
       "tag": "v0",
-      "new_sqlite_classes": ["UserAccount", "MyGatekeeperImpl"],
-    },
-  ],
+      "new_sqlite_classes": ["UserAccount", "MyGatekeeperImpl"]
+    }
+  ]
 }
 ```
 
@@ -637,11 +628,11 @@ that and silently bake the wrong value into the shipped HTML (do not add either 
 // Vite+ per-package settings. The build:configurator task definition is shared by all gatekeepers
 // with a configurator UI and ships as an export of `@gadgets/scripts`, alongside the builder it
 // runs.
-export { default } from "@gadgets/scripts/gatekeeper-configurator";
+export { default } from '@gadgets/scripts/gatekeeper-configurator'
 
 // ...or, if the gatekeeper has tests, `withTests` instead: the same settings plus the shared vitest
 // `test` task. Add a `"test:run": "vitest run"` script too, for iterating without the cache.
-export { withTests as default } from "@gadgets/scripts/gatekeeper-configurator";
+export { withTests as default } from '@gadgets/scripts/gatekeeper-configurator'
 ```
 
 Keep tokens and broad API clients out of public `RpcTarget` properties; use closures, `#private`, or `WeakMap` state and expose only narrow read-only helper methods.

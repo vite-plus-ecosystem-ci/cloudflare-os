@@ -30,11 +30,9 @@ function githubApi(target: object): GitHubApi {
 function viewerLogin(target: object): Promise<string> {
   const cached = githubViewerLogins.get(target);
   if (cached) return cached;
-  const pending = githubApi(target)
-    .getViewerConditional()
-    .then((result) => {
-      if (result.status === 304)
-        throw new Error("GitHub unexpectedly returned 304 for viewer lookup.");
+  const pending = githubApi(target).getViewerConditional()
+    .then(result => {
+      if (result.status === 304) throw new Error("GitHub unexpectedly returned 304 for viewer lookup.");
       return result.data.login;
     });
   githubViewerLogins.set(target, pending);
@@ -75,7 +73,7 @@ function optionMatches(parts: (string | undefined | null)[], query: string): boo
   const lowerQuery = query.trim().toLowerCase();
   if (!lowerQuery) return true;
   const corpus = parts.filter(Boolean).join(" ").toLowerCase();
-  return lowerQuery.split(/\s+/).every((term) => corpus.includes(term));
+  return lowerQuery.split(/\s+/).every(term => corpus.includes(term));
 }
 
 function issueNumberFromQuery(query: string): number | null {
@@ -157,10 +155,7 @@ export class GitHubRepoConfiguratorUI extends RpcTarget implements GitHubRepoCon
     const matches = repos.map(repoToOption);
 
     // Fall back to a direct lookup for exact names or URLs that scoped search didn't return.
-    if (
-      exactRepo &&
-      !matches.some((option) => option.value.toLowerCase() === normalizedQuery.toLowerCase())
-    ) {
+    if (exactRepo && !matches.some(option => option.value.toLowerCase() === normalizedQuery.toLowerCase())) {
       try {
         const repo = await api.getRepo(exactRepo.owner, exactRepo.repo);
         matches.unshift(repoToOption(repo));
@@ -171,17 +166,12 @@ export class GitHubRepoConfiguratorUI extends RpcTarget implements GitHubRepoCon
 
     return matches.slice(0, AUTOCOMPLETE_OPTION_LIMIT);
   }
+
 }
 
 @validateRpc()
-export class GitHubIssueConfiguratorUI
-  extends GitHubRepoConfiguratorUI
-  implements GitHubIssueConfiguratorRpc
-{
-  async listIssues(
-    repoFullName: string | null | undefined,
-    query: string,
-  ): Promise<ConfiguratorOption[]> {
+export class GitHubIssueConfiguratorUI extends GitHubRepoConfiguratorUI implements GitHubIssueConfiguratorRpc {
+  async listIssues(repoFullName: string | null | undefined, query: string): Promise<ConfiguratorOption[]> {
     if (!repoFullName) return [];
 
     const parsed = splitRepoFullName(repoFullName);
@@ -205,17 +195,13 @@ export class GitHubIssueConfiguratorUI
         });
 
     const options = issues
-      .filter((issue) => !issue.pull_request)
-      .filter(
-        (issue) =>
-          trimmedQuery ||
-          optionMatches([String(issue.number), issue.title, issue.user?.login, issue.state], query),
-      )
+      .filter(issue => !issue.pull_request)
+      .filter(issue => trimmedQuery || optionMatches([String(issue.number), issue.title, issue.user?.login, issue.state], query))
       .slice(0, 100)
       .map(issueOption);
 
     const issueNumber = issueNumberFromQuery(query);
-    if (issueNumber && !options.some((option) => option.value === String(issueNumber))) {
+    if (issueNumber && !options.some(option => option.value === String(issueNumber))) {
       try {
         const issue = await githubApi(this).getIssue(parsed.owner, parsed.repo, issueNumber);
         if (!issue.pull_request) options.unshift(issueOption(issue));
@@ -224,17 +210,12 @@ export class GitHubIssueConfiguratorUI
 
     return options.slice(0, 100);
   }
+
 }
 
 @validateRpc()
-export class GitHubPullRequestConfiguratorUI
-  extends GitHubRepoConfiguratorUI
-  implements GitHubPullRequestConfiguratorRpc
-{
-  async listPullRequests(
-    repoFullName: string | null | undefined,
-    query: string,
-  ): Promise<ConfiguratorOption[]> {
+export class GitHubPullRequestConfiguratorUI extends GitHubRepoConfiguratorUI implements GitHubPullRequestConfiguratorRpc {
+  async listPullRequests(repoFullName: string | null | undefined, query: string): Promise<ConfiguratorOption[]> {
     if (!repoFullName) return [];
 
     const parsed = splitRepoFullName(repoFullName);
@@ -249,16 +230,14 @@ export class GitHubPullRequestConfiguratorUI
         "updated",
         "desc",
       );
-      const options: ConfiguratorOption[] = pullRequests.slice(0, 100).map(pullRequestSearchOption);
+      const options: ConfiguratorOption[] = pullRequests
+        .slice(0, 100)
+        .map(pullRequestSearchOption);
 
       const pullNumber = issueNumberFromQuery(query);
-      if (pullNumber && !options.some((option) => option.value === String(pullNumber))) {
+      if (pullNumber && !options.some(option => option.value === String(pullNumber))) {
         try {
-          options.unshift(
-            pullRequestOption(
-              await githubApi(this).getPullRequest(parsed.owner, parsed.repo, pullNumber),
-            ),
-          );
+          options.unshift(pullRequestOption(await githubApi(this).getPullRequest(parsed.owner, parsed.repo, pullNumber)));
         } catch {}
       }
 
@@ -274,33 +253,25 @@ export class GitHubPullRequestConfiguratorUI
     });
 
     const options = pullRequests
-      .filter((pullRequest) =>
-        optionMatches(
-          [
-            String(pullRequest.number),
-            pullRequest.title,
-            pullRequest.user?.login,
-            pullRequest.state,
-            pullRequest.head.ref,
-            pullRequest.base.ref,
-          ],
-          query,
-        ),
-      )
+      .filter(pullRequest => optionMatches([
+        String(pullRequest.number),
+        pullRequest.title,
+        pullRequest.user?.login,
+        pullRequest.state,
+        pullRequest.head.ref,
+        pullRequest.base.ref,
+      ], query))
       .slice(0, 100)
       .map(pullRequestOption);
 
     const pullNumber = issueNumberFromQuery(query);
-    if (pullNumber && !options.some((option) => option.value === String(pullNumber))) {
+    if (pullNumber && !options.some(option => option.value === String(pullNumber))) {
       try {
-        options.unshift(
-          pullRequestOption(
-            await githubApi(this).getPullRequest(parsed.owner, parsed.repo, pullNumber),
-          ),
-        );
+        options.unshift(pullRequestOption(await githubApi(this).getPullRequest(parsed.owner, parsed.repo, pullNumber)));
       } catch {}
     }
 
     return options.slice(0, 100);
   }
+
 }

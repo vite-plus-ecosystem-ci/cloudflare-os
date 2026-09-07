@@ -71,22 +71,17 @@ export function serializeComposerDraft(
   const storedFormats: MessageFormatRef[] = [];
   let storedCommand: StoredComposerDraftSlashCommand | undefined;
   for (const token of tokens) {
-    if (
-      token.start < cursor ||
-      token.start < 0 ||
-      token.length < 0 ||
-      token.start + token.length > text.length
-    ) {
+    if (token.start < cursor || token.start < 0 || token.length < 0 ||
+        token.start + token.length > text.length) {
       continue;
     }
     normalized += text.slice(cursor, token.start);
     // Capsule capability URLs restore as plain links, not chips.
-    const replacement =
-      token.kind === "capsule"
-        ? token.url
-        : token.kind === "format"
-          ? token.noun
-          : `/${token.choice.name}`;
+    const replacement = token.kind === "capsule"
+      ? token.url
+      : token.kind === "format"
+        ? token.noun
+        : `/${token.choice.name}`;
     if (token.kind === "format") {
       storedFormats.push({
         position: normalized.length,
@@ -155,9 +150,9 @@ export function decorateComposerDraft(
   command.length = commandText.length;
   return {
     text,
-    formats: formats.map((format) =>
-      format.start >= commandEnd ? { ...format, start: format.start + delta } : format,
-    ),
+    formats: formats.map(format => format.start >= commandEnd
+      ? {...format, start: format.start + delta}
+      : format),
     command,
   };
 }
@@ -168,12 +163,8 @@ function readSlashCommandId(value: unknown): SlashCommandId | undefined {
   if (record.builtin === true) {
     return record.commandId === "compact" ? { builtin: true, commandId: "compact" } : undefined;
   }
-  if (
-    record.builtin !== undefined ||
-    !Number.isInteger(record.gatekeeperId) ||
-    typeof record.commandId !== "string" ||
-    !record.commandId
-  ) {
+  if (record.builtin !== undefined || !Number.isInteger(record.gatekeeperId) ||
+      typeof record.commandId !== "string" || !record.commandId) {
     return undefined;
   }
   return { gatekeeperId: record.gatekeeperId as number, commandId: record.commandId };
@@ -183,15 +174,10 @@ function readSlashCommandChoice(value: unknown): SlashCommandChoice | undefined 
   if (!value || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
   const selection = readSlashCommandId(record.selection);
-  if (
-    !selection ||
-    typeof record.name !== "string" ||
-    !record.name ||
-    ("builtin" in selection && record.name !== selection.commandId) ||
-    typeof record.description !== "string" ||
-    typeof record.providerLabel !== "string" ||
-    (record.resourceLabel !== undefined && typeof record.resourceLabel !== "string")
-  ) {
+  if (!selection || typeof record.name !== "string" || !record.name ||
+      "builtin" in selection && record.name !== selection.commandId ||
+      typeof record.description !== "string" || typeof record.providerLabel !== "string" ||
+      record.resourceLabel !== undefined && typeof record.resourceLabel !== "string") {
     return undefined;
   }
   return {
@@ -209,7 +195,8 @@ export function readComposerDraft(key: string | undefined): StoredComposerDraft 
     const value: unknown = JSON.parse(window.sessionStorage.getItem(key) ?? "null");
     if (!value || typeof value !== "object") return undefined;
     const record = value as Record<string, unknown>;
-    if (record.version !== 1 || typeof record.text !== "string" || !Array.isArray(record.formats)) {
+    if (record.version !== 1 || typeof record.text !== "string" ||
+        !Array.isArray(record.formats)) {
       return undefined;
     }
 
@@ -218,22 +205,14 @@ export function readComposerDraft(key: string | undefined): StoredComposerDraft 
     for (const candidate of record.formats) {
       if (!candidate || typeof candidate !== "object") return undefined;
       const format = candidate as Record<string, unknown>;
-      if (
-        !Number.isInteger(format.position) ||
-        !Number.isInteger(format.length) ||
-        typeof format.noun !== "string" ||
-        !isOutputIcon(format.icon)
-      ) {
+      if (!Number.isInteger(format.position) || !Number.isInteger(format.length) ||
+          typeof format.noun !== "string" || !isOutputIcon(format.icon)) {
         return undefined;
       }
       const position = format.position as number;
       const length = format.length as number;
-      if (
-        position < previousEnd ||
-        format.noun.length === 0 ||
-        length !== format.noun.length ||
-        record.text.slice(position, position + length) !== format.noun
-      ) {
+      if (position < previousEnd || format.noun.length === 0 || length !== format.noun.length ||
+          record.text.slice(position, position + length) !== format.noun) {
         return undefined;
       }
       formats.push({ position, length, noun: format.noun, icon: format.icon });
@@ -250,15 +229,10 @@ export function readComposerDraft(key: string | undefined): StoredComposerDraft 
       }
       const position = candidate.position as number;
       const length = candidate.length as number;
-      if (
-        position < 0 ||
-        length !== choice.name.length + 1 ||
-        record.text.slice(position, position + length) !== `/${choice.name}` ||
-        formats.some(
-          (format) =>
-            position < format.position + format.length && format.position < position + length,
-        )
-      ) {
+      if (position < 0 || length !== choice.name.length + 1 ||
+          record.text.slice(position, position + length) !== `/${choice.name}` ||
+          formats.some(format => position < format.position + format.length &&
+            format.position < position + length)) {
         return undefined;
       }
       command = { position, length, choice };

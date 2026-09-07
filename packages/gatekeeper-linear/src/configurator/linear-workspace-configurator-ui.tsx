@@ -21,18 +21,16 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return (
-      <Section>
-        <Field label="Workspace" description="The Linear workspace this account is connected to.">
-          <Autocomplete
-            name="workspaceUrlKey"
-            value={values.workspaceUrlKey}
-            placeholder="Select your workspace..."
-            loadOptions={() => ui.listWorkspaces()}
-            onChange={(workspaceUrlKey) => setValues({ workspaceUrlKey })}
-          />
-        </Field>
-      </Section>
-    );
+    return <Section>
+      <Field label="Workspace" description="The Linear workspace this account is connected to.">
+        <Autocomplete
+          name="workspaceUrlKey"
+          value={values.workspaceUrlKey}
+          placeholder="Select your workspace..."
+          loadOptions={() => ui.listWorkspaces()}
+          onChange={workspaceUrlKey => setValues({ workspaceUrlKey })}
+        />
+      </Field>
+    </Section>;
   },
 } satisfies ConfiguratorUISpec<LinearWorkspaceConfiguratorRpc, LinearWorkspaceConfiguratorValues>;

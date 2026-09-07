@@ -5,9 +5,8 @@
 
 @theme {
   /* ===== FONTS ===== */
-  --font-sans:
-    "FT Kunst Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue",
-    sans-serif;
+  --font-sans: "FT Kunst Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Roboto", "Helvetica Neue", sans-serif;
   --font-mono: "Apercu Mono Pro", "SF Mono", Menlo, Monaco, Consolas, monospace;
 
   /* ===== TEXT SIZES (restore Tailwind defaults, overriding Kumo's 12/13/14/16px) ===== */
@@ -138,9 +137,8 @@
   --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Shadows */
-  --shadow-stack:
-    1px 6px 6px 0 #fff3 inset, 0 0 0px 0 #ffffff59 inset, 0 4px 12px 0 #00000005,
-    0 0 0px 0 #00000005, 0 2px 12px 0 #00000008;
+  --shadow-stack: 1px 6px 6px 0 #fff3 inset, 0 0 0px 0 #ffffff59 inset,
+    0 4px 12px 0 #00000005, 0 0 0px 0 #00000005, 0 2px 12px 0 #00000008;
 }
 
 [data-mode="dark"] {
@@ -216,9 +214,8 @@
   --color-status-draft: oklch(82.8% 0.189 84.429);
   --color-status-building: oklch(74% 0.16 250);
 
-  --shadow-stack:
-    1px 6px 6px 0 #ffffff08 inset, 0 0 0 1px #ffffff05 inset, 0 18px 40px 0 #00000033,
-    0 4px 12px 0 #0000002e;
+  --shadow-stack: 1px 6px 6px 0 #ffffff08 inset, 0 0 0 1px #ffffff05 inset,
+    0 18px 40px 0 #00000033, 0 4px 12px 0 #0000002e;
 }
 
 :root {
@@ -249,8 +246,8 @@ body {
   left: 0;
   box-sizing: border-box;
   height: var(--app-height);
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
-    env(safe-area-inset-left);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 .visual-viewport-fixed {
@@ -313,22 +310,17 @@ code {
   border-color: var(--color-kumo-line);
   background: var(--color-kumo-base);
   box-shadow: var(--shadow-stack);
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .prompt-input:focus-within {
   border-color: var(--color-kumo-brand);
-  box-shadow:
-    var(--shadow-stack),
-    0 0 0 3px var(--color-selection-bg);
+  box-shadow: var(--shadow-stack), 0 0 0 3px var(--color-selection-bg);
 }
 
 /* Template card hover */
 .template-card {
-  transition:
-    transform 0.2s var(--ease-out),
+  transition: transform 0.2s var(--ease-out),
     box-shadow 0.2s var(--ease-out);
 }
 
@@ -363,9 +355,7 @@ html {
 .connection-chip {
   border-color: var(--color-kumo-line);
   background: var(--color-kumo-elevated);
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 .connection-chip:hover {
   border-color: var(--color-kumo-fill);
@@ -830,28 +820,15 @@ html {
 
 /* Thinking indicator shimmer */
 @keyframes thinking {
-  0% {
-    left: -33%;
-  }
-  50% {
-    left: 100%;
-  }
-  100% {
-    left: -33%;
-  }
+  0% { left: -33%; }
+  50% { left: 100%; }
+  100% { left: -33%; }
 }
 
 /* Prompt breathing glow */
 @keyframes prompt-breathe {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: scale(0.95);
-  }
-  50% {
-    opacity: 0.55;
-    transform: scale(1.05);
-  }
+  0%, 100% { opacity: 0.35; transform: scale(0.95); }
+  50% { opacity: 0.55; transform: scale(1.05); }
 }
 
 .prompt-glow {

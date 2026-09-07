@@ -29,9 +29,7 @@ const BIGQUERY_CONFIGURATOR_EMPTY_LIST_OPTIONS = { maxPages: 1, maxResults: 200 
 const BIGQUERY_CONFIGURATOR_SEARCH_LIST_OPTIONS = { maxPages: 5, maxResults: 1000 };
 
 function bigQueryConfiguratorListOptions(query: string) {
-  return query.trim()
-    ? BIGQUERY_CONFIGURATOR_SEARCH_LIST_OPTIONS
-    : BIGQUERY_CONFIGURATOR_EMPTY_LIST_OPTIONS;
+  return query.trim() ? BIGQUERY_CONFIGURATOR_SEARCH_LIST_OPTIONS : BIGQUERY_CONFIGURATOR_EMPTY_LIST_OPTIONS;
 }
 
 function googleToken(target: object, opts?: AccessTokenRequest): Promise<GoogleAccessToken> {
@@ -42,10 +40,13 @@ function googleToken(target: object, opts?: AccessTokenRequest): Promise<GoogleA
 
 /** A provider that re-asks on every call, so `fetchWithAuthRetry` can refresh a rejected token. */
 function googleTokenProvider(target: object): AccessTokenProvider {
-  return async (opts) => (await googleToken(target, opts)).token;
+  return async opts => (await googleToken(target, opts)).token;
 }
 
-async function withDriveApiEnabled<T>(message: string, operation: () => Promise<T>): Promise<T> {
+async function withDriveApiEnabled<T>(
+  message: string,
+  operation: () => Promise<T>,
+): Promise<T> {
   try {
     return await operation();
   } catch (error) {
@@ -89,7 +90,7 @@ function optionMatches(parts: (string | undefined)[], query: string): boolean {
   let lowerQuery = query.trim().toLowerCase();
   if (!lowerQuery) return true;
   let corpus = parts.filter(Boolean).join(" ").toLowerCase();
-  return lowerQuery.split(/\s+/).every((term) => corpus.includes(term));
+  return lowerQuery.split(/\s+/).every(term => corpus.includes(term));
 }
 
 async function listDriveFiles(
@@ -105,16 +106,12 @@ async function listDriveFiles(
     () => drive.listFiles({ mimeType, namePrefix: query }),
   );
 
-  return files.map((file) => {
+  return files.map(file => {
     let owner = file.owners?.[0];
     let subtitle = [
       owner?.displayName ?? owner?.emailAddress,
-      file.modifiedTime
-        ? `Modified ${new Date(file.modifiedTime).toLocaleDateString()}`
-        : undefined,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+      file.modifiedTime ? `Modified ${new Date(file.modifiedTime).toLocaleDateString()}` : undefined,
+    ].filter(Boolean).join(" · ");
     return { value: file.id, title: file.name, subtitle };
   });
 }
@@ -146,7 +143,7 @@ export class CalendarConfiguratorUI extends RpcTarget implements CalendarConfigu
       options = (async () => {
         let api = await calendarApi(this);
         let calendars = await api.listCalendars({ maxResults: 250 });
-        return calendars.map((calendar) => ({
+        return calendars.map(calendar => ({
           value: calendar.id,
           title: calendar.summary,
           subtitle: calendar.primary ? "Primary calendar" : calendar.id,
@@ -158,9 +155,7 @@ export class CalendarConfiguratorUI extends RpcTarget implements CalendarConfigu
       calendarConfiguratorCaches.set(this, options);
     }
     let resolved = await options;
-    return resolved.filter((option) =>
-      optionMatches([option.title, option.subtitle, option.value], query),
-    );
+    return resolved.filter(option => optionMatches([option.title, option.subtitle, option.value], query));
   }
 }
 
@@ -177,11 +172,9 @@ export class BigQueryConfiguratorUI extends RpcTarget implements BigQueryConfigu
       let api = await bigQueryApi(this);
       let projects = await api.listProjects(bigQueryConfiguratorListOptions(query));
       return projects
-        .filter((project) =>
-          optionMatches([project.projectId, project.friendlyName, project.numericId], query),
-        )
+        .filter(project => optionMatches([project.projectId, project.friendlyName, project.numericId], query))
         .slice(0, 100)
-        .map((project) => ({
+        .map(project => ({
           value: project.projectId,
           title: project.projectId,
           subtitle: project.friendlyName,
@@ -190,57 +183,37 @@ export class BigQueryConfiguratorUI extends RpcTarget implements BigQueryConfigu
   }
 
   async listDatasets(projectId: string, query: string): Promise<ConfiguratorOption[]> {
-    return cachedBigQueryOptions(
-      this,
-      `datasets:${projectId}:${query.trim().toLowerCase()}`,
-      async () => {
-        let api = await bigQueryApi(this);
-        let datasets = await api.listDatasets(projectId, bigQueryConfiguratorListOptions(query));
-        return datasets
-          .filter((dataset) =>
-            optionMatches(
-              [dataset.datasetId, dataset.friendlyName, dataset.description, dataset.location],
-              query,
-            ),
-          )
-          .slice(0, 100)
-          .map((dataset) => ({
-            value: dataset.datasetId,
-            title: dataset.datasetId,
-            subtitle: dataset.friendlyName ?? dataset.description,
-            meta: dataset.location,
-          }));
-      },
-    );
+    return cachedBigQueryOptions(this, `datasets:${projectId}:${query.trim().toLowerCase()}`, async () => {
+      let api = await bigQueryApi(this);
+      let datasets = await api.listDatasets(projectId, bigQueryConfiguratorListOptions(query));
+      return datasets
+        .filter(dataset => optionMatches([dataset.datasetId, dataset.friendlyName, dataset.description, dataset.location], query))
+        .slice(0, 100)
+        .map(dataset => ({
+          value: dataset.datasetId,
+          title: dataset.datasetId,
+          subtitle: dataset.friendlyName ?? dataset.description,
+          meta: dataset.location,
+        }));
+    });
   }
 
-  async listTables(
-    projectId: string,
-    datasetId: string,
-    query: string,
-  ): Promise<ConfiguratorOption[]> {
-    return cachedBigQueryOptions(
-      this,
-      `tables:${projectId}:${datasetId}:${query.trim().toLowerCase()}`,
-      async () => {
-        let api = await bigQueryApi(this);
-        let tables = await api.listTables(
-          projectId,
-          datasetId,
-          bigQueryConfiguratorListOptions(query),
-        );
-        return tables
-          .filter((table) => optionMatches([table.tableId, table.friendlyName, table.type], query))
-          .slice(0, 100)
-          .map((table) => ({
-            value: table.tableId,
-            title: table.tableId,
-            subtitle: table.friendlyName,
-            meta: table.type,
-          }));
-      },
-    );
+  async listTables(projectId: string, datasetId: string, query: string): Promise<ConfiguratorOption[]> {
+    return cachedBigQueryOptions(this, `tables:${projectId}:${datasetId}:${query.trim().toLowerCase()}`, async () => {
+      let api = await bigQueryApi(this);
+      let tables = await api.listTables(projectId, datasetId, bigQueryConfiguratorListOptions(query));
+      return tables
+        .filter(table => optionMatches([table.tableId, table.friendlyName, table.type], query))
+        .slice(0, 100)
+        .map(table => ({
+          value: table.tableId,
+          title: table.tableId,
+          subtitle: table.friendlyName,
+          meta: table.type,
+        }));
+    });
   }
+
 }
 
 // RPC interface exposed by Gatekeeper to the resource selection/configuration iframe.
@@ -252,7 +225,9 @@ export class GoogleDocConfiguratorUI extends RpcTarget implements GoogleDocConfi
   }
 
   async listDocs(query: string): Promise<ConfiguratorOption[]> {
-    return listDriveFiles(this, query, "application/vnd.google-apps.document", "Google Docs");
+    return listDriveFiles(
+      this, query, "application/vnd.google-apps.document", "Google Docs",
+    );
   }
 }
 
@@ -265,7 +240,9 @@ export class GoogleSheetsConfiguratorUI extends RpcTarget implements GoogleSheet
   }
 
   async listSpreadsheets(query: string): Promise<ConfiguratorOption[]> {
-    return listDriveFiles(this, query, "application/vnd.google-apps.spreadsheet", "Google Sheets");
+    return listDriveFiles(
+      this, query, "application/vnd.google-apps.spreadsheet", "Google Sheets",
+    );
   }
 }
 
@@ -285,7 +262,7 @@ export class SharedDriveConfiguratorUI extends RpcTarget implements SharedDriveC
       "Shared-drive search requires the Google Drive API to be enabled for this OAuth project.",
       () => drive.listAllDrives({ namePrefix: query }),
     );
-    return drives.map((item) => ({ value: item.id, title: item.name, subtitle: item.id }));
+    return drives.map(item => ({ value: item.id, title: item.name, subtitle: item.id }));
   }
 }
 
@@ -300,24 +277,17 @@ export class DriveFileConfiguratorUI extends RpcTarget implements DriveFileConfi
     let drive = new DriveApi(googleTokenProvider(this));
     let { files } = await withDriveApiEnabled(
       "Drive file search requires the Google Drive API to be enabled for this OAuth project.",
-      () =>
-        drive.listFiles({
-          namePrefix: query,
-          excludeMimeTypes: ["application/vnd.google-apps.folder"],
-        }),
+      () => drive.listFiles({
+        namePrefix: query, excludeMimeTypes: ["application/vnd.google-apps.folder"],
+      }),
     );
-    return files.map((file) => ({
+    return files.map(file => ({
       value: file.id,
       title: file.name,
-      subtitle:
-        [
-          file.mimeType,
-          file.modifiedTime
-            ? `Modified ${new Date(file.modifiedTime).toLocaleDateString()}`
-            : undefined,
-        ]
-          .filter(Boolean)
-          .join(" · ") || undefined,
+      subtitle: [
+        file.mimeType,
+        file.modifiedTime ? `Modified ${new Date(file.modifiedTime).toLocaleDateString()}` : undefined,
+      ].filter(Boolean).join(" · ") || undefined,
     }));
   }
 }

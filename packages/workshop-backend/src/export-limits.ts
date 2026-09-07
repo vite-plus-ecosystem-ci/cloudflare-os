@@ -51,7 +51,7 @@ export function limitExportStream(
     return settlePromise;
   };
 
-  deadline.onExpire((reason) => settle(true, reason));
+  deadline.onExpire(reason => settle(true, reason));
 
   return new ReadableStream<Uint8Array>({
     async pull(controller) {

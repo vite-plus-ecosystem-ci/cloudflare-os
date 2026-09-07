@@ -20,18 +20,16 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return (
-      <Section>
-        <Field label="Space" description="Search the spaces shared with this connection.">
-          <Autocomplete
-            name="spaceUrl"
-            value={values.spaceUrl}
-            placeholder="Search spaces..."
-            loadOptions={(query) => ui.listSpaces(query)}
-            onChange={(spaceUrl) => setValues({ spaceUrl })}
-          />
-        </Field>
-      </Section>
-    );
+    return <Section>
+      <Field label="Space" description="Search the spaces shared with this connection.">
+        <Autocomplete
+          name="spaceUrl"
+          value={values.spaceUrl}
+          placeholder="Search spaces..."
+          loadOptions={query => ui.listSpaces(query)}
+          onChange={spaceUrl => setValues({ spaceUrl })}
+        />
+      </Field>
+    </Section>;
   },
 } satisfies ConfiguratorUISpec<ConfluenceSpaceConfiguratorRpc, ConfluenceSpaceConfiguratorValues>;

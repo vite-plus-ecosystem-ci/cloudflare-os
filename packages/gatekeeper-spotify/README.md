@@ -36,7 +36,6 @@ your own Spotify app.
    > Spotify **does not allow `localhost`** as a redirect URI for new apps — you must use the
    > loopback IP literal `127.0.0.1`. Replace host/port with your `BASE_URL` when not running
    > locally (production must use HTTPS).
-
 4. Under **APIs used**, select **Web API**.
 5. Save, then copy the **Client ID** and **Client secret**.
 

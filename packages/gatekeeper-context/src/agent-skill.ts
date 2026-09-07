@@ -35,9 +35,10 @@ export type CollectionSkills = {
 };
 
 /** Build slash command entries for the picker. */
-export function buildAgentSkillCommands(loaded: CollectionSkills[]): SlashCommandDescriptor[] {
+export function buildAgentSkillCommands(
+    loaded: CollectionSkills[]): SlashCommandDescriptor[] {
   let commands: SlashCommandDescriptor[] = [];
-  for (let { collection, skills } of loaded) {
+  for (let {collection, skills} of loaded) {
     for (let skill of skills) {
       let id = encodeDocId(collection.id, skill.path);
       commands.push({
@@ -53,23 +54,20 @@ export function buildAgentSkillCommands(loaded: CollectionSkills[]): SlashComman
 
 /** Build Agent Catalog entries. Their IDs can be passed to ContextLibrary.read(). */
 export function buildAgentSkillCatalogEntries(
-  loaded: CollectionSkills[],
-): Array<{ id: string; title: string; description: string }> {
-  let entries: Array<{ id: string; title: string; description: string }> = [];
-  for (let { collection, skills } of loaded) {
+    loaded: CollectionSkills[]): Array<{id: string, title: string, description: string}> {
+  let entries: Array<{id: string, title: string, description: string}> = [];
+  for (let {collection, skills} of loaded) {
     for (let skill of skills) {
       entries.push({
         id: encodeDocId(collection.id, skill.path),
         title: skill.skillName,
-        description:
-          `Agent Skill. Read with env[N].read(id) and ` +
+        description: `Agent Skill. Read with env[N].read(id) and ` +
           `console.log(document.content). ${skill.description}`,
       });
     }
   }
-  return entries.toSorted(
-    (left, right) => left.title.localeCompare(right.title) || left.id.localeCompare(right.id),
-  );
+  return entries.toSorted((left, right) =>
+    left.title.localeCompare(right.title) || left.id.localeCompare(right.id));
 }
 
 /**
@@ -79,18 +77,15 @@ export function buildAgentSkillCatalogEntries(
  * Workshop sorts the survivors; sorting here would only decide alphabetically which entries lose.
  */
 export function buildContextCatalog(
-  collections: EnabledCollectionInfo[],
-  loaded: CollectionSkills[],
-): AgentCatalog {
+    collections: EnabledCollectionInfo[], loaded: CollectionSkills[]): AgentCatalog {
   let collectionEntries = collections
-    .map((collection) => ({
-      id: collection.id,
-      title: collection.title,
-      description: collection.description,
-    }))
-    .toSorted(
-      (left, right) => left.title.localeCompare(right.title) || left.id.localeCompare(right.id),
-    );
+      .map(collection => ({
+        id: collection.id,
+        title: collection.title,
+        description: collection.description,
+      }))
+      .toSorted((left, right) =>
+        left.title.localeCompare(right.title) || left.id.localeCompare(right.id));
   let skillEntries = buildAgentSkillCatalogEntries(loaded);
   let catalog = boundAgentCatalog([
     ...collectionEntries,
@@ -111,35 +106,25 @@ export function buildContextCatalog(
 export function buildAgentSkillMessage(docId: string, content: string, args: string): string {
   let usesArgument = /\$ARGUMENT(?![A-Za-z0-9_[])/.test(content);
   let expanded = content.replace(/\$ARGUMENT(?![A-Za-z0-9_[])/g, () => args);
-  let message =
-    `<agent_skill>\n${expanded}\n</agent_skill>\n\n` +
+  let message = `<agent_skill>\n${expanded}\n</agent_skill>\n\n` +
     `skill root: ${docIdRoot(docId)} — read the documents it references ` +
     `before following it: prefix skill-local paths with this root, shared paths with the ` +
     `collection ID alone. Read by ID.`;
   return !usesArgument && args ? `${message}\n\nARGUMENT: ${args}` : message;
 }
 
-const SkillFrontmatterSchema = z
-  .object({
-    name: z
-      .string()
+const SkillFrontmatterSchema = z.object({
+  name: z.string()
       .min(1, "Skill name is required.")
       .max(AGENT_SKILL_NAME_MAX_LENGTH, "Skill name must be at most 64 characters.")
-      .regex(
-        /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-        "Skill name must use lowercase letters, numbers, and single hyphens.",
-      ),
-    description: z
-      .string()
-      .transform((value) => value.trim())
-      .pipe(
-        z
-          .string()
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+          "Skill name must use lowercase letters, numbers, and single hyphens."),
+  description: z.string()
+      .transform(value => value.trim())
+      .pipe(z.string()
           .min(1, "Skill description is required.")
-          .max(1024, "Skill description must be at most 1024 characters."),
-      ),
-  })
-  .passthrough();
+          .max(1024, "Skill description must be at most 1024 characters.")),
+}).passthrough();
 
 /** Check whether the last path segment is exactly SKILL.md. */
 export function isSkillManifestPath(path: string): boolean {

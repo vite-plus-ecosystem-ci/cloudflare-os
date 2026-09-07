@@ -30,29 +30,26 @@ export type ContextSearchResult = {
 };
 
 /** A listing entry returned when browsing the content tree. */
-export type ContextListingEntry =
-  | {
-      type: "collection";
-      /** A collectionId — pass to list()/search() to see inside it, not to read() (which takes a docId). */
-      id: string;
-      title: string;
-      description?: string;
-      documentCount: number;
-    }
-  | {
-      type: "directory";
-      path: string;
-      name: string;
-    }
-  | {
-      type: "document";
-      docId: string;
-      path: string;
-      name: string;
-      description?: string;
-      /** MIME type, so the agent can tell text documents from embeddable binary ones (e.g. images). */
-      contentType?: string;
-    };
+export type ContextListingEntry = {
+  type: "collection";
+  /** A collectionId — pass to list()/search() to see inside it, not to read() (which takes a docId). */
+  id: string;
+  title: string;
+  description?: string;
+  documentCount: number;
+} | {
+  type: "directory";
+  path: string;
+  name: string;
+} | {
+  type: "document";
+  docId: string;
+  path: string;
+  name: string;
+  description?: string;
+  /** MIME type, so the agent can tell text documents from embeddable binary ones (e.g. images). */
+  contentType?: string;
+};
 
 /** Top-level collections or a collection subtree. */
 export type ContextListing = {
@@ -81,12 +78,12 @@ export function docIdRoot(docId: string): string {
 }
 
 /** Invalid IDs resolve to no document. */
-export function decodeDocId(docId: string): { collectionId: string; path: string } | null {
+export function decodeDocId(docId: string): {collectionId: string; path: string} | null {
   let slashIndex = docId.indexOf("/");
   if (slashIndex < 0) return null;
   let collectionId = docId.slice(0, slashIndex);
   let path = docId.slice(slashIndex + 1);
-  return collectionId && path ? { collectionId, path } : null;
+  return collectionId && path ? {collectionId, path} : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -316,21 +313,12 @@ export interface ContextApi extends RpcTarget {
   getViewerInfo(): Promise<{ isAdmin: boolean; supportsGitCollections: boolean }>;
 
   createContextCollection(
-    title: string,
-    description: string,
-    visibility: ContextCollectionVisibility,
-    icon?: string,
+    title: string, description: string, visibility: ContextCollectionVisibility, icon?: string,
     source?: ContextCollectionContent["source"],
   ): Promise<ContextCollectionMetadata>;
-  updateContextCollection(
-    collectionId: string,
-    options: {
-      title?: string;
-      description?: string;
-      icon?: string;
-      branch?: string;
-    },
-  ): Promise<void>;
+  updateContextCollection(collectionId: string, options: {
+    title?: string; description?: string; icon?: string; branch?: string;
+  }): Promise<void>;
   syncContextCollectionArtifactSource(collectionId: string): Promise<void>;
   createContextCollectionGitToken(collectionId: string): Promise<ContextGitTokenCreateResult>;
   listContextCollectionGitTokens(collectionId: string): Promise<ContextGitTokenList>;
@@ -340,15 +328,9 @@ export interface ContextApi extends RpcTarget {
   listContextDocuments(collectionId: string, prefix?: string): Promise<ContextDocumentSummary[]>;
   getContextDocument(collectionId: string, path: string): Promise<ContextDocument | null>;
   /** The document's display name is always derived from its path (the file name), so it's not passed. */
-  putContextDocument(
-    collectionId: string,
-    path: string,
-    doc: {
-      description: string;
-      body: string;
-      contentType?: string;
-    },
-  ): Promise<void>;
+  putContextDocument(collectionId: string, path: string, doc: {
+    description: string; body: string; contentType?: string;
+  }): Promise<void>;
   deleteContextDocument(collectionId: string, path: string): Promise<void>;
   moveContextDocument(collectionId: string, fromPath: string, toPath: string): Promise<void>;
   /** Own private collections plus every public one. */

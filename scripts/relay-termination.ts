@@ -33,14 +33,9 @@ const DEFAULT_GRACE_MS = 10_000;
  * Deliberately adds no `error` listener, so a spawn that fails keeps Node's loud uncaught-error
  * behaviour instead of hanging on an `exit` event that will never arrive.
  */
-export function relayTermination(
-  child: ChildProcess,
-  {
-    graceMs = DEFAULT_GRACE_MS,
-  }: {
-    graceMs?: number;
-  } = {},
-): void {
+export function relayTermination(child: ChildProcess, { graceMs = DEFAULT_GRACE_MS }: {
+  graceMs?: number;
+} = {}): void {
   const force = new AbortController();
   let escalation: Promise<void> | null = null;
   let forwarded: NodeJS.Signals | null = null;
@@ -56,16 +51,13 @@ export function relayTermination(
     if (child.pid === undefined) return;
     // The signal the caller sent, not a SIGTERM of our own: in the Ctrl-C case the child already
     // received SIGINT via the process group, and a SIGTERM here would cut its handling short.
-    escalation = killProcessTreeEscalating(child.pid, {
-      initialSignal: signal,
-      graceMs,
-      forceSignal: force.signal,
-    });
+    escalation = killProcessTreeEscalating(
+        child.pid, { initialSignal: signal, graceMs, forceSignal: force.signal });
   }
 
   // Kept by reference so they can be removed individually below -- `removeAllListeners` would take
   // out any handler the calling script installed for its own reasons.
-  const handlers = (["SIGINT", "SIGTERM"] as const).map((signal) => {
+  const handlers = (["SIGINT", "SIGTERM"] as const).map(signal => {
     const handler = () => onSignal(signal);
     process.on(signal, handler);
     return [signal, handler] as const;

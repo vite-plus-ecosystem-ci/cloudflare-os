@@ -17,13 +17,12 @@ export default {
   },
 
   render() {
-    return (
-      <Section>
-        <Field
-          label="Whole workspace"
-          description="Grants access to every page and database you have shared with this Notion connection. To limit access, connect a single page or database instead."
-        ></Field>
-      </Section>
-    );
+    return <Section>
+      <Field
+        label="Whole workspace"
+        description="Grants access to every page and database you have shared with this Notion connection. To limit access, connect a single page or database instead."
+      >
+      </Field>
+    </Section>;
   },
 } satisfies ConfiguratorUISpec<NotionWorkspaceConfiguratorRpc, NotionWorkspaceConfiguratorValues>;

@@ -6,12 +6,8 @@
 // instantiates a gatekeeper in production.
 
 import { DurableObject, RpcStub, RpcTarget } from "cloudflare:workers";
-import type {
-  GatekeeperUserVerifier,
-  GitCache,
-  GitObjectType,
-  GitOid,
-} from "@gadgets/workshop-shared/gatekeeper";
+import type { GatekeeperUserVerifier, GitCache, GitObjectType, GitOid }
+  from "@gadgets/workshop-shared/gatekeeper";
 import type { CloudflareObservabilityGatekeeper } from "../src/cloudflare.js";
 
 export { default } from "../src/cloudflare.js";
@@ -24,9 +20,8 @@ type GatekeeperProps = {
 };
 
 type TestExports = {
-  CloudflareObservabilityGatekeeper(options: {
-    props: GatekeeperProps;
-  }): DurableObjectClass<CloudflareObservabilityGatekeeper>;
+  CloudflareObservabilityGatekeeper(options: { props: GatekeeperProps }):
+    DurableObjectClass<CloudflareObservabilityGatekeeper>;
 };
 
 /**
@@ -34,24 +29,18 @@ type TestExports = {
  * never touches it, so every method just throws.
  */
 class TestGitCache extends RpcTarget implements GitCache {
-  async get(_id: GitOid): Promise<{ type: GitObjectType; content: Uint8Array } | null> {
+  async get(_id: GitOid): Promise<{type: GitObjectType, content: Uint8Array} | null> {
     throw new Error("not implemented");
   }
-  async has(_id: GitOid): Promise<boolean> {
-    throw new Error("not implemented");
-  }
-  async stat(_id: GitOid): Promise<{ type: GitObjectType; size: number } | null> {
+  async has(_id: GitOid): Promise<boolean> { throw new Error("not implemented"); }
+  async stat(_id: GitOid): Promise<{type: GitObjectType, size: number} | null> {
     throw new Error("not implemented");
   }
   async put(_type: GitObjectType, _content: Uint8Array): Promise<GitOid> {
     throw new Error("not implemented");
   }
-  async advertiseCommit(_commitId: GitOid): Promise<void> {
-    throw new Error("not implemented");
-  }
-  async buildPack(): Promise<ReadableStream<Uint8Array>> {
-    throw new Error("not implemented");
-  }
+  async advertiseCommit(_commitId: GitOid): Promise<void> { throw new Error("not implemented"); }
+  async buildPack(): Promise<ReadableStream<Uint8Array>> { throw new Error("not implemented"); }
   async consumePack(_pack: ReadableStream<Uint8Array>): Promise<GitOid[]> {
     throw new Error("not implemented");
   }
@@ -85,15 +74,12 @@ export class TestHooks extends DurableObject<Env> {
    * when the collaborator was admitted, so the test can assert on both outcomes.
    */
   async addObserver(
-    facetName: string,
-    props: GatekeeperProps,
-    outcome: boolean | string,
+    facetName: string, props: GatekeeperProps, outcome: boolean | string,
   ): Promise<string | null> {
     // A local RpcTarget stands in for the remote verifier the overseer would pass; only
     // `hasObservabilityAccess` is ever called on it.
-    const verifier = new RpcStub(
-      new TestVerifier(outcome),
-    ) as unknown as Fetcher<GatekeeperUserVerifier>;
+    const verifier = new RpcStub(new TestVerifier(outcome)) as unknown as
+      Fetcher<GatekeeperUserVerifier>;
     try {
       await this.#gatekeeper(facetName, props).addObserver("observer-1", verifier);
       return null;
@@ -104,13 +90,10 @@ export class TestHooks extends DurableObject<Env> {
 
   /** The resource description for a binding, which encodes the account/Worker split. */
   async describeResource(
-    facetName: string,
-    props: GatekeeperProps,
+    facetName: string, props: GatekeeperProps,
   ): Promise<{ url: string; title: string; suggestedBindingName: string }> {
-    const { url, title, suggestedBindingName } = await this.#gatekeeper(
-      facetName,
-      props,
-    ).describe();
+    const { url, title, suggestedBindingName } =
+      await this.#gatekeeper(facetName, props).describe();
     return { url, title, suggestedBindingName };
   }
 

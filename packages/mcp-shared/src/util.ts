@@ -3,7 +3,7 @@
 
 /** Lowercase hex for a byte string. Used for nonces and catalog fingerprints. */
 export function hexEncode(bytes: Uint8Array): string {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return [...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
 /** Upper-snake-cases an id for use in a suggested binding name (e.g. `my-portal` -> `MY_PORTAL`). */
@@ -41,8 +41,7 @@ function secretSpellings(secret: string): string[] {
  * that looks sanitized.
  */
 export function redactSecrets(
-  text: string,
-  secrets: readonly (string | null | undefined)[],
+  text: string, secrets: readonly (string | null | undefined)[],
 ): string {
   const spellings: string[] = [];
   for (const secret of secrets) {
@@ -71,12 +70,11 @@ export function safeServerText(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   // Control characters go entirely; the rest collapses to single spaces.
   // oxlint-disable-next-line no-control-regex -- intentionally stripping control chars (log-forging guard)
-  const cleaned = value
-    .replace(/[\u0000-\u001f\u007f]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const cleaned = value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
   if (cleaned.length === 0) return undefined;
-  return cleaned.length > MAX_QUOTED_TEXT ? `${cleaned.slice(0, MAX_QUOTED_TEXT)}\u2026` : cleaned;
+  return cleaned.length > MAX_QUOTED_TEXT
+    ? `${cleaned.slice(0, MAX_QUOTED_TEXT)}\u2026`
+    : cleaned;
 }
 
 /** The host of an endpoint URL, for log fields and human-facing messages. */

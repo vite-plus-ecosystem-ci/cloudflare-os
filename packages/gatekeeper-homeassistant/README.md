@@ -21,13 +21,13 @@ The gatekeeper makes HTTP and WebSocket calls to the configured HA URL. On a Clo
 
 Five granularities are exposed; each comes with its own configurator UI for picking a specific resource from the connected HA instance:
 
-| Granularity    | What it grants                                                |
-| -------------- | ------------------------------------------------------------- |
-| Whole instance | Access to every area, device, entity, dashboard, and service. |
-| Area           | A single area (room) — its devices and entities only.         |
-| Label          | All entities carrying a particular HA label.                  |
-| Device         | A single physical device and the entities it provides.        |
-| Entity         | A single entity (light, sensor, switch, etc).                 |
+| Granularity   | What it grants                                                      |
+| ------------- | ------------------------------------------------------------------- |
+| Whole instance | Access to every area, device, entity, dashboard, and service.       |
+| Area          | A single area (room) — its devices and entities only.               |
+| Label         | All entities carrying a particular HA label.                        |
+| Device        | A single physical device and the entities it provides.              |
+| Entity        | A single entity (light, sensor, switch, etc).                       |
 
 ## TypeScript API
 
@@ -42,7 +42,7 @@ const lights = await session.listEntities({ domain: "light" });
 // Capability-based:
 const light = await session.getEntity("light.kitchen");
 await light.turnOn({ brightness: 200 });
-const state = await light.getState(); // reflects the simulated post-write state
+const state = await light.getState();  // reflects the simulated post-write state
 
 // Area-scoped service call (affects every entity in the area):
 const livingRoom = await session.getArea("living_room");

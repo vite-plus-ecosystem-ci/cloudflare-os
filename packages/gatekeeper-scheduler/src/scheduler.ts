@@ -114,12 +114,7 @@ export class ScheduleSessionImpl extends RpcTarget implements ScheduleSession {
     options: RecurringScheduleOptions,
   ): Promise<string> {
     const registeredAt = this.#now();
-    return this.#register(
-      normalizeInterval(everyMs, registeredAt),
-      callback,
-      options,
-      registeredAt,
-    );
+    return this.#register(normalizeInterval(everyMs, registeredAt), callback, options, registeredAt);
   }
 
   /** Registers a timezone-aware calendar recurrence. */
@@ -130,10 +125,7 @@ export class ScheduleSessionImpl extends RpcTarget implements ScheduleSession {
   ): Promise<string> {
     const registeredAt = this.#now();
     return this.#register(
-      normalizeCalendarRule(rule, registeredAt),
-      callback,
-      options,
-      registeredAt,
+      normalizeCalendarRule(rule, registeredAt), callback, options, registeredAt,
     );
   }
 

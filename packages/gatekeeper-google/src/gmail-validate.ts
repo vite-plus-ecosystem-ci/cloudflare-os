@@ -67,9 +67,7 @@ export function validateGmailQueryForGrouping(query: string): void {
 
 /** Combine a binding restriction and caller query without allowing either to escape its group. */
 export function combineGmailQueries(
-  bindingQuery: string | undefined,
-  callerQuery: string | undefined,
-): string | undefined {
+    bindingQuery: string | undefined, callerQuery: string | undefined): string | undefined {
   if (bindingQuery !== undefined) validateGmailQueryForGrouping(bindingQuery);
   if (callerQuery !== undefined) validateGmailQueryForGrouping(callerQuery);
 
@@ -82,7 +80,9 @@ export function combineGmailQueries(
     throw new Error("Gmail search query cannot end with AND or OR.");
   }
 
-  const effective = base && caller ? `(${base}) AND (${caller})` : base || caller || undefined;
+  const effective = base && caller
+    ? `(${base}) AND (${caller})`
+    : base || caller || undefined;
   // Wrappers and the explicit operator count toward Gmail's actual request limit.
   if (effective !== undefined) validateGmailQueryForGrouping(effective);
   return effective;
@@ -91,11 +91,8 @@ export function combineGmailQueries(
 /** Rejects a label name that is empty or over the byte limit. */
 export function validateGmailLabelName(labelName: string): void {
   // oxlint-disable-next-line no-control-regex -- label names are rendered into approval text
-  if (
-    !labelName.trim() ||
-    /[\x00-\x1f\x7f]/.test(labelName) ||
-    utf8Bytes(labelName) > MAX_GMAIL_LABEL_BYTES
-  ) {
+  if (!labelName.trim() || /[\x00-\x1f\x7f]/.test(labelName) ||
+      utf8Bytes(labelName) > MAX_GMAIL_LABEL_BYTES) {
     throw new Error(`Gmail label name must be between 1 and ${MAX_GMAIL_LABEL_BYTES} bytes.`);
   }
 }
@@ -121,8 +118,7 @@ export function validateGmailBodyAlternatives(text: string, html?: string): void
   if (html !== undefined) validateGmailBody(html);
   if (utf8Bytes(text) + utf8Bytes(html ?? "") > MAX_GMAIL_BODY_BYTES) {
     throw new Error(
-      `Plain-text and HTML email bodies must total at most ${MAX_GMAIL_BODY_BYTES} bytes.`,
-    );
+      `Plain-text and HTML email bodies must total at most ${MAX_GMAIL_BODY_BYTES} bytes.`);
   }
 }
 
@@ -144,8 +140,7 @@ export function validateGmailSubject(subject: string): void {
   // oxlint-disable-next-line no-control-regex -- prevents RFC header injection
   if (/[\x00-\x1f\x7f]/.test(subject) || utf8Bytes(subject) > MAX_GMAIL_SUBJECT_BYTES) {
     throw new Error(
-      `Email subject must be at most ${MAX_GMAIL_SUBJECT_BYTES} UTF-8 bytes and contain no control characters.`,
-    );
+      `Email subject must be at most ${MAX_GMAIL_SUBJECT_BYTES} UTF-8 bytes and contain no control characters.`);
   }
 }
 
@@ -159,11 +154,8 @@ export function validateOutboundInput(to: string[], subject: string, body: strin
 
 /** Validate an aggregate To/CC/BCC recipient set and both body alternatives. */
 export function validateOutboundFields(
-  recipients: { to: string[]; cc: string[]; bcc: string[] },
-  subject: string,
-  text: string,
-  html?: string,
-): void {
+    recipients: {to: string[]; cc: string[]; bcc: string[]}, subject: string, text: string,
+    html?: string): void {
   const all = [...recipients.to, ...recipients.cc, ...recipients.bcc];
   validateGmailRecipientCount(all);
   for (const address of all) validateGmailAddress(address);

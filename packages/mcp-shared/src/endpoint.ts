@@ -46,7 +46,7 @@ function normalizeHost(hostname: string): string {
     ? Number(hostname)
     : NaN;
   if (Number.isInteger(asInteger) && asInteger >= 0 && asInteger <= 0xffffffff) {
-    return [24, 16, 8, 0].map((shift) => (asInteger >>> shift) & 0xff).join(".");
+    return [24, 16, 8, 0].map(shift => (asInteger >>> shift) & 0xff).join(".");
   }
   return hostname;
 }
@@ -58,7 +58,7 @@ function normalizeHost(hostname: string): string {
  */
 export function isBlockedHost(hostname: string): boolean {
   const host = normalizeHost(hostname);
-  return BLOCKED_HOST_PATTERNS.some((pattern) => pattern.test(host));
+  return BLOCKED_HOST_PATTERNS.some(pattern => pattern.test(host));
 }
 
 /**

@@ -36,6 +36,7 @@ try {
   process.exit(1);
 }
 
+
 function runPnpm(args: string[]): void {
   console.log(`\n> pnpm ${args.join(" ")}`);
   const [command, argv] = pnpmCommand(args);
@@ -52,10 +53,9 @@ runPnpm(["exec", "vp", "run", "--cache", "@gadgets/workshop-frontend#build:asset
 
 console.log(`\nStarting local server at http://${backendHost} ...`);
 const server = spawn(
-  process.execPath,
-  [join(ROOT, "scripts", "run-dev-server.ts"), "--serve-frontend-assets", ...passthroughArgs],
-  { stdio: "inherit", cwd: ROOT, env },
-);
+    process.execPath,
+    [join(ROOT, "scripts", "run-dev-server.ts"), "--serve-frontend-assets", ...passthroughArgs],
+    { stdio: "inherit", cwd: ROOT, env });
 
 // Signals reach the whole server tree, not just run-dev-server itself (relay-termination.ts).
 // Known limitation, not worth the restructuring to fix: the pre-flight steps above are

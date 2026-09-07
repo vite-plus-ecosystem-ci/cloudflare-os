@@ -46,7 +46,8 @@ type ActionFileAllocation = {
   createdAt: number;
 };
 
-const HANDLE_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const HANDLE_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CORRUPTED = "The stored queued-action file is incomplete or corrupted.";
 
 /**
@@ -88,8 +89,7 @@ export class ActionFileStore {
     const size = bytes.byteLength;
     if (size > this.#maxFileBytes) {
       throw new Error(
-        `Cannot retain a queued-action file larger than ${this.#maxFileBytes} bytes.`,
-      );
+        `Cannot retain a queued-action file larger than ${this.#maxFileBytes} bytes.`);
     }
 
     // WebCrypto snapshots its input synchronously, and each chunk is copied (`slice()` on a Node
@@ -109,23 +109,15 @@ export class ActionFileStore {
       if ((total as number) + size > this.#maxTotalBytes) {
         throw new Error(
           "Queued-action files exceed the safe aggregate storage limit. " +
-            "Resolve existing actions before adding another.",
-        );
+          "Resolve existing actions before adding another.");
       }
       this.#storage.kv.put<ActionFileAllocation>(this.#allocationKey(file.handle), {
-        version: 1,
-        size,
-        chunks: chunks.length,
-        createdAt: Date.now(),
+        version: 1, size, chunks: chunks.length, createdAt: Date.now(),
       });
       this.#storage.kv.put<ActionFileManifest>(this.#manifestKey(file.handle), {
-        ...file,
-        version: 1,
-        chunks: chunks.length,
+        ...file, version: 1, chunks: chunks.length,
       });
-      chunks.forEach((chunk, index) =>
-        this.#storage.kv.put(this.#chunkKey(file.handle, index), chunk),
-      );
+      chunks.forEach((chunk, index) => this.#storage.kv.put(this.#chunkKey(file.handle, index), chunk));
       this.#storage.kv.put(this.#totalKey, (total as number) + size);
     });
     return file;
@@ -139,39 +131,30 @@ export class ActionFileStore {
   async read(file: ActionFileReference): Promise<Uint8Array> {
     if (!validReference(file)) {
       throw new Error(
-        "This queued action uses an obsolete file reference. Reject and resubmit it.",
-      );
+        "This queued action uses an obsolete file reference. Reject and resubmit it.");
     }
     const manifest = this.#storage.kv.get<unknown>(this.#manifestKey(file.handle));
-    if (
-      !validManifest(manifest) ||
-      manifest.handle !== file.handle ||
-      manifest.size !== file.size ||
-      manifest.digest !== file.digest
-    ) {
+    if (!validManifest(manifest) || manifest.handle !== file.handle ||
+        manifest.size !== file.size || manifest.digest !== file.digest) {
       throw new Error(CORRUPTED);
     }
 
-    const entries = [
-      ...this.#storage.kv.list<unknown>({ prefix: this.#chunkPrefix(file.handle) }),
-    ].toSorted(([left], [right]) => left.localeCompare(right));
+    const entries = [...this.#storage.kv.list<unknown>({ prefix: this.#chunkPrefix(file.handle) })]
+      .toSorted(([left], [right]) => left.localeCompare(right));
     if (entries.length !== manifest.chunks) throw new Error(CORRUPTED);
 
     const bytes = new Uint8Array(manifest.size);
     let offset = 0;
     for (const [index, [key, chunk]] of entries.entries()) {
       const expectedSize = Math.min(ACTION_FILE_CHUNK_BYTES, manifest.size - offset);
-      if (
-        key !== this.#chunkKey(file.handle, index) ||
-        !(chunk instanceof Uint8Array) ||
-        chunk.byteLength !== expectedSize
-      ) {
+      if (key !== this.#chunkKey(file.handle, index) || !(chunk instanceof Uint8Array) ||
+          chunk.byteLength !== expectedSize) {
         throw new Error(CORRUPTED);
       }
       bytes.set(chunk, offset);
       offset += chunk.byteLength;
     }
-    if (offset !== manifest.size || (await sha256(bytes)) !== manifest.digest) {
+    if (offset !== manifest.size || await sha256(bytes) !== manifest.digest) {
       throw new Error(CORRUPTED);
     }
     return bytes;
@@ -194,12 +177,8 @@ export class ActionFileStore {
     const orphaned: string[] = [];
     for (const [key, value] of this.#storage.kv.list<unknown>({ prefix: this.#allocationPrefix })) {
       const handle = key.slice(this.#allocationPrefix.length);
-      if (
-        validAllocation(value) &&
-        value.createdAt <= createdBefore &&
-        HANDLE_PATTERN.test(handle) &&
-        !referencedHandles.has(handle)
-      ) {
+      if (validAllocation(value) && value.createdAt <= createdBefore &&
+          HANDLE_PATTERN.test(handle) && !referencedHandles.has(handle)) {
         orphaned.push(handle);
       }
     }
@@ -244,14 +223,9 @@ export class ActionFileStore {
 function validReference(value: unknown): value is ActionFileReference {
   if (!value || typeof value !== "object") return false;
   const file = value as Record<string, unknown>;
-  return (
-    typeof file.handle === "string" &&
-    HANDLE_PATTERN.test(file.handle) &&
-    Number.isSafeInteger(file.size) &&
-    (file.size as number) >= 0 &&
-    typeof file.digest === "string" &&
-    /^[0-9a-f]{64}$/.test(file.digest)
-  );
+  return typeof file.handle === "string" && HANDLE_PATTERN.test(file.handle) &&
+    Number.isSafeInteger(file.size) && (file.size as number) >= 0 &&
+    typeof file.digest === "string" && /^[0-9a-f]{64}$/.test(file.digest);
 }
 
 function validChunkCount(record: { size: number; chunks: unknown }): boolean {
@@ -267,17 +241,12 @@ function validManifest(value: unknown): value is ActionFileManifest {
 function validAllocation(value: unknown): value is ActionFileAllocation {
   if (!value || typeof value !== "object") return false;
   const allocation = value as ActionFileAllocation;
-  return (
-    allocation.version === 1 &&
-    Number.isSafeInteger(allocation.size) &&
-    allocation.size >= 0 &&
-    validChunkCount(allocation) &&
-    Number.isSafeInteger(allocation.createdAt) &&
-    allocation.createdAt >= 0
-  );
+  return allocation.version === 1 &&
+    Number.isSafeInteger(allocation.size) && allocation.size >= 0 && validChunkCount(allocation) &&
+    Number.isSafeInteger(allocation.createdAt) && allocation.createdAt >= 0;
 }
 
 async function sha256(value: Uint8Array): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", value));
-  return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return [...digest].map(byte => byte.toString(16).padStart(2, "0")).join("");
 }

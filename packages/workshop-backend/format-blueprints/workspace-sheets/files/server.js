@@ -147,18 +147,12 @@ export class Gadget extends DurableObject {
         const isDelete = op.value == null && op.fmt == null;
         if (isDelete) {
           if (!cur) continue;
-          if (cur.version !== base) {
-            conflicts.push({ sheetId, ref, cell: cur });
-            continue;
-          }
+          if (cur.version !== base) { conflicts.push({ sheetId, ref, cell: cur }); continue; }
           delete cells[ref];
           deletes.push({ sheetId, ref });
           dirty = true;
         } else {
-          if (cur && cur.version !== base) {
-            conflicts.push({ sheetId, ref, cell: cur });
-            continue;
-          }
+          if (cur && cur.version !== base) { conflicts.push({ sheetId, ref, cell: cur }); continue; }
           const next = {
             value: op.value == null ? "" : String(op.value).slice(0, 8192),
             fmt: sanitizeFmt(op.fmt),
@@ -174,11 +168,7 @@ export class Gadget extends DurableObject {
     if (upserts.length || deletes.length) changed = true;
 
     if (!changed) {
-      return {
-        status: conflicts.length ? "conflict" : "unchanged",
-        revision: meta.revision,
-        conflicts,
-      };
+      return { status: conflicts.length ? "conflict" : "unchanged", revision: meta.revision, conflicts };
     }
 
     meta.revision += 1;
@@ -226,22 +216,10 @@ export class Gadget extends DurableObject {
     queueMicrotask(async () => {
       for (const person of existing) {
         try {
-          await dup.presence({
-            type: "join",
-            clientId: person.clientId,
-            name: person.name,
-            color: person.color,
-          });
-        } catch (e) {
-          break;
-        }
+          await dup.presence({ type: "join", clientId: person.clientId, name: person.name, color: person.color });
+        } catch (e) { break; }
       }
-      await this.broadcastPresence({
-        type: "join",
-        clientId: info.clientId,
-        name: info.name,
-        color: info.color,
-      });
+      await this.broadcastPresence({ type: "join", clientId: info.clientId, name: info.name, color: info.color });
     });
     return this.assembleDocument(await this.loadMeta());
   }
@@ -253,20 +231,14 @@ export class Gadget extends DurableObject {
       name: String(presence.name || "Guest").slice(0, 40),
       color: String(presence.color || "#e1632e"),
       sheetId: presence.sheetId ? String(presence.sheetId) : null,
-      r1: int(presence.r1),
-      c1: int(presence.c1),
-      r2: int(presence.r2),
-      c2: int(presence.c2),
+      r1: int(presence.r1), c1: int(presence.c1),
+      r2: int(presence.r2), c2: int(presence.c2),
       at: Date.now(),
     });
   }
 
   async leavePresence(clientId) {
-    await this.broadcastPresence({
-      type: "leave",
-      clientId: String(clientId || ""),
-      at: Date.now(),
-    });
+    await this.broadcastPresence({ type: "leave", clientId: String(clientId || ""), at: Date.now() });
   }
 
   async broadcast(event) {
@@ -287,10 +259,7 @@ export class Gadget extends DurableObject {
 }
 
 // --- Sanitizers -------------------------------------------------------------
-function int(v) {
-  const n = Math.round(Number(v));
-  return Number.isFinite(n) ? Math.max(0, n) : 0;
-}
+function int(v) { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(0, n) : 0; }
 function clampInt(v, lo, hi, dflt) {
   const n = Math.round(Number(v));
   if (!Number.isFinite(n)) return dflt;
@@ -328,19 +297,12 @@ function sanitizeFmt(fmt) {
   const out = {};
   for (const [k, v] of Object.entries(fmt)) {
     if (!FMT_KEYS.has(k) || v == null || v === false || v === "") continue;
-    if (k === "c" || k === "bg") {
-      if (/^#[0-9a-fA-F]{3,8}$/.test(v)) out[k] = v;
-    } else if (k === "a") {
-      if (v === "l" || v === "c" || v === "r") out[k] = v;
-    } else if (k === "nf") {
-      out[k] = String(v).slice(0, 20);
-    } else if (k === "d") {
-      const n = Math.round(Number(v));
-      if (n >= 0 && n <= 10) out[k] = n;
-    } else if (k === "fs") {
-      const n = Math.round(Number(v));
-      if (n >= 6 && n <= 96) out[k] = n;
-    } else out[k] = true;
+    if (k === "c" || k === "bg") { if (/^#[0-9a-fA-F]{3,8}$/.test(v)) out[k] = v; }
+    else if (k === "a") { if (v === "l" || v === "c" || v === "r") out[k] = v; }
+    else if (k === "nf") { out[k] = String(v).slice(0, 20); }
+    else if (k === "d") { const n = Math.round(Number(v)); if (n >= 0 && n <= 10) out[k] = n; }
+    else if (k === "fs") { const n = Math.round(Number(v)); if (n >= 6 && n <= 96) out[k] = n; }
+    else out[k] = true;
   }
   return Object.keys(out).length ? out : null;
 }
@@ -359,6 +321,7 @@ function sanitizeCellMap(map) {
   }
   return out;
 }
+
 
 const CSV_FORMAT_PREFIX = "csv:";
 const MAX_CSV_SHEETS = 32;
@@ -425,12 +388,12 @@ function parseCsvCellRef(ref) {
 function csvCellRef(row, column) {
   let letters = "";
   for (let value = column + 1; value > 0; value = Math.floor((value - 1) / 26)) {
-    letters = String.fromCharCode(65 + ((value - 1) % 26)) + letters;
+    letters = String.fromCharCode(65 + (value - 1) % 26) + letters;
   }
   return letters + (row + 1);
 }
 
 function escapeCsvField(value) {
   const text = String(value);
-  return /[",\r\n]/.test(text) ? '"' + text.replace(/\"/g, '""') + '"' : text;
+  return /[",\r\n]/.test(text) ? "\"" + text.replace(/\"/g, "\"\"") + "\"" : text;
 }

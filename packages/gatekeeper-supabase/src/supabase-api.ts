@@ -35,10 +35,9 @@ export class SupabaseApiError extends Error {
     this.details = details;
     // A dead/revoked refresh token makes the token endpoint return 400 `invalid_grant`, so treat
     // that as an auth error too (not just 401) — otherwise expiry goes undetected.
-    const invalidGrant =
-      status === 400 &&
-      typeof (details as { error?: string } | undefined)?.error === "string" &&
-      (details as { error?: string }).error === "invalid_grant";
+    const invalidGrant = status === 400
+      && typeof (details as { error?: string } | undefined)?.error === "string"
+      && (details as { error?: string }).error === "invalid_grant";
     this.isAuthError = status === 401 || invalidGrant;
   }
 }
@@ -113,7 +112,8 @@ function errorMessage(status: number, statusText: string, parsed: unknown): stri
   if (typeof parsed === "string" && parsed.length > 0) return parsed;
   if (parsed && typeof parsed === "object") {
     const obj = parsed as { message?: string; error?: string; error_description?: string };
-    const message = obj.message ?? [obj.error, obj.error_description].filter(Boolean).join(": ");
+    const message = obj.message
+      ?? [obj.error, obj.error_description].filter(Boolean).join(": ");
     if (message) return message;
   }
   return `${status} ${statusText}`;
@@ -142,11 +142,7 @@ async function postTokenForm(
 
   const parsed = await parseBody(response);
   if (!response.ok) {
-    throw new SupabaseApiError(
-      response.status,
-      errorMessage(response.status, response.statusText, parsed),
-      parsed,
-    );
+    throw new SupabaseApiError(response.status, errorMessage(response.status, response.statusText, parsed), parsed);
   }
 
   const result = parsed as {
@@ -213,20 +209,12 @@ export async function revokeRefreshToken(
       "Content-Type": "application/json",
       "User-Agent": USER_AGENT,
     },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-    }),
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok && response.status !== 404) {
     const parsed = await parseBody(response);
-    throw new SupabaseApiError(
-      response.status,
-      errorMessage(response.status, response.statusText, parsed),
-      parsed,
-    );
+    throw new SupabaseApiError(response.status, errorMessage(response.status, response.statusText, parsed), parsed);
   }
 }
 
@@ -284,11 +272,7 @@ export class SupabaseApi {
 
     if (!response.ok) {
       const parsed = await parseBody(response);
-      throw new SupabaseApiError(
-        response.status,
-        errorMessage(response.status, response.statusText, parsed),
-        parsed,
-      );
+      throw new SupabaseApiError(response.status, errorMessage(response.status, response.statusText, parsed), parsed);
     }
 
     if (options.maxBytes !== undefined) {
@@ -305,8 +289,8 @@ export class SupabaseApi {
         const mb = (n: number) => Math.round(n / (1024 * 1024));
         throw new Error(
           `Query returned too much data (~${mb(text.length)} MB across ${rowCount} rows). ` +
-            `Re-run with a LIMIT (and OFFSET to page) or select fewer columns; results must stay ` +
-            `under ${mb(options.maxBytes)} MB.`,
+          `Re-run with a LIMIT (and OFFSET to page) or select fewer columns; results must stay ` +
+          `under ${mb(options.maxBytes)} MB.`,
         );
       }
       return (text.length === 0 ? undefined : JSON.parse(text)) as T;
@@ -357,10 +341,7 @@ export class SupabaseApi {
   }
 
   async listFunctions(ref: string): Promise<FunctionResponse[]> {
-    return await this.#request<FunctionResponse[]>(
-      "GET",
-      `/v1/projects/${encodeURIComponent(ref)}/functions`,
-    );
+    return await this.#request<FunctionResponse[]>("GET", `/v1/projects/${encodeURIComponent(ref)}/functions`);
   }
 
   async getFunctionBody(ref: string, slug: string): Promise<string> {

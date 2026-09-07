@@ -13,25 +13,21 @@ function truncate(value: string): string {
 }
 
 function connectTyped<Session extends RpcCompatible<Session>>(
-  client: RpcStub<GadgetClient>,
-  chatId: number,
-): Promise<RpcStub<Session>>;
+    client: RpcStub<GadgetClient>, chatId: number): Promise<RpcStub<Session>>;
 function connectTyped(client: RpcStub<GadgetClient>, chatId: number) {
   return client.connectToGadget(chatId);
 }
 
 /** Find the single Gadget with the exact title required by a task. */
-export function resolveGadget(workpieces: readonly WorkpieceSummary[], title: string): WorkpieceId {
+export function resolveGadget(
+    workpieces: readonly WorkpieceSummary[], title: string): WorkpieceId {
   const matches = workpieces.filter(
-    (workpiece) => workpiece.type === "gadget" && workpiece.title === title,
-  );
+      workpiece => workpiece.type === "gadget" && workpiece.title === title);
   const match = matches.at(0);
   if (matches.length !== 1 || match === undefined) {
-    const built = workpieces.map((workpiece) => JSON.stringify(workpiece.title)).join(", ");
-    throw new Error(
-      `Expected exactly one Gadget titled ${JSON.stringify(title)}, ` +
-        `found ${matches.length} among [${built}]`,
-    );
+    const built = workpieces.map(workpiece => JSON.stringify(workpiece.title)).join(", ");
+    throw new Error(`Expected exactly one Gadget titled ${JSON.stringify(title)}, ` +
+      `found ${matches.length} among [${built}]`);
   }
   return match.id;
 }
@@ -49,7 +45,7 @@ export class EvalVerifier {
   }
 
   async check(id: string, body: () => Promise<EvalCheckOutcome>): Promise<void> {
-    if (this.#checks.some((check) => check.id === id)) {
+    if (this.#checks.some(check => check.id === id)) {
       throw new Error(`Duplicate eval check ID ${JSON.stringify(id)} within one turn`);
     }
     const index = this.#checks.length;
@@ -60,9 +56,9 @@ export class EvalVerifier {
   }
 
   async connect<Session extends RpcCompatible<Session>>(
-    gadgetTitle: string,
-  ): Promise<RpcStub<Session>> {
-    const opened = await this.#session.openGadget(resolveGadget(this.workpieces, gadgetTitle));
+      gadgetTitle: string): Promise<RpcStub<Session>> {
+    const opened = await this.#session.openGadget(
+        resolveGadget(this.workpieces, gadgetTitle));
     try {
       return connectTyped<Session>(opened.client, opened.chatId);
     } finally {
@@ -81,12 +77,12 @@ export class EvalVerifier {
   }
 
   results(): EvalCheck[] {
-    return this.#checks.map((check) => ({ ...check }));
+    return this.#checks.map(check => ({ ...check }));
   }
 
   async #run(index: number, id: string, body: () => Promise<EvalCheckOutcome>): Promise<void> {
     try {
-      this.#checks[index] = { id, ...(await body()) };
+      this.#checks[index] = { id, ...await body() };
     } catch (error) {
       this.#checks[index] = { id, pass: false, evidence: truncate(String(error)) };
     }

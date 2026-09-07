@@ -20,11 +20,9 @@ export function findInterruptedImportBackups(
   entries: Dirent[],
   label: string,
 ): Map<string, string> {
-  const visibleDirectories = new Set(
-    entries
-      .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
-      .map((entry) => entry.name),
-  );
+  const visibleDirectories = new Set(entries
+      .filter(entry => entry.isDirectory() && !entry.name.startsWith("."))
+      .map(entry => entry.name));
   const backups = new Map<string, string>();
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
@@ -48,10 +46,7 @@ function invalid(label: string, message: string): never {
   throw new Error(`${label}: ${message}`);
 }
 
-export function parseArchive(
-  bytes: Uint8Array,
-  label: string,
-): {
+export function parseArchive(bytes: Uint8Array, label: string): {
   metadata: Record<string, unknown>;
   content: Uint8Array;
 } {
@@ -75,9 +70,8 @@ export function parseArchive(
 
   let metadata: Record<string, unknown>;
   try {
-    metadata = JSON.parse(
-      textDecoder.decode(bytes.subarray(PREFIX_BYTES, PREFIX_BYTES + metadataLength)),
-    );
+    metadata = JSON.parse(textDecoder.decode(
+        bytes.subarray(PREFIX_BYTES, PREFIX_BYTES + metadataLength)));
   } catch (err) {
     invalid(label, `metadata is not valid UTF-8 JSON (${errorMessage(err)})`);
   }
@@ -119,15 +113,12 @@ export function extractFiles(content: Uint8Array, label: string): Map<string, st
     invalid(label, `content is not a valid Yjs V2 update (${errorMessage(err)})`);
   }
 
-  if ([...doc.share.keys()].some((name) => name !== "")) {
+  if ([...doc.share.keys()].some(name => name !== "")) {
     invalid(label, "content contains a non-canonical named Yjs root");
   }
   const root = doc.getMap();
   const entries = [...root];
-  validateFilePaths(
-    entries.map(([filename]) => filename),
-    label,
-  );
+  validateFilePaths(entries.map(([filename]) => filename), label);
   const files = new Map<string, string>();
   for (const [filename, value] of entries) {
     if (!(value instanceof Y.Text)) invalid(label, `${filename} is not text`);
@@ -150,7 +141,7 @@ export function buildContent(files: Map<string, string>, label: string): Uint8Ar
   }
   const update = Y.encodeStateAsUpdateV2(doc);
   if (update.byteLength > MAX_SOURCE_BYTES) invalid(label, "source snapshot is too large");
-  return gzipSync(update, { level: 9 });
+  return gzipSync(update, {level: 9});
 }
 
 export async function readSourceFiles(
@@ -164,9 +155,8 @@ export async function readSourceFiles(
   if (!root.isDirectory()) invalid(label, "must be a directory");
 
   const visit = async (directory: string, prefix: string): Promise<void> => {
-    for (const entry of (await readdir(directory, { withFileTypes: true })).toSorted((a, b) =>
-      compareNames(a.name, b.name),
-    )) {
+    for (const entry of (await readdir(directory, { withFileTypes: true }))
+        .toSorted((a, b) => compareNames(a.name, b.name))) {
       const path = prefix ? `${prefix}/${entry.name}` : entry.name;
       validateFilePath(path, label);
       if (entry.isSymbolicLink()) invalid(label, `${path} must not be a symlink`);
@@ -209,11 +199,8 @@ export function validatePortablePaths(paths: Iterable<string>, label: string): v
     }
     const conflictingDirectory = portableDirectories.get(portable);
     if (conflictingDirectory) {
-      invalid(
-        label,
-        `${path} conflicts with directory ${conflictingDirectory} on ` +
-          `case-insensitive filesystems`,
-      );
+      invalid(label, `${path} conflicts with directory ${conflictingDirectory} on ` +
+          `case-insensitive filesystems`);
     }
     portablePaths.set(portable, path);
 
@@ -223,18 +210,13 @@ export function validatePortablePaths(paths: Iterable<string>, label: string): v
       const portableDirectory = portablePath(directory);
       const existingDirectory = portableDirectories.get(portableDirectory);
       if (existingDirectory && existingDirectory !== directory) {
-        invalid(
-          label,
-          `${directory} aliases directory ${existingDirectory} on ` +
-            `case-insensitive filesystems`,
-        );
+        invalid(label, `${directory} aliases directory ${existingDirectory} on ` +
+            `case-insensitive filesystems`);
       }
       const existingFile = portablePaths.get(portableDirectory);
       if (existingFile) {
-        invalid(
-          label,
-          `${path} conflicts with file ${existingFile} on ` + `case-insensitive filesystems`,
-        );
+        invalid(label, `${path} conflicts with file ${existingFile} on ` +
+            `case-insensitive filesystems`);
       }
       portableDirectories.set(portableDirectory, directory);
     }
@@ -253,24 +235,16 @@ export function validatePortablePaths(paths: Iterable<string>, label: string): v
 }
 
 function validateFilePath(path: string, label: string): void {
-  if (
-    typeof path !== "string" ||
-    path.includes("\\") ||
-    path.includes("\0") ||
-    path.split("/").some((segment) => segment === "" || segment === "." || segment === "..")
-  ) {
+  if (typeof path !== "string" || path.includes("\\") || path.includes("\0") ||
+      path.split("/").some(segment => segment === "" || segment === "." || segment === "..")) {
     invalid(label, `unsafe blueprint file path ${JSON.stringify(path)}`);
   }
   for (const segment of path.split("/")) {
-    if (
-      [...segment].some((char) => char.codePointAt(0)! <= 0x1f) ||
-      /[<>:"|?*]/u.test(segment) ||
-      /[. ]$/u.test(segment) ||
-      /^(con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/iu.test(
-        segment,
-      ) ||
-      /^\.git(?:ignore)?$/iu.test(segment)
-    ) {
+    if ([...segment].some(char => char.codePointAt(0)! <= 0x1f) || /[<>:"|?*]/u.test(segment) ||
+        /[. ]$/u.test(segment) ||
+        /^(con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/iu
+            .test(segment) ||
+        /^\.git(?:ignore)?$/iu.test(segment)) {
       invalid(label, `non-portable blueprint file path ${JSON.stringify(path)}`);
     }
   }

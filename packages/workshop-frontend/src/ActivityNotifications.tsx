@@ -1,39 +1,39 @@
-import { useState } from "react";
-import { Popover } from "@cloudflare/kumo";
-import { ArrowRight, Pulse } from "@phosphor-icons/react";
-import type { RpcStub } from "capnweb";
-import type { Overseer } from "@gadgets/workshop-shared/api";
-import { CountBadge } from "./components/CountBadge";
-import { ResolveButton } from "./components/ResolveButton";
+import { useState } from 'react'
+import { Popover } from '@cloudflare/kumo'
+import { ArrowRight, Pulse } from '@phosphor-icons/react'
+import type { RpcStub } from 'capnweb'
+import type { Overseer } from '@gadgets/workshop-shared/api'
+import { CountBadge } from './components/CountBadge'
+import { ResolveButton } from './components/ResolveButton'
 import {
   formatRelativeTime,
   PENDING_CHECKING_COPY,
   PENDING_ERROR_COPY,
   type ActivityView,
-} from "./Activity";
-import { useActions } from "./useActions";
-import { useResolveAction } from "./useResolveAction";
+} from './Activity'
+import { useActions } from './useActions'
+import { useResolveAction } from './useResolveAction'
 
 interface ActivityNotificationsProps {
-  overseer: RpcStub<Overseer>;
-  onViewActivity: (view: ActivityView) => void;
+  overseer: RpcStub<Overseer>
+  onViewActivity: (view: ActivityView) => void
 }
 
-const PREVIEW_LIMIT = 3;
+const PREVIEW_LIMIT = 3
 
 export default function ActivityNotifications({
   overseer,
   onViewActivity,
 }: ActivityNotificationsProps) {
-  const [open, setOpen] = useState(false);
-  const [processing, setProcessing] = useState<Set<number>>(new Set());
-  const resolveAction = useResolveAction(overseer, setProcessing);
-  const { status, pending } = useActions(overseer);
+  const [open, setOpen] = useState(false)
+  const [processing, setProcessing] = useState<Set<number>>(new Set())
+  const resolveAction = useResolveAction(overseer, setProcessing)
+  const { status, pending } = useActions(overseer)
 
   const openFullView = (view: ActivityView) => {
-    setOpen(false);
-    onViewActivity(view);
-  };
+    setOpen(false)
+    onViewActivity(view)
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -41,21 +41,15 @@ export default function ActivityNotifications({
         render={
           <button
             type="button"
-            aria-label={
-              pending.length > 0
-                ? `Activity — ${pending.length} ${pending.length === 1 ? "request needs" : "requests need"} review`
-                : "Activity"
-            }
+            aria-label={pending.length > 0
+              ? `Activity — ${pending.length} ${pending.length === 1 ? 'request needs' : 'requests need'} review`
+              : 'Activity'}
             className={`relative flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors duration-150 hover:bg-kumo-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kumo-ring ${
-              pending.length > 0 ? "text-kumo-strong" : "text-kumo-subtle hover:text-kumo-default"
+              pending.length > 0 ? 'text-kumo-strong' : 'text-kumo-subtle hover:text-kumo-default'
             }`}
           >
-            <Pulse size={16} weight={pending.length > 0 ? "bold" : "regular"} />
-            <CountBadge
-              count={pending.length}
-              tone="solid"
-              className="absolute -right-0.5 -top-0.5"
-            />
+            <Pulse size={16} weight={pending.length > 0 ? 'bold' : 'regular'} />
+            <CountBadge count={pending.length} tone="solid" className="absolute -right-0.5 -top-0.5" />
           </button>
         }
       />
@@ -76,25 +70,23 @@ export default function ActivityNotifications({
 
         {pending.length === 0 ? (
           <p className="m-0 px-3.5 pb-3 pt-1 text-[13px] leading-[18px] tracking-[-0.25px] text-kumo-subtle">
-            {status === "error"
-              ? PENDING_ERROR_COPY
-              : status === "checking"
-                ? PENDING_CHECKING_COPY
-                : "Nothing is waiting on you."}
+            {status === 'error' ? PENDING_ERROR_COPY
+              : status === 'checking' ? PENDING_CHECKING_COPY
+              : 'Nothing is waiting on you.'}
           </p>
         ) : (
           <div className="max-h-[min(58vh,420px)] overflow-y-auto pb-1">
             {pending.slice(0, PREVIEW_LIMIT).map((action, index) => {
-              const isProcessing = processing.has(action.id);
+              const isProcessing = processing.has(action.id)
               return (
                 <div
                   key={action.id}
-                  className={`px-3.5 py-2.5 ${index === 0 ? "" : "border-t border-kumo-line"}`}
+                  className={`px-3.5 py-2.5 ${index === 0 ? '' : 'border-t border-kumo-line'}`}
                 >
                   <div className="flex items-start gap-2">
                     <button
                       type="button"
-                      onClick={() => openFullView("review")}
+                      onClick={() => openFullView('review')}
                       className="min-w-[7rem] flex-1 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kumo-ring"
                     >
                       <span className="block truncate text-[13px] font-medium leading-[18px] tracking-[-0.25px] text-kumo-default">
@@ -113,17 +105,17 @@ export default function ActivityNotifications({
                       <ResolveButton
                         tone="deny"
                         disabled={isProcessing}
-                        onClick={() => void resolveAction(action.id, "deny")}
+                        onClick={() => void resolveAction(action.id, 'deny')}
                       />
                       <ResolveButton
                         tone="approve"
                         disabled={isProcessing}
-                        onClick={() => void resolveAction(action.id, "approve")}
+                        onClick={() => void resolveAction(action.id, 'approve')}
                       />
                     </div>
                   </div>
                 </div>
-              );
+              )
             })}
           </div>
         )}
@@ -131,18 +123,18 @@ export default function ActivityNotifications({
         <div className="border-t border-kumo-line p-1">
           <button
             type="button"
-            onClick={() => openFullView(pending.length > 0 ? "review" : "history")}
+            onClick={() => openFullView(pending.length > 0 ? 'review' : 'history')}
             className="flex w-full cursor-pointer items-center justify-between rounded-md px-2.5 py-1.5 text-left text-[13px] leading-[18px] tracking-[-0.25px] text-kumo-default transition-colors hover:bg-kumo-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kumo-ring"
           >
             <span>
               {pending.length > PREVIEW_LIMIT
                 ? `View all ${pending.length} requests`
-                : "View all activity"}
+                : 'View all activity'}
             </span>
             <ArrowRight size={13} className="text-kumo-inactive" />
           </button>
         </div>
       </Popover.Content>
     </Popover>
-  );
+  )
 }

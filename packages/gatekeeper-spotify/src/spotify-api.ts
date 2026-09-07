@@ -87,11 +87,7 @@ async function tokenRequest(
     scope?: string;
   };
   if (!result.access_token) {
-    throw new SpotifyApiError(
-      400,
-      "Spotify token exchange did not return an access token.",
-      parsed,
-    );
+    throw new SpotifyApiError(400, "Spotify token exchange did not return an access token.", parsed);
   }
 
   return {
@@ -307,32 +303,14 @@ export class SpotifyApi {
    * each item individually. Unknown/unavailable ids resolve to null rather than failing the batch.
    */
   async getTracks(trackIds: string[]): Promise<(SpotifyTrackResponse | null)[]> {
-    return Promise.all(
-      trackIds.map((id) =>
-        this.getTrack(id).then(
-          (track) => track,
-          () => null,
-        ),
-      ),
-    );
+    return Promise.all(trackIds.map(id => this.getTrack(id).then(track => track, () => null)));
   }
 
   async getAlbums(albumIds: string[]): Promise<(SpotifyAlbumResponse | null)[]> {
-    return Promise.all(
-      albumIds.map((id) =>
-        this.getAlbum(id).then(
-          (album) => album,
-          () => null,
-        ),
-      ),
-    );
+    return Promise.all(albumIds.map(id => this.getAlbum(id).then(album => album, () => null)));
   }
 
-  search(
-    query: string,
-    types: string[],
-    limit: number,
-  ): Promise<{
+  search(query: string, types: string[], limit: number): Promise<{
     tracks?: SpotifyPaging<SpotifyTrackResponse>;
     artists?: SpotifyPaging<SpotifyArtistResponse>;
     albums?: SpotifyPaging<SpotifyAlbumResponse>;
@@ -345,17 +323,11 @@ export class SpotifyApi {
 
   // --- Library ---
 
-  listSavedTracks(
-    limit: number,
-    offset: number,
-  ): Promise<SpotifyPaging<{ track: SpotifyTrackResponse }>> {
+  listSavedTracks(limit: number, offset: number): Promise<SpotifyPaging<{ track: SpotifyTrackResponse }>> {
     return this.#request("GET", "/v1/me/tracks", { query: { limit, offset } });
   }
 
-  listSavedAlbums(
-    limit: number,
-    offset: number,
-  ): Promise<SpotifyPaging<{ album: SpotifyAlbumResponse }>> {
+  listSavedAlbums(limit: number, offset: number): Promise<SpotifyPaging<{ album: SpotifyAlbumResponse }>> {
     return this.#request("GET", "/v1/me/albums", { query: { limit, offset } });
   }
 
@@ -380,20 +352,14 @@ export class SpotifyApi {
   async saveToLibrary(uris: string[]): Promise<void> {
     for (let i = 0; i < uris.length; i += LIBRARY_CHUNK) {
       const chunk = uris.slice(i, i + LIBRARY_CHUNK);
-      await this.#request("PUT", "/v1/me/library", {
-        query: { uris: chunk.join(",") },
-        body: { uris: chunk },
-      });
+      await this.#request("PUT", "/v1/me/library", { query: { uris: chunk.join(",") }, body: { uris: chunk } });
     }
   }
 
   async removeFromLibrary(uris: string[]): Promise<void> {
     for (let i = 0; i < uris.length; i += LIBRARY_CHUNK) {
       const chunk = uris.slice(i, i + LIBRARY_CHUNK);
-      await this.#request("DELETE", "/v1/me/library", {
-        query: { uris: chunk.join(",") },
-        body: { uris: chunk },
-      });
+      await this.#request("DELETE", "/v1/me/library", { query: { uris: chunk.join(",") }, body: { uris: chunk } });
     }
   }
 
@@ -423,22 +389,15 @@ export class SpotifyApi {
    * GET /playlists/{id}/items only returns contents for playlists the user owns or collaborates on;
    * for others Spotify withholds items (returns metadata only).
    */
-  listPlaylistItems(
-    playlistId: string,
-    limit: number,
-    offset: number,
-  ): Promise<SpotifyPaging<SpotifyPlaylistItemResponse>> {
+  listPlaylistItems(playlistId: string, limit: number, offset: number): Promise<SpotifyPaging<SpotifyPlaylistItemResponse>> {
     return this.#request("GET", `/v1/playlists/${encodeURIComponent(playlistId)}/items`, {
       query: { limit, offset },
     });
   }
 
-  createPlaylist(body: {
-    name: string;
-    description?: string;
-    public?: boolean;
-    collaborative?: boolean;
-  }): Promise<SpotifyPlaylistResponse> {
+  createPlaylist(
+    body: { name: string; description?: string; public?: boolean; collaborative?: boolean },
+  ): Promise<SpotifyPlaylistResponse> {
     return this.#request("POST", "/v1/me/playlists", { body });
   }
 
@@ -450,7 +409,7 @@ export class SpotifyApi {
 
   async removePlaylistItems(playlistId: string, uris: string[]): Promise<void> {
     await this.#request("DELETE", `/v1/playlists/${encodeURIComponent(playlistId)}/items`, {
-      body: { items: uris.map((uri) => ({ uri })) },
+      body: { items: uris.map(uri => ({ uri })) },
     });
   }
 
@@ -488,27 +447,20 @@ export class SpotifyApi {
   }
 
   async getDevices(): Promise<SpotifyDeviceResponse[]> {
-    const result = await this.#request<{ devices: SpotifyDeviceResponse[] }>(
-      "GET",
-      "/v1/me/player/devices",
-    );
+    const result = await this.#request<{ devices: SpotifyDeviceResponse[] }>("GET", "/v1/me/player/devices");
     return result.devices ?? [];
   }
 
-  getQueue(): Promise<
-    { currently_playing: SpotifyTrackResponse | null; queue: SpotifyTrackResponse[] } | undefined
-  > {
+  getQueue(): Promise<{ currently_playing: SpotifyTrackResponse | null; queue: SpotifyTrackResponse[] } | undefined> {
     // 204 (no active device/session) yields an empty body, modeled as undefined.
     return this.#request("GET", "/v1/me/player/queue", { okStatuses: [204] });
   }
 
-  getRecentlyPlayed(limit: number): Promise<
-    SpotifyPaging<{
-      track: SpotifyTrackResponse;
-      played_at: string;
-      context?: { uri?: string } | null;
-    }>
-  > {
+  getRecentlyPlayed(limit: number): Promise<SpotifyPaging<{
+    track: SpotifyTrackResponse;
+    played_at: string;
+    context?: { uri?: string } | null;
+  }>> {
     return this.#request("GET", "/v1/me/player/recently-played", { query: { limit } });
   }
 
@@ -521,24 +473,15 @@ export class SpotifyApi {
   }
 
   async pause(deviceId?: string): Promise<void> {
-    await this.#request("PUT", "/v1/me/player/pause", {
-      query: { device_id: deviceId },
-      okStatuses: [202, 204],
-    });
+    await this.#request("PUT", "/v1/me/player/pause", { query: { device_id: deviceId }, okStatuses: [202, 204] });
   }
 
   async next(deviceId?: string): Promise<void> {
-    await this.#request("POST", "/v1/me/player/next", {
-      query: { device_id: deviceId },
-      okStatuses: [202, 204],
-    });
+    await this.#request("POST", "/v1/me/player/next", { query: { device_id: deviceId }, okStatuses: [202, 204] });
   }
 
   async previous(deviceId?: string): Promise<void> {
-    await this.#request("POST", "/v1/me/player/previous", {
-      query: { device_id: deviceId },
-      okStatuses: [202, 204],
-    });
+    await this.#request("POST", "/v1/me/player/previous", { query: { device_id: deviceId }, okStatuses: [202, 204] });
   }
 
   async seek(positionMs: number, deviceId?: string): Promise<void> {
@@ -570,10 +513,7 @@ export class SpotifyApi {
   }
 
   async transfer(deviceId: string, play: boolean): Promise<void> {
-    await this.#request("PUT", "/v1/me/player", {
-      body: { device_ids: [deviceId], play },
-      okStatuses: [202, 204],
-    });
+    await this.#request("PUT", "/v1/me/player", { body: { device_ids: [deviceId], play }, okStatuses: [202, 204] });
   }
 
   async addToQueue(uri: string, deviceId?: string): Promise<void> {

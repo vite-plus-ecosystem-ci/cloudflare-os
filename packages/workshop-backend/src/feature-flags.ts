@@ -17,8 +17,8 @@ type FeatureFlagEnv = {
 type UiFeatureFlagEntry = [UiFeatureFlagName, boolean];
 
 export async function resolveUiFeatureFlags(
-  env: FeatureFlagEnv,
-  userId: string,
+    env: FeatureFlagEnv,
+    userId: string,
 ): Promise<UiFeatureFlags> {
   if (env.DEV) {
     return { ...DEV_UI_FEATURE_FLAGS };

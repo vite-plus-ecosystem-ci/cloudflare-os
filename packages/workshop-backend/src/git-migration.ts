@@ -62,12 +62,7 @@
 import * as Y from "yjs";
 import { keyString } from "@gadgets/typed-storage";
 import type {
-  AiChatMessage,
-  AiChatMetadata,
-  ChatGadgetPin,
-  ChatGadgetPinState,
-  CommitIdentity,
-  WorkpieceId,
+  AiChatMessage, AiChatMetadata, ChatGadgetPin, ChatGadgetPinState, CommitIdentity, WorkpieceId,
 } from "@gadgets/workshop-shared/api";
 import { diffFiles, type CodeContent, type CodeChange } from "@gadgets/workshop-shared/code-change";
 import type { CompactionCheckpoint } from "./agent";
@@ -91,16 +86,9 @@ export const HISTORY_COMMIT_GAP_MS = 60 * 60 * 1000;
  */
 export interface GitMigrationHost {
   /** The workspace's storage. Only the listed collections are read or written. */
-  storage: Pick<
-    OverseerStorage,
-    | "code"
-    | "gadgets"
-    | "chats"
-    | "chatMeta"
-    | "chatDraftUpdates"
-    | "nextChatSequences"
-    | "blueprints"
-  >;
+  storage: Pick<OverseerStorage,
+      "code" | "gadgets" | "chats" | "chatMeta" | "chatDraftUpdates" | "nextChatSequences" |
+      "blueprints">;
 
   /** The workspace's git object store, which receives the synthesized commits. */
   gitStore: GitStore;
@@ -139,7 +127,7 @@ export interface GitMigrationHost {
 // delivery strips it (hydrateChatMessageForClient) and agent replay only tests its presence
 // (the generic pre-conversion user-edit note).
 type StoredChangesMessage = Extract<AiChatMessage, { type: "changes" }> & {
-  update?: Uint8Array;
+  update?: Uint8Array,
 };
 
 // One gadget's synthesis state: its legacy files root, the file map and commit chain synthesized
@@ -148,15 +136,13 @@ type StoredChangesMessage = Extract<AiChatMessage, { type: "changes" }> & {
 type GadgetSynthesis = {
   root: string;
   files: Map<string, string>;
-  chain: { version: number; commitId: string }[];
+  chain: { version: number, commitId: string }[];
 };
 
 // The last chain entry at or below `version`, or undefined if the gadget had no commit yet.
-function chainFloor(
-  state: GadgetSynthesis,
-  version: number,
-): { version: number; commitId: string } | undefined {
-  let found: { version: number; commitId: string } | undefined;
+function chainFloor(state: GadgetSynthesis, version: number)
+    : { version: number, commitId: string } | undefined {
+  let found: { version: number, commitId: string } | undefined;
   for (let entry of state.chain) {
     if (entry.version > version) break;
     found = entry;
@@ -186,11 +172,11 @@ export async function migrateCodeLogToGit(host: GitMigrationHost): Promise<{ com
   // ---------------------------------------------------------------------------------------
   // Inventory the log and choose commit points.
 
-  let log: { version: number; timestamp: Date }[] = [];
+  let log: { version: number, timestamp: Date }[] = [];
   for (let entry of storage.code.list()) {
     log.push({ version: entry.version, timestamp: entry.timestamp });
   }
-  let logVersions = new Set(log.map((entry) => entry.version));
+  let logVersions = new Set(log.map(entry => entry.version));
   let finalVersion = log[log.length - 1]?.version ?? 0;
 
   // The last code version at or below `version`, or 0 if none. Anchors and blueprint pins may
@@ -210,10 +196,8 @@ export async function migrateCodeLogToGit(host: GitMigrationHost): Promise<{ com
 
   // Batch gaps and the final version.
   for (let i = 0; i < log.length; i++) {
-    if (
-      i === log.length - 1 ||
-      log[i + 1].timestamp.getTime() - log[i].timestamp.getTime() >= HISTORY_COMMIT_GAP_MS
-    ) {
+    if (i === log.length - 1 ||
+        log[i + 1].timestamp.getTime() - log[i].timestamp.getTime() >= HISTORY_COMMIT_GAP_MS) {
       points.add(log[i].version);
     }
   }
@@ -277,7 +261,7 @@ export async function migrateCodeLogToGit(host: GitMigrationHost): Promise<{ com
   for (let record of storage.blueprints.list()) {
     if (record.codeVersion === undefined || record.commitId !== undefined) continue;
     let gadgetId = record.gadgetId ?? defaultGadgetId;
-    if (gadgetId === undefined) continue; // unresolvable; left as-is below
+    if (gadgetId === undefined) continue;  // unresolvable; left as-is below
     track(gadgetId);
     let resolved = floorLogVersion(record.codeVersion);
     if (resolved > 0) points.add(resolved);
@@ -336,9 +320,8 @@ export async function migrateCodeLogToGit(host: GitMigrationHost): Promise<{ com
       let commitId = await gitStore.writeFilesAsCommit(files, {
         parents: parent !== undefined ? [parent.commitId] : [],
         author: host.ownerIdentity,
-        message:
-          `Import pre-git history (code versions ${(parent?.version ?? 0) + 1}-` +
-          `${entry.version})`,
+        message: `Import pre-git history (code versions ${(parent?.version ?? 0) + 1}-` +
+            `${entry.version})`,
         timestamp: entry.timestamp,
       });
       state.chain.push({ version: entry.version, commitId });
@@ -368,7 +351,7 @@ export async function migrateCodeLogToGit(host: GitMigrationHost): Promise<{ com
   for (let msg of legacyMerges) {
     msg.commits = [];
     for (let [gadgetId, state] of tracked) {
-      let hit = state.chain.find((entry) => entry.version === msg.version);
+      let hit = state.chain.find(entry => entry.version === msg.version);
       if (hit !== undefined) msg.commits.push({ gadgetId, commitId: hit.commitId });
     }
     storage.chats.put(msg);
@@ -377,7 +360,7 @@ export async function migrateCodeLogToGit(host: GitMigrationHost): Promise<{ com
   // Convert each live pre-git chat (see the module comment).
   for (let meta of Array.from(storage.chatMeta.list())) {
     let anchor = chatAnchors.get(meta.id);
-    if (anchor === undefined) continue; // already converted by a previous run
+    if (anchor === undefined) continue;  // already converted by a previous run
     convertLegacyChat(host, tracked, meta, anchor, anchorStates.get(anchor));
   }
 
@@ -388,16 +371,15 @@ export async function migrateCodeLogToGit(host: GitMigrationHost): Promise<{ com
     if (record.codeVersion === undefined || record.commitId !== undefined) continue;
     let gadgetId = record.gadgetId ?? defaultGadgetId;
     let state = gadgetId === undefined ? undefined : tracked.get(gadgetId);
-    let floor =
-      state === undefined ? undefined : chainFloor(state, floorLogVersion(record.codeVersion));
+    let floor = state === undefined
+        ? undefined : chainFloor(state, floorLogVersion(record.codeVersion));
     if (floor === undefined || floor.version === 0) {
       // No content ever existed at that version (or the gadget is unresolvable) -- the floor is
       // at best the synthesized empty root, and an empty snapshot is not a valid blueprint
       // (instantiation refuses empty archives). Leave the legacy record; its readers keep
       // their explicit legacy errors.
       logger.warn("blueprint record has no synthesizable commit", {
-        event: "storage.migration.git.blueprint.unresolved",
-        blueprintId: record.id,
+        event: "storage.migration.git.blueprint.unresolved", blueprintId: record.id,
       });
       continue;
     }
@@ -416,10 +398,7 @@ export async function migrateCodeLogToGit(host: GitMigrationHost): Promise<{ com
 // updates are the root's only possible source. Size alone decides, mirroring the conversion's
 // own diff-against-empty-anchor condition.
 function chatDocHasLegacyRootContent(
-  storage: GitMigrationHost["storage"],
-  chatId: number,
-  messages: AiChatMessage[],
-): boolean {
+    storage: GitMigrationHost["storage"], chatId: number, messages: AiChatMessage[]): boolean {
   let statuses = chatChangeStatuses(messages);
   let doc = new Y.Doc();
   for (let msg of messages) {
@@ -438,12 +417,8 @@ function chatDocHasLegacyRootContent(
 // conversion-boundary "changes" message and the matching commit-pinned codeBase. Fully
 // synchronous (see the caller's atomicity note).
 function convertLegacyChat(
-  host: GitMigrationHost,
-  tracked: Map<WorkpieceId, GadgetSynthesis>,
-  meta: AiChatMetadata,
-  anchor: number,
-  anchorState: Uint8Array | undefined,
-): void {
+    host: GitMigrationHost, tracked: Map<WorkpieceId, GadgetSynthesis>, meta: AiChatMetadata,
+    anchor: number, anchorState: Uint8Array | undefined): void {
   let { storage } = host;
   let messages = [...storage.chats.list({ prefix: `${keyString(meta.id)}.` })];
   let statuses = chatChangeStatuses(messages);
@@ -468,13 +443,11 @@ function convertLegacyChat(
   // Outstanding drafts fold in (they are strictly newer than every message, and their keys --
   // hence this iteration -- order by timestamp), then are deleted: their content now lives in
   // the conversion change.
-  for (let draft of Array.from(
-    storage.chatDraftUpdates.list({ prefix: `${keyString(meta.id)}.` }),
-  )) {
+  for (let draft of Array.from(storage.chatDraftUpdates.list(
+      { prefix: `${keyString(meta.id)}.` }))) {
     Y.applyUpdateV2(chatDoc, draft.update);
     storage.chatDraftUpdates.delete(
-      `${keyString(draft.chatId)}.${keyString(draft.timestamp.valueOf())}`,
-    );
+        `${keyString(draft.chatId)}.${keyString(draft.timestamp.valueOf())}`);
   }
 
   // Diff the flatten against the anchor trees, gadget by gadget. Untouched gadgets contribute
@@ -499,7 +472,8 @@ function convertLegacyChat(
     after.set(gadget.id, chatFiles);
     if (gadget.pending === undefined) {
       let floor = chainFloor(tracked.get(gadget.id)!, anchor)!;
-      pins.push({ gadgetId: gadget.id, baseCommit: floor.commitId, mergedCommit: floor.commitId });
+      pins.push({ gadgetId: gadget.id, baseCommit: floor.commitId,
+                  mergedCommit: floor.commitId });
     } else if (gadget.pending.sequence !== undefined) {
       // A touched pending gadget's files now ride the boundary change, but its creation was
       // recorded by an earlier message -- a split the new model never produces (a creation's
@@ -521,7 +495,7 @@ function convertLegacyChat(
   let sequenceRecord = storage.nextChatSequences.get(meta.id);
   let sequence = sequenceRecord?.nextSequence ?? 0;
   storage.nextChatSequences.put({ chatId: meta.id, nextSequence: sequence + 1 });
-  let createdGadgets = carriedPending.map((id) => {
+  let createdGadgets = carriedPending.map(id => {
     // Pre-v4 rows are all gadgets (see the heads loop above for why this is a cast).
     let gadget = storage.gadgets.get(id)! as GadgetRecord;
     return { gadgetId: id, title: gadget.title, bindingName: gadget.bindingName };
@@ -536,13 +510,9 @@ function convertLegacyChat(
     type: "changes",
     ...(change !== undefined ? { change } : {}),
     ...(pins.length > 0
-      ? {
-          pins: pins.map((pin): ChatGadgetPin => ({
-            gadgetId: pin.gadgetId,
-            baseCommit: pin.baseCommit,
-          })),
-        }
-      : {}),
+        ? { pins: pins.map((pin): ChatGadgetPin =>
+              ({ gadgetId: pin.gadgetId, baseCommit: pin.baseCommit })) }
+        : {}),
     ...(createdGadgets.length > 0 ? { createdGadgets } : {}),
     conversionBoundary: true,
   });

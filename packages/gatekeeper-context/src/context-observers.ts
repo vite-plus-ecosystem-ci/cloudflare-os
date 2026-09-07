@@ -23,14 +23,9 @@ type ObservedCollectionState = true | "pending" | "observed";
  * public collections are domain-wide, while each private collection belongs to one account.
  */
 export class ContextObserverTracker {
-  constructor(
-    private kv: ObserverKv,
-    private sharingDomain: string,
-  ) {}
+  constructor(private kv: ObserverKv, private sharingDomain: string) {}
 
-  #observerKey(id: string): string {
-    return `observer:${id}`;
-  }
+  #observerKey(id: string): string { return `observer:${id}`; }
   #observedCollectionKey(collectionId: string): string {
     return `observedCollection:${collectionId}`;
   }
@@ -46,9 +41,8 @@ export class ContextObserverTracker {
 
   #listTrackedCollections(): string[] {
     let prefix = "observedCollection:";
-    return [...this.kv.list<ObservedCollectionState>({ prefix })].map(([key]) =>
-      key.slice(prefix.length),
-    );
+    return [...this.kv.list<ObservedCollectionState>({ prefix })]
+        .map(([key]) => key.slice(prefix.length));
   }
 
   *#listObservers(): IterableIterator<[string, Fetcher<ContextVerifierApi>]> {
@@ -61,22 +55,19 @@ export class ContextObserverTracker {
   async addObserver(id: string, verifier: Fetcher<ContextVerifierApi>): Promise<void> {
     let checked = new Set<string>();
     while (true) {
-      let collections = this.#listTrackedCollections().filter(
-        (collectionId) => !checked.has(collectionId),
-      );
+      let collections = this.#listTrackedCollections()
+          .filter(collectionId => !checked.has(collectionId));
       if (collections.length === 0) {
         this.kv.put(this.#observerKey(id), verifier);
         return;
       }
-      let access = await Promise.all(
-        collections.map((collectionId) =>
-          verifier.hasCollectionAccess(this.sharingDomain, collectionId),
-        ),
-      );
-      if (access.some((hasAccess) => !hasAccess)) {
+      let access = await Promise.all(collections.map(
+        collectionId => verifier.hasCollectionAccess(this.sharingDomain, collectionId),
+      ));
+      if (access.some(hasAccess => !hasAccess)) {
         throw new Error(
           "This collaborator does not have access to a Context collection whose data this workspace " +
-            "has read, so they cannot be allowed to observe it.",
+          "has read, so they cannot be allowed to observe it.",
         );
       }
       for (let collectionId of collections) checked.add(collectionId);
@@ -88,9 +79,8 @@ export class ContextObserverTracker {
   }
 
   async prepareObservation(collectionIds: string[]): Promise<ContextObservationCheck> {
-    let pendingCollections = [...new Set(collectionIds)].filter(
-      (collectionId) => !this.#isCollectionObserved(collectionId),
-    );
+    let pendingCollections = [...new Set(collectionIds)]
+        .filter(collectionId => !this.#isCollectionObserved(collectionId));
     if (pendingCollections.length === 0) return { pendingCollections, commit() {} };
 
     for (let collectionId of pendingCollections) {
@@ -99,16 +89,12 @@ export class ContextObserverTracker {
       }
     }
 
-    let observerAccess = await Promise.all(
-      [...this.#listObservers()].map(async ([id, verifier]) => {
-        let access = await Promise.all(
-          pendingCollections.map((collectionId) =>
-            verifier.hasCollectionAccess(this.sharingDomain, collectionId),
-          ),
-        );
-        return [id, access.every((hasAccess) => hasAccess)] as const;
-      }),
-    );
+    let observerAccess = await Promise.all([...this.#listObservers()].map(async ([id, verifier]) => {
+      let access = await Promise.all(pendingCollections.map(
+        collectionId => verifier.hasCollectionAccess(this.sharingDomain, collectionId),
+      ));
+      return [id, access.every(hasAccess => hasAccess)] as const;
+    }));
     let excluded = observerAccess.filter(([, hasAccess]) => !hasAccess).map(([id]) => id);
     return {
       excludeObservers: excluded.length > 0 ? excluded : undefined,

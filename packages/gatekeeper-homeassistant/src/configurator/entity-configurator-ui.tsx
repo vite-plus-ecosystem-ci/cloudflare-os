@@ -16,24 +16,16 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return (
-      <Section>
-        <Field
-          label="Entity"
-          description="Choose a single Home Assistant entity (light, sensor, switch, etc)."
-        >
-          <Autocomplete
-            name="entityId"
-            value={values.entityId}
-            placeholder="Search entities..."
-            loadOptions={(query) => ui.listEntities(query)}
-            onChange={(entityId) => setValues({ entityId })}
-          />
-        </Field>
-      </Section>
-    );
+    return <Section>
+      <Field label="Entity" description="Choose a single Home Assistant entity (light, sensor, switch, etc).">
+        <Autocomplete
+          name="entityId"
+          value={values.entityId}
+          placeholder="Search entities..."
+          loadOptions={query => ui.listEntities(query)}
+          onChange={entityId => setValues({ entityId })}
+        />
+      </Field>
+    </Section>;
   },
-} satisfies ConfiguratorUISpec<
-  HomeAssistantEntityConfiguratorRpc,
-  HomeAssistantEntityConfiguratorValues
->;
+} satisfies ConfiguratorUISpec<HomeAssistantEntityConfiguratorRpc, HomeAssistantEntityConfiguratorValues>;

@@ -8,7 +8,7 @@ const CHAT_ATTACHMENT_IMAGE_MAX_EDGE = 1568;
 const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> =>
   new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("Failed to encode image."))),
+      (blob) => blob ? resolve(blob) : reject(new Error("Failed to encode image.")),
       type,
       quality,
     );
@@ -33,20 +33,14 @@ export const prepareChatAttachment = async (
 
   const bitmap = await createImageBitmap(file);
   try {
-    const supportedOriginalType =
-      file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp";
-    if (
-      supportedOriginalType &&
-      file.size <= MAX_CHAT_ATTACHMENT_BYTES &&
-      Math.max(bitmap.width, bitmap.height) <= CHAT_ATTACHMENT_IMAGE_MAX_EDGE
-    ) {
+    const supportedOriginalType = file.type === "image/jpeg" || file.type === "image/png" ||
+      file.type === "image/webp";
+    if (supportedOriginalType && file.size <= MAX_CHAT_ATTACHMENT_BYTES &&
+        Math.max(bitmap.width, bitmap.height) <= CHAT_ATTACHMENT_IMAGE_MAX_EDGE) {
       return { blob: file, mimeType: file.type };
     }
 
-    const scale = Math.min(
-      1,
-      CHAT_ATTACHMENT_IMAGE_MAX_EDGE / Math.max(bitmap.width, bitmap.height),
-    );
+    const scale = Math.min(1, CHAT_ATTACHMENT_IMAGE_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
     const width = Math.max(1, Math.round(bitmap.width * scale));
     const height = Math.max(1, Math.round(bitmap.height * scale));
     const canvas = document.createElement("canvas");

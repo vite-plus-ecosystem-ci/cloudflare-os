@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { getDevServerConfig, getWranglerPortFromBackendHost } from "./dev-server-config.ts";
+import {
+  getDevServerConfig,
+  getWranglerPortFromBackendHost,
+} from "./dev-server-config.ts";
 
 describe("getWranglerPortFromBackendHost", () => {
   it("extracts a port from a localhost backend host", () => {
@@ -18,30 +21,26 @@ describe("getWranglerPortFromBackendHost", () => {
 
   it("rejects invalid ports", () => {
     assert.throws(
-      () => getWranglerPortFromBackendHost("localhost:99999"),
-      /VITE_BACKEND_HOST must include a valid port/,
-    );
+        () => getWranglerPortFromBackendHost("localhost:99999"),
+        /VITE_BACKEND_HOST must include a valid port/);
   });
 
   it("rejects invalid IPv6 ports", () => {
     assert.throws(
-      () => getWranglerPortFromBackendHost("[::1]:99999"),
-      /VITE_BACKEND_HOST must include a valid port/,
-    );
+        () => getWranglerPortFromBackendHost("[::1]:99999"),
+        /VITE_BACKEND_HOST must include a valid port/);
   });
 
   it("rejects port zero", () => {
     assert.throws(
-      () => getWranglerPortFromBackendHost("localhost:0"),
-      /VITE_BACKEND_HOST must include a valid port/,
-    );
+        () => getWranglerPortFromBackendHost("localhost:0"),
+        /VITE_BACKEND_HOST must include a valid port/);
   });
 
   it("rejects invalid hosts", () => {
     assert.throws(
-      () => getWranglerPortFromBackendHost("http://localhost:9000"),
-      /VITE_BACKEND_HOST must include a valid host/,
-    );
+        () => getWranglerPortFromBackendHost("http://localhost:9000"),
+        /VITE_BACKEND_HOST must include a valid host/);
   });
 });
 
@@ -69,10 +68,7 @@ describe("getDevServerConfig", () => {
 
   for (const args of [["--port"], ["--port", "nope"], ["--port=0"], ["--port=65536"]]) {
     it(`rejects invalid arguments: ${args.join(" ")}`, () => {
-      assert.throws(
-        () => getDevServerConfig(args),
-        /--port must be an integer between 1 and 65535/,
-      );
+      assert.throws(() => getDevServerConfig(args), /--port must be an integer between 1 and 65535/);
     });
   }
 });

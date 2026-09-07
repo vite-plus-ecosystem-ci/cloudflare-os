@@ -46,26 +46,15 @@ export interface GitHubClient {
       update(args: PullRequestRef & { state: string }): Promise<unknown>;
     };
     repos: {
-      getCollaboratorPermissionLevel(args: {
-        owner: string;
-        repo: string;
-        username: string;
-      }): Promise<{ data: { permission: string } }>;
+      getCollaboratorPermissionLevel(args: { owner: string; repo: string; username: string }):
+          Promise<{ data: { permission: string } }>;
     };
     issues: {
       listComments: unknown;
-      createComment(args: {
-        owner: string;
-        repo: string;
-        issue_number: number;
-        body: string;
-      }): Promise<unknown>;
-      updateComment(args: {
-        owner: string;
-        repo: string;
-        comment_id: number;
-        body: string;
-      }): Promise<unknown>;
+      createComment(args: { owner: string; repo: string; issue_number: number; body: string }):
+          Promise<unknown>;
+      updateComment(args: { owner: string; repo: string; comment_id: number; body: string }):
+          Promise<unknown>;
     };
   };
   paginate: {
@@ -128,9 +117,9 @@ export function getContributionPolicyViolations(pullRequest: PolicyPullRequest):
   }
 
   const body = pullRequest.body ?? "";
-  const violations = REQUIRED_CONFIRMATIONS.filter(
-    ({ marker }) => !hasCheckedConfirmation(body, marker),
-  ).map(({ violation }) => violation);
+  const violations = REQUIRED_CONFIRMATIONS
+    .filter(({ marker }) => !hasCheckedConfirmation(body, marker))
+    .map(({ violation }) => violation);
   const changedLines = pullRequest.additions + pullRequest.deletions;
 
   if (changedLines > MAX_CHANGED_LINES) {
@@ -149,11 +138,7 @@ export function getContributionPolicyViolations(pullRequest: PolicyPullRequest):
  * @param options GitHub Actions runtime dependencies: the authenticated API client, the event
  *     context, and the logging helper.
  */
-export async function enforceContributionPolicy({
-  github,
-  context,
-  core,
-}: {
+export async function enforceContributionPolicy({ github, context, core }: {
   github: GitHubClient;
   context: ActionsContext;
   core: ActionsCore;

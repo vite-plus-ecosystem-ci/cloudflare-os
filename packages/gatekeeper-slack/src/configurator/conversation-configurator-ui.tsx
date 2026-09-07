@@ -1,7 +1,6 @@
 import { Autocomplete, Field, h, Section, type ConfiguratorUISpec } from "@gadgets/configurator-ui";
 import type {
-  ConversationConfiguratorRpc,
-  ConversationConfiguratorValues,
+  ConversationConfiguratorRpc, ConversationConfiguratorValues,
 } from "./conversation-configurator-types";
 
 export default {
@@ -23,21 +22,19 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return (
-      <Section>
-        <Field
-          label="Conversation"
-          description="Choose a channel or direct message this connection can read."
-        >
-          <Autocomplete
-            name="conversationId"
-            value={values.conversationId}
-            placeholder="Search channels and DMs..."
-            loadOptions={(query) => ui.listConversations(query)}
-            onChange={(conversationId) => setValues({ conversationId })}
-          />
-        </Field>
-      </Section>
-    );
+    return <Section>
+      <Field
+        label="Conversation"
+        description="Choose a channel or direct message this connection can read."
+      >
+        <Autocomplete
+          name="conversationId"
+          value={values.conversationId}
+          placeholder="Search channels and DMs..."
+          loadOptions={query => ui.listConversations(query)}
+          onChange={conversationId => setValues({ conversationId })}
+        />
+      </Field>
+    </Section>;
   },
 } satisfies ConfiguratorUISpec<ConversationConfiguratorRpc, ConversationConfiguratorValues>;
