@@ -6,7 +6,7 @@
 // Runs against a real OverseerDurableObject (the TEST_OVERSEER binding, like
 // observer-scope-restart.test.ts).
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { ObservationDescription } from "@gadgets/workshop-shared/gatekeeper";

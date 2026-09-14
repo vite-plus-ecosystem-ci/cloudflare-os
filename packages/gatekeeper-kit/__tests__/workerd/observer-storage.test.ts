@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 // Exercise verifier-stub persistence, which the cloning Node fake cannot represent.
 function host(name: string) {

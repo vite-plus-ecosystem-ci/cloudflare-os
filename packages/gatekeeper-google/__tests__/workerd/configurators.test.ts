@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AccessTokenRequest } from "../../src/auth-retry";
 import { BigQueryConfiguratorUI, CalendarConfiguratorUI } from "../../src/google-configurators";
 import type { GoogleAccessToken } from "../../src/google-api";

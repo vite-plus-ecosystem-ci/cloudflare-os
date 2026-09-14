@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 // @ts-expect-error node builtin without @types/node
 import { createRequire } from 'node:module'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vite-plus/test'
 import { deserialize, serialize } from 'capnweb'
 import { AUTH_ERROR_CODES, createAuthError } from '@gadgets/workshop-shared/api'
 

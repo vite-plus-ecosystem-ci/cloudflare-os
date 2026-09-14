@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   AGENT_SKILL_CATALOG_MAX_ENTRIES,
   isSkillManifestPath, buildAgentSkillCatalogEntries, buildAgentSkillCommands,

@@ -24,8 +24,8 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test:run": "vitest run",
-    "test:watch": "vitest"
+    "test:run": "vp test run",
+    "test:watch": "vp test"
   },
   "dependencies": {
     "@gadgets/error-reporting": "workspace:*"

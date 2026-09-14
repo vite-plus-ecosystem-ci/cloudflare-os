@@ -15,7 +15,7 @@
 // The version-3 action-index backfill and the version-4 workpiece-type stamp ride the same
 // constructor trigger, so their tests live here too.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { abortAllDurableObjects, runInDurableObject } from "cloudflare:test";
 import type { OverseerDurableObject } from "../src/overseer.js";

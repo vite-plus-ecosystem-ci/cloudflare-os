@@ -8,7 +8,7 @@
 // Runs against a real OverseerDurableObject (the TEST_OVERSEER binding). scheduleAccessRestart is
 // replaced with a recorder: a real ctx.abort() would kill the test DO.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env, RpcStub as NativeRpcStub } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { AiChatAuthorInfo } from "@gadgets/workshop-shared/api";

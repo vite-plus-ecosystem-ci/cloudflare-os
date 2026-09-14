@@ -13,7 +13,7 @@
 // action (held for the owner's approval, so a test that wants it to go through approves it via
 // the overseer).
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type {
   AuthenticatedApi, Overseer, PublicApi,

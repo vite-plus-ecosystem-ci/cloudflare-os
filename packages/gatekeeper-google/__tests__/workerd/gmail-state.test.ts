@@ -1,6 +1,6 @@
 import {env} from "cloudflare:workers";
 import {runInDurableObject} from "cloudflare:test";
-import {describe, expect, it} from "vitest";
+import {describe, expect, it} from "vite-plus/test";
 import {
   applyGmailDraftPatch, canonicalizeGmailMutableLabel, GMAIL_FORWARD_SNAPSHOT_CHUNK_BYTES,
   GmailDraftState, GmailForwardSnapshotReference, gmailDependencyError, gmailDraftFingerprint,

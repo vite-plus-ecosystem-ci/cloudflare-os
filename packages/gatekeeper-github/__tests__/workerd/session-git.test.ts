@@ -10,7 +10,7 @@
 
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import type { ApprovalQueue } from "@gadgets/workshop-shared/gatekeeper";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { GitHubGatekeeperImpl } from "../../src/github";
 import { GitHubPullRequestImpl, GitHubRepoSessionImpl } from "../../src/github";
 import type {

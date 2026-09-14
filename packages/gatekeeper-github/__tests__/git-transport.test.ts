@@ -7,7 +7,7 @@
 // canonical empty pack, report-status parsing, and the push driver's body composition.
 
 import type { GitOid, GitPullHints } from "@gadgets/workshop-shared/gatekeeper";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   DELIM_PKT,
   FLUSH_PKT,

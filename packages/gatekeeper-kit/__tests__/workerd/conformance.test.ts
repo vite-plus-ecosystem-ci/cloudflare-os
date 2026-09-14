@@ -8,7 +8,7 @@
  */
 
 import { env } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { RpcStub } from "cloudflare:workers";
 import type { ConformanceAccount, ConformanceResource } from "./conformance/gatekeeper";
 import {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { AiChatMessage } from "@gadgets/workshop-shared/api";
 import { chatChangeStatuses } from "../src/agent-compaction";
 

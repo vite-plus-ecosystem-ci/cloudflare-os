@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 import { FORCE_RERUN_TRIGGERS, WATCH_PATHS } from "./src/worker-inputs.js";
 
 export default defineConfig({

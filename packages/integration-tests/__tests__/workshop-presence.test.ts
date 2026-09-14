@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { PresenceParticipant, PresenceSubscriber } from "@gadgets/workshop-shared/api";
 import { type Harness, startHarness } from "../src/harness.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";

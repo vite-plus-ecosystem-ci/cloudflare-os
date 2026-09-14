@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { DRIVE_OBSERVATION_PREFIX, driveObserverTracker } from "../src/drive-observers";
 import type { DriveBindingScope } from "../src/drive-session";
 import type { ObserverBatchResult } from "../src/observers";

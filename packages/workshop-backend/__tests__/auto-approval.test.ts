@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import { AutoApprovalDrainer, AutoApprovalStorage, ApplyPendingActionFn }
     from "../src/auto-approval.js";
 import type { ActionRecord } from "../src/overseer.js";

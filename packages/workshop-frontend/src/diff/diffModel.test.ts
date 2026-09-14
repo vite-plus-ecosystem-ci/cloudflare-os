@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import { buildDiffModel, type ChangeRun } from './diffModel'
 
 function run(model: { changes: ChangeRun[] }, index = 0): ChangeRun {

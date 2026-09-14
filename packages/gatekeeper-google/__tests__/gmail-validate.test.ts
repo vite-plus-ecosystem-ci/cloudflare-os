@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   combineGmailQueries, MAX_GMAIL_ADDRESS_BYTES, MAX_GMAIL_BODY_BYTES, MAX_GMAIL_LABEL_BYTES,
   MAX_GMAIL_QUERY_BYTES, MAX_GMAIL_RECIPIENTS, MAX_GMAIL_SUBJECT_BYTES, validateGmailAddress,

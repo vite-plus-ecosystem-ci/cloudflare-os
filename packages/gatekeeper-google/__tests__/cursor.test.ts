@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { CursorPager, DEFAULT_MAX_EMPTY_PAGES } from "../src/cursor";
 import type { CursorPage, CursorPagerOptions } from "../src/cursor";
 

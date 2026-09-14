@@ -6,7 +6,7 @@
 
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { vi } from 'vitest'
+import { vi } from 'vite-plus/test'
 import type { RpcStub } from 'capnweb'
 import type {
   ActionHistoryPage,

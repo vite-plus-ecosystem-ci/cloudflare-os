@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { scriptedChatCompletions } from "../src/mock-model.js";
 
 it("returns scripted OpenAI tool and text responses while recording each request", async () => {

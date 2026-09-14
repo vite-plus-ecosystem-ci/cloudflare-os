@@ -4,7 +4,7 @@
 // These cases stay serial because they replace globalThis.fetch inside one file process. Vitest's
 // default fork pool gives each parallel test file its own process and global state.
 
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it } from "vite-plus/test";
 import { NetworkInterceptor, type Handler } from "../src/network-interceptor.js";
 
 const realFetch = globalThis.fetch;

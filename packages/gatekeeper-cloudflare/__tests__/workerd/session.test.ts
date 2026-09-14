@@ -4,7 +4,7 @@
 
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import type { ApprovalQueue } from "@gadgets/workshop-shared/gatekeeper";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { CloudflareObservabilityApi } from "../../src/observability-api";
 import {
   CloudflareObservabilitySessionImpl,
