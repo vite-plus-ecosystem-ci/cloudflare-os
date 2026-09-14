@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createTypedStorage } from "@gadgets/typed-storage";
 import type { GitPullHints, GitOid } from "@gadgets/workshop-shared/gatekeeper";
 import { makeMockStorage } from "./mock-storage";

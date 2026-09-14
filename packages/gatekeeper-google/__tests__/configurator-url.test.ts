@@ -7,7 +7,7 @@
 // `encodeURIComponent`, a normalization one side does and the other does not -- shows up here
 // rather than as a resource the backend rejects after the user has filled the form.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("@gadgets/configurator-ui", () => ({
   h: (component: unknown, props: unknown, ...children: unknown[]) => ({

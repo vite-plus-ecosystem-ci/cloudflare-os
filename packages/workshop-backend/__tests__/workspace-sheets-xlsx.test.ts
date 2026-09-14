@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { ExportHandler, Gadget } from "../format-blueprints/workspace-sheets/files/server.js";
 import { workbookToXlsx } from "../format-blueprints/workspace-sheets/files/xlsx.js";
 import { createZip, crc32 } from "../format-blueprints/workspace-sheets/files/zip.js";

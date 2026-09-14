@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { GoogleDocsApi, type GoogleDocsTab } from "../src/docs-api";
 import { GoogleSheetsApi } from "../src/sheets-api";
 import { readGoogleJson } from "../src/google-response";

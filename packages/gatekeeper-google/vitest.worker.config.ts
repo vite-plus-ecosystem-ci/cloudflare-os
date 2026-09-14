@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 /** Workerd coverage for Google resource configurators, Gmail sessions, and the Gmail Durable Object. */
 export default defineConfig({

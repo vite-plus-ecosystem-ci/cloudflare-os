@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   DRIVE_FILE_FIELDS, DRIVE_FILE_ITEM_FIELDS, DriveApi, DriveApiDisabledError, DriveApiRequestError,
   buildDriveQuery, escapeDriveQueryLiteral,

@@ -5,7 +5,7 @@
 // with the old account's Worker. This test drives the real `render` against a recording JSX runtime
 // so that omission fails here instead of producing a binding that queries the wrong resource.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("@gadgets/configurator-ui", () => {
   const runtimeComponent = (name: string) => Object.assign(() => undefined, { componentName: name });

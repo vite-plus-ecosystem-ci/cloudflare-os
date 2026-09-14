@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import {
   EVAL_AGENT_BUDGET_MS, EVAL_TEST_TIMEOUT_MS, EVAL_VERIFICATION_BUDGET_MS,
 } from "./budgets.js";

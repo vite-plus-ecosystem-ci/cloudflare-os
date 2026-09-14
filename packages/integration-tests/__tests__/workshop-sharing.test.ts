@@ -1,5 +1,5 @@
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import {
   getOpenGadgetErrorCode, OPEN_GADGET_ERROR_CODES, type AuthenticatedApi, type Overseer,
 } from "@gadgets/workshop-shared/api";

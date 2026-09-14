@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import { z } from "zod";
 import { openAgentSession, type WorkshopAgentSession } from "../src/agent-session.js";
 import {

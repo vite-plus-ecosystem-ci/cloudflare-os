@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { matchesToolQuery, toolQueryTerms } from "../src/tool-search.js";
 

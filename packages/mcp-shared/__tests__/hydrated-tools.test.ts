@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { CATALOG_TTL_MS, HydratedTools } from "../src/catalog.js";
 import type { McpTool } from "../src/client.js";

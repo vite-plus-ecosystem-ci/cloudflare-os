@@ -3,7 +3,7 @@
 // failure as a denial, are both asserted here.
 
 import { env } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 const ACCOUNT_ID = "0123456789abcdef0123456789abcdef";
 const WORKER_PROPS = { userObjectId: "user-1", accountId: ACCOUNT_ID, workerName: "api-worker" };

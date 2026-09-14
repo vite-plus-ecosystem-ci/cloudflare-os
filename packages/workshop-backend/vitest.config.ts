@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Plugin } from 'vite'
-import { defineConfig } from 'vitest/config'
+import type { Plugin } from 'vite-plus'
+import { defineConfig } from 'vite-plus'
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers'
 import capnwebValidate from 'capnweb-validate/vite'
 

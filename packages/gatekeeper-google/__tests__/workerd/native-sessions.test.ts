@@ -3,7 +3,7 @@ import type {
   ActionDescription, ApprovalQueue, GitCache, HookController, HookDescription,
   ObservationDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { GoogleDocsApi } from "../../src/docs-api";
 import { DriveApi } from "../../src/drive-api";
 import { GoogleDriveSessionImpl } from "../../src/google";

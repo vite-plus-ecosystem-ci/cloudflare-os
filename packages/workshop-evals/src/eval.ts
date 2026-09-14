@@ -1,5 +1,5 @@
 import { createJudge, describeEval } from "vitest-evals";
-import { expect } from "vitest";
+import { expect } from "vite-plus/test";
 import { evalMatrix, resolveEvalCommit, resolveEvalModel } from "./config.js";
 import { createWorkshopHarness } from "./harness.js";
 import { taskVersion, type EvalRunInput, type EvalRunOutput, type EvalTask } from "./task.js";

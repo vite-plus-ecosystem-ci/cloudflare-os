@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import type { CodeChangeSubmission } from '@gadgets/workshop-shared/api'
 import { applyCodeChange, transformCodeChange, type CodeContent, type CodeChange }
   from '@gadgets/workshop-shared/code-change'

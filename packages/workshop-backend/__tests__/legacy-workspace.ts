@@ -5,7 +5,7 @@
 // storage) and by the DO-level integration tests (git-migration-do.test.ts, over a real
 // Durable Object's storage).
 
-import { expect } from "vitest";
+import { expect } from "vite-plus/test";
 import * as Y from "yjs";
 import { keyString } from "@gadgets/typed-storage";
 import type {

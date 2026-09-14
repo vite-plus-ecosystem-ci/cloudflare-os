@@ -1,5 +1,5 @@
 import type { AiChatAuthorInfo, AiChatMessage } from "@gadgets/workshop-shared/api";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { measureHistory, toTranscriptEvents } from "./transcript.js";
 
 const user: AiChatAuthorInfo = { type: "user", id: "user", name: "User" };

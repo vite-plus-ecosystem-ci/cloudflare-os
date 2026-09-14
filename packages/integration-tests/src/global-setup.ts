@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { TestProject } from "vitest/node";
+import type { TestProject } from "vite-plus/test/node";
 import { pnpmCommand } from "@gadgets/scripts/pnpm-command";
 import { isWorkerInput } from "./worker-inputs.js";
 

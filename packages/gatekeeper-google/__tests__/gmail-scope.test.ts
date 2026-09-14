@@ -1,4 +1,4 @@
-import {describe, expect, it} from "vitest";
+import {describe, expect, it} from "vite-plus/test";
 import {
   GMAIL_MAILBOX_SCOPE, gmailMessagesAllowedByScope, gmailMutationTarget, gmailRestrictedScope,
   gmailScopeAllowsMessage, groupGmailMessagesByThread,

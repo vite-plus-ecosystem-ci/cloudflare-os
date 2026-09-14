@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 
 import { McpSessionBase, type McpSessionHost, type StoredAction } from "../src/session.js";
 import { MAX_TOOL_NAME_CHARS } from "../src/client.js";

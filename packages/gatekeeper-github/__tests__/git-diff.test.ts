@@ -2,7 +2,7 @@
 // the line-level unified diff whose hunks must match the shape parsePatch produces from GitHub's
 // own patches.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   MAX_DIFF_BLOB_BYTES,
   TreeUnavailableError,

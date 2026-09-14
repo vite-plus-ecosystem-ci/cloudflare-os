@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { ObservationDescription } from "@gadgets/workshop-shared/gatekeeper";
 import { DriveSessionCore, driveFileToEntry } from "../src/drive-session";
 import { DriveApiRequestError, type DriveFile, type DriveListFilesOptions } from "../src/drive-api";

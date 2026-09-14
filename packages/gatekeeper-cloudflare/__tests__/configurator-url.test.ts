@@ -7,7 +7,7 @@
 // the server-side parser. A drift on either side -- a changed path segment, a lost `encodeURIComponent`
 // -- shows up here rather than as a resource the backend rejects after the user has filled the form.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import accountConfigurator from "../src/configurator/cloudflare-account-configurator-ui.js";
 import workerConfigurator from "../src/configurator/cloudflare-worker-configurator-ui.js";
 import {

@@ -1,5 +1,5 @@
 import type { ConfigEnv, UserConfig, UserConfigExport } from 'vite'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vite-plus/test'
 
 vi.mock('vite', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vite')>()

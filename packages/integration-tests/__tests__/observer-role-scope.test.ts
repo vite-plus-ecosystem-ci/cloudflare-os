@@ -10,7 +10,7 @@
 // the shared local harness briefly drop unrelated in-flight requests; their concurrent tests pass
 // with their current timing, but growing either file re-rolls those dice.
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type { AuthenticatedApi, Overseer, PublicApi } from "@gadgets/workshop-shared/api";
 import {
