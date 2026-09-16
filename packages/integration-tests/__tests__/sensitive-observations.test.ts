@@ -13,18 +13,28 @@
 // action (held for the owner's approval, so a test that wants it to go through approves it via
 // the overseer).
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
-import type {
-  AuthenticatedApi, Overseer, PublicApi,
-} from "@gadgets/workshop-shared/api";
+import type { AuthenticatedApi, Overseer, PublicApi } from "@gadgets/workshop-shared/api";
 import {
-  startTestGatekeeperHarness, TEST_GATEKEEPER_WORKER, TEST_VENDOR_ID, type Harness,
+  startTestGatekeeperHarness,
+  TEST_GATEKEEPER_WORKER,
+  TEST_VENDOR_ID,
+  type Harness,
 } from "../src/harness.js";
 import type { TestSession } from "../fixtures/gatekeeper-test/src/test-gatekeeper.js";
 import {
-  accountLabel, connect, listConnectedAccounts, logIn, MAX_OBSERVER_PROMPTS, nextUsernames,
-  ObserverConfigRecorder, signUp, stubFor, waitFor, type ConnectedAccount,
+  accountLabel,
+  connect,
+  listConnectedAccounts,
+  logIn,
+  MAX_OBSERVER_PROMPTS,
+  nextUsernames,
+  ObserverConfigRecorder,
+  signUp,
+  stubFor,
+  waitFor,
+  type ConnectedAccount,
 } from "../src/rpc-client.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 
@@ -62,7 +72,7 @@ async function provisionAccount(api: RpcStub<AuthenticatedApi>): Promise<Connect
   await api.provisionAmbientAccount(TEST_VENDOR_ID);
   return waitFor("the test account to be provisioned", async () => {
     const accounts = await listConnectedAccounts(api);
-    return accounts.find(a => a.vendorId === TEST_VENDOR_ID) ?? null;
+    return accounts.find((a) => a.vendorId === TEST_VENDOR_ID) ?? null;
   });
 }
 
@@ -71,11 +81,15 @@ async function provisionAccount(api: RpcStub<AuthenticatedApi>): Promise<Connect
  * `resourceUrl`) at one bound resource only, which wins over the account-wide outcome.
  */
 async function setVerifyOutcome(
-    label: string, outcome: { allow: true } | { allow: false; reason: string },
-    resourceUrl?: string): Promise<void> {
+  label: string,
+  outcome: { allow: true } | { allow: false; reason: string },
+  resourceUrl?: string,
+): Promise<void> {
   const res = await harness.fetchWorker(
-    TEST_GATEKEEPER_WORKER, "http://gatekeeper-test.test/control/verify-outcome",
-    { method: "POST", body: JSON.stringify({ label, resourceUrl, ...outcome }) });
+    TEST_GATEKEEPER_WORKER,
+    "http://gatekeeper-test.test/control/verify-outcome",
+    { method: "POST", body: JSON.stringify({ label, resourceUrl, ...outcome }) },
+  );
   if (res.status !== 204) {
     throw new Error(`Setting the verify outcome failed with ${res.status}: ${await res.text()}`);
   }
@@ -102,7 +116,7 @@ async function newWorkspace(publicApi: RpcStub<PublicApi>, thingName: string): P
   const gatekeeper = await overseer.newGatekeeper(account.id, thingUrl(thingName));
   if (!gatekeeper) throw new Error("Failed to create the test connection");
   const gatekeeperId = await gatekeeper.getId();
-  const session = await gatekeeper.openSession() as RpcStub<TestSession>;
+  const session = (await gatekeeper.openSession()) as RpcStub<TestSession>;
   const { id: gadgetId } = await overseer.getMetadata();
   return { gadgetId, overseer, alice, aliceApi, session, gatekeeperId };
 }
@@ -123,7 +137,10 @@ async function addBob(publicApi: RpcStub<PublicApi>, ws: Workspace): Promise<Bob
   const collaborator = await ws.overseer.addCollaborator(bob, "build");
   if (!collaborator) throw new Error(`Failed to share the gadget with ${bob}`);
   return {
-    bob, bobProfileId: collaborator.profile.id, bobApi, bobAccount,
+    bob,
+    bobProfileId: collaborator.profile.id,
+    bobApi,
+    bobAccount,
     bobLabel: accountLabel(bobAccount),
   };
 }
@@ -131,11 +148,15 @@ async function addBob(publicApi: RpcStub<PublicApi>, ws: Workspace): Promise<Bob
 // Bob opens the workspace, answering observer prompts with his own account. This is what writes
 // his observer record, i.e. verifies him against every in-scope gatekeeper. Pass a `recorder` to
 // assert *which* connections the open asked him about.
-async function bobOpens(gadgetId: string, bobApi: RpcStub<AuthenticatedApi>,
-                        bobAccount: ConnectedAccount,
-                        recorder?: ObserverConfigRecorder): Promise<RpcStub<Overseer>> {
+async function bobOpens(
+  gadgetId: string,
+  bobApi: RpcStub<AuthenticatedApi>,
+  bobAccount: ConnectedAccount,
+  recorder?: ObserverConfigRecorder,
+): Promise<RpcStub<Overseer>> {
   const callback = stubFor(
-      recorder ?? new ObserverConfigRecorder().alwaysChoose(bobAccount.id, MAX_OBSERVER_PROMPTS));
+    recorder ?? new ObserverConfigRecorder().alwaysChoose(bobAccount.id, MAX_OBSERVER_PROMPTS),
+  );
   try {
     return await bobApi.openGadget(gadgetId, undefined, callback);
   } finally {
@@ -151,13 +172,20 @@ async function bobOpens(gadgetId: string, bobApi: RpcStub<AuthenticatedApi>,
 // dead -- never one about to die -- so a reopen attempted inside the pre-abort window can fully
 // succeed against the doomed instance and then lose its session under the assertions that follow.
 // Hence two steps: watch the pre-restart session die, then reopen with retries.
-async function reopenAfterRestart(ws: Workspace, gatekeeperId = ws.gatekeeperId): Promise<{
+async function reopenAfterRestart(
+  ws: Workspace,
+  gatekeeperId = ws.gatekeeperId,
+): Promise<{
   publicApi: RpcStub<PublicApi>;
   overseer: RpcStub<Overseer>;
   session: RpcStub<TestSession>;
 }> {
   await waitFor("the restart to fell the old workspace instance", () =>
-      ws.session.readValue().then(() => null, () => true));
+    ws.session.readValue().then(
+      () => null,
+      () => true,
+    ),
+  );
 
   return waitFor("the workspace to come back after the restart", async () => {
     const publicApi = connect(harness.url);
@@ -165,7 +193,7 @@ async function reopenAfterRestart(ws: Workspace, gatekeeperId = ws.gatekeeperId)
       const aliceApi = await logIn(publicApi, ws.alice);
       const overseer = await aliceApi.openGadget(ws.gadgetId);
       const gatekeeper = await overseer.getGatekeeperById(gatekeeperId);
-      const session = await gatekeeper.openSession() as RpcStub<TestSession>;
+      const session = (await gatekeeper.openSession()) as RpcStub<TestSession>;
       // Probe with a benign read, so a session felled by the abort retries here rather than
       // failing an assertion below.
       await session.readValue();
@@ -182,7 +210,10 @@ async function reopenAfterRestart(ws: Workspace, gatekeeperId = ws.gatekeeperId)
 // connection, not just its workspace stubs -- so reusing it here would fail on a dead socket
 // rather than exercising the re-verification this asserts.
 async function bobReopens(
-    ws: Workspace, bob: Bob, recorder: ObserverConfigRecorder): Promise<void> {
+  ws: Workspace,
+  bob: Bob,
+  recorder: ObserverConfigRecorder,
+): Promise<void> {
   const publicApi = connect(harness.url);
   try {
     const bobApi = await logIn(publicApi, bob.bob);
@@ -196,7 +227,7 @@ async function bobReopens(
 // close(). What a widening restarts is a live session: a collaborator who is only named in the
 // sharing table, or who opened and left, has nothing to sever -- so a test that expects the
 // restart must have Bob connected when the widening lands.
-type HeldSession = { overseer: RpcStub<Overseer>, close: () => void };
+type HeldSession = { overseer: RpcStub<Overseer>; close: () => void };
 
 async function bobHolds(ws: Workspace, bob: Bob): Promise<HeldSession> {
   const publicApi = connect(harness.url);
@@ -218,7 +249,7 @@ async function bobHolds(ws: Workspace, bob: Bob): Promise<HeldSession> {
 
 describe("sensitive observations", () => {
   it.concurrent("latch restricted mode: actions are blocked and metadata reports it", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "latch");
 
       // Before the latch, actions submit fine -- held for the owner's approval rather than
@@ -243,7 +274,7 @@ describe("sensitive observations", () => {
   });
 
   it.concurrent("an unredeemed share link does not block a sensitive observation", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "unredeemed");
       await ws.overseer.createShareLink("build", "never redeemed");
 
@@ -254,7 +285,7 @@ describe("sensitive observations", () => {
   });
 
   it.concurrent("sharing stays available after the latch", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "share-after");
       await expect(ws.session.readValue(true)).resolves.toBe(42);
 
@@ -272,7 +303,7 @@ describe("sensitive observations", () => {
   });
 
   it.concurrent("an unverified collaborator does not block a sensitive observation", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "unverified");
       const bob = await addBob(publicApi, ws);
 
@@ -284,8 +315,9 @@ describe("sensitive observations", () => {
       // Admission is where the coverage requirement bites: the gatekeeper refuses him, so his
       // open is denied and he never reaches the workspace, let alone the observation.
       await setVerifyOutcome(bob.bobLabel, { allow: false, reason: "You do not have access." });
-      await expect(bobOpens(ws.gadgetId, bob.bobApi, bob.bobAccount))
-          .rejects.toThrow(/could not confirm/i);
+      await expect(bobOpens(ws.gadgetId, bob.bobApi, bob.bobAccount)).rejects.toThrow(
+        /could not confirm/i,
+      );
 
       // His refusal costs the owner nothing: only his open is denied, so nothing was severed and
       // reads keep flowing.
@@ -294,7 +326,7 @@ describe("sensitive observations", () => {
   });
 
   it.concurrent("a verified collaborator allows the sensitive observation through", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "verified");
       const bob = await addBob(publicApi, ws);
       (await bobOpens(ws.gadgetId, bob.bobApi, bob.bobAccount))[Symbol.dispose]();
@@ -303,9 +335,8 @@ describe("sensitive observations", () => {
     });
   });
 
-  it.concurrent("adding a connection restarts the workspace so collaborators re-verify",
-      async () => {
-    await withSession(async publicApi => {
+  it.concurrent("adding a connection restarts the workspace so collaborators re-verify", async () => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "covered");
       const bob = await addBob(publicApi, ws);
 
@@ -318,7 +349,7 @@ describe("sensitive observations", () => {
         // observer check -- and his live session was admitted without it, so adding it severs
         // every session.
         const accounts = await listConnectedAccounts(ws.aliceApi);
-        const account = accounts.find(a => a.vendorId === TEST_VENDOR_ID)!;
+        const account = accounts.find((a) => a.vendorId === TEST_VENDOR_ID)!;
         const late = await ws.overseer.newGatekeeper(account.id, thingUrl("late"));
         if (!late) throw new Error("Failed to create the second test connection");
         lateId = await late.getId();
@@ -333,20 +364,21 @@ describe("sensitive observations", () => {
 
         // ...and Bob's forced re-open is where it gets verified. He is asked about exactly it,
         // since his coverage for the connections that predate it survived.
-        const recorder = new ObserverConfigRecorder()
-            .alwaysChoose(bob.bobAccount.id, MAX_OBSERVER_PROMPTS);
+        const recorder = new ObserverConfigRecorder().alwaysChoose(
+          bob.bobAccount.id,
+          MAX_OBSERVER_PROMPTS,
+        );
         await bobReopens(ws, bob, recorder);
         expect(recorder.callCount).toBe(1);
-        expect(recorder.calls[0].map(need => need.gatekeeperId)).toEqual([lateId]);
+        expect(recorder.calls[0].map((need) => need.gatekeeperId)).toEqual([lateId]);
       } finally {
         reopened.publicApi[Symbol.dispose]();
       }
     });
   });
 
-  it.concurrent("a collaborator can open a workspace that latched before they were added",
-      async () => {
-    await withSession(async publicApi => {
+  it.concurrent("a collaborator can open a workspace that latched before they were added", async () => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "open-after");
       await expect(ws.session.readValue(true)).resolves.toBe(42);
 
@@ -361,9 +393,8 @@ describe("sensitive observations", () => {
     });
   });
 
-  it.concurrent("a collaborator the gatekeeper refuses is denied at open, with its reason",
-      async () => {
-    await withSession(async publicApi => {
+  it.concurrent("a collaborator the gatekeeper refuses is denied at open, with its reason", async () => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "refused");
       await expect(ws.session.readValue(true)).resolves.toBe(42);
 
@@ -374,8 +405,12 @@ describe("sensitive observations", () => {
       // This is the strategy-A shape: enforcement lives in the gatekeeper's addObserver(), so
       // the user sees the gatekeeper's own message.
       const error = await bobOpens(ws.gadgetId, bob.bobApi, bob.bobAccount).then(
-        overseer => { overseer[Symbol.dispose](); return null; },
-        (err: unknown) => err as Error);
+        (overseer) => {
+          overseer[Symbol.dispose]();
+          return null;
+        },
+        (err: unknown) => err as Error,
+      );
       expect(error).not.toBeNull();
       expect(error!.message).toMatch(/could not confirm/i);
       expect(error!.message).toContain(reason);
@@ -383,15 +418,15 @@ describe("sensitive observations", () => {
   });
 
   it.concurrent("a failed re-verification denies that open and nothing else", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "revoked");
       // A second producer, so the test can prove the denial is scoped to the one that refused.
       // Added before Bob, so it widens nobody's scope and restarts nothing.
       const accounts = await listConnectedAccounts(ws.aliceApi);
-      const account = accounts.find(a => a.vendorId === TEST_VENDOR_ID)!;
+      const account = accounts.find((a) => a.vendorId === TEST_VENDOR_ID)!;
       const second = await ws.overseer.newGatekeeper(account.id, thingUrl("revoked-2"));
       if (!second) throw new Error("Failed to create the second test connection");
-      const secondSession = await second.openSession() as RpcStub<TestSession>;
+      const secondSession = (await second.openSession()) as RpcStub<TestSession>;
 
       // Bob verifies against both producers.
       const bob = await addBob(publicApi, ws);
@@ -401,9 +436,13 @@ describe("sensitive observations", () => {
 
       // Bob's access to the first producer's resource is revoked; his next open is denied...
       await setVerifyOutcome(
-          bob.bobLabel, { allow: false, reason: "Access revoked." }, thingUrl("revoked"));
-      await expect(bobOpens(ws.gadgetId, bob.bobApi, bob.bobAccount))
-          .rejects.toThrow(/could not confirm/i);
+        bob.bobLabel,
+        { allow: false, reason: "Access revoked." },
+        thingUrl("revoked"),
+      );
+      await expect(bobOpens(ws.gadgetId, bob.bobApi, bob.bobAccount)).rejects.toThrow(
+        /could not confirm/i,
+      );
 
       // ...and only that open. Nothing is severed and the owner's reads keep flowing through both
       // producers: Bob cannot be admitted again without re-verifying, which is the whole of the
@@ -421,9 +460,8 @@ describe("sensitive observations", () => {
     });
   });
 
-  it.concurrent("a refused share-link recipient persists as a collaborator without blocking reads",
-      async () => {
-    await withSession(async publicApi => {
+  it.concurrent("a refused share-link recipient persists as a collaborator without blocking reads", async () => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "refused-link");
       await expect(ws.session.readValue(true)).resolves.toBe(42);
 
@@ -432,18 +470,23 @@ describe("sensitive observations", () => {
       const [dave] = nextUsernames("dave");
       const daveApi = await signUp(publicApi, dave);
       const daveAccount = await provisionAccount(daveApi);
-      await setVerifyOutcome(
-          accountLabel(daveAccount), { allow: false, reason: "You do not have access." });
+      await setVerifyOutcome(accountLabel(daveAccount), {
+        allow: false,
+        reason: "You do not have access.",
+      });
 
       // Dave's open redeems the key -- writing a real edge -- and observer verification then
       // refuses him. One-step redemption accepts the residue: he persists as an unverified
       // collaborator (see the TODO on redeemShareKey).
-      const recorder =
-          new ObserverConfigRecorder().alwaysChoose(daveAccount.id, MAX_OBSERVER_PROMPTS);
+      const recorder = new ObserverConfigRecorder().alwaysChoose(
+        daveAccount.id,
+        MAX_OBSERVER_PROMPTS,
+      );
       const callback = stubFor(recorder);
       try {
-        await expect(daveApi.openGadget(ws.gadgetId, key, callback))
-            .rejects.toThrow(/could not confirm/i);
+        await expect(daveApi.openGadget(ws.gadgetId, key, callback)).rejects.toThrow(
+          /could not confirm/i,
+        );
       } finally {
         callback[Symbol.dispose]();
       }
@@ -458,7 +501,7 @@ describe("sensitive observations", () => {
   });
 
   it.concurrent("concurrent redemptions of the same key both verify", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "raced");
       const { key } = await ws.overseer.createShareLink("build", "raced");
 
@@ -466,13 +509,15 @@ describe("sensitive observations", () => {
       const daveApi = await signUp(publicApi, dave);
       const daveAccount = await provisionAccount(daveApi);
 
-      const callbacks = [0, 1].map(() => stubFor(
-          new ObserverConfigRecorder().alwaysChoose(daveAccount.id, MAX_OBSERVER_PROMPTS)));
+      const callbacks = [0, 1].map(() =>
+        stubFor(new ObserverConfigRecorder().alwaysChoose(daveAccount.id, MAX_OBSERVER_PROMPTS)),
+      );
       try {
         // Each open redeems the same key; the edges deduplicate, so neither open is turned away
         // and the grants collapse to one edge.
         const overseers = await Promise.all(
-            callbacks.map(cb => daveApi.openGadget(ws.gadgetId, key, cb)));
+          callbacks.map((cb) => daveApi.openGadget(ws.gadgetId, key, cb)),
+        );
         for (const overseer of overseers) overseer[Symbol.dispose]();
       } finally {
         for (const cb of callbacks) cb[Symbol.dispose]();
@@ -485,7 +530,7 @@ describe("sensitive observations", () => {
   });
 
   it.concurrent("removal restarts the workspace and tears down the observer record", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "removal");
       const bob = await addBob(publicApi, ws);
       (await bobOpens(ws.gadgetId, bob.bobApi, bob.bobAccount))[Symbol.dispose]();
@@ -506,10 +551,12 @@ describe("sensitive observations", () => {
         // his coverage: his next open has to name an account for the producer and pass
         // addObserver again.
         await reopened.overseer.addCollaborator(bob.bob, "build");
-        const recorder = new ObserverConfigRecorder()
-            .alwaysChoose(bob.bobAccount.id, MAX_OBSERVER_PROMPTS);
+        const recorder = new ObserverConfigRecorder().alwaysChoose(
+          bob.bobAccount.id,
+          MAX_OBSERVER_PROMPTS,
+        );
         await bobReopens(ws, bob, recorder);
-        expect(recorder.calls[0].map(need => need.gatekeeperId)).toContain(ws.gatekeeperId);
+        expect(recorder.calls[0].map((need) => need.gatekeeperId)).toContain(ws.gatekeeperId);
       } finally {
         reopened.publicApi[Symbol.dispose]();
       }

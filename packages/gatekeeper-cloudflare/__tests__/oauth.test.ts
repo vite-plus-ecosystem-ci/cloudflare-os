@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   buildAuthorizeUrl,
   exchangeCode,
@@ -20,10 +20,13 @@ const config: CloudflareOAuthConfig = {
 /** Captures the single request `redeem` makes, so the tests can assert on how the code is redeemed. */
 function captureRedeem(payload: Record<string, unknown>) {
   const calls: Array<{ url: string; init: RequestInit }> = [];
-  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-    calls.push({ url: String(input), init: init ?? {} });
-    return Response.json(payload);
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(input), init: init ?? {} });
+      return Response.json(payload);
+    }),
+  );
   return calls;
 }
 
@@ -86,7 +89,10 @@ describe("Cloudflare OAuth", () => {
   });
 
   it("returns null rather than a token on a rejected redemption", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 401 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("nope", { status: 401 })),
+    );
 
     expect(await exchangeCode(config, "code", "verifier")).toBeNull();
   });
@@ -105,7 +111,9 @@ describe("Cloudflare OAuth", () => {
     expect(challenge).toMatch(/^[\w-]+$/);
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
     const expected = btoa(String.fromCharCode(...new Uint8Array(digest)))
-      .replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+      .replaceAll("+", "-")
+      .replaceAll("/", "_")
+      .replace(/=+$/, "");
     expect(challenge).toBe(expected);
   });
 

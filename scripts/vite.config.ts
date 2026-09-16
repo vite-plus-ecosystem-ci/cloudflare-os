@@ -26,6 +26,7 @@
 import { TESTS_WITH_TIMEOUT_ENV, withTestTimeout } from "./vitest-task-vite-config.ts";
 
 export default {
+  test: { clearMocks: false },
   run: {
     tasks: {
       test: {

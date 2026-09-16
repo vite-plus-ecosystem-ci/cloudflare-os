@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "preview": "vite preview",
+    "dev": "vp dev",
+    "preview": "vp preview",
     "clean": "rm -rf dist",
-    "test:run": "vitest run"
+    "test:run": "vp test run"
   },
   "dependencies": {
     "@cloudflare/kumo": "^2.13.2",

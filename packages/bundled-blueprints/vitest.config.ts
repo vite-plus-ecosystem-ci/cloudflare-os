@@ -1,6 +1,6 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -20,14 +20,15 @@ const here = dirname(fileURLToPath(import.meta.url));
  */
 export default defineConfig({
   test: {
+    clearMocks: false,
+    sharedViteServer: false,
     projects: [
       {
+        extends: false,
         test: {
+          clearMocks: false,
           name: "gadgets",
-          include: [
-            "blueprints/*/__tests__/**/*.test.ts",
-            "libraries/*/__tests__/**/*.test.ts",
-          ],
+          include: ["blueprints/*/__tests__/**/*.test.ts", "libraries/*/__tests__/**/*.test.ts"],
           environment: "jsdom",
         },
         resolve: {
@@ -40,7 +41,9 @@ export default defineConfig({
         },
       },
       {
+        extends: false,
         test: {
+          clearMocks: false,
           name: "build",
           include: ["__tests__/**/*.test.ts"],
           environment: "node",

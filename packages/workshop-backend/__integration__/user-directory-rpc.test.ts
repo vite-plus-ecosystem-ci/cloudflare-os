@@ -2,15 +2,19 @@ import { createExecutionContext } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { newWebSocketRpcSession, type RpcStub } from "capnweb";
 import type { PublicApi } from "@gadgets/workshop-shared/api";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import server from "../src/server";
 
 const PASSWORD_HASH = new Uint8Array([1, 2, 3]);
 
 async function connect(): Promise<RpcStub<PublicApi>> {
-  const response = await server.fetch(new Request("https://workshop.invalid/api", {
-    headers: { Upgrade: "websocket" },
-  }), env, createExecutionContext());
+  const response = await server.fetch(
+    new Request("https://workshop.invalid/api", {
+      headers: { Upgrade: "websocket" },
+    }),
+    env,
+    createExecutionContext(),
+  );
   expect(response.status).toBe(101);
   const socket = response.webSocket;
   if (!socket) throw new TypeError("Expected a WebSocket response.");
@@ -19,7 +23,9 @@ async function connect(): Promise<RpcStub<PublicApi>> {
 }
 
 async function createAccount(
-    publicApi: RpcStub<PublicApi>, prefix: string, displayName: string,
+  publicApi: RpcStub<PublicApi>,
+  prefix: string,
+  displayName: string,
 ): Promise<{ username: string; token: string }> {
   const name = prefix + crypto.randomUUID().replaceAll("-", "");
   const token = await publicApi.createAccount(name, displayName, PASSWORD_HASH);
@@ -45,17 +51,17 @@ describe("authenticated user directory RPC", () => {
     await expect(viewerApi.searchUsers("target bef", [])).resolves.toEqual([]);
     using targetApi = await publicApi.authenticate(target.token);
     // The sync is fire-and-forget from the user DO, so the record lands shortly after the call.
-    await expect.poll(() => viewerApi.searchUsers("target bef", [])).toEqual([
-      { id: target.username, name: "Directory Target Before" },
-    ]);
+    await expect
+      .poll(() => viewerApi.searchUsers("target bef", []))
+      .toEqual([{ id: target.username, name: "Directory Target Before" }]);
     // The authenticated caller is always excluded, and callers can exclude more users.
     await expect(viewerApi.searchUsers("directory viewer", [])).resolves.toEqual([]);
     await expect(viewerApi.searchUsers("target bef", [target.username])).resolves.toEqual([]);
 
     await targetApi.setOwnDisplayName("Directory Target After");
-    await expect.poll(() => viewerApi.searchUsers("target aft", [])).toEqual([
-      { id: target.username, name: "Directory Target After" },
-    ]);
+    await expect
+      .poll(() => viewerApi.searchUsers("target aft", []))
+      .toEqual([{ id: target.username, name: "Directory Target After" }]);
     await expect(viewerApi.searchUsers("target bef", [])).resolves.toEqual([]);
   });
 

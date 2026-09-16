@@ -1,8 +1,17 @@
-import { expect, expectTypeOf, it, describe } from "vitest"
-import { createTypedStorage, collection, singleton, Singleton, SingletonSchema, UniqueIndex,
-         NonUniqueIndex }
-    from "../src/index.js";
-import { DurableObjectListOptions, DurableObjectStorage } from "@cloudflare/workers-types/experimental";
+import { expect, expectTypeOf, it, describe } from "vite-plus/test";
+import {
+  createTypedStorage,
+  collection,
+  singleton,
+  Singleton,
+  SingletonSchema,
+  UniqueIndex,
+  NonUniqueIndex,
+} from "../src/index.js";
+import {
+  DurableObjectListOptions,
+  DurableObjectStorage,
+} from "@cloudflare/workers-types/experimental";
 
 // We mock out DurableObjectStorage becaues otherwise we'd have to run the tests inside a
 // Durable Object which is a bit of a trek.
@@ -29,13 +38,15 @@ function makeMockStorage(): DurableObjectStorage {
         return structuredClone(map.get(key));
       },
       *list<T = unknown>(options: DurableObjectListOptions = {}): Iterable<[string, T]> {
-        let results: {key: string, value: any}[] = [];
+        let results: { key: string; value: any }[] = [];
         for (let [key, value] of map) {
-          if (   (options.prefix     === undefined || key.startsWith(options.prefix))
-              && (options.start      === undefined || key >= options.start)
-              && (options.startAfter === undefined || key > options.startAfter)
-              && (options.end        === undefined || key < options.end)) {
-            results.push({key, value});
+          if (
+            (options.prefix === undefined || key.startsWith(options.prefix)) &&
+            (options.start === undefined || key >= options.start) &&
+            (options.startAfter === undefined || key > options.startAfter) &&
+            (options.end === undefined || key < options.end)
+          ) {
+            results.push({ key, value });
           }
         }
 
@@ -64,8 +75,9 @@ function makeMockStorage(): DurableObjectStorage {
           // The real kv.list() only allows one outstanding cursor at a time, so emulate that here.
           if (currentList !== me) {
             throw new Error(
-                "kv.list() iterator was invalidated because a new call to kv.list() was sarted. " +
-                "Only one kv.list() iterator can exist at a time.");
+              "kv.list() iterator was invalidated because a new call to kv.list() was sarted. " +
+                "Only one kv.list() iterator can exist at a time.",
+            );
           }
         }
 
@@ -76,8 +88,8 @@ function makeMockStorage(): DurableObjectStorage {
       },
       delete(key: string): boolean {
         return map.delete(key);
-      }
-    }
+      },
+    },
   };
 }
 
@@ -87,7 +99,7 @@ describe("singletons", () => {
       singletons: {
         counter: 0,
         name: "Alice",
-      }
+      },
     });
 
     expect(storage.counter.get()).toStrictEqual(0);
@@ -109,14 +121,14 @@ describe("singletons", () => {
       singletons: {
         counter: 0,
         name: "Alice",
-      }
+      },
     });
 
     let subscriber = {
       lastValue: -1,
       update(value: number) {
         this.lastValue = value;
-      }
+      },
     };
     storage.counter.subscribe(subscriber);
 
@@ -145,7 +157,7 @@ describe("singletons", () => {
     let storage = createTypedStorage(mockStorage, {
       singletons: {
         counter: singleton(0),
-      }
+      },
     });
 
     storage.counter.put(123);
@@ -162,8 +174,8 @@ describe("singletons", () => {
 
     let storage = createTypedStorage(mockStorage, {
       singletons: {
-        newName: singleton(0, {storageKey: "oldName"}),
-      }
+        newName: singleton(0, { storageKey: "oldName" }),
+      },
     });
 
     expect(storage.newName.get()).toStrictEqual(42);
@@ -179,8 +191,8 @@ describe("singletons", () => {
     let mockStorage = makeMockStorage();
     let storage = createTypedStorage(mockStorage, {
       singletons: {
-        newName: singleton(false, {storageKey: "oldName"}),
-      }
+        newName: singleton(false, { storageKey: "oldName" }),
+      },
     });
 
     expect(storage.newName.get()).toStrictEqual(false);
@@ -194,15 +206,15 @@ describe("singletons", () => {
     let mockStorage = makeMockStorage();
     let storage = createTypedStorage(mockStorage, {
       singletons: {
-        newName: singleton(0, {storageKey: "oldName"}),
-      }
+        newName: singleton(0, { storageKey: "oldName" }),
+      },
     });
 
     let subscriber = {
       lastValue: -1,
       update(value: number) {
         this.lastValue = value;
-      }
+      },
     };
     storage.newName.subscribe(subscriber);
 
@@ -217,9 +229,9 @@ describe("singletons", () => {
       singletons: {
         bareNull: <string | null>null,
         bareUndefined: <string | undefined>undefined,
-        optNull: singleton(<string | null>null, {storageKey: "legacyNull"}),
-        optUndefined: singleton(<string | undefined>undefined, {storageKey: "legacyUndefined"}),
-      }
+        optNull: singleton(<string | null>null, { storageKey: "legacyNull" }),
+        optUndefined: singleton(<string | undefined>undefined, { storageKey: "legacyUndefined" }),
+      },
     });
 
     expectTypeOf(storage.optNull).toEqualTypeOf<Singleton<string | null>>();
@@ -236,49 +248,59 @@ describe("singletons", () => {
 
   it("rejects two singletons resolving to the same storage key", () => {
     // Two explicit keys.
-    expect(() => createTypedStorage(makeMockStorage(), {
-      singletons: {
-        a: singleton(0, {storageKey: "shared"}),
-        b: singleton(0, {storageKey: "shared"}),
-      }
-    })).toThrow('Two singletons resolve to the same storage key "shared".');
+    expect(() =>
+      createTypedStorage(makeMockStorage(), {
+        singletons: {
+          a: singleton(0, { storageKey: "shared" }),
+          b: singleton(0, { storageKey: "shared" }),
+        },
+      }),
+    ).toThrow('Two singletons resolve to the same storage key "shared".');
 
     // An explicit key colliding with another slot's default (property-name) key, in either order.
-    expect(() => createTypedStorage(makeMockStorage(), {
-      singletons: {
-        a: singleton(0, {storageKey: "b"}),
-        b: 0,
-      }
-    })).toThrow('Two singletons resolve to the same storage key "b".');
-    expect(() => createTypedStorage(makeMockStorage(), {
-      singletons: {
-        b: 0,
-        a: singleton(0, {storageKey: "b"}),
-      }
-    })).toThrow('Two singletons resolve to the same storage key "b".');
+    expect(() =>
+      createTypedStorage(makeMockStorage(), {
+        singletons: {
+          a: singleton(0, { storageKey: "b" }),
+          b: 0,
+        },
+      }),
+    ).toThrow('Two singletons resolve to the same storage key "b".');
+    expect(() =>
+      createTypedStorage(makeMockStorage(), {
+        singletons: {
+          b: 0,
+          a: singleton(0, { storageKey: "b" }),
+        },
+      }),
+    ).toThrow('Two singletons resolve to the same storage key "b".');
   });
 
   it("rejects a storage key containing a namespace delimiter", () => {
     // `users:alice` is exactly where collection `users` stores record `alice`; an exact-name
     // check would never notice, so the delimiters themselves are refused.
-    expect(() => createTypedStorage(makeMockStorage(), {
-      collections: {users: collection<User>()({primaryKey: "name"})},
-      singletons: {alias: singleton(0, {storageKey: "users:alice"})},
-    })).toThrow('Singleton storage key "users:alice" must not contain "." or ":"');
-    expect(() => createTypedStorage(makeMockStorage(), {
-      singletons: {alias: singleton(0, {storageKey: "users.byUid"})},
-    })).toThrow('Singleton storage key "users.byUid" must not contain "." or ":"');
+    expect(() =>
+      createTypedStorage(makeMockStorage(), {
+        collections: { users: collection<User>()({ primaryKey: "name" }) },
+        singletons: { alias: singleton(0, { storageKey: "users:alice" }) },
+      }),
+    ).toThrow('Singleton storage key "users:alice" must not contain "." or ":"');
+    expect(() =>
+      createTypedStorage(makeMockStorage(), {
+        singletons: { alias: singleton(0, { storageKey: "users.byUid" }) },
+      }),
+    ).toThrow('Singleton storage key "users.byUid" must not contain "." or ":"');
   });
 
   it("types a bare default shaped like a schema as the object, not its defaultValue", () => {
     // `SingletonSchema` is nominal: an object literal with the same public fields is a bare
     // default at runtime, and must be one at the type level too, or `get()` would be typed as
     // returning `number` while actually returning the object.
-    let lookalike = {defaultValue: 1, options: {}};
+    let lookalike = { defaultValue: 1, options: {} };
     let storage = createTypedStorage(makeMockStorage(), {
       singletons: {
         slot: lookalike,
-      }
+      },
     });
 
     expectTypeOf(storage.slot).toEqualTypeOf<Singleton<typeof lookalike>>();
@@ -293,7 +315,7 @@ describe("singletons", () => {
     let storage = createTypedStorage(makeMockStorage(), {
       singletons: {
         slot: either,
-      }
+      },
     });
 
     expectTypeOf(storage.slot).toEqualTypeOf<Singleton<number | string>>();
@@ -310,13 +332,13 @@ describe("collections with a legacy storage name", () => {
           storageName: "users",
           primaryKey: "name",
           uniqueIndexes: {
-            byUid: (user: User) => user.uid
+            byUid: (user: User) => user.uid,
           },
           nonUniqueIndexes: {
-            byLevel: (user: User) => user.level
-          }
-        })
-      }
+            byLevel: (user: User) => user.level,
+          },
+        }),
+      },
     });
 
     storage.people.put(ALICE);
@@ -328,60 +350,70 @@ describe("collections with a legacy storage name", () => {
     // Every key -- the record and both indexes -- lives under the legacy name, so a collection
     // renamed in code reads data written before the rename.
     let keys = [...mockStorage.kv.list({})].map(([key]) => key);
-    expect(keys.some(key => key.startsWith("users:"))).toStrictEqual(true);
-    expect(keys.some(key => key.startsWith("users.byUid:"))).toStrictEqual(true);
-    expect(keys.some(key => key.startsWith("users.byLevel:"))).toStrictEqual(true);
-    expect(keys.some(key => key.startsWith("people"))).toStrictEqual(false);
+    expect(keys.some((key) => key.startsWith("users:"))).toStrictEqual(true);
+    expect(keys.some((key) => key.startsWith("users.byUid:"))).toStrictEqual(true);
+    expect(keys.some((key) => key.startsWith("users.byLevel:"))).toStrictEqual(true);
+    expect(keys.some((key) => key.startsWith("people"))).toStrictEqual(false);
   });
 
   it("rejects two collections resolving to the same storage name", () => {
     // Two explicit names.
-    expect(() => createTypedStorage(makeMockStorage(), {
-      collections: {
-        a: collection<User>()({storageName: "shared", primaryKey: "name"}),
-        b: collection<User>()({storageName: "shared", primaryKey: "name"}),
-      }
-    })).toThrow('Two collections resolve to the same storage name "shared".');
+    expect(() =>
+      createTypedStorage(makeMockStorage(), {
+        collections: {
+          a: collection<User>()({ storageName: "shared", primaryKey: "name" }),
+          b: collection<User>()({ storageName: "shared", primaryKey: "name" }),
+        },
+      }),
+    ).toThrow('Two collections resolve to the same storage name "shared".');
 
     // An explicit name colliding with another collection's default (property) name, either order.
-    expect(() => createTypedStorage(makeMockStorage(), {
-      collections: {
-        a: collection<User>()({storageName: "b", primaryKey: "name"}),
-        b: collection<User>()({primaryKey: "name"}),
-      }
-    })).toThrow('Two collections resolve to the same storage name "b".');
-    expect(() => createTypedStorage(makeMockStorage(), {
-      collections: {
-        b: collection<User>()({primaryKey: "name"}),
-        a: collection<User>()({storageName: "b", primaryKey: "name"}),
-      }
-    })).toThrow('Two collections resolve to the same storage name "b".');
+    expect(() =>
+      createTypedStorage(makeMockStorage(), {
+        collections: {
+          a: collection<User>()({ storageName: "b", primaryKey: "name" }),
+          b: collection<User>()({ primaryKey: "name" }),
+        },
+      }),
+    ).toThrow('Two collections resolve to the same storage name "b".');
+    expect(() =>
+      createTypedStorage(makeMockStorage(), {
+        collections: {
+          b: collection<User>()({ primaryKey: "name" }),
+          a: collection<User>()({ storageName: "b", primaryKey: "name" }),
+        },
+      }),
+    ).toThrow('Two collections resolve to the same storage name "b".');
   });
 
   it("rejects a storage name containing a namespace delimiter", () => {
     // `users.byUid` is exactly the prefix of collection `users`'s `byUid` index; an exact-name
     // check would never notice, so the delimiters themselves are refused.
-    expect(() => createTypedStorage(makeMockStorage(), {
-      collections: {
-        users: collection<User>()({
-          primaryKey: "name",
-          uniqueIndexes: {byUid: (user: User) => user.uid},
-        }),
-        alias: collection<User>()({storageName: "users.byUid", primaryKey: "name"}),
-      }
-    })).toThrow('Collection storage name "users.byUid" must not contain "." or ":"');
-    expect(() => createTypedStorage(makeMockStorage(), {
-      collections: {
-        alias: collection<User>()({storageName: "users:alice", primaryKey: "name"}),
-      }
-    })).toThrow('Collection storage name "users:alice" must not contain "." or ":"');
+    expect(() =>
+      createTypedStorage(makeMockStorage(), {
+        collections: {
+          users: collection<User>()({
+            primaryKey: "name",
+            uniqueIndexes: { byUid: (user: User) => user.uid },
+          }),
+          alias: collection<User>()({ storageName: "users.byUid", primaryKey: "name" }),
+        },
+      }),
+    ).toThrow('Collection storage name "users.byUid" must not contain "." or ":"');
+    expect(() =>
+      createTypedStorage(makeMockStorage(), {
+        collections: {
+          alias: collection<User>()({ storageName: "users:alice", primaryKey: "name" }),
+        },
+      }),
+    ).toThrow('Collection storage name "users:alice" must not contain "." or ":"');
   });
 });
 
 type User = {
   uid: number;
   name: string;
-  level: number,
+  level: number;
   emails: string[];
   groups: string[];
 };
@@ -398,21 +430,21 @@ let BOB: User = {
   name: "bob",
   level: 4,
   emails: ["bob@example.com", "robert@example.com"],
-  groups: ["everyone"]
+  groups: ["everyone"],
 };
 let CAROL: User = {
   uid: 2,
   name: "carol",
   level: 8,
   emails: [],
-  groups: ["everyone", "admin"]
+  groups: ["everyone", "admin"],
 };
 let DAVE: User = {
   uid: 17,
   name: "dave",
   level: 1,
   emails: ["dave@example.com", "david@example.com"],
-  groups: ["everyone","interns"]
+  groups: ["everyone", "interns"],
 };
 
 // User that should never show up in the index being tested.
@@ -421,7 +453,7 @@ let EVE: User = {
   name: "eve",
   level: 0,
   emails: [],
-  groups: []
+  groups: [],
 };
 
 // Schemas shared by the non-unique-index suites: users indexed by level, and the same collection
@@ -431,23 +463,23 @@ const INDEXED_SCHEMA = {
     users: collection<User>()({
       primaryKey: "name",
       nonUniqueIndexes: {
-        byLevel: (user: User) => user.level == 0 ? null : user.level
-      }
-    })
-  }
+        byLevel: (user: User) => (user.level == 0 ? null : user.level),
+      },
+    }),
+  },
 };
 const PLAIN_SCHEMA = {
-  collections: { users: collection<User>()({ primaryKey: "name" }) }
+  collections: { users: collection<User>()({ primaryKey: "name" }) },
 };
 const GROUP_SCHEMA = {
   collections: {
     users: collection<User>()({
       primaryKey: "name",
       nonUniqueIndexes: {
-        byGroup: (user: User) => user.groups
-      }
-    })
-  }
+        byGroup: (user: User) => user.groups,
+      },
+    }),
+  },
 };
 
 describe("basic collections with string primary key", () => {
@@ -455,9 +487,9 @@ describe("basic collections with string primary key", () => {
   let storage = createTypedStorage(mockStorage, {
     collections: {
       users: collection<User>()({
-        primaryKey: "name"
-      })
-    }
+        primaryKey: "name",
+      }),
+    },
   });
 
   expect([...storage.users.list()]).toStrictEqual([]);
@@ -471,10 +503,10 @@ describe("basic collections with string primary key", () => {
   });
 
   it("stores with primary keys erased", () => {
-    expect(mockStorage.kv.get("users:alice")).toStrictEqual({...ALICE, name: null});
-    expect(mockStorage.kv.get("users:bob")).toStrictEqual({...BOB, name: null});
-    expect(mockStorage.kv.get("users:carol")).toStrictEqual({...CAROL, name: null});
-    expect(mockStorage.kv.get("users:dave")).toStrictEqual({...DAVE, name: null});
+    expect(mockStorage.kv.get("users:alice")).toStrictEqual({ ...ALICE, name: null });
+    expect(mockStorage.kv.get("users:bob")).toStrictEqual({ ...BOB, name: null });
+    expect(mockStorage.kv.get("users:carol")).toStrictEqual({ ...CAROL, name: null });
+    expect(mockStorage.kv.get("users:dave")).toStrictEqual({ ...DAVE, name: null });
   });
 
   testByName(storage.users);
@@ -492,15 +524,15 @@ function testByName(index: Pick<UniqueIndex<User, string>, "get" | "list" | "del
 
   it("supports list", () => {
     expect([...index.list()]).toStrictEqual([ALICE, BOB, CAROL, DAVE]);
-    expect([...index.list({reverse: true})]).toStrictEqual([DAVE, CAROL, BOB, ALICE]);
+    expect([...index.list({ reverse: true })]).toStrictEqual([DAVE, CAROL, BOB, ALICE]);
 
-    expect([...index.list({prefix: "b"})]).toStrictEqual([BOB]);
-    expect([...index.list({start: "bob"})]).toStrictEqual([BOB, CAROL, DAVE]);
-    expect([...index.list({startAfter: "bob"})]).toStrictEqual([CAROL, DAVE]);
-    expect([...index.list({end: "carol"})]).toStrictEqual([ALICE, BOB]);
-    expect([...index.list({start: "bob", end: "dave"})]).toStrictEqual([BOB, CAROL]);
-    expect([...index.list({limit: 3})]).toStrictEqual([ALICE, BOB, CAROL]);
-    expect([...index.list({limit: 3, reverse: true})]).toStrictEqual([DAVE, CAROL, BOB]);
+    expect([...index.list({ prefix: "b" })]).toStrictEqual([BOB]);
+    expect([...index.list({ start: "bob" })]).toStrictEqual([BOB, CAROL, DAVE]);
+    expect([...index.list({ startAfter: "bob" })]).toStrictEqual([CAROL, DAVE]);
+    expect([...index.list({ end: "carol" })]).toStrictEqual([ALICE, BOB]);
+    expect([...index.list({ start: "bob", end: "dave" })]).toStrictEqual([BOB, CAROL]);
+    expect([...index.list({ limit: 3 })]).toStrictEqual([ALICE, BOB, CAROL]);
+    expect([...index.list({ limit: 3, reverse: true })]).toStrictEqual([DAVE, CAROL, BOB]);
   });
 
   it("supports delete", () => {
@@ -517,9 +549,9 @@ describe("basic collections with integer primary key", () => {
   let storage = createTypedStorage(mockStorage, {
     collections: {
       users: collection<User>()({
-        primaryKey: "uid"
-      })
-    }
+        primaryKey: "uid",
+      }),
+    },
   });
 
   expect([...storage.users.list()]).toStrictEqual([]);
@@ -554,14 +586,14 @@ function testByNumber(index: Pick<UniqueIndex<User, number>, "get" | "list" | "d
 
   it("supports list", () => {
     expect([...index.list()]).toStrictEqual([CAROL, DAVE, ALICE, BOB]);
-    expect([...index.list({reverse: true})]).toStrictEqual([BOB, ALICE, DAVE, CAROL]);
+    expect([...index.list({ reverse: true })]).toStrictEqual([BOB, ALICE, DAVE, CAROL]);
 
-    expect([...index.list({start: DAVE.uid})]).toStrictEqual([DAVE, ALICE, BOB]);
-    expect([...index.list({startAfter: DAVE.uid})]).toStrictEqual([ALICE, BOB]);
-    expect([...index.list({end: ALICE.uid})]).toStrictEqual([CAROL, DAVE]);
-    expect([...index.list({start: DAVE.uid, end: BOB.uid})]).toStrictEqual([DAVE, ALICE]);
-    expect([...index.list({limit: 3})]).toStrictEqual([CAROL, DAVE, ALICE]);
-    expect([...index.list({limit: 3, reverse: true})]).toStrictEqual([BOB, ALICE, DAVE]);
+    expect([...index.list({ start: DAVE.uid })]).toStrictEqual([DAVE, ALICE, BOB]);
+    expect([...index.list({ startAfter: DAVE.uid })]).toStrictEqual([ALICE, BOB]);
+    expect([...index.list({ end: ALICE.uid })]).toStrictEqual([CAROL, DAVE]);
+    expect([...index.list({ start: DAVE.uid, end: BOB.uid })]).toStrictEqual([DAVE, ALICE]);
+    expect([...index.list({ limit: 3 })]).toStrictEqual([CAROL, DAVE, ALICE]);
+    expect([...index.list({ limit: 3, reverse: true })]).toStrictEqual([BOB, ALICE, DAVE]);
   });
 
   it("supports delete", () => {
@@ -578,9 +610,9 @@ describe("basic collections with function primary key", () => {
   let storage = createTypedStorage(mockStorage, {
     collections: {
       users: collection<User>()({
-        primaryKey: (user: User) => user.name.toUpperCase()
-      })
-    }
+        primaryKey: (user: User) => user.name.toUpperCase(),
+      }),
+    },
   });
 
   expect([...storage.users.list()]).toStrictEqual([]);
@@ -594,10 +626,10 @@ describe("basic collections with function primary key", () => {
   });
 
   it("stores with primary keys intact", () => {
-    expect(mockStorage.kv.get("users:ALICE")).toStrictEqual({...ALICE});
-    expect(mockStorage.kv.get("users:BOB")).toStrictEqual({...BOB});
-    expect(mockStorage.kv.get("users:CAROL")).toStrictEqual({...CAROL});
-    expect(mockStorage.kv.get("users:DAVE")).toStrictEqual({...DAVE});
+    expect(mockStorage.kv.get("users:ALICE")).toStrictEqual({ ...ALICE });
+    expect(mockStorage.kv.get("users:BOB")).toStrictEqual({ ...BOB });
+    expect(mockStorage.kv.get("users:CAROL")).toStrictEqual({ ...CAROL });
+    expect(mockStorage.kv.get("users:DAVE")).toStrictEqual({ ...DAVE });
   });
 
   it("supports various ops", () => {
@@ -605,10 +637,10 @@ describe("basic collections with function primary key", () => {
     expect(storage.users.get("alice")).toStrictEqual(undefined);
 
     expect([...storage.users.list()]).toStrictEqual([ALICE, BOB, CAROL, DAVE]);
-    expect([...storage.users.list({reverse: true})]).toStrictEqual([DAVE, CAROL, BOB, ALICE]);
+    expect([...storage.users.list({ reverse: true })]).toStrictEqual([DAVE, CAROL, BOB, ALICE]);
 
-    expect([...storage.users.list({prefix: "b"})]).toStrictEqual([]);
-    expect([...storage.users.list({prefix: "B"})]).toStrictEqual([BOB]);
+    expect([...storage.users.list({ prefix: "b" })]).toStrictEqual([]);
+    expect([...storage.users.list({ prefix: "B" })]).toStrictEqual([BOB]);
 
     expect(storage.users.delete("CAROL")).toStrictEqual(true);
     expect(storage.users.delete("CAROL")).toStrictEqual(false);
@@ -623,12 +655,12 @@ describe("unique index by string", () => {
   let storage = createTypedStorage(mockStorage, {
     collections: {
       users: collection<User>()({
-        primaryKey: "uid",  // primary key different from index
+        primaryKey: "uid", // primary key different from index
         uniqueIndexes: {
-          byName: (user: User) => user.name === "eve" ? null : user.name,
-        }
-      })
-    }
+          byName: (user: User) => (user.name === "eve" ? null : user.name),
+        },
+      }),
+    },
   });
 
   expect([...storage.users.byName.list()]).toStrictEqual([]);
@@ -645,7 +677,7 @@ describe("unique index by string", () => {
   testByName(storage.users.byName);
 
   it("supports updating a record to change the key", () => {
-    let ROBERT = {...BOB, name: "robert"};
+    let ROBERT = { ...BOB, name: "robert" };
     storage.users.put(ROBERT);
     expect(storage.users.byName.get("bob")).toStrictEqual(undefined);
     expect(storage.users.byName.get("robert")).toStrictEqual(ROBERT);
@@ -653,9 +685,10 @@ describe("unique index by string", () => {
   });
 
   it("throws on conflict", () => {
-    let DAVE2 = {...DAVE, name: "alice"};
+    let DAVE2 = { ...DAVE, name: "alice" };
     expect(() => storage.users.put(DAVE2)).toThrow(
-        new Error("Update conflicts with record '45' in 'users.byName'."));
+      new Error("Update conflicts with record '45' in 'users.byName'."),
+    );
     expect(storage.users.byName.get("dave")).toStrictEqual(DAVE);
     expect(storage.users.byName.get("alice")).toStrictEqual(ALICE);
   });
@@ -666,12 +699,12 @@ describe("unique index by number", () => {
   let storage = createTypedStorage(mockStorage, {
     collections: {
       users: collection<User>()({
-        primaryKey: "name",  // primary key different from index
+        primaryKey: "name", // primary key different from index
         uniqueIndexes: {
-          byUid: (user: User) => user.uid === 404 ? null : user.uid
-        }
-      })
-    }
+          byUid: (user: User) => (user.uid === 404 ? null : user.uid),
+        },
+      }),
+    },
   });
 
   expect([...storage.users.byUid.list()]).toStrictEqual([]);
@@ -688,7 +721,7 @@ describe("unique index by number", () => {
   testByNumber(storage.users.byUid);
 
   it("supports updating a record to change the key", () => {
-    let BOB500 = {...BOB, uid: 500};
+    let BOB500 = { ...BOB, uid: 500 };
     storage.users.put(BOB500);
     expect(storage.users.byUid.get(BOB.uid)).toStrictEqual(undefined);
     expect(storage.users.byUid.get(500)).toStrictEqual(BOB500);
@@ -696,9 +729,10 @@ describe("unique index by number", () => {
   });
 
   it("throws on conflict", () => {
-    let CAROL2 = {...CAROL, uid: DAVE.uid};
+    let CAROL2 = { ...CAROL, uid: DAVE.uid };
     expect(() => storage.users.put(CAROL2)).toThrow(
-        new Error("Update conflicts with record 'dave' in 'users.byUid'."));
+      new Error("Update conflicts with record 'dave' in 'users.byUid'."),
+    );
     expect(storage.users.byUid.get(CAROL.uid)).toStrictEqual(CAROL);
     expect(storage.users.byUid.get(DAVE.uid)).toStrictEqual(DAVE);
   });
@@ -711,10 +745,10 @@ describe("unique index by array", () => {
       users: collection<User>()({
         primaryKey: "name",
         uniqueIndexes: {
-          byEmail: (user: User) => user.emails
-        }
-      })
-    }
+          byEmail: (user: User) => user.emails,
+        },
+      }),
+    },
   });
 
   expect([...storage.users.byEmail.list()]).toStrictEqual([]);
@@ -730,23 +764,23 @@ describe("unique index by array", () => {
     expect(index.get("alice@example.com")).toStrictEqual(ALICE);
     expect(index.get("bob@example.com")).toStrictEqual(BOB);
     expect(index.get("robert@example.com")).toStrictEqual(BOB);
-    expect(index.get("carol@example.com")).toStrictEqual(undefined);  // CAROL has no email
+    expect(index.get("carol@example.com")).toStrictEqual(undefined); // CAROL has no email
     expect(index.get("dave@example.com")).toStrictEqual(DAVE);
     expect(index.get("david@example.com")).toStrictEqual(DAVE);
   });
 
   it("supports list", () => {
-    expect([...index.list({dedupe: true})]).toStrictEqual([ALICE, BOB, DAVE]);
+    expect([...index.list({ dedupe: true })]).toStrictEqual([ALICE, BOB, DAVE]);
     expect([...index.list()]).toStrictEqual([ALICE, BOB, DAVE, DAVE, BOB]);
 
-    expect([...index.list({prefix: "dav"})]).toStrictEqual([DAVE, DAVE]);
-    expect([...index.list({prefix: "dav", dedupe: true})]).toStrictEqual([DAVE]);
+    expect([...index.list({ prefix: "dav" })]).toStrictEqual([DAVE, DAVE]);
+    expect([...index.list({ prefix: "dav", dedupe: true })]).toStrictEqual([DAVE]);
 
-    expect([...index.list({start: "b", end: "e"})]).toStrictEqual([BOB, DAVE, DAVE]);
-    expect([...index.list({start: "b", end: "davf"})]).toStrictEqual([BOB, DAVE]);
+    expect([...index.list({ start: "b", end: "e" })]).toStrictEqual([BOB, DAVE, DAVE]);
+    expect([...index.list({ start: "b", end: "davf" })]).toStrictEqual([BOB, DAVE]);
 
-    expect([...index.list({limit: 3})]).toStrictEqual([ALICE, BOB, DAVE]);
-    expect([...index.list({limit: 3, reverse: true})]).toStrictEqual([BOB, DAVE, DAVE]);
+    expect([...index.list({ limit: 3 })]).toStrictEqual([ALICE, BOB, DAVE]);
+    expect([...index.list({ limit: 3, reverse: true })]).toStrictEqual([BOB, DAVE, DAVE]);
   });
 
   it("supports delete", () => {
@@ -758,17 +792,18 @@ describe("unique index by array", () => {
     expect([...index.list()]).toStrictEqual([ALICE, DAVE, DAVE]);
   });
 
-  let DAVE2 = {...DAVE, emails: ["dave@example.com"]};
+  let DAVE2 = { ...DAVE, emails: ["dave@example.com"] };
   it("supports updating a record to change the key", () => {
     storage.users.put(DAVE2);
     expect(storage.users.byEmail.get("dave@example.com")).toStrictEqual(DAVE2);
     expect(storage.users.byEmail.get("david@example.com")).toStrictEqual(undefined);
   });
 
-  let DAVE3 = {...DAVE, emails: ["dave@example.com", "alice@example.com"]};
+  let DAVE3 = { ...DAVE, emails: ["dave@example.com", "alice@example.com"] };
   it("throws on conflict", () => {
     expect(() => storage.users.put(DAVE3)).toThrow(
-        new Error("Update conflicts with record 'alice' in 'users.byEmail'."));
+      new Error("Update conflicts with record 'alice' in 'users.byEmail'."),
+    );
     expect(storage.users.byEmail.get("dave@example.com")).toStrictEqual(DAVE2);
     expect(storage.users.byEmail.get("alice@example.com")).toStrictEqual(ALICE);
   });
@@ -797,14 +832,14 @@ describe("non-unique index by number", () => {
 
   it("supports list", () => {
     expect([...index.list()]).toStrictEqual([DAVE, BOB, ALICE, CAROL]);
-    expect([...index.list({reverse: true})]).toStrictEqual([CAROL, ALICE, BOB, DAVE]);
+    expect([...index.list({ reverse: true })]).toStrictEqual([CAROL, ALICE, BOB, DAVE]);
 
-    expect([...index.list({start: 4})]).toStrictEqual([BOB, ALICE, CAROL]);
-    expect([...index.list({startAfter: 4})]).toStrictEqual([ALICE, CAROL]);
-    expect([...index.list({end: 8})]).toStrictEqual([DAVE, BOB]);
-    expect([...index.list({start: 4, end: 8})]).toStrictEqual([BOB]);
-    expect([...index.list({limit: 2})]).toStrictEqual([DAVE, BOB]);
-    expect([...index.list({limit: 2, reverse: true})]).toStrictEqual([CAROL, ALICE, BOB]);
+    expect([...index.list({ start: 4 })]).toStrictEqual([BOB, ALICE, CAROL]);
+    expect([...index.list({ startAfter: 4 })]).toStrictEqual([ALICE, CAROL]);
+    expect([...index.list({ end: 8 })]).toStrictEqual([DAVE, BOB]);
+    expect([...index.list({ start: 4, end: 8 })]).toStrictEqual([BOB]);
+    expect([...index.list({ limit: 2 })]).toStrictEqual([DAVE, BOB]);
+    expect([...index.list({ limit: 2, reverse: true })]).toStrictEqual([CAROL, ALICE, BOB]);
   });
 
   it("supports delete", () => {
@@ -823,10 +858,10 @@ describe("non-unique index by array", () => {
       users: collection<User>()({
         primaryKey: "name",
         nonUniqueIndexes: {
-          byGroup: (user: User) => user.groups
-        }
-      })
-    }
+          byGroup: (user: User) => user.groups,
+        },
+      }),
+    },
   });
 
   expect([...storage.users.byGroup.list()]).toStrictEqual([]);
@@ -848,17 +883,29 @@ describe("non-unique index by array", () => {
 
   it("supports list", () => {
     expect([...index.list()]).toStrictEqual([ALICE, CAROL, ALICE, BOB, CAROL, DAVE, DAVE]);
-    expect([...index.list({dedupe: true})]).toStrictEqual([ALICE, CAROL, BOB, DAVE]);
-    expect([...index.list({reverse: true})]).toStrictEqual(
-        [DAVE, DAVE, CAROL, BOB, ALICE, CAROL, ALICE]);
+    expect([...index.list({ dedupe: true })]).toStrictEqual([ALICE, CAROL, BOB, DAVE]);
+    expect([...index.list({ reverse: true })]).toStrictEqual([
+      DAVE,
+      DAVE,
+      CAROL,
+      BOB,
+      ALICE,
+      CAROL,
+      ALICE,
+    ]);
 
-    expect([...index.list({start: "everyone"})]).toStrictEqual([ALICE, BOB, CAROL, DAVE, DAVE]);
-    expect([...index.list({startAfter: "everyone"})]).toStrictEqual([DAVE]);
-    expect([...index.list({end: "everyone"})]).toStrictEqual([ALICE, CAROL]);
-    expect([...index.list({start: "e", end: "f"})]).toStrictEqual([ALICE, BOB, CAROL, DAVE]);
-    expect([...index.list({limit: 2})]).toStrictEqual([ALICE, CAROL, ALICE, BOB, CAROL, DAVE]);
-    expect([...index.list({limit: 2, reverse: true})]).toStrictEqual(
-        [DAVE, DAVE, CAROL, BOB, ALICE]);
+    expect([...index.list({ start: "everyone" })]).toStrictEqual([ALICE, BOB, CAROL, DAVE, DAVE]);
+    expect([...index.list({ startAfter: "everyone" })]).toStrictEqual([DAVE]);
+    expect([...index.list({ end: "everyone" })]).toStrictEqual([ALICE, CAROL]);
+    expect([...index.list({ start: "e", end: "f" })]).toStrictEqual([ALICE, BOB, CAROL, DAVE]);
+    expect([...index.list({ limit: 2 })]).toStrictEqual([ALICE, CAROL, ALICE, BOB, CAROL, DAVE]);
+    expect([...index.list({ limit: 2, reverse: true })]).toStrictEqual([
+      DAVE,
+      DAVE,
+      CAROL,
+      BOB,
+      ALICE,
+    ]);
   });
 
   it("supports delete", () => {
@@ -884,14 +931,14 @@ describe("non-unique index rebuild", () => {
     // Declared over pre-existing records, the index starts empty -- and resolving one of those
     // records would throw on the index's remove.
     expect([...storage.users.byLevel.list()]).toStrictEqual([]);
-    expect(() => storage.users.put({...ALICE, level: 0})).toThrow("inconsistent");
+    expect(() => storage.users.put({ ...ALICE, level: 0 })).toThrow("inconsistent");
 
     storage.users.byLevel.rebuild();
     expect([...storage.users.byLevel.list()]).toStrictEqual([BOB, ALICE, CAROL]);
     expect([...storage.users.byLevel.get(8)]).toStrictEqual([ALICE, CAROL]);
 
     // Writes after the rebuild keep the index consistent, including key removal.
-    storage.users.put({...ALICE, level: 0});
+    storage.users.put({ ...ALICE, level: 0 });
     expect([...storage.users.byLevel.list()]).toStrictEqual([BOB, CAROL]);
   });
 
@@ -901,7 +948,7 @@ describe("non-unique index rebuild", () => {
     legacy.users.put(ALICE);
     legacy.users.put(BOB);
     legacy.users.put(DAVE);
-    legacy.users.put(EVE);  // no groups: unindexed
+    legacy.users.put(EVE); // no groups: unindexed
 
     let storage = createTypedStorage(mockStorage, GROUP_SCHEMA);
     storage.users.byGroup.rebuild();
@@ -909,19 +956,21 @@ describe("non-unique index rebuild", () => {
     expect([...storage.users.byGroup.get("everyone")]).toStrictEqual([ALICE, BOB, DAVE]);
     expect([...storage.users.byGroup.get("admin")]).toStrictEqual([ALICE]);
     expect([...storage.users.byGroup.get("interns")]).toStrictEqual([DAVE]);
-    expect([...storage.users.byGroup.list({dedupe: true})]).toStrictEqual([ALICE, BOB, DAVE]);
+    expect([...storage.users.byGroup.list({ dedupe: true })]).toStrictEqual([ALICE, BOB, DAVE]);
   });
 
   it("reclaims orphaned child rows and never reuses child-group ids", () => {
     let mockStorage = makeMockStorage();
     let storage = createTypedStorage(mockStorage, INDEXED_SCHEMA);
-    storage.users.put(ALICE);  // level 8
-    storage.users.put(BOB);    // level 4
+    storage.users.put(ALICE); // level 8
+    storage.users.put(BOB); // level 4
 
     // A child row whose parent key vanished (e.g. a partially-applied wipe): unreachable from
     // the parent keys, but still swept by rebuild's raw-range deleteAll.
     mockStorage.kv.put("users.byLevel.999:zombie", {});
-    let preIds = new Set([...mockStorage.kv.list({prefix: "users.byLevel:"})].map(([, id]) => id));
+    let preIds = new Set(
+      [...mockStorage.kv.list({ prefix: "users.byLevel:" })].map(([, id]) => id),
+    );
     let counterBefore = mockStorage.kv.get<number>("users.byLevel#")!;
 
     storage.users.byLevel.rebuild();
@@ -929,7 +978,7 @@ describe("non-unique index rebuild", () => {
     expect(mockStorage.kv.get("users.byLevel.999:zombie")).toStrictEqual(undefined);
     // The unique-id counter survives the wipe, so the rebuilt groups get fresh ids.
     expect(mockStorage.kv.get<number>("users.byLevel#")).toBeGreaterThanOrEqual(counterBefore);
-    for (let [, id] of mockStorage.kv.list({prefix: "users.byLevel:"})) {
+    for (let [, id] of mockStorage.kv.list({ prefix: "users.byLevel:" })) {
       expect(preIds.has(id)).toStrictEqual(false);
     }
     expect([...storage.users.byLevel.list()]).toStrictEqual([BOB, ALICE]);
@@ -958,10 +1007,10 @@ describe("unique index rebuild", () => {
       users: collection<User>()({
         primaryKey: "name",
         uniqueIndexes: {
-          byUid: (user: User) => user.uid === 404 ? null : user.uid
-        }
-      })
-    }
+          byUid: (user: User) => (user.uid === 404 ? null : user.uid),
+        },
+      }),
+    },
   };
 
   it("backfills an index declared after records were written", () => {
@@ -976,24 +1025,24 @@ describe("unique index rebuild", () => {
     // Declared over pre-existing records, the index starts empty -- and changing one of those
     // records' keys would throw on the index's remove.
     expect(storage.users.byUid.get(ALICE.uid)).toStrictEqual(undefined);
-    expect(() => storage.users.put({...ALICE, uid: 46})).toThrow("inconsistent");
+    expect(() => storage.users.put({ ...ALICE, uid: 46 })).toThrow("inconsistent");
 
     storage.users.byUid.rebuild();
     expect(storage.users.byUid.get(ALICE.uid)).toStrictEqual(ALICE);
     expect(storage.users.byUid.get(BOB.uid)).toStrictEqual(BOB);
-    expect(storage.users.byUid.get(EVE.uid)).toStrictEqual(undefined);  // null-keyed, unindexed
+    expect(storage.users.byUid.get(EVE.uid)).toStrictEqual(undefined); // null-keyed, unindexed
 
     // Writes after the rebuild keep the index consistent, including key changes.
-    storage.users.put({...ALICE, uid: 46});
+    storage.users.put({ ...ALICE, uid: 46 });
     expect(storage.users.byUid.get(ALICE.uid)).toStrictEqual(undefined);
-    expect(storage.users.byUid.get(46)).toStrictEqual({...ALICE, uid: 46});
+    expect(storage.users.byUid.get(46)).toStrictEqual({ ...ALICE, uid: 46 });
   });
 
   it("throws when two records derive the same key, leaving no partial index", () => {
     let mockStorage = makeMockStorage();
     let legacy = createTypedStorage(mockStorage, PLAIN_SCHEMA);
     legacy.users.put(ALICE);
-    legacy.users.put({...BOB, uid: ALICE.uid});
+    legacy.users.put({ ...BOB, uid: ALICE.uid });
 
     let storage = createTypedStorage(mockStorage, UNIQUE_SCHEMA);
     expect(() => storage.users.byUid.rebuild()).toThrow("conflicts");
@@ -1013,37 +1062,39 @@ describe("non-unique index ranged get", () => {
     storage.users.put(ALICE);
 
     let index = storage.users.byGroup;
-    expect([...index.get("everyone", {start: "bob"})]).toStrictEqual([BOB, CAROL, DAVE]);
-    expect([...index.get("everyone", {startAfter: "bob"})]).toStrictEqual([CAROL, DAVE]);
-    expect([...index.get("everyone", {end: "carol"})]).toStrictEqual([ALICE, BOB]);
-    expect([...index.get("everyone", {limit: 2})]).toStrictEqual([ALICE, BOB]);
-    expect([...index.get("everyone", {reverse: true})]).toStrictEqual([DAVE, CAROL, BOB, ALICE]);
-    expect([...index.get("admin", {reverse: true, limit: 1})]).toStrictEqual([CAROL]);
-    expect([...index.get("nobody", {limit: 2})]).toStrictEqual([]);
+    expect([...index.get("everyone", { start: "bob" })]).toStrictEqual([BOB, CAROL, DAVE]);
+    expect([...index.get("everyone", { startAfter: "bob" })]).toStrictEqual([CAROL, DAVE]);
+    expect([...index.get("everyone", { end: "carol" })]).toStrictEqual([ALICE, BOB]);
+    expect([...index.get("everyone", { limit: 2 })]).toStrictEqual([ALICE, BOB]);
+    expect([...index.get("everyone", { reverse: true })]).toStrictEqual([DAVE, CAROL, BOB, ALICE]);
+    expect([...index.get("admin", { reverse: true, limit: 1 })]).toStrictEqual([CAROL]);
+    expect([...index.get("nobody", { limit: 2 })]).toStrictEqual([]);
   });
 
   it("pages a numeric-pk group descending with an exclusive end", () => {
-    type Row = {id: number, group: string};
+    type Row = { id: number; group: string };
     let storage = createTypedStorage(makeMockStorage(), {
       collections: {
         rows: collection<Row>()({
           primaryKey: "id",
           nonUniqueIndexes: {
-            byGroup: (row: Row) => row.group
-          }
-        })
-      }
+            byGroup: (row: Row) => row.group,
+          },
+        }),
+      },
     });
     for (let id = 0; id < 7; id++) {
-      storage.rows.put({id, group: id % 2 === 0 ? "even" : "odd"});
+      storage.rows.put({ id, group: id % 2 === 0 ? "even" : "odd" });
     }
 
     // The cursored-history shape: a newest-first page strictly below the cursor.
     let index = storage.rows.byGroup;
-    expect([...index.get("even", {end: 6, reverse: true, limit: 2})].map(r => r.id))
-        .toStrictEqual([4, 2]);
-    expect([...index.get("even", {reverse: true, limit: 2})].map(r => r.id))
-        .toStrictEqual([6, 4]);
-    expect([...index.get("even", {end: 2})].map(r => r.id)).toStrictEqual([0]);
+    expect(
+      [...index.get("even", { end: 6, reverse: true, limit: 2 })].map((r) => r.id),
+    ).toStrictEqual([4, 2]);
+    expect([...index.get("even", { reverse: true, limit: 2 })].map((r) => r.id)).toStrictEqual([
+      6, 4,
+    ]);
+    expect([...index.get("even", { end: 2 })].map((r) => r.id)).toStrictEqual([0]);
   });
 });

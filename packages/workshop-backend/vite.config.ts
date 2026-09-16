@@ -1,13 +1,12 @@
 // Vite+ per-package settings. The `test` task definition is shared by every package whose tests run
 // under vitest and ships as `@gadgets/scripts/vitest-task`.
-import {
-  TESTS_WITH_TIMEOUT_ENV, vitestTask, withTestTimeout,
-} from '@gadgets/scripts/vitest-task'
+import { TESTS_WITH_TIMEOUT_ENV, vitestTask, withTestTimeout } from "@gadgets/scripts/vitest-task";
 
 /**
  * Codegen steps stay separate commands rather than one `&&` string so each caches on its own.
  */
 export default {
+  test: { clearMocks: false },
   run: {
     tasks: {
       /**
@@ -23,12 +22,12 @@ export default {
        * The generator itself, and the blueprints it bundles by default, are `@gadgets/bundled-blueprints`;
        * the script here is the command line around it, because the module it writes is this package's.
        */
-      'build:bundled-blueprints': {
-        command: 'node scripts/build-bundled-blueprints.ts',
+      "build:bundled-blueprints": {
+        command: "node scripts/build-bundled-blueprints.ts",
         cache: false,
       },
-      'build:browser-runtime': {
-        command: withTestTimeout('node build-browser-runtime.mjs'),
+      "build:browser-runtime": {
+        command: withTestTimeout("node build-browser-runtime.mjs"),
         cache: false,
       },
       /**
@@ -52,14 +51,16 @@ export default {
        * is the guard: if capnweb-validate ever starts reading an ambient var, it fails there rather
        * than replaying a stale tree. The watchdog's own off switch is the one variable declared.
        */
-      'build:integration-worker': {
-        command: withTestTimeout('capnweb-validate build --out .wrangler/validate'),
+      "build:integration-worker": {
+        command: withTestTimeout("capnweb-validate build --out .wrangler/validate"),
         env: TESTS_WITH_TIMEOUT_ENV,
         dependsOn: [
-          '@gadgets/typed-storage#build', 'build:bundled-blueprints', 'build:browser-runtime',
+          "@gadgets/typed-storage#build",
+          "build:bundled-blueprints",
+          "build:browser-runtime",
         ],
-        input: [{ auto: true }, { pattern: '!**/.wrangler/**', base: 'workspace' }],
-        output: ['.wrangler/validate/**'],
+        input: [{ auto: true }, { pattern: "!**/.wrangler/**", base: "workspace" }],
+        output: [".wrangler/validate/**"],
       },
       /**
        * Two programs: this package's `src/` under its generated Workers types, and `browser/` under
@@ -67,11 +68,8 @@ export default {
        * own `build`, not here -- a gadget's Durable Object must not see this Worker's bindings.
        */
       build: {
-        command: [
-          'tsc',
-          'tsc --project tsconfig.browser.json',
-        ],
-        dependsOn: ['build:bundled-blueprints', 'build:browser-runtime'],
+        command: ["tsc", "tsc --project tsconfig.browser.json"],
+        dependsOn: ["build:bundled-blueprints", "build:browser-runtime"],
         cache: false,
       },
       /**
@@ -84,13 +82,15 @@ export default {
        */
       test: {
         ...vitestTask([
-          { command: 'vitest run', idleSeconds: 120 },
-          'vitest run --config vitest.integration.config.ts',
+          { command: "vitest run", idleSeconds: 120 },
+          "vitest run --config vitest.integration.config.ts",
         ]),
         dependsOn: [
-          '@gadgets/typed-storage#build', 'build:bundled-blueprints', 'build:browser-runtime',
+          "@gadgets/typed-storage#build",
+          "build:bundled-blueprints",
+          "build:browser-runtime",
         ],
       },
     },
   },
-}
+};

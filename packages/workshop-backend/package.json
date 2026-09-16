@@ -8,9 +8,9 @@
     "deploy": "wrangler deploy",
     "build:worker": "node build-browser-runtime.mjs && pnpm exec capnweb-validate build --out .wrangler/validate",
     "clean": "rm -rf dist",
-    "test:integration": "node build-browser-runtime.mjs && node scripts/build-bundled-blueprints.ts && vitest run --config vitest.integration.config.ts",
-    "test:run": "node build-browser-runtime.mjs && node scripts/build-bundled-blueprints.ts && vitest run && vitest run --config vitest.integration.config.ts",
-    "test:watch": "node build-browser-runtime.mjs && node scripts/build-bundled-blueprints.ts && vitest",
+    "test:integration": "node build-browser-runtime.mjs && node scripts/build-bundled-blueprints.ts && vp test run --config vitest.integration.config.ts",
+    "test:run": "node build-browser-runtime.mjs && node scripts/build-bundled-blueprints.ts && vp test run && vp test run --config vitest.integration.config.ts",
+    "test:watch": "node build-browser-runtime.mjs && node scripts/build-bundled-blueprints.ts && vp test",
     "import:bundled-blueprint": "node scripts/import-bundled-blueprint.ts"
   },
   "dependencies": {

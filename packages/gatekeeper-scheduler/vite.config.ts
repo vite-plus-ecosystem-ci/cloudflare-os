@@ -6,6 +6,7 @@ import { vitestTask } from "@gadgets/scripts/vitest-task";
  * Vite+ reads per-package settings only from `vite.config.*`, so the two cannot share a file.
  */
 export default defineConfig({
+  test: { clearMocks: false },
   run: {
     tasks: {
       // Shared by every package whose tests run under vitest; see the module for why the two

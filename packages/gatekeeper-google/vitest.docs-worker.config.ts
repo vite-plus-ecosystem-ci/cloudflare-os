@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 /** Workerd coverage for nested Drive sessions and the Google Doc Durable Object. */
 export default defineConfig({
@@ -22,6 +22,7 @@ export default defineConfig({
     }),
   ],
   test: {
+    clearMocks: false,
     include: [
       "__tests__/workerd/google-doc-actions.test.ts",
       "__tests__/workerd/native-sessions.test.ts",
