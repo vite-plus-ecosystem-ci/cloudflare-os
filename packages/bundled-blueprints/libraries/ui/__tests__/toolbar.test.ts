@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { ICONS } from "../src/icons.ts";
 import { colorBtn, customSelect, group, iconBtn, segBtn } from "../src/toolbar.ts";
@@ -60,7 +60,11 @@ describe("group", () => {
     const b = iconBtn(ICONS.redo, "Redo", () => {});
     const node = group("p2", [a, b]);
     expect(node.className).toBe("tgroup p2");
-    expect(Array.from(node.children).map((child) => child.className)).toEqual(["tdiv", "icon-btn", "icon-btn"]);
+    expect(Array.from(node.children).map((child) => child.className)).toEqual([
+      "tdiv",
+      "icon-btn",
+      "icon-btn",
+    ]);
     expect(node.children[1]).toBe(a);
   });
 
@@ -78,7 +82,11 @@ describe("colorBtn", () => {
     const button = colorBtn(ICONS.textcolor, "Text color", "#1d1d20", onChange);
     expect(button.className).toBe("color-btn");
     expect(button.title).toBe("Text color");
-    const [iconHost, bar, input] = Array.from(button.children) as [HTMLElement, HTMLElement, HTMLInputElement];
+    const [iconHost, bar, input] = Array.from(button.children) as [
+      HTMLElement,
+      HTMLElement,
+      HTMLInputElement,
+    ];
     expect(iconHost.querySelector("svg")).not.toBeNull();
     expect(bar.className).toBe("bar");
     expect(bar.style.background).toBe("rgb(29, 29, 32)");
@@ -102,7 +110,13 @@ describe("customSelect", () => {
   ];
 
   it("shows the current label and marks the item selected", () => {
-    const select = customSelect({ className: "style-sel", title: "Paragraph style", options, value: "H1", onChange: () => {} });
+    const select = customSelect({
+      className: "style-sel",
+      title: "Paragraph style",
+      options,
+      value: "H1",
+      onChange: () => {},
+    });
     expect(select.el.tagName).toBe("BUTTON");
     expect(select.el.type).toBe("button");
     expect(select.el.className).toBe("cselect style-sel");
@@ -115,7 +129,17 @@ describe("customSelect", () => {
   it("opens a positioned menu on the body and closes it again", () => {
     const select = customSelect({ options, value: "P", onChange: () => {} });
     document.body.appendChild(select.el);
-    vi.spyOn(select.el, "getBoundingClientRect").mockReturnValue({ left: 10.4, bottom: 30, width: 100.6, top: 0, right: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) });
+    vi.spyOn(select.el, "getBoundingClientRect").mockReturnValue({
+      left: 10.4,
+      bottom: 30,
+      width: 100.6,
+      top: 0,
+      right: 0,
+      height: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
     select.el.click();
     const menu = document.body.querySelector(".cmenu") as HTMLElement;
     expect(menu).not.toBeNull();
@@ -125,7 +149,11 @@ describe("customSelect", () => {
     expect(menu.style.minWidth).toBe("101px");
 
     const items = Array.from(menu.querySelectorAll(".cmenu-item"));
-    expect(items.map((item) => item.textContent)).toEqual(["Normal text", "Heading 1", "Code blockmono"]);
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Normal text",
+      "Heading 1",
+      "Code blockmono",
+    ]);
     expect(items[0]!.classList.contains("sel")).toBe(true);
     expect((items[1] as HTMLElement).style.fontWeight).toBe("700");
     expect(items[2]!.querySelector(".ex")!.textContent).toBe("mono");
@@ -192,7 +220,11 @@ describe("customSelect", () => {
     document.body.appendChild(select.el);
     select.el.click();
     const items = Array.from(document.body.querySelectorAll(".cmenu-item"));
-    expect(items.filter((item) => item.classList.contains("sel")).map((item) => (item as HTMLElement).dataset.value)).toEqual(["16"]);
+    expect(
+      items
+        .filter((item) => item.classList.contains("sel"))
+        .map((item) => (item as HTMLElement).dataset.value),
+    ).toEqual(["16"]);
 
     (items[3] as HTMLElement).click();
     expect(onChange).toHaveBeenCalledWith("18");
@@ -200,11 +232,19 @@ describe("customSelect", () => {
     select.setValue(11);
     expect(select.el.querySelector(".cs-label")!.textContent).toBe("11");
     select.el.click();
-    expect(Array.from(document.body.querySelectorAll(".cmenu-item.sel")).map((item) => (item as HTMLElement).dataset.value)).toEqual(["11"]);
+    expect(
+      Array.from(document.body.querySelectorAll(".cmenu-item.sel")).map(
+        (item) => (item as HTMLElement).dataset.value,
+      ),
+    ).toEqual(["11"]);
   });
 
   it("shows the first choice's label for a value no option carries, selecting nothing", () => {
-    const select = customSelect({ options: [{ sep: true }, ...options], value: "nope", onChange: () => {} });
+    const select = customSelect({
+      options: [{ sep: true }, ...options],
+      value: "nope",
+      onChange: () => {},
+    });
     expect(select.getValue()).toBe("nope");
     expect(select.el.querySelector(".cs-label")!.textContent).toBe("Normal text");
     document.body.appendChild(select.el);

@@ -1,5 +1,5 @@
 import { abortAllDurableObjects, env } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { googleDocActionTab } from "../../src/google";
 
 /** Every write coordinate names the tab it applies to; tab bodies index independently. */
@@ -51,8 +51,10 @@ class DocsModel {
   readonly #held = new Map<BatchKind, { reach: () => void; released: Promise<void> }>();
 
   install(): void {
-    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request, init?: RequestInit) =>
-      this.fetch(input, init)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL | Request, init?: RequestInit) => this.fetch(input, init)),
+    );
   }
 
   addMarker(name: string, id: string, tabId = MAIN_TAB): void {
@@ -65,7 +67,10 @@ class DocsModel {
   }
 
   removeTab(id: string): void {
-    this.tabs.splice(this.tabs.findIndex(tab => tab.id === id), 1);
+    this.tabs.splice(
+      this.tabs.findIndex((tab) => tab.id === id),
+      1,
+    );
     this.#revision++;
   }
 
@@ -89,8 +94,12 @@ class DocsModel {
   hold(kind: BatchKind): { reached: Promise<void>; release: () => void } {
     let reach!: () => void;
     let release!: () => void;
-    let reached = new Promise<void>(resolve => { reach = resolve; });
-    let released = new Promise<void>(resolve => { release = resolve; });
+    let reached = new Promise<void>((resolve) => {
+      reach = resolve;
+    });
+    let released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     this.#held.set(kind, { reach, released });
     return { reached, release };
   }
@@ -112,10 +121,15 @@ class DocsModel {
       if (this.driveFailure) {
         let { status, reason } = this.driveFailure;
         return Response.json(
-          { error: { code: status, errors: reason ? [{ reason }] : [] } }, { status });
+          { error: { code: status, errors: reason ? [{ reason }] : [] } },
+          { status },
+        );
       }
-      return Response.json(
-        { id: "doc-1", name: "Test document", modifiedTime: this.driveModifiedTime });
+      return Response.json({
+        id: "doc-1",
+        name: "Test document",
+        modifiedTime: this.driveModifiedTime,
+      });
     }
     if (url.hostname !== "docs.googleapis.com") {
       throw new Error(`Unexpected provider request: ${url}`);
@@ -137,8 +151,10 @@ class DocsModel {
       this.cleanupFailures--;
       throw new Error("cleanup failed");
     }
-    if (body.writeControl?.requiredRevisionId &&
-        body.writeControl.requiredRevisionId !== `revision-${this.#revision}`) {
+    if (
+      body.writeControl?.requiredRevisionId &&
+      body.writeControl.requiredRevisionId !== `revision-${this.#revision}`
+    ) {
       return Response.json({ error: { code: 400, message: "revision mismatch" } }, { status: 400 });
     }
 
@@ -154,9 +170,13 @@ class DocsModel {
 
       // Google resolves an unqualified coordinate against a default tab, so a request that omits
       // the ID would edit whichever tab that happens to be.
-      let coordinate = request.createNamedRange?.range ?? request.insertText?.location ??
-        request.deleteContentRange?.range ?? request.updateParagraphStyle?.range ??
-        request.createParagraphBullets?.range ?? request.updateTextStyle?.range;
+      let coordinate =
+        request.createNamedRange?.range ??
+        request.insertText?.location ??
+        request.deleteContentRange?.range ??
+        request.updateParagraphStyle?.range ??
+        request.createParagraphBullets?.range ??
+        request.updateTextStyle?.range;
       if (!coordinate?.tabId) {
         throw new Error(`Google Docs request is missing tabId: ${JSON.stringify(request)}`);
       }
@@ -208,7 +228,7 @@ class DocsModel {
   }
 
   #tab(id: string): ModelTab {
-    let tab = this.tabs.find(candidate => candidate.id === id);
+    let tab = this.tabs.find((candidate) => candidate.id === id);
     if (!tab) throw new Error(`Google Docs has no tab "${id}"`);
     return tab;
   }
@@ -218,30 +238,38 @@ class DocsModel {
     let namedRanges: Record<string, { namedRanges: { namedRangeId: string; name: string }[] }> = {};
     for (const [namedRangeId, marker] of this.markers) {
       if (marker.tabId !== tab.id) continue;
-      (namedRanges[marker.name] ??= { namedRanges: [] })
-        .namedRanges.push({ namedRangeId, name: marker.name });
+      (namedRanges[marker.name] ??= { namedRanges: [] }).namedRanges.push({
+        namedRangeId,
+        name: marker.name,
+      });
     }
     return {
       tabProperties: { tabId: tab.id, title: tab.title },
       documentTab: {
         body: {
-          content: [{
-            startIndex: 1,
-            endIndex: text.length + 1,
-            paragraph: {
-              elements: [{
-                startIndex: 1, endIndex: text.length + 1,
-                textRun: { content: text, textStyle: {} },
-              }],
-              paragraphStyle: { namedStyleType: "NORMAL_TEXT" },
+          content: [
+            {
+              startIndex: 1,
+              endIndex: text.length + 1,
+              paragraph: {
+                elements: [
+                  {
+                    startIndex: 1,
+                    endIndex: text.length + 1,
+                    textRun: { content: text, textStyle: {} },
+                  },
+                ],
+                paragraphStyle: { namedStyleType: "NORMAL_TEXT" },
+              },
             },
-          }],
+          ],
         },
         lists: {},
         namedRanges,
       },
-      childTabs: this.tabs.filter(child => child.parentId === tab.id)
-        .map(child => this.#documentTab(child)),
+      childTabs: this.tabs
+        .filter((child) => child.parentId === tab.id)
+        .map((child) => this.#documentTab(child)),
     };
   }
 
@@ -249,9 +277,10 @@ class DocsModel {
     return {
       documentId: "doc-1",
       title: "Test document",
-      ...this.editable ? { revisionId: `revision-${this.#revision}` } : {},
-      tabs: this.tabs.filter(tab => tab.parentId === undefined)
-        .map(tab => this.#documentTab(tab)),
+      ...(this.editable ? { revisionId: `revision-${this.#revision}` } : {}),
+      tabs: this.tabs
+        .filter((tab) => tab.parentId === undefined)
+        .map((tab) => this.#documentTab(tab)),
     };
   }
 }
@@ -342,9 +371,7 @@ describe("Google Doc write receipts", () => {
     docs.install();
     let actionId = await hooks().submitAppend("duplicates", "first");
 
-    expect(await hooks().applyAction("duplicates", actionId)).toMatch(
-      /multiple write markers/,
-    );
+    expect(await hooks().applyAction("duplicates", actionId)).toMatch(/multiple write markers/);
     expect(docs.contentBatches).toBe(0);
 
     docs.clearMarkers();
@@ -407,8 +434,7 @@ describe("Google Doc write receipts", () => {
     docs.ambiguousContentResponses = 1;
     docs.install();
     let actionId = await hooks().submitAppend("lost-response", "first");
-    expect(await hooks().applyAction("lost-response", actionId))
-      .toMatch(/content response lost/);
+    expect(await hooks().applyAction("lost-response", actionId)).toMatch(/content response lost/);
     expect(docs.markers.size).toBe(1);
 
     // Past the snapshot TTL, so the next read refetches the document -- which holds the append
@@ -462,8 +488,9 @@ describe("Google Doc metadata", () => {
     expect(await hooks().readMetadata("metadata-read-only")).toBe(first);
 
     docs.driveModifiedTime = "2026-01-02T04:00:00Z";
-    expect(await hooks().readMetadata("metadata-read-only"))
-      .toBe(new Date("2026-01-02T04:00:00Z").valueOf());
+    expect(await hooks().readMetadata("metadata-read-only")).toBe(
+      new Date("2026-01-02T04:00:00Z").valueOf(),
+    );
   });
 
   it("holds the modification time steady when Drive metadata is not granted", async () => {
@@ -485,20 +512,22 @@ describe("Google Doc metadata", () => {
     ["an outage", "metadata-drive-outage", { status: 500 }],
     ["a quota refusal", "metadata-drive-quota", { status: 403, reason: "userRateLimitExceeded" }],
     ["a malformed reply", "metadata-drive-malformed", "malformed"],
-  ] as const)("fails a metadata read rather than dating a document from %s", async (
-    _case, facetName, failure,
-  ) => {
-    let docs = new DocsModel();
-    docs.editable = false;
-    docs.driveFailure = failure;
-    docs.install();
+  ] as const)(
+    "fails a metadata read rather than dating a document from %s",
+    async (_case, facetName, failure) => {
+      let docs = new DocsModel();
+      docs.editable = false;
+      docs.driveFailure = failure;
+      docs.install();
 
-    await expect(Promise.resolve(hooks().readMetadata(facetName))).rejects.toThrow();
+      await expect(Promise.resolve(hooks().readMetadata(facetName))).rejects.toThrow();
 
-    docs.driveFailure = null;
-    expect(await hooks().readMetadata(facetName))
-      .toBe(new Date("2026-01-02T03:04:05Z").valueOf());
-  });
+      docs.driveFailure = null;
+      expect(await hooks().readMetadata(facetName)).toBe(
+        new Date("2026-01-02T03:04:05Z").valueOf(),
+      );
+    },
+  );
 });
 
 // Google withholds revisionId from a caller without edit access, which is the ordinary case for
@@ -573,11 +602,12 @@ describe("Google Doc tab isolation", () => {
   it("submits nothing for an omitted or unknown tab", async () => {
     let docs = nestedDocs();
 
-    await expect(Promise.resolve(hooks().submitAppend("tabs-selector", "added")))
-      .rejects.toThrow(/tabId is required for documents with multiple tabs/);
-    await expect(Promise.resolve(
-      hooks().submitReplace("tabs-selector", "shared", "changed", "ghost"),
-    )).rejects.toThrow(/no tab with ID "ghost"/);
+    await expect(Promise.resolve(hooks().submitAppend("tabs-selector", "added"))).rejects.toThrow(
+      /tabId is required for documents with multiple tabs/,
+    );
+    await expect(
+      Promise.resolve(hooks().submitReplace("tabs-selector", "shared", "changed", "ghost")),
+    ).rejects.toThrow(/no tab with ID "ghost"/);
 
     expect(docs.contentBatches).toBe(0);
     expect(docs.text("metrics")).toBe("shared");
@@ -588,23 +618,32 @@ describe("Google Doc tab isolation", () => {
   const GENERIC_READ = "Read the content of one tab of the document.";
 
   it.each([
-    ["an omitted tab", () => hooks().submitAppend("tabs-write-oracle", "added"),
-      /tabId is required for documents with multiple tabs/],
-    ["an unknown tab", () => hooks().submitAppend("tabs-write-oracle", "added", "ghost"),
-      /no tab with ID "ghost"/],
-    ["unmatched text",
+    [
+      "an omitted tab",
+      () => hooks().submitAppend("tabs-write-oracle", "added"),
+      /tabId is required for documents with multiple tabs/,
+    ],
+    [
+      "an unknown tab",
+      () => hooks().submitAppend("tabs-write-oracle", "added", "ghost"),
+      /no tab with ID "ghost"/,
+    ],
+    [
+      "unmatched text",
       () => hooks().submitReplace("tabs-write-oracle", "absent", "changed", "metrics"),
-      /was not found in the current simulated tab/],
-  ] as const)("authorizes a generic observation when an edit fails on %s", async (
-    _case, submit, message,
-  ) => {
-    let docs = nestedDocs();
+      /was not found in the current simulated tab/,
+    ],
+  ] as const)(
+    "authorizes a generic observation when an edit fails on %s",
+    async (_case, submit, message) => {
+      let docs = nestedDocs();
 
-    await expect(Promise.resolve(submit())).rejects.toThrow(message);
+      await expect(Promise.resolve(submit())).rejects.toThrow(message);
 
-    expect(await hooks().lastObservations).toEqual([GENERIC_READ]);
-    expect(docs.contentBatches).toBe(0);
-  });
+      expect(await hooks().lastObservations).toEqual([GENERIC_READ]);
+      expect(docs.contentBatches).toBe(0);
+    },
+  );
 
   it("is not suppressed by a same-named write marker in another tab", async () => {
     vi.spyOn(crypto, "randomUUID").mockReturnValue("fixed-write-id");
@@ -626,11 +665,13 @@ describe("Google Doc tab isolation", () => {
     docs.removeTab("metrics");
     expect(await hooks().applyAction("tabs-deleted", actionId)).toBe(
       'appendText: no tab with ID "metrics" exists in this document. ' +
-      "Call listTabs() to refresh the tab list.");
+        "Call listTabs() to refresh the tab list.",
+    );
 
     // Approving it again must not report success for a write that never happened, and must not
     // decay into "unknown action" either — rejecting is the way out.
-    let repeated = "Pending Google Doc edit could not be applied: " +
+    let repeated =
+      "Pending Google Doc edit could not be applied: " +
       'appendText: no tab with ID "metrics" exists in this document. ' +
       "Call listTabs() to refresh the tab list.";
     expect(await hooks().applyAction("tabs-deleted", actionId)).toBe(repeated);
@@ -705,8 +746,13 @@ describe("Google Doc tab isolation", () => {
 describe("Google Doc edits stored before tab support", () => {
   function tabSnapshot(tabId: string, title: string) {
     return {
-      tabId, title, index: 0, nestingLevel: 0,
-      markdown: "shared\n", sourceMap: { blocks: [] }, bodyEndIndex: 8,
+      tabId,
+      title,
+      index: 0,
+      nestingLevel: 0,
+      markdown: "shared\n",
+      sourceMap: { blocks: [] },
+      bodyEndIndex: 8,
       committedWriteIds: [],
     };
   }
@@ -736,13 +782,15 @@ describe("Google Doc edits stored before tab support", () => {
     let grown = { ...snapshot, tabs: [...snapshot.tabs, tabSnapshot("second", "Second")] };
     expect(() => googleDocActionTab(grown, storedAppend)).toThrow(
       "Pending Google Doc edit predates tab support and the document has gained tabs since, " +
-      "so the tab it was approved against is unknown. Reject it and retry on a selected tab.");
+        "so the tab it was approved against is unknown. Reject it and retry on a selected tab.",
+    );
   });
 
   it("refuses a vanished tab rather than retargeting to the first", () => {
     expect(() => googleDocActionTab(snapshot, { ...storedAppend, tabId: "ghost" })).toThrow(
       'appendText: no tab with ID "ghost" exists in this document. ' +
-      "Call listTabs() to refresh the tab list.");
+        "Call listTabs() to refresh the tab list.",
+    );
   });
 
   it("resolves a record that names a live tab", () => {

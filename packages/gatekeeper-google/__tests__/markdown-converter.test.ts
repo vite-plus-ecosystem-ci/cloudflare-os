@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  computeReplaceOperations, docTabToMarkdown, markdownToDocRequests,
+  computeReplaceOperations,
+  docTabToMarkdown,
+  markdownToDocRequests,
 } from "../src/markdown-converter";
 import type { Segment } from "../src/markdown-converter";
 import { BULLET_LIST, buildTab } from "./doc-fixture";
@@ -36,24 +38,32 @@ function coordinates(requests: unknown[]): Record<string, unknown>[] {
 
 describe("docTabToMarkdown", () => {
   it("renders headings, inline styles, links and bullets", () => {
-    let snapshot = docTabToMarkdown(buildTab([
-      { runs: ["Title\n"], namedStyleType: "HEADING_1" },
-      { runs: ["Sub\n"], namedStyleType: "HEADING_2" },
-      { runs: [
-        "Hello ",
-        { text: "bold", style: { bold: true } },
-        " and ",
-        { text: "it", style: { italic: true } },
-        " and ",
-        { text: "link", style: { link: { url: "https://e.com" } } },
-        ".\n",
-      ] },
-      { runs: ["one\n"], bullet: { listId: "L1", nestingLevel: 0 } },
-      { runs: ["two\n"], bullet: { listId: "L1", nestingLevel: 0 } },
-    ], BULLET_LIST));
+    let snapshot = docTabToMarkdown(
+      buildTab(
+        [
+          { runs: ["Title\n"], namedStyleType: "HEADING_1" },
+          { runs: ["Sub\n"], namedStyleType: "HEADING_2" },
+          {
+            runs: [
+              "Hello ",
+              { text: "bold", style: { bold: true } },
+              " and ",
+              { text: "it", style: { italic: true } },
+              " and ",
+              { text: "link", style: { link: { url: "https://e.com" } } },
+              ".\n",
+            ],
+          },
+          { runs: ["one\n"], bullet: { listId: "L1", nestingLevel: 0 } },
+          { runs: ["two\n"], bullet: { listId: "L1", nestingLevel: 0 } },
+        ],
+        BULLET_LIST,
+      ),
+    );
 
     expect(snapshot.markdown).toBe(
-      "# Title\n\n## Sub\n\nHello **bold** and *it* and [link](https://e.com).\n\n- one\n- two\n");
+      "# Title\n\n## Sub\n\nHello **bold** and *it* and [link](https://e.com).\n\n- one\n- two\n",
+    );
   });
 
   it("carries the tab's identity, position and body end index through", () => {
@@ -66,7 +76,11 @@ describe("docTabToMarkdown", () => {
       nestingLevel: 2,
     });
     expect(snapshot).toMatchObject({
-      tabId: "metrics", title: "Metrics", parentTabId: "details", index: 1, nestingLevel: 2,
+      tabId: "metrics",
+      title: "Metrics",
+      parentTabId: "details",
+      index: 1,
+      nestingLevel: 2,
     });
     // Section break (1) + "abc\n" (4).
     expect(snapshot.bodyEndIndex).toBe(5);
@@ -76,19 +90,26 @@ describe("docTabToMarkdown", () => {
 // These are what keeps an edit from landing on the wrong characters. A content segment claims a
 // 1:1 mapping between Markdown and document indices, and computeReplaceOperations trusts it.
 describe("source map invariants", () => {
-  let snapshot = docTabToMarkdown(buildTab([
-    { runs: ["Title\n"], namedStyleType: "HEADING_1" },
-    { runs: [
-      "Hello ",
-      { text: "bold", style: { bold: true } },
-      " and ",
-      { text: "link", style: { link: { url: "https://e.com" } } },
-      ".\n",
-    ] },
-    { runs: ["one\n"], bullet: { listId: "L1", nestingLevel: 0 } },
-  ], BULLET_LIST));
+  let snapshot = docTabToMarkdown(
+    buildTab(
+      [
+        { runs: ["Title\n"], namedStyleType: "HEADING_1" },
+        {
+          runs: [
+            "Hello ",
+            { text: "bold", style: { bold: true } },
+            " and ",
+            { text: "link", style: { link: { url: "https://e.com" } } },
+            ".\n",
+          ],
+        },
+        { runs: ["one\n"], bullet: { listId: "L1", nestingLevel: 0 } },
+      ],
+      BULLET_LIST,
+    ),
+  );
   let text = docText(["Title\n", "Hello ", "bold", " and ", "link", ".\n", "one\n"]);
-  let segments = snapshot.sourceMap.blocks.flatMap(b => b.segments);
+  let segments = snapshot.sourceMap.blocks.flatMap((b) => b.segments);
   let contentSegments = segments.filter(isContent);
 
   it("gives every content segment equal length in both spaces", () => {
@@ -99,8 +120,9 @@ describe("source map invariants", () => {
 
   it("maps every content segment to the same text in both spaces", () => {
     for (let seg of contentSegments) {
-      expect(snapshot.markdown.slice(seg.mdStart, seg.mdEnd))
-        .toBe(text.slice(seg.docStart, seg.docEnd));
+      expect(snapshot.markdown.slice(seg.mdStart, seg.mdEnd)).toBe(
+        text.slice(seg.docStart, seg.docEnd),
+      );
     }
   });
 
@@ -135,10 +157,16 @@ describe("source map invariants", () => {
 describe("selected-tab write coordinates", () => {
   it("stamps the tab ID on every inserted location and styled range", () => {
     let requests = markdownToDocRequests(
-      "# Head\n\n- one\n\n**bold** and [link](https://e.com)\n", 7, "metrics");
+      "# Head\n\n- one\n\n**bold** and [link](https://e.com)\n",
+      7,
+      "metrics",
+    );
 
-    expect(requests.map(request => Object.keys(request)[0])).toEqual([
-      "insertText", "updateParagraphStyle", "createParagraphBullets", "updateTextStyle",
+    expect(requests.map((request) => Object.keys(request)[0])).toEqual([
+      "insertText",
+      "updateParagraphStyle",
+      "createParagraphBullets",
+      "updateTextStyle",
       "updateTextStyle",
     ]);
     let found = coordinates(requests);
@@ -148,16 +176,24 @@ describe("selected-tab write coordinates", () => {
 });
 
 describe("computeReplaceOperations", () => {
-  let snapshot = docTabToMarkdown(buildTab([
-    { runs: ["Title\n"], namedStyleType: "HEADING_1" },
-    { runs: ["Hello ", { text: "bold", style: { bold: true } }, " world.\n"] },
-  ]));
+  let snapshot = docTabToMarkdown(
+    buildTab([
+      { runs: ["Title\n"], namedStyleType: "HEADING_1" },
+      { runs: ["Hello ", { text: "bold", style: { bold: true } }, " world.\n"] },
+    ]),
+  );
   let md = snapshot.markdown;
   let replace = (oldText: string, newText: string) => {
     let start = md.indexOf(oldText);
     expect(start).toBeGreaterThanOrEqual(0);
     return computeReplaceOperations(
-      snapshot.sourceMap, md, start, start + oldText.length, newText, TAB_ID);
+      snapshot.sourceMap,
+      md,
+      start,
+      start + oldText.length,
+      newText,
+      TAB_ID,
+    );
   };
 
   it("renders the fixture as expected", () => {
@@ -191,7 +227,9 @@ describe("computeReplaceOperations", () => {
     expect(replace("world", "")).toEqual({
       trimmedOld: "world",
       trimmedNew: "",
-      requests: [{ deleteContentRange: { range: { startIndex: 18, endIndex: 23, tabId: TAB_ID } } }],
+      requests: [
+        { deleteContentRange: { range: { startIndex: 18, endIndex: 23, tabId: TAB_ID } } },
+      ],
     });
   });
 

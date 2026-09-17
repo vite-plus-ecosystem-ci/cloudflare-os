@@ -1,6 +1,6 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -20,14 +20,27 @@ const here = dirname(fileURLToPath(import.meta.url));
  */
 export default defineConfig({
   test: {
+    // Vitest v4 compatibility: preserve mock call history.
+    // Remove after tests no longer rely on calls from setup or earlier tests.
+    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+    clearMocks: false,
+    // Vitest v4 compatibility: keep separate Vite servers for inline projects.
+    // Remove when plugins and config hooks can run once for shared projects.
+    // https://vitest.dev/guide/migration/#inline-projects-share-the-vite-server-by-default
+    sharedViteServer: false,
     projects: [
       {
+        // Vitest v4 compatibility: keep this inline project independent of the root config.
+        // Remove to inherit root options, including plugins and setup files.
+        // https://vitest.dev/guide/migration/#inline-projects-inherit-the-root-config-by-default
+        extends: false,
         test: {
+          // Vitest v4 compatibility: preserve mock call history.
+          // Remove after tests no longer rely on calls from setup or earlier tests.
+          // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+          clearMocks: false,
           name: "gadgets",
-          include: [
-            "blueprints/*/__tests__/**/*.test.ts",
-            "libraries/*/__tests__/**/*.test.ts",
-          ],
+          include: ["blueprints/*/__tests__/**/*.test.ts", "libraries/*/__tests__/**/*.test.ts"],
           environment: "jsdom",
         },
         resolve: {
@@ -40,7 +53,15 @@ export default defineConfig({
         },
       },
       {
+        // Vitest v4 compatibility: keep this inline project independent of the root config.
+        // Remove to inherit root options, including plugins and setup files.
+        // https://vitest.dev/guide/migration/#inline-projects-inherit-the-root-config-by-default
+        extends: false,
         test: {
+          // Vitest v4 compatibility: preserve mock call history.
+          // Remove after tests no longer rely on calls from setup or earlier tests.
+          // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+          clearMocks: false,
           name: "build",
           include: ["__tests__/**/*.test.ts"],
           environment: "node",

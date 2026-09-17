@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import type { EvalModel } from "./config.js";
 import type { LocalModelAccess } from "./target.js";
 
@@ -71,18 +71,24 @@ afterEach(() => {
 const WORKERS_AI_MODEL: EvalModel = { provider: "cloudflare", model: "@cf/zai-org/glm-5.2" };
 const DIRECT: LocalModelAccess = { kind: "direct", accountId: "account-id", apiToken: "token" };
 const BINDING: LocalModelAccess = {
-  kind: "gateway", gateway: "gateway", accountId: "account-id", transport: "binding",
+  kind: "gateway",
+  gateway: "gateway",
+  accountId: "account-id",
+  transport: "binding",
 };
 const BINDING_WITH_TOKEN: LocalModelAccess = { ...BINDING, apiToken: "token" };
 const HTTPS: LocalModelAccess = {
-  kind: "gateway", gateway: "gateway", accountId: "account-id", transport: "https",
+  kind: "gateway",
+  gateway: "gateway",
+  accountId: "account-id",
+  transport: "https",
   apiToken: "token",
 };
 
 const WORKERS_AI_INFERENCE_URL =
-    "https://gateway.ai.cloudflare.com/v1/account-id/gateway/workers-ai/v1/chat/completions";
+  "https://gateway.ai.cloudflare.com/v1/account-id/gateway/workers-ai/v1/chat/completions";
 const COST_LOG_URL =
-    "https://api.cloudflare.com/client/v4/accounts/account-id/ai-gateway/gateways/gateway/logs/log-id";
+  "https://api.cloudflare.com/client/v4/accounts/account-id/ai-gateway/gateways/gateway/logs/log-id";
 
 async function run(access: LocalModelAccess, model: EvalModel = WORKERS_AI_MODEL): Promise<void> {
   const opened = await openLocalEvalTarget(access, model, 25);
@@ -91,7 +97,8 @@ async function run(access: LocalModelAccess, model: EvalModel = WORKERS_AI_MODEL
 
 it("allows the direct Workers AI route", async () => {
   fakes.requestUrls.push(
-      "https://api.cloudflare.com/client/v4/accounts/account-id/ai/v1/chat/completions");
+    "https://api.cloudflare.com/client/v4/accounts/account-id/ai/v1/chat/completions",
+  );
 
   await run(DIRECT);
 
@@ -105,15 +112,17 @@ it("allows AI Gateway inference and cost-log routes over HTTPS", async () => {
   await run(HTTPS);
 
   expect(globalThis.fetch).toHaveBeenCalledTimes(2);
-  expect(fakes.configs).toEqual([{
-    vars: {
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
-      CF_AI_GATEWAY_API_TOKEN: "token",
-      CF_AI_GATEWAY_PROVIDERS: "cloudflare",
-      CF_AI_GATEWAY_USE_BINDING: "false",
+  expect(fakes.configs).toEqual([
+    {
+      vars: {
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
+        CF_AI_GATEWAY_API_TOKEN: "token",
+        CF_AI_GATEWAY_PROVIDERS: "cloudflare",
+        CF_AI_GATEWAY_USE_BINDING: "false",
+      },
     },
-  }]);
+  ]);
   expect(fakes.responseStatuses).toEqual([204, 204]);
 });
 
@@ -123,16 +132,18 @@ it("keeps HTTPS model routes closed in binding mode", async () => {
   await run(BINDING);
 
   expect(globalThis.fetch).not.toHaveBeenCalled();
-  expect(fakes.configs).toEqual([{
-    account_id: "account-id",
-    ai: { binding: "WORKERS_AI", remote: true },
-    vars: {
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
-      CF_AI_GATEWAY_PROVIDERS: "cloudflare",
-      CF_AI_GATEWAY_USE_BINDING: "true",
+  expect(fakes.configs).toEqual([
+    {
+      account_id: "account-id",
+      ai: { binding: "WORKERS_AI", remote: true },
+      vars: {
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
+        CF_AI_GATEWAY_PROVIDERS: "cloudflare",
+        CF_AI_GATEWAY_USE_BINDING: "true",
+      },
     },
-  }]);
+  ]);
   expect(fakes.responseStatuses).toEqual([403, 403]);
 });
 
@@ -142,17 +153,19 @@ it("keeps HTTPS model routes closed in binding mode even when a token is availab
   await run(BINDING_WITH_TOKEN);
 
   expect(globalThis.fetch).not.toHaveBeenCalled();
-  expect(fakes.configs).toEqual([{
-    account_id: "account-id",
-    ai: { binding: "WORKERS_AI", remote: true },
-    vars: {
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
-      CF_AI_GATEWAY_API_TOKEN: "token",
-      CF_AI_GATEWAY_PROVIDERS: "cloudflare",
-      CF_AI_GATEWAY_USE_BINDING: "true",
+  expect(fakes.configs).toEqual([
+    {
+      account_id: "account-id",
+      ai: { binding: "WORKERS_AI", remote: true },
+      vars: {
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
+        CF_AI_GATEWAY_API_TOKEN: "token",
+        CF_AI_GATEWAY_PROVIDERS: "cloudflare",
+        CF_AI_GATEWAY_USE_BINDING: "true",
+      },
     },
-  }]);
+  ]);
   expect(fakes.responseStatuses).toEqual([403, 403]);
 });
 
@@ -166,17 +179,19 @@ it("opens only the HTTPS inference route for an HTTPS-only provider in binding m
   await run(BINDING_WITH_TOKEN, { provider: "google", model: "gemini-3.6-flash" });
 
   expect(globalThis.fetch).toHaveBeenCalledOnce();
-  expect(fakes.configs).toEqual([{
-    account_id: "account-id",
-    ai: { binding: "WORKERS_AI", remote: true },
-    vars: {
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
-      CF_AI_GATEWAY_API_TOKEN: "token",
-      CF_AI_GATEWAY_PROVIDERS: "google",
-      CF_AI_GATEWAY_USE_BINDING: "true",
+  expect(fakes.configs).toEqual([
+    {
+      account_id: "account-id",
+      ai: { binding: "WORKERS_AI", remote: true },
+      vars: {
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
+        CF_AI_GATEWAY_API_TOKEN: "token",
+        CF_AI_GATEWAY_PROVIDERS: "google",
+        CF_AI_GATEWAY_USE_BINDING: "true",
+      },
     },
-  }]);
+  ]);
   expect(fakes.responseStatuses).toEqual([204, 403, 403]);
 });
 
@@ -207,40 +222,46 @@ it("returns a deterministic denial for every other route", async () => {
 });
 
 it("keeps the deny filter installed when runtime shutdown fails", async () => {
-  fakes.server.close.mockImplementation(
-      () => Promise.reject(new Error("workerd failed to terminate")));
+  fakes.server.close.mockImplementation(() =>
+    Promise.reject(new Error("workerd failed to terminate")),
+  );
 
-  const opened = await openLocalEvalTarget(
-      DIRECT, WORKERS_AI_MODEL, 25);
+  const opened = await openLocalEvalTarget(DIRECT, WORKERS_AI_MODEL, 25);
   const fetchDuringCleanup = globalThis.fetch;
-  await expect(opened[Symbol.asyncDispose]())
-      .rejects.toThrow("workerd failed to terminate");
+  await expect(opened[Symbol.asyncDispose]()).rejects.toThrow("workerd failed to terminate");
 
   // Cleanup failed, so the interceptor must still own globalThis.fetch: unrestricted network
   // access is not restored while the runtime may still run model-authored code.
   expect(globalThis.fetch).toBe(fetchDuringCleanup);
 
   // An outbound request after the failed shutdown is still answered by the deny filter.
-  fakes.responseStatuses.push((await fetch("https://example.com/collect", { method: "POST" })).status);
+  fakes.responseStatuses.push(
+    (await fetch("https://example.com/collect", { method: "POST" })).status,
+  );
   expect(fakes.responseStatuses).toEqual([403]);
 
   globalThis.fetch = realFetch;
 });
 
 it("preserves session and runtime cleanup failures", async () => {
-  fakes.session.close.mockImplementation(
-      () => Promise.reject(new Error("session refused to close")));
-  fakes.server.close.mockImplementation(
-      () => Promise.reject(new Error("workerd failed to terminate")));
+  fakes.session.close.mockImplementation(() =>
+    Promise.reject(new Error("session refused to close")),
+  );
+  fakes.server.close.mockImplementation(() =>
+    Promise.reject(new Error("workerd failed to terminate")),
+  );
 
-  const opened = await openLocalEvalTarget(
-      DIRECT, WORKERS_AI_MODEL, 25);
+  const opened = await openLocalEvalTarget(DIRECT, WORKERS_AI_MODEL, 25);
   const fetchDuringCleanup = globalThis.fetch;
-  const failure = await opened[Symbol.asyncDispose]().then(() => undefined, error => error);
+  const failure = await opened[Symbol.asyncDispose]().then(
+    () => undefined,
+    (error) => error,
+  );
 
   if (!(failure instanceof AggregateError)) throw new Error("Expected aggregate cleanup failure");
-  expect(failure.errors.map(error => error instanceof Error ? error.message : String(error)))
-    .toEqual(["session refused to close", "workerd failed to terminate"]);
+  expect(
+    failure.errors.map((error) => (error instanceof Error ? error.message : String(error))),
+  ).toEqual(["session refused to close", "workerd failed to terminate"]);
   expect(globalThis.fetch).toBe(fetchDuringCleanup);
   globalThis.fetch = realFetch;
 });
@@ -250,9 +271,9 @@ it("keeps the deny filter installed when setup cleanup cannot stop workerd", asy
   fakes.server.close.mockRejectedValueOnce(new Error("workerd failed to terminate"));
   const unrestrictedFetch = globalThis.fetch;
 
-  await expect(openLocalEvalTarget(
-      DIRECT, WORKERS_AI_MODEL, 25))
-    .rejects.toThrow("Eval session setup and cleanup failed");
+  await expect(openLocalEvalTarget(DIRECT, WORKERS_AI_MODEL, 25)).rejects.toThrow(
+    "Eval session setup and cleanup failed",
+  );
   expect(globalThis.fetch).not.toBe(unrestrictedFetch);
   expect((await fetch("https://example.com/collect", { method: "POST" })).status).toBe(403);
   globalThis.fetch = realFetch;

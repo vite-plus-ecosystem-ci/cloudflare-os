@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
-import type { Plugin } from 'vite'
-import { defineConfig } from 'vitest/config'
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers'
-import capnwebValidate from 'capnweb-validate/vite'
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import type { Plugin } from "vite-plus";
+import { defineConfig } from "vite-plus";
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import capnwebValidate from "capnweb-validate/vite";
 
 // Wrangler ships `*.txt` imports as Text modules (its default module rules; see
 // src/text-modules.d.ts), but this config drives the pool from inline miniflare settings, and
@@ -13,19 +13,19 @@ import capnwebValidate from 'capnweb-validate/vite'
 // symlinked .txt (the binding .txts are symlinks to their .d.ts) would dodge the load hook
 // below and fall through to the TypeScript pipeline.
 const textModules: Plugin = {
-  name: 'text-modules',
-  enforce: 'pre',
+  name: "text-modules",
+  enforce: "pre",
   resolveId(source, importer) {
-    if (source.endsWith('.txt') && importer !== undefined) {
-      return path.resolve(path.dirname(importer), source)
+    if (source.endsWith(".txt") && importer !== undefined) {
+      return path.resolve(path.dirname(importer), source);
     }
   },
   load(id) {
-    if (id.endsWith('.txt')) {
-      return `export default ${JSON.stringify(readFileSync(id, 'utf-8'))};`
+    if (id.endsWith(".txt")) {
+      return `export default ${JSON.stringify(readFileSync(id, "utf-8"))};`;
     }
   },
-}
+};
 
 /**
  * Tests run inside workerd (via vitest-pool-workers) so they exercise the same runtime APIs as
@@ -39,29 +39,33 @@ export default defineConfig({
     capnwebValidate(),
     cloudflareTest({
       // The production Worker plus test-only entrypoints (see __tests__/test-worker.ts).
-      main: './__tests__/test-worker.ts',
+      main: "./__tests__/test-worker.ts",
       miniflare: {
-        compatibilityDate: '2026-09-04',
+        compatibilityDate: "2026-09-04",
         // `allow_irrevocable_stub_storage` as in wrangler.jsonc: the user DO persists account stubs.
-        compatibilityFlags: ['experimental', 'nodejs_compat', 'allow_irrevocable_stub_storage'],
-        bindings: { PUBLIC_BASE_URL: 'https://workshop.example/' },
+        compatibilityFlags: ["experimental", "nodejs_compat", "allow_irrevocable_stub_storage"],
+        bindings: { PUBLIC_BASE_URL: "https://workshop.example/" },
         // The overseer loads gadget code through this, so a test can run a real gadget facet.
         workerLoaders: { LOADER: {} },
         durableObjects: {
-          TEST_OVERSEER: { className: 'OverseerDurableObject', useSQLite: true },
-          TEST_USER: { className: 'UserDurableObject', useSQLite: true },
-          TEST_PENDING_LOGIN: { className: 'PendingLogin', useSQLite: true },
+          TEST_OVERSEER: { className: "OverseerDurableObject", useSQLite: true },
+          TEST_USER: { className: "UserDurableObject", useSQLite: true },
+          TEST_PENDING_LOGIN: { className: "PendingLogin", useSQLite: true },
           // Never addressed by name: a binding is what puts the class in `ctx.exports`, from
           // which the overseer instantiates it (with props) as one of its own facets.
-          TEST_AGENT_SPAWNER: { className: 'AgentSpawnerGatekeeper', useSQLite: true },
-          TEST_USER_DIRECTORY: { className: 'UserDirectoryDurableObject', useSQLite: true },
+          TEST_AGENT_SPAWNER: { className: "AgentSpawnerGatekeeper", useSQLite: true },
+          TEST_USER_DIRECTORY: { className: "UserDirectoryDurableObject", useSQLite: true },
         },
       },
     }),
   ],
   test: {
-    include: ['__tests__/*.test.ts'],
+    // Vitest v4 compatibility: preserve mock call history.
+    // Remove after tests no longer rely on calls from setup or earlier tests.
+    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+    clearMocks: false,
+    include: ["__tests__/*.test.ts"],
     // Asserts the pool actually started, rather than trusting a green run to mean workerd.
-    setupFiles: ['@gadgets/scripts/assert-workerd'],
+    setupFiles: ["@gadgets/scripts/assert-workerd"],
   },
-})
+});

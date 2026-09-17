@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   advanceToOAuth,
   claimOAuth,
@@ -31,8 +31,9 @@ describe("two-stage connect handshake", () => {
     const kv = makeKv();
     putInitiation(kv, "init", 100);
 
-    expect(() => advanceToOAuth(kv, "init", 101, { stage: "oauth" } as never))
-      .toThrow(/reserved key "stage"/);
+    expect(() => advanceToOAuth(kv, "init", 101, { stage: "oauth" } as never)).toThrow(
+      /reserved key "stage"/,
+    );
     // Rejected before the attempt was consumed, so the user's link still works.
     expect(advanceToOAuth(kv, "init", 101)).not.toBeNull();
   });

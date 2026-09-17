@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 /**
  * The suite that has to run in workerd, because what it covers -- the approval-queue audit on every
@@ -32,6 +32,10 @@ export default defineConfig({
     }),
   ],
   test: {
+    // Vitest v4 compatibility: preserve mock call history.
+    // Remove after tests no longer rely on calls from setup or earlier tests.
+    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+    clearMocks: false,
     include: ["__tests__/workerd/*.test.ts"],
     // Asserts the pool actually started, rather than trusting a green run to mean workerd.
     setupFiles: ["@gadgets/scripts/assert-workerd"],
