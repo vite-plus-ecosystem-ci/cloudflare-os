@@ -3,8 +3,7 @@
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveBinEntry } from "@gadgets/scripts/bin-entry";
-import { pnpmCommand } from "@gadgets/scripts/pnpm-command";
+import { createRequire } from "node:module";
 
 const pkgDir = resolve(fileURLToPath(import.meta.url), "..");
 const watch = process.argv.includes("--watch");
@@ -17,21 +16,15 @@ console.log(
     ? "watching context library app for changes…"
     : "building context library app single-file bundle…",
 );
-// Reached directly: Vite+ runs tasks with a filtered environment that drops `npm_execpath`, so on
-// Windows there is no shell-free way back to pnpm. Falls back to `pnpm exec` if vite is missing.
+// Resolve the JavaScript entry directly so the build also works without a shell on Windows.
 const viteArgs = ["build", "-c", "vite.app.config.ts", ...(watch ? ["--watch"] : [])];
-const viteEntry = resolveBinEntry(pkgDir, "vite");
-const [command, argv] = viteEntry
-  ? [process.execPath, [viteEntry, ...viteArgs]]
-  : pnpmCommand(["exec", "vite", ...viteArgs]);
-execFileSync(
-  command,
-  argv,
-  {
-    cwd: pkgDir,
-    stdio: "inherit",
-    // Always set explicitly an inherited GATEKEEPER_APP_UNMINIFIED would
-    // turn a production build unminified, and Vite+ would cache that under `build:app`.
-    env: { ...process.env, GATEKEEPER_APP_UNMINIFIED: dev ? "true" : "false" },
-  },
-);
+const require = createRequire(import.meta.url);
+const viteEntry = resolve(require.resolve("vite-plus/package.json"), "../dist/bin.js");
+const [command, argv] = [process.execPath, [viteEntry, ...viteArgs]];
+execFileSync(command, argv, {
+  cwd: pkgDir,
+  stdio: "inherit",
+  // Always set explicitly an inherited GATEKEEPER_APP_UNMINIFIED would
+  // turn a production build unminified, and Vite+ would cache that under `build:app`.
+  env: { ...process.env, GATEKEEPER_APP_UNMINIFIED: dev ? "true" : "false" },
+});
