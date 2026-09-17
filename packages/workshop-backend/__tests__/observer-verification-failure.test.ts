@@ -4,7 +4,7 @@
 // Runs against a real OverseerDurableObject (the TEST_OVERSEER binding, like
 // git-migration-do.test.ts); the gatekeeper facet and the client's User DO are the only fakes.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { OverseerDurableObject } from "../src/overseer.js";

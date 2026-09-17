@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import * as Y from "yjs";
 import type { AiChatMessage, BlueprintMetadata } from "@gadgets/workshop-shared/api";
 import { HISTORY_COMMIT_GAP_MS, migrateCodeLogToGit } from "../src/git-migration";

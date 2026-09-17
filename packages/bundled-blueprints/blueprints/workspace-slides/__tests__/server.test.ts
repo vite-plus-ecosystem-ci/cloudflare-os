@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { Gadget } from "../files/server.ts";
 
 // The Slides Durable Object over in-memory storage: the contract its client relies on for adding

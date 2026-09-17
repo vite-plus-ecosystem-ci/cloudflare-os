@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { withAuthRetry } from "../src/auth-retry";
 
 type TokenRequest = { forceRefresh: boolean; staleToken?: string };

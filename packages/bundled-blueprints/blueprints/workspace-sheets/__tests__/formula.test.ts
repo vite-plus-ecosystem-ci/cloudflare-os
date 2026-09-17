@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { type Ast, CellError, parseFormula, serializeAst, tokenize, unwrapParens } from "../files/lib/formula.ts";
 
 describe("the formula tokenizer", () => {

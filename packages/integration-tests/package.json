@@ -13,8 +13,8 @@
   "scripts": {
     "build": "tsc --noEmit",
     "test:prebuild": "vp run -F @gadgets/integration-tests build:test-gatekeeper",
-    "test:run": "pnpm run test:prebuild && vitest run",
-    "test:watch": "pnpm run test:prebuild && vitest"
+    "test:run": "pnpm run test:prebuild && vp test run",
+    "test:watch": "pnpm run test:prebuild && vp test"
   },
   "dependencies": {
     "@gadgets/workshop-shared": "workspace:*",

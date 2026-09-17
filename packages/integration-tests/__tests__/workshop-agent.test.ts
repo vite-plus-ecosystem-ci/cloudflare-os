@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import { openAgentSession } from "../src/agent-session.js";
 import {
   startTestGatekeeperHarness, TEST_VENDOR_ID, type Harness,

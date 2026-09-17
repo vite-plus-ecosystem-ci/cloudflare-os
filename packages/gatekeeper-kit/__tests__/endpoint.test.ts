@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { normalizeVendorEndpoint } from "../src/endpoint";
 
 const hostPattern = /^[a-z0-9-]+\.mktorest\.com$/i;

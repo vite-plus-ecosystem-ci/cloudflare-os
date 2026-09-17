@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { readTextCapped, ResponseTooLargeError } from "../src/response-body";
 
 /** A body delivered in chunks, reporting whether it was pulled and whether it was cancelled. */

@@ -2,7 +2,7 @@
 /* eslint-disable react/react-in-jsx-scope */
 
 import { act } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 import type { RpcStub } from 'capnweb'
 import type { ActionLogEntry, Overseer } from '@gadgets/workshop-shared/api'
 import { entry as pendingEntry, makeOverseer, makeTestRoot } from './action-test-harness'

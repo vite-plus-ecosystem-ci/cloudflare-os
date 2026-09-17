@@ -1,5 +1,5 @@
 import type { WorkpieceSummary } from "@gadgets/workshop-shared/api";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { EvalVerifier, resolveGadget, type VerifierSession } from "./verifier.js";
 import type { EvalCheck } from "./task.js";
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 // typescript6 = npm:typescript@6.0.3: this test drives the JS compiler API, which the
 // TypeScript 7 package does not ship. The workspace "typescript" (tsgo) only type-checks.
 import ts from "typescript6";

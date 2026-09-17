@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { PROMPT_STYLES, promptInline } from "../src/prompt.ts";
 

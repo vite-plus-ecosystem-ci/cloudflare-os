@@ -1,4 +1,4 @@
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 
 import { McpFacetBase } from "../src/facet.js";
 import { McpSessionBase } from "../src/session.js";

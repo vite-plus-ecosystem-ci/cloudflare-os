@@ -13,7 +13,7 @@
 
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import { env, runInDurableObject } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { ActionDescription, GitObjectType, GitOid }
   from "@gadgets/workshop-shared/gatekeeper";
 import { FLUSH_PKT, ZERO_OID, encodePktLine, pktText } from "../../src/git-transport";

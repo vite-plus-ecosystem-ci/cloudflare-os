@@ -6,7 +6,7 @@
 // These live in their own file -- with their own harness, like every suite here -- so the suite
 // stays self-contained as the observer suites around it grow.
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type { AuthenticatedApi, PublicApi } from "@gadgets/workshop-shared/api";
 import type {

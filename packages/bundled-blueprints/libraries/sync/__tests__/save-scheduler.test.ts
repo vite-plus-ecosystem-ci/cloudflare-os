@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { DEBOUNCE_MS, RETRY_BASE_MS, RETRY_MAX_MS, type SaveOutcome, SaveScheduler, retryDelay } from "../src/save-scheduler.ts";
 

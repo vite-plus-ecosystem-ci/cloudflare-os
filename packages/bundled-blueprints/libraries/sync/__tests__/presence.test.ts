@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { collaboratorFor, normalizeCollaborator } from "../src/collaborator.ts";
 import { HEARTBEAT_MS, type PresenceEvent, PresenceReporter, PresenceRoster, STALE_MS, THROTTLE_MS } from "../src/presence.ts";

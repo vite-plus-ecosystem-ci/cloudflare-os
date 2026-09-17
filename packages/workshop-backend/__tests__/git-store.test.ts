@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { deserialize, serialize } from "capnweb";
 import { createTypedStorage } from "@gadgets/typed-storage";
 import {

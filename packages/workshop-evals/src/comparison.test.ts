@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { compareEvalResults, renderEvalComparison, validateEvalResults } from "./comparison.js";
 
 const MODEL = "@cf/deepseek-ai/deepseek-v4-pro-0813";

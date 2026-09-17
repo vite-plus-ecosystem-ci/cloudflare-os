@@ -6,7 +6,7 @@
 // Runs against a real OverseerDurableObject (the TEST_OVERSEER binding); the gatekeeper facet is
 // the only fake.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { OverseerDurableObject } from "../src/overseer.js";

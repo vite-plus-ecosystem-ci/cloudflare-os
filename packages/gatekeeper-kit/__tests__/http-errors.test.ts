@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { HttpError, isNoAccessError, probeAccess } from "../src/http-errors";
 
 describe("isNoAccessError", () => {

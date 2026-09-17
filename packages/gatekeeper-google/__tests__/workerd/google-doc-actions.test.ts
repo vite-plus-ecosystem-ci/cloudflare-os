@@ -1,5 +1,5 @@
 import { abortAllDurableObjects, env } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { googleDocActionTab } from "../../src/google";
 
 /** Every write coordinate names the tab it applies to; tab bodies index independently. */

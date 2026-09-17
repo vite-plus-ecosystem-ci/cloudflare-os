@@ -4,7 +4,7 @@
 // imports nothing from the runtime, so nothing is mocked; the stubs are the shape the RPC layer
 // delivers.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { MutationQueue, type PresenceEvent, SubscriberRegistry, type SubscriberStub, applyVersioned, normalizeCollaborator } from "../server.ts";
 

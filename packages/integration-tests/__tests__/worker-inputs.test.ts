@@ -5,7 +5,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { isWorkerInput, WATCH_PATHS } from "../src/worker-inputs.js";
 
 const WORKSPACE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");

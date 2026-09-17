@@ -1,4 +1,4 @@
-import { expect, expectTypeOf, it, describe } from "vitest"
+import { expect, expectTypeOf, it, describe } from "vite-plus/test"
 import { createTypedStorage, collection, singleton, Singleton, SingletonSchema, UniqueIndex,
          NonUniqueIndex }
     from "../src/index.js";

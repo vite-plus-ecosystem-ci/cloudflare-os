@@ -8,7 +8,7 @@
 // is replaced with a fake whose model config makes the turn fail before any network access, so
 // the real turn machinery -- including the `finally` that drains -- runs without a model.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env, RpcStub as NativeRpcStub } from "cloudflare:workers";
 import { abortAllDurableObjects, runInDurableObject } from "cloudflare:test";
 import { keyString } from "@gadgets/typed-storage";

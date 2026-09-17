@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 const EXPECTED_OPEN_ERROR_CODES = new Set([
   "WORKSPACE_NOT_FOUND",

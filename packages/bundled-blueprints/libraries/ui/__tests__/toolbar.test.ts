@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { ICONS } from "../src/icons.ts";
 import { colorBtn, customSelect, group, iconBtn, segBtn } from "../src/toolbar.ts";

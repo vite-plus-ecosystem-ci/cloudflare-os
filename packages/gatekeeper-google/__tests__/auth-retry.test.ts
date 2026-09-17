@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { AccessTokenCache, type AccessTokenRequest } from "../src/auth-retry";
 
 /** A stub authority recording every request, answering with whatever token it currently holds. */

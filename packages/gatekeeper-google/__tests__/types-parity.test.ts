@@ -2,7 +2,7 @@
 
 import { readlinkSync } from "node:fs";
 import { URL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import bigqueryDeclared from "../src/bigquery-types.d.ts?raw";
 import bigqueryShipped from "../src/bigquery-types.txt?raw";
 import calendarDeclared from "../src/calendar-types.d.ts?raw";

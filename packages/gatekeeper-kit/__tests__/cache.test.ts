@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { KvTtlCache, type AuthoritySource, type CacheKv } from "../src/cache";
 import { CredentialsExpiredError, CredentialSource } from "../src/credentials";
 import { fakeKv } from "./fake-kv";

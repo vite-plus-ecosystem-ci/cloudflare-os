@@ -1,5 +1,5 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 /** These suites require workerd-only APIs and persistent verifier-stub storage. */
 export default defineConfig({

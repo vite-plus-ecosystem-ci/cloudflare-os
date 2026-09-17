@@ -2,7 +2,7 @@ import { createExecutionContext } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { newWebSocketRpcSession, type RpcStub } from "capnweb";
 import type { PublicApi } from "@gadgets/workshop-shared/api";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import server from "../src/server";
 
 const PASSWORD_HASH = new Uint8Array([1, 2, 3]);

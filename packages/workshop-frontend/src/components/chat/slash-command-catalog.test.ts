@@ -1,6 +1,6 @@
 import type { RpcStub } from "capnweb";
 import type { Overseer, SlashCommandChoice } from "@gadgets/workshop-shared/api";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   invalidateSlashCommandCatalog,
   loadSlashCommandCatalog,

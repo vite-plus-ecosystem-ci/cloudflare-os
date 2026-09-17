@@ -5,7 +5,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { RpcStub } from "capnweb";
 import type { GatekeeperClient } from "@gadgets/workshop-shared/api";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { ComposerDocument, ComposerSelection } from "./composerDocument";
 import type { StoredComposerDraft } from "./draft/composerDraft";
 

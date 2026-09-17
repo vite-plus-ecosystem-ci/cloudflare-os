@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /* eslint-disable react/react-in-jsx-scope */
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 import type { RpcStub } from 'capnweb'
 import type { ActionLogEntry, Overseer } from '@gadgets/workshop-shared/api'
 import { entry, flushFrames, makeOverseer, makeTestRoot } from './action-test-harness'

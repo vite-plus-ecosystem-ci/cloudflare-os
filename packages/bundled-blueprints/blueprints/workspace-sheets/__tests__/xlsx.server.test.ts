@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { MutationQueue, SubscriberRegistry } from "@gadgets/bundled-blueprints/libraries/sync/server";
 import { ExportHandler, Gadget } from "../files/server.ts";
 import type { Operation, SheetsDocument } from "../files/lib/protocol.ts";

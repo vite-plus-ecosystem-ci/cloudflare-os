@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vite-plus/test'
 import type { MessageFormatRef } from '@gadgets/workshop-shared/api'
 import { locateMessageFormatRefs } from '../messageFormatRefs'
 

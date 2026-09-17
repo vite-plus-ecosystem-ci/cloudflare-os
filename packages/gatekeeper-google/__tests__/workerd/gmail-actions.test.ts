@@ -1,6 +1,6 @@
 import {env} from "cloudflare:workers";
 import {runInDurableObject} from "cloudflare:test";
-import {afterEach, describe, expect, it, vi} from "vitest";
+import {afterEach, describe, expect, it, vi} from "vite-plus/test";
 import type {ActionKind, ResourceDescription} from "@gadgets/workshop-shared/gatekeeper";
 import {
   base64UrlDecodedByteLength, buildEncodedEmail, decodeBase64UrlToBytes, extractRfc822Attachments,
