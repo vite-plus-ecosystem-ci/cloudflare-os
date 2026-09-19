@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { ConfluenceApiError, type AccessibleResource } from "../src/confluence-api";
 import {
   ConfluenceAccessChecker,
@@ -20,11 +20,7 @@ function makeKv(): TrackerKv {
   };
 }
 
-function verifier(options?: {
-  sites?: string[];
-  spaces?: string[];
-  content?: string[];
-}) {
+function verifier(options?: { sites?: string[]; spaces?: string[]; content?: string[] }) {
   const calls = { sites: [] as string[], spaces: [] as string[], content: [] as string[] };
   const api = {
     async hasSiteAccess(cloudId: string) {
@@ -56,16 +52,22 @@ describe("ConfluenceAccessChecker", () => {
   it("checks sites live and routes numeric space IDs, keys, and content IDs", async () => {
     const calls: string[] = [];
     const resource: AccessibleResource = {
-      id: "cloud-1", name: "Acme", url: "https://acme.atlassian.net", scopes: ["read:space:confluence"],
+      id: "cloud-1",
+      name: "Acme",
+      url: "https://acme.atlassian.net",
+      scopes: ["read:space:confluence"],
     };
     const checker = new ConfluenceAccessChecker(
       async () => "observer-token",
-      cloudId => ({
-        getSpaceById: async id => void calls.push(`${cloudId}:space-id:${id}`),
-        getSpaceByKey: async key => void calls.push(`${cloudId}:space-key:${key}`),
-        getContentById: async id => { calls.push(`${cloudId}:content:${id}`); return {} as never; },
+      (cloudId) => ({
+        getSpaceById: async (id) => void calls.push(`${cloudId}:space-id:${id}`),
+        getSpaceByKey: async (key) => void calls.push(`${cloudId}:space-key:${key}`),
+        getContentById: async (id) => {
+          calls.push(`${cloudId}:content:${id}`);
+          return {} as never;
+        },
       }),
-      async token => {
+      async (token) => {
         calls.push(`resources:${token}`);
         return [resource];
       },
@@ -77,20 +79,31 @@ describe("ConfluenceAccessChecker", () => {
     expect(await checker.hasSpaceAccess("cloud-1", "ENG")).toBe(true);
     expect(await checker.hasContentAccess("cloud-1", "456")).toBe(true);
     expect(calls).toEqual([
-      "resources:observer-token", "resources:observer-token", "cloud-1:space-id:123",
-      "cloud-1:space-key:ENG", "cloud-1:content:456",
+      "resources:observer-token",
+      "resources:observer-token",
+      "cloud-1:space-id:123",
+      "cloud-1:space-key:ENG",
+      "cloud-1:content:456",
     ]);
   });
 
-  it.each([401, 403, 404])("treats HTTP %s as no access", async status => {
+  it.each([401, 403, 404])("treats HTTP %s as no access", async (status) => {
     const checker = new ConfluenceAccessChecker(
       async () => "token",
       () => ({
-        getSpaceById: async () => { throw new ConfluenceApiError(status, "denied"); },
-        getSpaceByKey: async () => { throw new ConfluenceApiError(status, "denied"); },
-        getContentById: async () => { throw new ConfluenceApiError(status, "denied"); },
+        getSpaceById: async () => {
+          throw new ConfluenceApiError(status, "denied");
+        },
+        getSpaceByKey: async () => {
+          throw new ConfluenceApiError(status, "denied");
+        },
+        getContentById: async () => {
+          throw new ConfluenceApiError(status, "denied");
+        },
       }),
-      async () => { throw new ConfluenceApiError(status, "denied"); },
+      async () => {
+        throw new ConfluenceApiError(status, "denied");
+      },
     );
 
     expect(await checker.hasSiteAccess("cloud")).toBe(false);
@@ -103,9 +116,15 @@ describe("ConfluenceAccessChecker", () => {
     const checker = new ConfluenceAccessChecker(
       async () => "token",
       () => ({
-        getSpaceById: async () => { throw failure; },
-        getSpaceByKey: async () => { throw failure; },
-        getContentById: async () => { throw failure; },
+        getSpaceById: async () => {
+          throw failure;
+        },
+        getSpaceByKey: async () => {
+          throw failure;
+        },
+        getContentById: async () => {
+          throw failure;
+        },
       }),
     );
     await expect(checker.hasContentAccess("cloud", "123")).rejects.toBe(failure);
@@ -118,7 +137,9 @@ describe("ConfluenceObserverTracker", () => {
     await observe(tracker, ["space:10", "content:20"]);
     const denied = verifier({ spaces: [], content: ["20"] });
 
-    await expect(tracker.addObserver("observer-1", denied.api)).rejects.toThrow(/does not have access/);
+    await expect(tracker.addObserver("observer-1", denied.api)).rejects.toThrow(
+      /does not have access/,
+    );
     expect(denied.calls.spaces).toEqual(["10"]);
     expect(denied.calls.content).toEqual(["20"]);
 
@@ -200,9 +221,14 @@ describe("ConfluenceObserverTracker", () => {
     const kv = makeKv();
     const tracker = new ConfluenceObserverTracker(kv, "cloud");
     let release!: () => void;
-    const waiting = new Promise<void>(resolve => { release = resolve; });
+    const waiting = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const current = {
-      hasContentAccess: async () => { await waiting; return true; },
+      hasContentAccess: async () => {
+        await waiting;
+        return true;
+      },
       hasSpaceAccess: async () => true,
     } as unknown as Fetcher<ConfluenceVerifierApi>;
     await tracker.addObserver("current", current);
@@ -220,7 +246,9 @@ describe("ConfluenceObserverTracker", () => {
     const tracker = new ConfluenceObserverTracker(makeKv(), "cloud");
     await observe(tracker, ["content:old"]);
     let release!: () => void;
-    const waiting = new Promise<void>(resolve => { release = resolve; });
+    const waiting = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const calls: string[] = [];
     const candidate = {
       async hasContentAccess(_cloudId: string, contentId: string) {
@@ -228,7 +256,9 @@ describe("ConfluenceObserverTracker", () => {
         if (contentId === "old") await waiting;
         return contentId === "old";
       },
-      async hasSpaceAccess() { return true; },
+      async hasSpaceAccess() {
+        return true;
+      },
     } as unknown as Fetcher<ConfluenceVerifierApi>;
 
     const admission = tracker.addObserver("candidate", candidate);
@@ -251,13 +281,17 @@ describe("ConfluenceObserverTracker", () => {
     expect((await concurrent).excludeObservers).toEqual(["limited"]);
 
     const mixed = await tracker.prepareObservation([
-      "content:old", "content:pending", "content:new", "content:new",
+      "content:old",
+      "content:pending",
+      "content:new",
+      "content:new",
     ]);
     expect(mixed.pendingSets).toEqual(["content:pending", "content:new"]);
     expect(mixed.excludeObservers).toEqual(["limited"]);
     mixed.commit();
-    expect((await tracker.prepareObservation(["content:pending", "content:new"]))
-      .excludeObservers).toBeUndefined();
+    expect(
+      (await tracker.prepareObservation(["content:pending", "content:new"])).excludeObservers,
+    ).toBeUndefined();
   });
 
   it("treats legacy boolean markers as observed", async () => {
@@ -266,7 +300,9 @@ describe("ConfluenceObserverTracker", () => {
     const tracker = new ConfluenceObserverTracker(kv, "cloud");
     const denied = verifier({ content: [] });
 
-    await expect(tracker.addObserver("candidate", denied.api)).rejects.toThrow(/does not have access/);
+    await expect(tracker.addObserver("candidate", denied.api)).rejects.toThrow(
+      /does not have access/,
+    );
     expect(denied.calls.content).toEqual(["legacy"]);
     expect((await tracker.prepareObservation(["content:legacy"])).pendingSets).toEqual([]);
   });

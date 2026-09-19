@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { withAuthRetry } from "../src/auth-retry";
 
 type TokenRequest = { forceRefresh: boolean; staleToken?: string };
@@ -8,8 +8,9 @@ describe("withAuthRetry", () => {
     const getToken = vi.fn(async () => "current");
     const run = vi.fn(async (token: string) => `${token}-result`);
 
-    expect(await withAuthRetry({ getToken, isAuthError: () => false, replayable: true }, run))
-      .toBe("current-result");
+    expect(await withAuthRetry({ getToken, isAuthError: () => false, replayable: true }, run)).toBe(
+      "current-result",
+    );
     expect(getToken).toHaveBeenCalledOnce();
     expect(getToken).toHaveBeenCalledWith({ forceRefresh: false });
     expect(run).toHaveBeenCalledOnce();
@@ -18,25 +19,32 @@ describe("withAuthRetry", () => {
   it("passes through a first non-auth failure without refreshing", async () => {
     const failure = new Error("provider unavailable");
     const getToken = vi.fn(async () => "current");
-    const run = vi.fn(async () => { throw failure; });
+    const run = vi.fn(async () => {
+      throw failure;
+    });
 
-    await expect(withAuthRetry({ getToken, isAuthError: () => false, replayable: true }, run))
-      .rejects.toBe(failure);
+    await expect(
+      withAuthRetry({ getToken, isAuthError: () => false, replayable: true }, run),
+    ).rejects.toBe(failure);
     expect(getToken).toHaveBeenCalledOnce();
   });
 
   it("refreshes with the rejected token and returns the replayed result", async () => {
     const authError = new Error("401");
     const getToken = vi.fn(async ({ forceRefresh }: TokenRequest) =>
-      forceRefresh ? "fresh" : "stale");
+      forceRefresh ? "fresh" : "stale",
+    );
     const run = vi.fn(async (token: string) => {
       if (token === "stale") throw authError;
       return "accepted";
     });
 
-    expect(await withAuthRetry(
-      { getToken, isAuthError: error => error === authError, replayable: true }, run))
-      .toBe("accepted");
+    expect(
+      await withAuthRetry(
+        { getToken, isAuthError: (error) => error === authError, replayable: true },
+        run,
+      ),
+    ).toBe("accepted");
     expect(getToken).toHaveBeenNthCalledWith(2, {
       forceRefresh: true,
       staleToken: "stale",
@@ -48,7 +56,8 @@ describe("withAuthRetry", () => {
     const firstError = new Error("first 401");
     const secondError = new Error("second 401");
     const getToken = vi.fn(async ({ forceRefresh }: TokenRequest) =>
-      forceRefresh ? "fresh" : "stale");
+      forceRefresh ? "fresh" : "stale",
+    );
     const run = vi.fn(async (token: string) => {
       throw token === "stale" ? firstError : secondError;
     });
@@ -56,26 +65,37 @@ describe("withAuthRetry", () => {
     // Reporting is out of scope here: `CredentialSource.run(operation, { replayable: true })`
     // owns the retry-then-report flow, with the account healing inside the rejection
     // adjudication.
-    await expect(withAuthRetry({
-      getToken,
-      isAuthError: error => error === firstError || error === secondError,
-      replayable: true,
-    }, run)).rejects.toBe(secondError);
+    await expect(
+      withAuthRetry(
+        {
+          getToken,
+          isAuthError: (error) => error === firstError || error === secondError,
+          replayable: true,
+        },
+        run,
+      ),
+    ).rejects.toBe(secondError);
   });
 
   it("propagates a non-auth failure from the replay untouched", async () => {
     const authError = new Error("401");
     const providerError = new Error("provider unavailable");
     const getToken = vi.fn(async ({ forceRefresh }: TokenRequest) =>
-      forceRefresh ? "fresh" : "stale");
+      forceRefresh ? "fresh" : "stale",
+    );
     const run = vi.fn(async (token: string) => {
       throw token === "stale" ? authError : providerError;
     });
 
-    await expect(withAuthRetry({
-      getToken,
-      isAuthError: error => error === authError,
-      replayable: true,
-    }, run)).rejects.toBe(providerError);
+    await expect(
+      withAuthRetry(
+        {
+          getToken,
+          isAuthError: (error) => error === authError,
+          replayable: true,
+        },
+        run,
+      ),
+    ).rejects.toBe(providerError);
   });
 });

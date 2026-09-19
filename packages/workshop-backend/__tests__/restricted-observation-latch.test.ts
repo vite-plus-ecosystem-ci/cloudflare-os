@@ -6,7 +6,7 @@
 // Runs against a real OverseerDurableObject (the TEST_OVERSEER binding); the gatekeeper facet is
 // the only fake.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { OverseerDurableObject } from "../src/overseer.js";
@@ -21,11 +21,13 @@ const OWNER = "alice";
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve!: () => void;
-  let promise = new Promise<void>(r => { resolve = r; });
+  let promise = new Promise<void>((r) => {
+    resolve = r;
+  });
   return { promise, resolve };
 }
 
-const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function getImpl(instance: OverseerDurableObject): any {
   let impl = (instance as unknown as { impl: any }).impl;
@@ -58,18 +60,24 @@ describe("authorizeObservation's restricted-data latch", () => {
       seedGatekeeper(impl, 1);
       // Mallory holds an observer record but no reachable role: the named exclusion admits the
       // observation and schedules her teardown.
-      impl.storage.observers.put(
-          { profileId: "mallory", observerId: "obs-m", accountChoices: { 1: 10 } });
+      impl.storage.observers.put({
+        profileId: "mallory",
+        observerId: "obs-m",
+        accountChoices: { 1: 10 },
+      });
 
       // The cross-worker teardown parks, holding the observation mid-flight before any decision
       // the delivery rests on has been made.
       let held = deferred();
       impl.getGatekeeperFacet = () => ({
-        removeObserver: async () => { await held.promise; },
+        removeObserver: async () => {
+          await held.promise;
+        },
       });
 
-      let observation = impl.authorizeObservation(
-          1, RESTRICTED_EXCLUDING_MALLORY, { from: "user" });
+      let observation = impl.authorizeObservation(1, RESTRICTED_EXCLUDING_MALLORY, {
+        from: "user",
+      });
       await tick();
 
       // Nothing is delivered while the teardown is in flight, so nothing has latched: a teardown
@@ -101,12 +109,15 @@ describe("authorizeObservation's restricted-data latch", () => {
         profile: { id: "mallory", name: "Mallory" },
         addedBy: [{ type: "user", sharer: OWNER, created: new Date(), role: "build" }],
       });
-      impl.storage.observers.put(
-          { profileId: "mallory", observerId: "obs-m", accountChoices: { 1: 10 } });
+      impl.storage.observers.put({
+        profileId: "mallory",
+        observerId: "obs-m",
+        accountChoices: { 1: 10 },
+      });
 
-      await expect(impl.authorizeObservation(
-          1, RESTRICTED_EXCLUDING_MALLORY, { from: "user" }))
-          .rejects.toThrow(/not permitted to see/);
+      await expect(
+        impl.authorizeObservation(1, RESTRICTED_EXCLUDING_MALLORY, { from: "user" }),
+      ).rejects.toThrow(/not permitted to see/);
 
       // The blocked observation delivered no data, so the workspace is not restricted: no latch,
       // no action record -- and mallory, still authorized, was not torn down.

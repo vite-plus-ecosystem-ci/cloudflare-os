@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vite-plus/test";
 import {
   validateWebFetchUrl,
   webFetch,
@@ -54,9 +54,7 @@ describe("validateWebFetchUrl", () => {
   });
 
   it("rejects URLs with embedded credentials", () => {
-    expect(() => validateWebFetchUrl("https://user:pass@example.com/")).toThrow(
-      /credentials/,
-    );
+    expect(() => validateWebFetchUrl("https://user:pass@example.com/")).toThrow(/credentials/);
   });
 
   // Note: there are deliberately no tests asserting that "internal-looking" hostnames are
@@ -78,11 +76,12 @@ describe("webFetch document conversion", () => {
   });
 
   function mockResponse(body: BodyInit, contentType: string, status = 200) {
-    globalThis.fetch = vi.fn(async () =>
-      new Response(body, {
-        status,
-        headers: { "content-type": contentType },
-      }),
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(body, {
+          status,
+          headers: { "content-type": contentType },
+        }),
     ) as unknown as typeof globalThis.fetch;
   }
 
@@ -233,9 +232,7 @@ describe("webFetch document conversion", () => {
     }));
     const env = makeEnv(toMarkdown);
 
-    await expect(
-      webFetch(env, { url: "https://example.com/" }),
-    ).rejects.toThrow(/parser blew up/);
+    await expect(webFetch(env, { url: "https://example.com/" })).rejects.toThrow(/parser blew up/);
   });
 
   it("strips parameters from Content-Type before matching the conversion allow-list", async () => {

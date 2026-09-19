@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 import type { AiChatAuthorInfo, AiModelConfig } from "@gadgets/workshop-shared/api";
 import { getModel, type ModelHandle } from "../src/ai-models.js";
 
@@ -56,9 +56,13 @@ const fetchStub = (async (input: RequestInfo | URL, init?: RequestInit) => {
 
 // Runs one request through the handle with the fetch stub and returns what was sent.
 async function captureRequest(handle: ModelHandle): Promise<CapturedRequest> {
-  const stream = await handle.stream(handle.model, {
-    messages: [{ role: "user", content: "hello", timestamp: 0 }],
-  }, { fetch: fetchStub, maxRetries: 0 });
+  const stream = await handle.stream(
+    handle.model,
+    {
+      messages: [{ role: "user", content: "hello", timestamp: 0 }],
+    },
+    { fetch: fetchStub, maxRetries: 0 },
+  );
   const message = await stream.result();
   expect(message.stopReason).toBe("error");
   expect(capturedRequests.length).toBeGreaterThan(0);
@@ -78,7 +82,8 @@ describe("getModel AI Gateway routing", () => {
     expect(handle.model.api).toBe("anthropic-messages");
     expect(handle.model.id).toBe("claude-sonnet-4-5");
     expect(handle.model.baseUrl).toBe(
-        "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/anthropic");
+      "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/anthropic",
+    );
     expect(handle.aiGatewayLogRoute).toEqual({
       gateway: "platform-gateway",
       accountId: "gateway-account-id",
@@ -87,8 +92,9 @@ describe("getModel AI Gateway routing", () => {
 
     const request = await captureRequest(handle);
     expect(request.url).toBe(
-        "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/anthropic/" +
-        "v1/messages");
+      "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/anthropic/" +
+        "v1/messages",
+    );
     // Gateway-owned auth: the cf-aig token authorizes the request and the SDK's own auth
     // headers are suppressed so the gateway's server-managed provider keys apply.
     expect(request.headers.get("cf-aig-authorization")).toBe("Bearer gateway-token");
@@ -107,16 +113,21 @@ describe("getModel AI Gateway routing", () => {
     // the provider verbatim (taking precedence over the gateway's stored keys), so the documented
     // stored-key flow passes the gateway token as the SDK API key. The adapter rejects injected
     // fetch, so only the descriptor is asserted here; the header behavior is the SDK's.
-    const handle = getModel(env(), {
-      provider: "google",
-      model: "gemini-2.5-flash",
-      apiToken: "ignored-in-gateway-mode",
-    }, INITIATOR);
+    const handle = getModel(
+      env(),
+      {
+        provider: "google",
+        model: "gemini-2.5-flash",
+        apiToken: "ignored-in-gateway-mode",
+      },
+      INITIATOR,
+    );
 
     expect(handle.model.api).toBe("google-generative-ai");
     expect(handle.model.baseUrl).toBe(
-        "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/" +
-        "google-ai-studio/v1beta");
+      "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/" +
+        "google-ai-studio/v1beta",
+    );
     expect(handle.aiGatewayLogRoute).toEqual({
       gateway: "platform-gateway",
       accountId: "gateway-account-id",
@@ -140,14 +151,16 @@ describe("getModel AI Gateway routing", () => {
   }, 15000);
 
   it("requires the gateway account id whenever gateway mode is enabled", () => {
-    expect(() => getModel(env({ CF_AI_GATEWAY_ACCOUNT_ID: undefined }), ANTHROPIC_CONFIG,
-        INITIATOR)).toThrow("CF_AI_GATEWAY_ACCOUNT_ID is required when CF_AI_GATEWAY is set.");
+    expect(() =>
+      getModel(env({ CF_AI_GATEWAY_ACCOUNT_ID: undefined }), ANTHROPIC_CONFIG, INITIATOR),
+    ).toThrow("CF_AI_GATEWAY_ACCOUNT_ID is required when CF_AI_GATEWAY is set.");
   });
 
   it("requires a transport: the Workers AI binding or an API token", () => {
     // Without the binding (local dev without --use-workers-ai-binding), the token is required.
-    expect(() => getModel(env({ CF_AI_GATEWAY_API_TOKEN: undefined }), ANTHROPIC_CONFIG,
-        INITIATOR)).toThrow("AI Gateway mode needs a transport");
+    expect(() =>
+      getModel(env({ CF_AI_GATEWAY_API_TOKEN: undefined }), ANTHROPIC_CONFIG, INITIATOR),
+    ).toThrow("AI Gateway mode needs a transport");
   });
 
   it("prioritizes a connected user's Gateway over platform routing", async () => {
@@ -162,7 +175,8 @@ describe("getModel AI Gateway routing", () => {
     expect(handle.model.api).toBe("openai-completions");
     expect(handle.model.id).toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
     expect(handle.model.baseUrl).toBe(
-        "https://gateway.ai.cloudflare.com/v1/user-account-id/default/workers-ai/v1");
+      "https://gateway.ai.cloudflare.com/v1/user-account-id/default/workers-ai/v1",
+    );
     expect(handle.aiGatewayLogRoute).toEqual({
       gateway: "default",
       accountId: "user-account-id",
@@ -171,8 +185,9 @@ describe("getModel AI Gateway routing", () => {
 
     const request = await captureRequest(handle);
     expect(request.url).toBe(
-        "https://gateway.ai.cloudflare.com/v1/user-account-id/default/workers-ai/v1/" +
-        "chat/completions");
+      "https://gateway.ai.cloudflare.com/v1/user-account-id/default/workers-ai/v1/" +
+        "chat/completions",
+    );
     expect(request.headers.get("cf-aig-authorization")).toBe("Bearer user-token");
     expect(JSON.parse(request.headers.get("cf-aig-metadata")!)).toEqual({
       user: "user-123",
@@ -192,11 +207,13 @@ describe("getModel AI Gateway routing", () => {
     expect(handle.model.api).toBe("anthropic-messages");
     expect(handle.model.id).toBe("claude-sonnet-4-5");
     expect(handle.model.baseUrl).toBe(
-        "https://gateway.ai.cloudflare.com/v1/user-account-id/default/anthropic");
+      "https://gateway.ai.cloudflare.com/v1/user-account-id/default/anthropic",
+    );
 
     const request = await captureRequest(handle);
     expect(request.url).toBe(
-        "https://gateway.ai.cloudflare.com/v1/user-account-id/default/anthropic/v1/messages");
+      "https://gateway.ai.cloudflare.com/v1/user-account-id/default/anthropic/v1/messages",
+    );
     // The user's token authorizes the gateway; the SDK's own auth headers are suppressed so the
     // gateway's unified-billing provider keys apply.
     expect(request.headers.get("cf-aig-authorization")).toBe("Bearer user-token");
@@ -205,16 +222,19 @@ describe("getModel AI Gateway routing", () => {
   }, 15000);
 
   it("routes Workers AI through the platform gateway like every other provider", async () => {
-    const handle = getModel(env(), WORKERS_AI_CONFIG, INITIATOR,
-        { sessionAffinity: "session-a" });
-    const glm = getModel(env(),
-        {...WORKERS_AI_CONFIG, model: "@cf/zai-org/glm-5.3-flash"}, INITIATOR);
-    expect(glm.model).toMatchObject({reasoning: true, input: ["text", "image"]});
+    const handle = getModel(env(), WORKERS_AI_CONFIG, INITIATOR, { sessionAffinity: "session-a" });
+    const glm = getModel(
+      env(),
+      { ...WORKERS_AI_CONFIG, model: "@cf/zai-org/glm-5.3-flash" },
+      INITIATOR,
+    );
+    expect(glm.model).toMatchObject({ reasoning: true, input: ["text", "image"] });
 
     expect(handle.model.api).toBe("openai-completions");
     expect(handle.model.id).toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
     expect(handle.model.baseUrl).toBe(
-        "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/workers-ai/v1");
+      "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/workers-ai/v1",
+    );
     expect(handle.aiGatewayLogRoute).toEqual({
       gateway: "platform-gateway",
       accountId: "gateway-account-id",
@@ -223,8 +243,9 @@ describe("getModel AI Gateway routing", () => {
 
     const request = await captureRequest(handle);
     expect(request.url).toBe(
-        "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/workers-ai/" +
-        "v1/chat/completions");
+      "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/workers-ai/" +
+        "v1/chat/completions",
+    );
     expect(request.headers.get("cf-aig-authorization")).toBe("Bearer gateway-token");
     // Session affinity flows through (Workers AI models opt in to the affinity headers).
     expect(request.headers.get("x-session-affinity")).toBe("session-a");
@@ -256,8 +277,7 @@ describe("getModel AI Gateway binding transport", () => {
       });
       // Same non-retryable client error as the HTTP fetch stub: pi surfaces an error-stop
       // message and the request stays captured for assertions.
-      return Response.json(
-          { error: { type: "bad_request", message: "stubbed" } }, { status: 400 });
+      return Response.json({ error: { type: "bad_request", message: "stubbed" } }, { status: 400 });
     },
   } as unknown as Ai;
 
@@ -274,9 +294,13 @@ describe("getModel AI Gateway binding transport", () => {
   }
 
   async function captureEntry(handle: ModelHandle): Promise<CapturedBindingRequest> {
-    const stream = handle.stream(handle.model, {
-      messages: [{ role: "user", content: "hello", timestamp: 0 }],
-    }, { maxRetries: 0 });
+    const stream = handle.stream(
+      handle.model,
+      {
+        messages: [{ role: "user", content: "hello", timestamp: 0 }],
+      },
+      { maxRetries: 0 },
+    );
     const message = await stream.result();
     expect(message.stopReason).toBe("error");
     expect(capturedEntries.length).toBeGreaterThan(0);
@@ -297,13 +321,15 @@ describe("getModel AI Gateway binding transport", () => {
     // Binding-routed models address the gateway on the binding's host, which takes no account
     // id -- the binding channel carries identity.
     expect(handle.model.baseUrl).toBe(
-        "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/anthropic");
+      "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/anthropic",
+    );
     // Same-account log reads ride the binding too: no account id or token in the route.
     expect(handle.aiGatewayLogRoute).toEqual({ gateway: "platform-gateway" });
 
     const entry = await captureEntry(handle);
     expect(entry.url).toBe(
-        "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/anthropic/v1/messages");
+      "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/anthropic/v1/messages",
+    );
     expect(entry.method).toBe("POST");
     // The sentinel auth header satisfies pi's request-auth check; the gateway recognizes and
     // strips it on binding-routed requests, so the shim forwards it. The SDK's own auth
@@ -325,15 +351,18 @@ describe("getModel AI Gateway binding transport", () => {
     const handle = getModel(bindingEnv(), WORKERS_AI_CONFIG, INITIATOR);
 
     expect(handle.model.baseUrl).toBe(
-        "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/workers-ai/v1");
+      "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/workers-ai/v1",
+    );
     expect(handle.aiGatewayLogRoute).toEqual({ gateway: "platform-gateway" });
 
     const entry = await captureEntry(handle);
     expect(entry.url).toBe(
-        "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/workers-ai/" +
-        "v1/chat/completions");
-    expect((JSON.parse(entry.body) as { model: string }).model)
-        .toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+      "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/workers-ai/" +
+        "v1/chat/completions",
+    );
+    expect((JSON.parse(entry.body) as { model: string }).model).toBe(
+      "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    );
     // openai-completions adapters inject `Authorization: Bearer unused` under header-owned
     // auth; the gatewayAuthHeaders nulls must delete it before dispatch, else the gateway
     // would treat it as a request-supplied provider key overriding stored keys.
@@ -350,9 +379,9 @@ describe("getModel AI Gateway binding transport", () => {
     const request = await captureRequest(handle);
     expect(capturedEntries).toHaveLength(0);
     expect(request.url).toBe(
-        "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/anthropic/v1/messages");
-    expect(request.headers.get("cf-aig-authorization"))
-        .toBe("Bearer cloudflare-gateway-binding");
+      "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/anthropic/v1/messages",
+    );
+    expect(request.headers.get("cf-aig-authorization")).toBe("Bearer cloudflare-gateway-binding");
   }, 15000);
 
   it("keeps Google on HTTPS with the token while other providers use the binding", async () => {
@@ -364,40 +393,53 @@ describe("getModel AI Gateway binding transport", () => {
       WORKERS_AI: fakeBinding,
     });
 
-    const googleHandle = getModel(hybridEnv, {
-      provider: "google",
-      model: "gemini-2.5-flash",
-      apiToken: "ignored-in-gateway-mode",
-    }, INITIATOR);
+    const googleHandle = getModel(
+      hybridEnv,
+      {
+        provider: "google",
+        model: "gemini-2.5-flash",
+        apiToken: "ignored-in-gateway-mode",
+      },
+      INITIATOR,
+    );
     expect(googleHandle.model.baseUrl).toBe(
-        "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/" +
-        "google-ai-studio/v1beta");
+      "https://gateway.ai.cloudflare.com/v1/gateway-account-id/platform-gateway/" +
+        "google-ai-studio/v1beta",
+    );
     expect(googleHandle.aiGatewayLogRoute).toEqual({ gateway: "platform-gateway" });
 
     const anthropicHandle = getModel(hybridEnv, ANTHROPIC_CONFIG, INITIATOR);
     const entry = await captureEntry(anthropicHandle);
     expect(entry.url).toBe(
-        "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/anthropic/v1/messages");
+      "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/anthropic/v1/messages",
+    );
     // The binding arm carries the sentinel, never the real gateway token.
     expect(entry.headers["cf-aig-authorization"]).toBe("Bearer cloudflare-gateway-binding");
   }, 15000);
 
   it("requires the token when google is an enabled provider", () => {
-    expect(() => getModel(
+    expect(() =>
+      getModel(
         bindingEnv({ CF_AI_GATEWAY_PROVIDERS: "anthropic,google" }),
-        ANTHROPIC_CONFIG, INITIATOR)).toThrow(
-        "enabling the google provider requires CF_AI_GATEWAY_API_TOKEN");
+        ANTHROPIC_CONFIG,
+        INITIATOR,
+      ),
+    ).toThrow("enabling the google provider requires CF_AI_GATEWAY_API_TOKEN");
   });
 
   it("rejects a stored google config when the deployment has no token", () => {
-    expect(() => getModel(bindingEnv(), {
-      provider: "google",
-      model: "gemini-2.5-flash",
-      apiToken: "ignored-in-gateway-mode",
-    }, INITIATOR)).toThrow(
-        'Provider "google" cannot use the Workers AI binding transport');
+    expect(() =>
+      getModel(
+        bindingEnv(),
+        {
+          provider: "google",
+          model: "gemini-2.5-flash",
+          apiToken: "ignored-in-gateway-mode",
+        },
+        INITIATOR,
+      ),
+    ).toThrow('Provider "google" cannot use the Workers AI binding transport');
   });
-
 });
 
 describe("getModel direct routing (no gateway)", () => {
@@ -406,11 +448,15 @@ describe("getModel direct routing (no gateway)", () => {
   });
 
   it("uses the provider defaults and the config's own credentials", async () => {
-    const handle = getModel(env({ CF_AI_GATEWAY: undefined }), {
-      provider: "anthropic",
-      model: "claude-sonnet-4-5",
-      apiToken: "direct-api-token",
-    }, INITIATOR);
+    const handle = getModel(
+      env({ CF_AI_GATEWAY: undefined }),
+      {
+        provider: "anthropic",
+        model: "claude-sonnet-4-5",
+        apiToken: "direct-api-token",
+      },
+      INITIATOR,
+    );
 
     expect(handle.model.api).toBe("anthropic-messages");
     expect(handle.model.baseUrl).toBe("https://api.anthropic.com");
@@ -425,20 +471,26 @@ describe("getModel direct routing (no gateway)", () => {
   it("uses the config's own account and token for direct Workers AI", async () => {
     // Outside gateway mode, Workers AI is BYOK like any other provider: credentials come from
     // the model config (never from env, which only configures gateway mode).
-    const handle = getModel(env({ CF_AI_GATEWAY: undefined }), {
-      ...WORKERS_AI_CONFIG,
-      accountId: "user-account-id",
-      apiToken: "user-token",
-    }, INITIATOR);
+    const handle = getModel(
+      env({ CF_AI_GATEWAY: undefined }),
+      {
+        ...WORKERS_AI_CONFIG,
+        accountId: "user-account-id",
+        apiToken: "user-token",
+      },
+      INITIATOR,
+    );
 
     expect(handle.model.api).toBe("openai-completions");
     expect(handle.model.baseUrl).toBe(
-        "https://api.cloudflare.com/client/v4/accounts/user-account-id/ai/v1");
+      "https://api.cloudflare.com/client/v4/accounts/user-account-id/ai/v1",
+    );
     expect(handle.aiGatewayLogRoute).toBeUndefined();
 
     const request = await captureRequest(handle);
     expect(request.url).toBe(
-        "https://api.cloudflare.com/client/v4/accounts/user-account-id/ai/v1/chat/completions");
+      "https://api.cloudflare.com/client/v4/accounts/user-account-id/ai/v1/chat/completions",
+    );
     expect(request.headers.get("authorization")).toBe("Bearer user-token");
   }, 15000);
 
@@ -447,18 +499,26 @@ describe("getModel direct routing (no gateway)", () => {
     { accountId: "user-account-id", apiToken: "" },
   ])("requires config credentials for direct Workers AI", (overrides) => {
     // Pre-BYOK configs (saved when Workers AI needed no credentials) fail with a clear message.
-    expect(() => getModel(env({ CF_AI_GATEWAY: undefined }),
-        { ...WORKERS_AI_CONFIG, ...overrides }, INITIATOR))
-        .toThrow("This Workers AI model has no Cloudflare credentials.");
+    expect(() =>
+      getModel(
+        env({ CF_AI_GATEWAY: undefined }),
+        { ...WORKERS_AI_CONFIG, ...overrides },
+        INITIATOR,
+      ),
+    ).toThrow("This Workers AI model has no Cloudflare credentials.");
   });
 
   it("appends /v1 to an Ollama server base URL", () => {
-    const handle = getModel(env({ CF_AI_GATEWAY: undefined }), {
-      provider: "ollama",
-      model: "qwen3:8b",
-      apiToken: "",
-      apiUrl: "http://my-ollama:11434/",
-    }, INITIATOR);
+    const handle = getModel(
+      env({ CF_AI_GATEWAY: undefined }),
+      {
+        provider: "ollama",
+        model: "qwen3:8b",
+        apiToken: "",
+        apiUrl: "http://my-ollama:11434/",
+      },
+      INITIATOR,
+    );
 
     expect(handle.model.api).toBe("openai-completions");
     expect(handle.model.baseUrl).toBe("http://my-ollama:11434/v1");
@@ -467,12 +527,16 @@ describe("getModel direct routing (no gateway)", () => {
   it("sends no Authorization header for an Ollama config without an API key", async () => {
     // An empty token means local auth: a strict local proxy may reject an unexpected bearer
     // token, so no Authorization header is sent at all (matching the pre-pi provider).
-    const handle = getModel(env({ CF_AI_GATEWAY: undefined }), {
-      provider: "ollama",
-      model: "qwen3:8b",
-      apiToken: "",
-      apiUrl: "http://my-ollama:11434",
-    }, INITIATOR);
+    const handle = getModel(
+      env({ CF_AI_GATEWAY: undefined }),
+      {
+        provider: "ollama",
+        model: "qwen3:8b",
+        apiToken: "",
+        apiUrl: "http://my-ollama:11434",
+      },
+      INITIATOR,
+    );
 
     const request = await captureRequest(handle);
     expect(request.url).toBe("http://my-ollama:11434/v1/chat/completions");
@@ -480,12 +544,16 @@ describe("getModel direct routing (no gateway)", () => {
   }, 15000);
 
   it("sends the configured Ollama API key as a bearer token", async () => {
-    const handle = getModel(env({ CF_AI_GATEWAY: undefined }), {
-      provider: "ollama",
-      model: "qwen3:8b",
-      apiToken: "ollama-token",
-      apiUrl: "http://my-ollama:11434",
-    }, INITIATOR);
+    const handle = getModel(
+      env({ CF_AI_GATEWAY: undefined }),
+      {
+        provider: "ollama",
+        model: "qwen3:8b",
+        apiToken: "ollama-token",
+        apiUrl: "http://my-ollama:11434",
+      },
+      INITIATOR,
+    );
 
     const request = await captureRequest(handle);
     expect(request.headers.get("authorization")).toBe("Bearer ollama-token");
@@ -494,12 +562,16 @@ describe("getModel direct routing (no gateway)", () => {
   it("strips a legacy /api (or /v1) suffix from an Ollama base URL", () => {
     // Configs saved before the pi migration store the native-API base (".../api").
     for (const apiUrl of ["http://my-ollama:11434/api", "http://my-ollama:11434/v1/"]) {
-      const handle = getModel(env({ CF_AI_GATEWAY: undefined }), {
-        provider: "ollama",
-        model: "qwen3:8b",
-        apiToken: "",
-        apiUrl,
-      }, INITIATOR);
+      const handle = getModel(
+        env({ CF_AI_GATEWAY: undefined }),
+        {
+          provider: "ollama",
+          model: "qwen3:8b",
+          apiToken: "",
+          apiUrl,
+        },
+        INITIATOR,
+      );
       expect(handle.model.baseUrl).toBe("http://my-ollama:11434/v1");
     }
   });
@@ -517,13 +589,19 @@ describe("PDF attachment bridging", () => {
   const PNG_PART = { type: "image" as const, data: "iVBOR", mimeType: "image/png" };
 
   async function capturePdfRequest(handle: ModelHandle): Promise<unknown> {
-    const stream = handle.stream(handle.model, {
-      messages: [{
-        role: "user",
-        content: [{ type: "text", text: "Summarize the attached PDF." }, PDF_PART, PNG_PART],
-        timestamp: 0,
-      }],
-    }, { fetch: fetchStub, maxRetries: 0 });
+    const stream = handle.stream(
+      handle.model,
+      {
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "text", text: "Summarize the attached PDF." }, PDF_PART, PNG_PART],
+            timestamp: 0,
+          },
+        ],
+      },
+      { fetch: fetchStub, maxRetries: 0 },
+    );
     const message = await stream.result();
     expect(message.stopReason).toBe("error");
     return JSON.parse(capturedRequests[0].body);
@@ -531,32 +609,45 @@ describe("PDF attachment bridging", () => {
 
   it("sends Anthropic PDFs as document blocks", async () => {
     const handle = getModel(env(), ANTHROPIC_CONFIG, INITIATOR);
-    const body = await capturePdfRequest(handle) as
-        { messages: { content: { type: string; source?: { media_type: string } }[] }[] };
+    const body = (await capturePdfRequest(handle)) as {
+      messages: { content: { type: string; source?: { media_type: string } }[] }[];
+    };
 
     const blocks = body.messages[0].content;
-    expect(blocks).toContainEqual(expect.objectContaining({
-      type: "document",
-      source: expect.objectContaining({ media_type: "application/pdf", data: "JVBERi0=" }),
-    }));
+    expect(blocks).toContainEqual(
+      expect.objectContaining({
+        type: "document",
+        source: expect.objectContaining({ media_type: "application/pdf", data: "JVBERi0=" }),
+      }),
+    );
     // A real image in the same message stays an image block.
-    expect(blocks).toContainEqual(expect.objectContaining({
-      type: "image",
-      source: expect.objectContaining({ media_type: "image/png" }),
-    }));
-    expect(blocks.some((block) => block.source?.media_type === "application/pdf" &&
-        block.type !== "document")).toBe(false);
+    expect(blocks).toContainEqual(
+      expect.objectContaining({
+        type: "image",
+        source: expect.objectContaining({ media_type: "image/png" }),
+      }),
+    );
+    expect(
+      blocks.some(
+        (block) => block.source?.media_type === "application/pdf" && block.type !== "document",
+      ),
+    ).toBe(false);
   }, 15000);
 
   it("sends OpenAI PDFs as input_file parts", async () => {
-    const handle = getModel(env({ CF_AI_GATEWAY: undefined }), {
-      provider: "openai",
-      model: "gpt-5.2",
-      apiToken: "direct-api-token",
-    }, INITIATOR);
+    const handle = getModel(
+      env({ CF_AI_GATEWAY: undefined }),
+      {
+        provider: "openai",
+        model: "gpt-5.2",
+        apiToken: "direct-api-token",
+      },
+      INITIATOR,
+    );
     expect(handle.model.api).toBe("openai-responses");
-    const body = await capturePdfRequest(handle) as
-        { input: { role?: string; content: { type: string; image_url?: string }[] }[] };
+    const body = (await capturePdfRequest(handle)) as {
+      input: { role?: string; content: { type: string; image_url?: string }[] }[];
+    };
 
     const parts = body.input.find((item) => item.role === "user")!.content;
     expect(parts).toContainEqual({
@@ -564,9 +655,11 @@ describe("PDF attachment bridging", () => {
       filename: "attachment.pdf",
       file_data: "data:application/pdf;base64,JVBERi0=",
     });
-    expect(parts).toContainEqual(expect.objectContaining({
-      type: "input_image",
-      image_url: "data:image/png;base64,iVBOR",
-    }));
+    expect(parts).toContainEqual(
+      expect.objectContaining({
+        type: "input_image",
+        image_url: "data:image/png;base64,iVBOR",
+      }),
+    );
   }, 15000);
 });
