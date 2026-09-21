@@ -158,8 +158,10 @@ export interface BigQuerySession {
    * @param sql - Standard SQL query.
    * @param opts - Optional query options (params and defaultDataset; other options ignored).
    */
-  dryRun(sql: string, opts?: Pick<BigQueryQueryOptions, "defaultDataset" | "params">):
-      Promise<BigQueryDryRunResult>;
+  dryRun(
+    sql: string,
+    opts?: Pick<BigQueryQueryOptions, "defaultDataset" | "params">,
+  ): Promise<BigQueryDryRunResult>;
 
   /** Return the GCP project this session is scoped to. */
   getProject(): Promise<BigQueryProject>;
@@ -187,6 +189,9 @@ export interface BigQuerySession {
    * @param datasetId - Dataset ID. Defaults to the scoped dataset, if any.
    * @param projectId - Project ID. Defaults to the scoped project.
    */
-  describeTable(tableId?: string, datasetId?: string, projectId?: string):
-      Promise<{ table: BigQueryTable; schema: BigQueryField[] }>;
+  describeTable(
+    tableId?: string,
+    datasetId?: string,
+    projectId?: string,
+  ): Promise<{ table: BigQueryTable; schema: BigQueryField[] }>;
 }

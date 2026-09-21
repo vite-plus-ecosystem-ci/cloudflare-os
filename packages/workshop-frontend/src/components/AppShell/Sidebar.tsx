@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router'
+import { Link } from "@tanstack/react-router";
 import {
   Blueprint,
   BookOpen,
@@ -9,18 +9,18 @@ import {
   SidebarSimple,
   SquaresFour,
   Stack,
-} from '@phosphor-icons/react'
-import { useSiteName } from '../../ServerConfigContext'
-import SiteLogo from '../SiteLogo'
-import { useGatekeeperApps } from '../../useGatekeeperApps'
-import { openCommandPalette } from './commandPaletteBus'
-import SidebarItem from './SidebarItem'
+} from "@phosphor-icons/react";
+import { useSiteName } from "../../ServerConfigContext";
+import SiteLogo from "../SiteLogo";
+import { useGatekeeperApps } from "../../useGatekeeperApps";
+import { openCommandPalette } from "./commandPaletteBus";
+import SidebarItem from "./SidebarItem";
 import {
   SidebarWorkspacesProvider,
   SidebarWorkspacesTools,
   SidebarWorkspacesLists,
-} from './SidebarWorkspaces'
-import SidebarUtilityStrip from './SidebarUtilityStrip'
+} from "./SidebarWorkspaces";
+import SidebarUtilityStrip from "./SidebarUtilityStrip";
 
 /**
  * The persistent left rail. Three pinned regions sandwich a single scrolling region of lists, so
@@ -38,14 +38,14 @@ export default function Sidebar({
   collapsed,
   onToggleCollapsed,
 }: {
-  collapsed: boolean
-  onToggleCollapsed: () => void
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }) {
-  const siteName = useSiteName()
+  const siteName = useSiteName();
   // Gatekeeper-served management apps the user can reach now (one per gatekeeper that provides a UI
   // and is connected / enabled for everyone). Disabled or not-yet-connected ones aren't returned, so
   // they simply don't appear. The set is fully dynamic — no gatekeeper is hardcoded.
-  const gatekeeperApps = useGatekeeperApps()
+  const gatekeeperApps = useGatekeeperApps();
 
   return (
     <aside
@@ -53,17 +53,17 @@ export default function Sidebar({
       className={[
         // Sidebar is the app chrome: a hair greyer than the (lighter) content canvas so the two
         // surfaces read as distinct without a heavy divider.
-        'flex h-full flex-col border-r border-kumo-line bg-kumo-elevated',
-        collapsed ? 'w-[56px]' : 'w-[min(320px,100vw)] md:w-[260px]',
-        'shrink-0 transition-[width] duration-200 ease-out',
-      ].join(' ')}
+        "flex h-full flex-col border-r border-kumo-line bg-kumo-elevated",
+        collapsed ? "w-[56px]" : "w-[min(320px,100vw)] md:w-[260px]",
+        "shrink-0 transition-[width] duration-200 ease-out",
+      ].join(" ")}
     >
       {/* Brand row */}
       <div
         className={[
-          'flex h-14 shrink-0 items-center border-b border-kumo-line',
-          collapsed ? 'justify-center px-1.5' : 'justify-between gap-2 px-3',
-        ].join(' ')}
+          "flex h-14 shrink-0 items-center border-b border-kumo-line",
+          collapsed ? "justify-center px-1.5" : "justify-between gap-2 px-3",
+        ].join(" ")}
       >
         <Link to="/" aria-label={siteName} className="flex min-w-0 items-center gap-2">
           <SiteLogo size={20} className="shrink-0">
@@ -145,40 +145,40 @@ export default function Sidebar({
             {gatekeeperApps.map((app) => {
               // Escape the icon URL for safe interpolation into a CSS url("…") string.
               const maskUrl = app.icon
-                ? `url("${app.icon.url.replace(/[\\"]/g, '\\$&')}")`
-                : undefined
+                ? `url("${app.icon.url.replace(/[\\"]/g, "\\$&")}")`
+                : undefined;
               return (
-              <SidebarItem
-                key={app.id}
-                to="/gatekeepers/$appId"
-                params={{ appId: app.id }}
-                label={app.title}
-                icon={
-                  maskUrl ? (
-                    // Render the (monochrome) app icon as a CSS mask filled with the row's current
-                    // text color, so it tints like the Phosphor icons — subtle by default, accent
-                    // when active, darker on hover.
-                    <span
-                      aria-hidden
-                      className="h-3.5 w-3.5 bg-current"
-                      style={{
-                        maskImage: maskUrl,
-                        WebkitMaskImage: maskUrl,
-                        maskRepeat: 'no-repeat',
-                        WebkitMaskRepeat: 'no-repeat',
-                        maskPosition: 'center',
-                        WebkitMaskPosition: 'center',
-                        maskSize: 'contain',
-                        WebkitMaskSize: 'contain',
-                      }}
-                    />
-                  ) : (
-                    <BookOpen size={14} weight="regular" />
-                  )
-                }
-                collapsed={collapsed}
-              />
-              )
+                <SidebarItem
+                  key={app.id}
+                  to="/gatekeepers/$appId"
+                  params={{ appId: app.id }}
+                  label={app.title}
+                  icon={
+                    maskUrl ? (
+                      // Render the (monochrome) app icon as a CSS mask filled with the row's current
+                      // text color, so it tints like the Phosphor icons — subtle by default, accent
+                      // when active, darker on hover.
+                      <span
+                        aria-hidden
+                        className="h-3.5 w-3.5 bg-current"
+                        style={{
+                          maskImage: maskUrl,
+                          WebkitMaskImage: maskUrl,
+                          maskRepeat: "no-repeat",
+                          WebkitMaskRepeat: "no-repeat",
+                          maskPosition: "center",
+                          WebkitMaskPosition: "center",
+                          maskSize: "contain",
+                          WebkitMaskSize: "contain",
+                        }}
+                      />
+                    ) : (
+                      <BookOpen size={14} weight="regular" />
+                    )
+                  }
+                  collapsed={collapsed}
+                />
+              );
             })}
             <SidebarItem
               to="/explore"
@@ -201,5 +201,5 @@ export default function Sidebar({
 
       <SidebarUtilityStrip collapsed={collapsed} />
     </aside>
-  )
+  );
 }

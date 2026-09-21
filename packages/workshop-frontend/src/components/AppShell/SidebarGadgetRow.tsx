@@ -1,16 +1,16 @@
-import { Link } from '@tanstack/react-router'
-import { DotsThree, Star, ShareNetwork, Trash, Pencil } from '@phosphor-icons/react'
-import { DropdownMenu } from '@cloudflare/kumo'
-import { MENU_CONTENT, MENU_ITEM, MENU_ITEM_DANGER, MENU_POSITIONER_STYLE } from '../menuStyles'
-import { useState, useEffect, useRef } from 'react'
-import type { GadgetMetadataWithTimestamps } from '@gadgets/workshop-shared/api'
-import { isImeComposing } from '../../keyboardEvent'
+import { Link } from "@tanstack/react-router";
+import { DotsThree, Star, ShareNetwork, Trash, Pencil } from "@phosphor-icons/react";
+import { DropdownMenu } from "@cloudflare/kumo";
+import { MENU_CONTENT, MENU_ITEM, MENU_ITEM_DANGER, MENU_POSITIONER_STYLE } from "../menuStyles";
+import { useState, useEffect, useRef } from "react";
+import type { GadgetMetadataWithTimestamps } from "@gadgets/workshop-shared/api";
+import { isImeComposing } from "../../keyboardEvent";
 
 function initials(title: string | undefined): string {
-  const t = (title || 'Untitled').trim()
-  if (!t) return 'UG'
-  const parts = t.split(/\s+/).slice(0, 2)
-  return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || t.slice(0, 2).toUpperCase()
+  const t = (title || "Untitled").trim();
+  if (!t) return "UG";
+  const parts = t.split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || t.slice(0, 2).toUpperCase();
 }
 
 /**
@@ -26,42 +26,45 @@ export default function SidebarGadgetRow({
   onShare,
   onDelete,
 }: {
-  gadget: GadgetMetadataWithTimestamps
-  collapsed?: boolean
-  onTogglePin: (g: GadgetMetadataWithTimestamps) => void
-  onRename: (g: GadgetMetadataWithTimestamps, newTitle: string) => void
-  onShare: (g: GadgetMetadataWithTimestamps) => void
-  onDelete: (g: GadgetMetadataWithTimestamps) => void
+  gadget: GadgetMetadataWithTimestamps;
+  collapsed?: boolean;
+  onTogglePin: (g: GadgetMetadataWithTimestamps) => void;
+  onRename: (g: GadgetMetadataWithTimestamps, newTitle: string) => void;
+  onShare: (g: GadgetMetadataWithTimestamps) => void;
+  onDelete: (g: GadgetMetadataWithTimestamps) => void;
 }) {
-  const [renaming, setRenaming] = useState(false)
-  const [renameValue, setRenameValue] = useState(gadget.title || '')
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(gadget.title || "");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (renaming) inputRef.current?.focus()
-  }, [renaming])
+    if (renaming) inputRef.current?.focus();
+  }, [renaming]);
 
   const commit = () => {
-    const trimmed = renameValue.trim()
-    if (trimmed && trimmed !== gadget.title) onRename(gadget, trimmed)
-    setRenaming(false)
-  }
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== gadget.title) onRename(gadget, trimmed);
+    setRenaming(false);
+  };
 
   const startRename = () => {
-    setRenameValue(gadget.title || '')
-    setRenaming(true)
-  }
+    setRenameValue(gadget.title || "");
+    setRenaming(true);
+  };
 
   return (
     <Link
       to="/workspace/$id"
       params={{ id: gadget.id }}
       className="group flex h-8 items-center gap-2 rounded-lg pl-1.5 pr-1 text-[13px] leading-[18px] tracking-[-0.25px] text-kumo-default transition-colors hover:bg-kumo-tint"
-      activeProps={{ className: 'flex h-8 items-center gap-2 rounded-lg pl-1.5 pr-1 text-[13px] leading-[18px] tracking-[-0.25px] bg-kumo-fill text-kumo-strong font-medium' }}
-      onClick={(e) => {
-        if (renaming) e.preventDefault()
+      activeProps={{
+        className:
+          "flex h-8 items-center gap-2 rounded-lg pl-1.5 pr-1 text-[13px] leading-[18px] tracking-[-0.25px] bg-kumo-fill text-kumo-strong font-medium",
       }}
-      title={collapsed ? gadget.title || 'Untitled workspace' : undefined}
+      onClick={(e) => {
+        if (renaming) e.preventDefault();
+      }}
+      title={collapsed ? gadget.title || "Untitled workspace" : undefined}
     >
       <div
         className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-kumo-fill text-[10px] font-medium text-kumo-subtle"
@@ -79,20 +82,25 @@ export default function SidebarGadgetRow({
               onChange={(e) => setRenameValue(e.target.value)}
               onBlur={commit}
               onKeyDown={(e) => {
-                if (isImeComposing(e)) return
-                if (e.key === 'Enter') commit()
-                if (e.key === 'Escape') setRenaming(false)
+                if (isImeComposing(e)) return;
+                if (e.key === "Enter") commit();
+                if (e.key === "Escape") setRenaming(false);
               }}
               className="min-w-0 flex-1 bg-transparent text-[13px] leading-[18px] tracking-[-0.25px] outline-none border-b border-kumo-brand text-kumo-default"
               onClick={(e) => e.preventDefault()}
             />
           ) : (
-            <span className="min-w-0 flex-1 truncate">{gadget.title || 'Untitled workspace'}</span>
+            <span className="min-w-0 flex-1 truncate">{gadget.title || "Untitled workspace"}</span>
           )}
 
           {/* Inside the row's <Link>: stopPropagation blocks the Link's SPA handler, so preventDefault
               is needed to stop the native <a> from navigating. */}
-          <div onClick={(e) => { e.stopPropagation(); e.preventDefault() }}>
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+          >
             <DropdownMenu>
               <DropdownMenu.Trigger
                 render={
@@ -106,23 +114,14 @@ export default function SidebarGadgetRow({
                 }
               />
               <DropdownMenu.Content className={MENU_CONTENT} style={MENU_POSITIONER_STYLE}>
-                <DropdownMenu.Item
-                  onClick={startRename}
-                  className={MENU_ITEM}
-                >
+                <DropdownMenu.Item onClick={startRename} className={MENU_ITEM}>
                   <Pencil size={13} className="mr-2" /> Rename
                 </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  onClick={() => onTogglePin(gadget)}
-                  className={MENU_ITEM}
-                >
-                  <Star size={13} className="mr-2" weight={gadget.pinned ? 'fill' : 'regular'} />
-                  {gadget.pinned ? 'Unfavorite' : 'Favorite'}
+                <DropdownMenu.Item onClick={() => onTogglePin(gadget)} className={MENU_ITEM}>
+                  <Star size={13} className="mr-2" weight={gadget.pinned ? "fill" : "regular"} />
+                  {gadget.pinned ? "Unfavorite" : "Favorite"}
                 </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  onClick={() => onShare(gadget)}
-                  className={MENU_ITEM}
-                >
+                <DropdownMenu.Item onClick={() => onShare(gadget)} className={MENU_ITEM}>
                   <ShareNetwork size={13} className="mr-2" /> Share
                 </DropdownMenu.Item>
                 <DropdownMenu.Separator />
@@ -132,7 +131,7 @@ export default function SidebarGadgetRow({
                   className={MENU_ITEM_DANGER}
                 >
                   <Trash size={13} className="mr-2" />
-                  {gadget.owner ? 'Dismiss' : 'Delete'}
+                  {gadget.owner ? "Dismiss" : "Delete"}
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu>
@@ -141,7 +140,7 @@ export default function SidebarGadgetRow({
       )}
 
       {/* Collapsed rows show only the monogram (aria-hidden), so name the link for screen readers. */}
-      {collapsed && <span className="sr-only">{gadget.title || 'Untitled workspace'}</span>}
+      {collapsed && <span className="sr-only">{gadget.title || "Untitled workspace"}</span>}
     </Link>
-  )
+  );
 }

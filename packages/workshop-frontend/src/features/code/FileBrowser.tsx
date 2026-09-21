@@ -1,16 +1,37 @@
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
-import { Collapsible, Dialog, DropdownMenu, useKumoToastManager } from '@cloudflare/kumo'
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { Collapsible, Dialog, DropdownMenu, useKumoToastManager } from "@cloudflare/kumo";
 import {
-  CaretDown, CaretRight, Cube, DotsThree, DownloadSimple, File, FolderSimple, LinkSimple, Pencil,
-  Plus, TerminalWindow, Trash, X, type Icon,
-} from '@phosphor-icons/react'
-import DeleteConfirmationDialog from '../../components/DeleteConfirmationDialog'
-import { WorkshopButton, WorkshopIconButton, WorkshopInput } from '../../components/WorkshopControls'
-import { isImeComposing } from '../../keyboardEvent'
+  CaretDown,
+  CaretRight,
+  Cube,
+  DotsThree,
+  DownloadSimple,
+  File,
+  FolderSimple,
+  LinkSimple,
+  Pencil,
+  Plus,
+  TerminalWindow,
+  Trash,
+  X,
+  type Icon,
+} from "@phosphor-icons/react";
+import DeleteConfirmationDialog from "../../components/DeleteConfirmationDialog";
 import {
-  ancestorDirs, resolveRenamePath, type BrowserNode, type BrowserTree, type ChangedFile,
-  type FileChangeStatus, type LeafKind,
-} from './workpieceTree'
+  WorkshopButton,
+  WorkshopIconButton,
+  WorkshopInput,
+} from "../../components/WorkshopControls";
+import { isImeComposing } from "../../keyboardEvent";
+import {
+  ancestorDirs,
+  resolveRenamePath,
+  type BrowserNode,
+  type BrowserTree,
+  type ChangedFile,
+  type FileChangeStatus,
+  type LeafKind,
+} from "./workpieceTree";
 
 // The code view's file browser: a Changes list (the files that differ from the review base, flat,
 // with status dots) above the Files tree (the workpiece's whole displayed tree; see
@@ -24,60 +45,60 @@ import {
 // CodeChange has no way to say "same mode at a new path".
 
 /** Trees with more leaves than this open collapsed to their first level. */
-const LARGE_TREE_LEAVES = 200
+const LARGE_TREE_LEAVES = 200;
 
-const INDENT_PX = 12
-const ROW_BASE_PADDING_PX = 8
+const INDENT_PX = 12;
+const ROW_BASE_PADDING_PX = 8;
 
 // Which listing a row belongs to (see the rename state).
-type RowSection = 'changes' | 'tree'
+type RowSection = "changes" | "tree";
 
 interface FileBrowserProps {
-  tree: BrowserTree
+  tree: BrowserTree;
   // The files that differ from the review base, in path order. The Changes section shows only
   // while this is non-empty and `isDiffMode`.
-  changes: readonly ChangedFile[]
+  changes: readonly ChangedFile[];
   // Statuses for the tree rows' dots; a path with no entry (or 'unchanged') shows none.
-  statuses?: ReadonlyMap<string, FileChangeStatus>
-  activeFile: string | null
-  streamingActiveFile?: string | null
-  isDiffMode: boolean
-  editLocked: boolean
+  statuses?: ReadonlyMap<string, FileChangeStatus>;
+  activeFile: string | null;
+  streamingActiveFile?: string | null;
+  isDiffMode: boolean;
+  editLocked: boolean;
   // What the workpiece is called in dialog copy: "gadget" or "worktree".
-  workpieceNoun: string
+  workpieceNoun: string;
   // The directories the user has explicitly opened or closed, by path, as last reported through
   // `onExpandedChange`. The browser owns this state from mount on; the pair lets the parent carry
   // it across the remount that a workpiece switch and switch-back is (see WorkpieceCodeInterface).
-  initialExpanded?: ExpandedDirs
-  onExpandedChange?: (expanded: ExpandedDirs) => void
-  onFileSelect: (path: string) => void
+  initialExpanded?: ExpandedDirs;
+  onExpandedChange?: (expanded: ExpandedDirs) => void;
+  onFileSelect: (path: string) => void;
   // `path` is relative to the tree root; the dialog accepts `dir/name.ext`.
-  onFileCreate: (path: string) => void
-  onFileDelete: (path: string) => void
-  onFileRename: (oldPath: string, newPath: string) => void
-  onFileDownload: (path: string) => void
-  className?: string
-  onRequestClose?: () => void
-  ref?: Ref<FileBrowserHandle>
+  onFileCreate: (path: string) => void;
+  onFileDelete: (path: string) => void;
+  onFileRename: (oldPath: string, newPath: string) => void;
+  onFileDownload: (path: string) => void;
+  className?: string;
+  onRequestClose?: () => void;
+  ref?: Ref<FileBrowserHandle>;
 }
 
 export interface FileBrowserHandle {
-  openCreateModal: () => void
+  openCreateModal: () => void;
 }
 
 /**
  * Explicit per-directory expansion toggles: directory path -> open. A directory with no entry
  * follows the tree's size-dependent default (see LARGE_TREE_LEAVES).
  */
-export type ExpandedDirs = ReadonlyMap<string, boolean>
+export type ExpandedDirs = ReadonlyMap<string, boolean>;
 
 /** Whether a leaf of this kind has text to show. */
 export function isOpenableKind(kind: LeafKind | undefined): boolean {
-  return kind === 'file' || kind === 'executable'
+  return kind === "file" || kind === "executable";
 }
 
 const SECTION_HEADER_CLASS =
-  'text-[11px] font-medium uppercase tracking-[0.08em] text-kumo-inactive'
+  "text-[11px] font-medium uppercase tracking-[0.08em] text-kumo-inactive";
 
 export default function FileBrowser({
   tree,
@@ -95,110 +116,116 @@ export default function FileBrowser({
   onFileDelete,
   onFileRename,
   onFileDownload,
-  className = '',
+  className = "",
   onRequestClose,
   ref,
 }: FileBrowserProps) {
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [deletingFile, setDeletingFile] = useState<string | null>(null)
-  const [newFileName, setNewFileName] = useState('')
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [deletingFile, setDeletingFile] = useState<string | null>(null);
+  const [newFileName, setNewFileName] = useState("");
   // A changed file is listed twice -- under Changes and in the tree -- so the row in rename mode
   // is identified by section as well as path: two inputs for one path would each take focus,
   // and the blur of the first would cancel the rename before it began.
-  const [renaming, setRenaming] = useState<{ path: string; section: RowSection } | null>(null)
+  const [renaming, setRenaming] = useState<{ path: string; section: RowSection } | null>(null);
 
-  useImperativeHandle(ref, () => ({
-    openCreateModal: () => setIsCreateModalOpen(true),
-  }), [])
+  useImperativeHandle(
+    ref,
+    () => ({
+      openCreateModal: () => setIsCreateModalOpen(true),
+    }),
+    [],
+  );
 
-  const toasts = useKumoToastManager()
+  const toasts = useKumoToastManager();
 
   // Per-directory expansion: explicit toggles over a size-dependent default (small trees open,
   // large ones collapsed to their first level). The active file's ancestors are opened whenever
   // the selection moves, so a file the agent starts editing -- or one picked from the Changes
   // list -- is always in view; the user can still collapse them afterwards.
-  const defaultExpanded = tree.leaves.size <= LARGE_TREE_LEAVES
-  const [expanded, setExpanded] = useState<ExpandedDirs>(() => initialExpanded ?? new Map())
-  const [revealedFile, setRevealedFile] = useState<string | null>(null)
+  const defaultExpanded = tree.leaves.size <= LARGE_TREE_LEAVES;
+  const [expanded, setExpanded] = useState<ExpandedDirs>(() => initialExpanded ?? new Map());
+  const [revealedFile, setRevealedFile] = useState<string | null>(null);
   if (activeFile !== revealedFile) {
-    setRevealedFile(activeFile)
+    setRevealedFile(activeFile);
     if (activeFile !== null) {
-      const dirs = ancestorDirs(activeFile).filter(dir => !(expanded.get(dir) ?? defaultExpanded))
+      const dirs = ancestorDirs(activeFile).filter(
+        (dir) => !(expanded.get(dir) ?? defaultExpanded),
+      );
       if (dirs.length > 0) {
-        const next = new Map(expanded)
-        for (const dir of dirs) next.set(dir, true)
-        setExpanded(next)
+        const next = new Map(expanded);
+        for (const dir of dirs) next.set(dir, true);
+        setExpanded(next);
       }
     }
   }
-  const isExpanded = (dir: string) => expanded.get(dir) ?? defaultExpanded
+  const isExpanded = (dir: string) => expanded.get(dir) ?? defaultExpanded;
   const setDirExpanded = (dir: string, open: boolean) => {
-    setExpanded(current => {
-      const next = new Map(current)
-      next.set(dir, open)
-      return next
-    })
-  }
+    setExpanded((current) => {
+      const next = new Map(current);
+      next.set(dir, open);
+      return next;
+    });
+  };
   // Reported from an effect rather than from the setters, because the reveal above updates the
   // state during render, where a parent callback may not run.
-  const onExpandedChangeRef = useRef(onExpandedChange)
-  onExpandedChangeRef.current = onExpandedChange
+  const onExpandedChangeRef = useRef(onExpandedChange);
+  onExpandedChangeRef.current = onExpandedChange;
   useEffect(() => {
-    onExpandedChangeRef.current?.(expanded)
-  }, [expanded])
+    onExpandedChangeRef.current?.(expanded);
+  }, [expanded]);
 
   const handleCreateFile = () => {
-    const path = newFileName.trim()
+    const path = newFileName.trim();
     if (!path) {
-      toasts.add({ title: 'Filename cannot be empty', variant: 'error' })
-      return
+      toasts.add({ title: "Filename cannot be empty", variant: "error" });
+      return;
     }
     if (tree.leaves.has(path)) {
-      toasts.add({ title: 'A file with this name already exists', variant: 'error' })
-      return
+      toasts.add({ title: "A file with this name already exists", variant: "error" });
+      return;
     }
-    onFileCreate(path)
-    setNewFileName('')
-    setIsCreateModalOpen(false)
-  }
+    onFileCreate(path);
+    setNewFileName("");
+    setIsCreateModalOpen(false);
+  };
 
   // The rename input edits the leaf's name within its directory; a name containing '/' moves the
   // file relative to that directory (see resolveRenamePath for `..` and root-relative forms).
   const commitRename = (path: string, nextName: string) => {
-    const trimmed = nextName.trim()
+    const trimmed = nextName.trim();
     if (!trimmed) {
-      setRenaming(null)
-      return
+      setRenaming(null);
+      return;
     }
-    const nextPath = resolveRenamePath(path, trimmed)
+    const nextPath = resolveRenamePath(path, trimmed);
     if (nextPath === null) {
-      toasts.add({ title: 'Invalid file path', variant: 'error' })
-      return
+      toasts.add({ title: "Invalid file path", variant: "error" });
+      return;
     }
     if (nextPath === path) {
-      setRenaming(null)
-      return
+      setRenaming(null);
+      return;
     }
     if (tree.leaves.has(nextPath)) {
-      toasts.add({ title: 'A file with this name already exists', variant: 'error' })
-      return
+      toasts.add({ title: "A file with this name already exists", variant: "error" });
+      return;
     }
-    onFileRename(path, nextPath)
-    setRenaming(null)
-  }
+    onFileRename(path, nextPath);
+    setRenaming(null);
+  };
 
   const startDelete = (path: string) => {
     if (tree.leaves.size <= 1) {
-      toasts.add({ title: 'Cannot delete the last remaining file', variant: 'error' })
-      return
+      toasts.add({ title: "Cannot delete the last remaining file", variant: "error" });
+      return;
     }
-    setDeletingFile(path)
-  }
+    setDeletingFile(path);
+  };
 
   const confirmDelete = () => {
-    if (deletingFile !== null) onFileDelete(deletingFile)
-    setDeletingFile(null)
-  }
+    if (deletingFile !== null) onFileDelete(deletingFile);
+    setDeletingFile(null);
+  };
 
   const leafRowProps = (path: string, kind: LeafKind, section: RowSection) => ({
     isActive: activeFile === path,
@@ -213,51 +240,56 @@ export default function FileBrowser({
     onDownload: () => onFileDownload(path),
     onRenameSubmit: (nextName: string) => commitRename(path, nextName),
     onRenameCancel: () => setRenaming(null),
-  })
+  });
 
-  const renderNodes = (nodes: readonly BrowserNode[], depth: number) => nodes.map(node => {
-    if (node.kind === 'dir') {
-      const open = isExpanded(node.path)
-      return (
-        <Collapsible.Root
-          key={node.path}
-          open={open}
-          onOpenChange={next => setDirExpanded(node.path, next)}
-        >
-          <Collapsible.Trigger
-            className="group mb-[2px] flex h-10 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 text-left text-[14px] leading-5 text-kumo-default outline-none transition-colors duration-150 ease-out hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-ring focus-visible:ring-offset-1 focus-visible:ring-offset-kumo-base md:h-7 md:text-[13px] md:leading-[18px]"
-            style={{ paddingLeft: ROW_BASE_PADDING_PX + depth * INDENT_PX }}
+  const renderNodes = (nodes: readonly BrowserNode[], depth: number) =>
+    nodes.map((node) => {
+      if (node.kind === "dir") {
+        const open = isExpanded(node.path);
+        return (
+          <Collapsible.Root
+            key={node.path}
+            open={open}
+            onOpenChange={(next) => setDirExpanded(node.path, next)}
           >
-            <span className="flex w-3.5 shrink-0 items-center justify-center text-kumo-inactive">
-              {open ? <CaretDown size={10} weight="bold" /> : <CaretRight size={10} weight="bold" />}
-            </span>
-            <FolderSimple size={14} className="shrink-0 text-kumo-inactive" />
-            <span className="min-w-0 flex-1 truncate">{node.name}</span>
-          </Collapsible.Trigger>
-          <Collapsible.Panel>
-            {renderNodes(node.children, depth + 1)}
-          </Collapsible.Panel>
-        </Collapsible.Root>
-      )
-    }
-    return (
-      <FileRow
-        key={node.path}
-        label={node.name}
-        path={node.path}
-        indent={ROW_BASE_PADDING_PX + depth * INDENT_PX + 20}
-        {...leafRowProps(node.path, node.kind, 'tree')}
-      />
-    )
-  })
+            <Collapsible.Trigger
+              className="group mb-[2px] flex h-10 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 text-left text-[14px] leading-5 text-kumo-default outline-none transition-colors duration-150 ease-out hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-ring focus-visible:ring-offset-1 focus-visible:ring-offset-kumo-base md:h-7 md:text-[13px] md:leading-[18px]"
+              style={{ paddingLeft: ROW_BASE_PADDING_PX + depth * INDENT_PX }}
+            >
+              <span className="flex w-3.5 shrink-0 items-center justify-center text-kumo-inactive">
+                {open ? (
+                  <CaretDown size={10} weight="bold" />
+                ) : (
+                  <CaretRight size={10} weight="bold" />
+                )}
+              </span>
+              <FolderSimple size={14} className="shrink-0 text-kumo-inactive" />
+              <span className="min-w-0 flex-1 truncate">{node.name}</span>
+            </Collapsible.Trigger>
+            <Collapsible.Panel>{renderNodes(node.children, depth + 1)}</Collapsible.Panel>
+          </Collapsible.Root>
+        );
+      }
+      return (
+        <FileRow
+          key={node.path}
+          label={node.name}
+          path={node.path}
+          indent={ROW_BASE_PADDING_PX + depth * INDENT_PX + 20}
+          {...leafRowProps(node.path, node.kind, "tree")}
+        />
+      );
+    });
 
-  const showChanges = isDiffMode && changes.length > 0
+  const showChanges = isDiffMode && changes.length > 0;
 
   return (
-    <div className={`flex h-full w-[260px] flex-col border-r border-kumo-line bg-kumo-base ${className}`}>
+    <div
+      className={`flex h-full w-[260px] flex-col border-r border-kumo-line bg-kumo-base ${className}`}
+    >
       <div className="flex h-9 shrink-0 items-center justify-between gap-2 px-3 pt-3 pb-2">
         <span className={SECTION_HEADER_CLASS}>
-          {showChanges ? `Changes (${changes.length})` : 'Files'}
+          {showChanges ? `Changes (${changes.length})` : "Files"}
         </span>
         <div className="flex items-center gap-1">
           <WorkshopIconButton
@@ -285,9 +317,9 @@ export default function FileBrowser({
         {showChanges && (
           <>
             <div className="mb-2">
-              {changes.map(change => {
-                const slash = change.path.lastIndexOf('/')
-                const kind = tree.leaves.get(change.path) ?? 'file'
+              {changes.map((change) => {
+                const slash = change.path.lastIndexOf("/");
+                const kind = tree.leaves.get(change.path) ?? "file";
                 return (
                   <FileRow
                     key={change.path}
@@ -295,10 +327,10 @@ export default function FileBrowser({
                     dirPrefix={slash >= 0 ? change.path.slice(0, slash + 1) : undefined}
                     path={change.path}
                     indent={ROW_BASE_PADDING_PX}
-                    {...leafRowProps(change.path, kind, 'changes')}
+                    {...leafRowProps(change.path, kind, "changes")}
                     status={change.status}
                   />
-                )
+                );
               })}
             </div>
             <div className="mb-1 flex h-6 items-center px-1">
@@ -306,17 +338,15 @@ export default function FileBrowser({
             </div>
           </>
         )}
-        <div>
-          {renderNodes(tree.roots, 0)}
-        </div>
+        <div>{renderNodes(tree.roots, 0)}</div>
       </div>
 
       <Dialog.Root
         open={isCreateModalOpen}
         onOpenChange={(o) => {
           if (!o) {
-            setIsCreateModalOpen(false)
-            setNewFileName('')
+            setIsCreateModalOpen(false);
+            setNewFileName("");
           }
         }}
       >
@@ -335,11 +365,7 @@ export default function FileBrowser({
             </div>
             <Dialog.Close
               render={(props) => (
-                <WorkshopIconButton
-                  {...props}
-                  className="!h-7 !w-7"
-                  aria-label="Close"
-                >
+                <WorkshopIconButton {...props} className="!h-7 !w-7" aria-label="Close">
                   <X size={16} />
                 </WorkshopIconButton>
               )}
@@ -354,10 +380,10 @@ export default function FileBrowser({
               value={newFileName}
               onChange={(e) => setNewFileName(e.target.value)}
               onKeyDown={(e) => {
-                if (isImeComposing(e)) return
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  handleCreateFile()
+                if (isImeComposing(e)) return;
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleCreateFile();
                 }
               }}
               spellCheck={false}
@@ -370,10 +396,7 @@ export default function FileBrowser({
           <div className="flex items-center justify-end gap-2 border-t border-kumo-line bg-kumo-base px-5 py-3">
             <Dialog.Close
               render={(props) => (
-                <WorkshopButton
-                  {...props}
-                  className="!h-9"
-                >
+                <WorkshopButton {...props} className="!h-9">
                   Cancel
                 </WorkshopButton>
               )}
@@ -392,14 +415,19 @@ export default function FileBrowser({
       <DeleteConfirmationDialog
         open={deletingFile !== null}
         onOpenChange={(o) => {
-          if (!o) setDeletingFile(null)
+          if (!o) setDeletingFile(null);
         }}
         title="Delete file?"
-        description={<>This removes <span className="font-mono text-kumo-default">{deletingFile}</span> from the {workpieceNoun}. You can&apos;t undo this.</>}
+        description={
+          <>
+            This removes <span className="font-mono text-kumo-default">{deletingFile}</span> from
+            the {workpieceNoun}. You can&apos;t undo this.
+          </>
+        }
         onConfirm={confirmDelete}
       />
     </div>
-  )
+  );
 }
 
 const LEAF_ICONS: Record<LeafKind, Icon> = {
@@ -407,33 +435,33 @@ const LEAF_ICONS: Record<LeafKind, Icon> = {
   executable: TerminalWindow,
   symlink: LinkSimple,
   submodule: Cube,
-}
+};
 
 const LEAF_KIND_LABELS: Record<LeafKind, string | undefined> = {
   file: undefined,
-  executable: 'Executable',
-  symlink: 'Symbolic link (not viewable)',
-  submodule: 'Submodule (not viewable)',
-}
+  executable: "Executable",
+  symlink: "Symbolic link (not viewable)",
+  submodule: "Submodule (not viewable)",
+};
 
 interface FileRowProps {
   // The leaf's name; `dirPrefix` (Changes rows only) is its directory, shown dimmed before it.
-  label: string
-  dirPrefix?: string
-  path: string
-  indent: number
-  kind: LeafKind
-  isActive: boolean
-  isStreamingActive: boolean
-  status?: ChangedFile['status'] | 'unchanged'
-  editLocked: boolean
-  isRenaming: boolean
-  onSelect: () => void
-  onRename: () => void
-  onDelete: () => void
-  onDownload: () => void
-  onRenameSubmit: (nextName: string) => void
-  onRenameCancel: () => void
+  label: string;
+  dirPrefix?: string;
+  path: string;
+  indent: number;
+  kind: LeafKind;
+  isActive: boolean;
+  isStreamingActive: boolean;
+  status?: ChangedFile["status"] | "unchanged";
+  editLocked: boolean;
+  isRenaming: boolean;
+  onSelect: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+  onDownload: () => void;
+  onRenameSubmit: (nextName: string) => void;
+  onRenameCancel: () => void;
 }
 
 function FileRow({
@@ -454,45 +482,45 @@ function FileRow({
   onRenameSubmit,
   onRenameCancel,
 }: FileRowProps) {
-  const inputRef = useRef<HTMLInputElement | null>(null)
-  const [renameValue, setRenameValue] = useState(label)
-  const openable = isOpenableKind(kind)
-  const isDeleted = status === 'deleted'
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [renameValue, setRenameValue] = useState(label);
+  const openable = isOpenableKind(kind);
+  const isDeleted = status === "deleted";
   // A removal whose review-base read is unsettled (see ChangedFile): selectable, nothing else.
-  const isPending = status === 'pending'
-  const dotClass = getStatusDotClass(status)
-  const KindIcon = LEAF_ICONS[kind]
-  const kindLabel = isPending ? 'Loading this change\u2026' : LEAF_KIND_LABELS[kind]
+  const isPending = status === "pending";
+  const dotClass = getStatusDotClass(status);
+  const KindIcon = LEAF_ICONS[kind];
+  const kindLabel = isPending ? "Loading this change\u2026" : LEAF_KIND_LABELS[kind];
 
   useEffect(() => {
-    if (!isRenaming) return
-    setRenameValue(label)
+    if (!isRenaming) return;
+    setRenameValue(label);
     const id = window.setTimeout(() => {
-      const input = inputRef.current
-      if (!input) return
-      input.focus()
-      const dotIndex = label.lastIndexOf('.')
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus();
+      const dotIndex = label.lastIndexOf(".");
       if (dotIndex > 0) {
-        input.setSelectionRange(0, dotIndex)
+        input.setSelectionRange(0, dotIndex);
       } else {
-        input.select()
+        input.select();
       }
-    }, 0)
-    return () => window.clearTimeout(id)
-  }, [isRenaming, label])
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [isRenaming, label]);
 
   return (
     <div
       className={[
-        'group relative mb-[2px] flex h-10 items-center gap-1.5 rounded-md pr-1 text-[14px] leading-5 transition-[background-color,box-shadow,color,opacity] duration-150 ease-out md:h-7 md:text-[13px] md:leading-[18px]',
+        "group relative mb-[2px] flex h-10 items-center gap-1.5 rounded-md pr-1 text-[14px] leading-5 transition-[background-color,box-shadow,color,opacity] duration-150 ease-out md:h-7 md:text-[13px] md:leading-[18px]",
         isRenaming
-          ? 'bg-kumo-base ring-1 ring-kumo-ring/40'
+          ? "bg-kumo-base ring-1 ring-kumo-ring/40"
           : isActive
-            ? 'file-row-active cursor-pointer bg-kumo-recessed text-kumo-default font-medium'
+            ? "file-row-active cursor-pointer bg-kumo-recessed text-kumo-default font-medium"
             : openable
-              ? 'cursor-pointer text-kumo-default hover:bg-kumo-tint'
-              : 'text-kumo-subtle',
-      ].join(' ')}
+              ? "cursor-pointer text-kumo-default hover:bg-kumo-tint"
+              : "text-kumo-subtle",
+      ].join(" ")}
       style={{ paddingLeft: indent }}
       title={kindLabel}
       onClick={isRenaming || !openable ? undefined : onSelect}
@@ -506,20 +534,20 @@ function FileRow({
           onChange={(event) => setRenameValue(event.target.value)}
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => {
-            if (isImeComposing(event)) return
-            if (event.key === 'Enter') {
-              event.preventDefault()
-              onRenameSubmit(renameValue)
-            } else if (event.key === 'Escape') {
-              event.preventDefault()
-              onRenameCancel()
+            if (isImeComposing(event)) return;
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onRenameSubmit(renameValue);
+            } else if (event.key === "Escape") {
+              event.preventDefault();
+              onRenameCancel();
             }
           }}
           onBlur={() => {
-            if (renameValue.trim() === '' || renameValue.trim() === label) {
-              onRenameCancel()
+            if (renameValue.trim() === "" || renameValue.trim() === label) {
+              onRenameCancel();
             } else {
-              onRenameSubmit(renameValue)
+              onRenameSubmit(renameValue);
             }
           }}
           spellCheck={false}
@@ -532,16 +560,14 @@ function FileRow({
         <button
           type="button"
           className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 self-stretch bg-transparent p-0 text-left text-[13px] leading-[18px] tracking-[-0.2px] text-inherit outline-none focus-visible:ring-2 focus-visible:ring-kumo-ring focus-visible:ring-offset-1 focus-visible:ring-offset-kumo-base"
-          aria-current={isActive ? 'page' : undefined}
+          aria-current={isActive ? "page" : undefined}
           onClick={(event) => {
-            event.stopPropagation()
-            onSelect()
+            event.stopPropagation();
+            onSelect();
           }}
         >
-          <span className={`min-w-0 flex-1 truncate ${isDeleted ? 'line-through' : ''}`}>
-            {dirPrefix !== undefined && (
-              <span className="text-kumo-inactive">{dirPrefix}</span>
-            )}
+          <span className={`min-w-0 flex-1 truncate ${isDeleted ? "line-through" : ""}`}>
+            {dirPrefix !== undefined && <span className="text-kumo-inactive">{dirPrefix}</span>}
             {label}
           </span>
           {isStreamingActive && (
@@ -554,25 +580,20 @@ function FileRow({
         </button>
       ) : (
         <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px] tracking-[-0.2px]">
-          {dirPrefix !== undefined && (
-            <span className="text-kumo-inactive">{dirPrefix}</span>
-          )}
+          {dirPrefix !== undefined && <span className="text-kumo-inactive">{dirPrefix}</span>}
           {label}
         </span>
       )}
 
       <span
         aria-hidden="true"
-        className={[
-          'h-1.5 w-1.5 shrink-0 rounded-full',
-          dotClass ?? 'bg-transparent',
-        ].join(' ')}
+        className={["h-1.5 w-1.5 shrink-0 rounded-full", dotClass ?? "bg-transparent"].join(" ")}
       />
 
       {!isRenaming && !isDeleted && !isPending && openable && (
         <DropdownMenu>
           <DropdownMenu.Trigger
-            render={(
+            render={
               <WorkshopIconButton
                 aria-label={`Actions for ${path}`}
                 onClick={(event) => event.stopPropagation()}
@@ -580,7 +601,7 @@ function FileRow({
               >
                 <DotsThree size={14} weight="bold" />
               </WorkshopIconButton>
-            )}
+            }
           />
           <DropdownMenu.Content
             onClick={(event) => event.stopPropagation()}
@@ -595,7 +616,7 @@ function FileRow({
             </DropdownMenu.Item>
             {!editLocked && (
               <>
-                {kind === 'file' && (
+                {kind === "file" && (
                   <DropdownMenu.Item
                     icon={<Pencil size={12} className="mr-2" />}
                     onClick={onRename}
@@ -618,12 +639,12 @@ function FileRow({
         </DropdownMenu>
       )}
     </div>
-  )
+  );
 }
 
-function getStatusDotClass(status: FileRowProps['status']): string | null {
-  if (status === 'added') return 'bg-kumo-success'
-  if (status === 'deleted') return 'bg-kumo-danger'
-  if (status === 'modified') return 'bg-kumo-warning'
-  return null
+function getStatusDotClass(status: FileRowProps["status"]): string | null {
+  if (status === "added") return "bg-kumo-success";
+  if (status === "deleted") return "bg-kumo-danger";
+  if (status === "modified") return "bg-kumo-warning";
+  return null;
 }

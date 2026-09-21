@@ -16,16 +16,24 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return <Section>
-      <Field label="Device" description="Choose a physical device. The binding grants access to all entities the device provides.">
-        <Autocomplete
-          name="deviceId"
-          value={values.deviceId}
-          placeholder="Search devices..."
-          loadOptions={query => ui.listDevices(query)}
-          onChange={deviceId => setValues({ deviceId })}
-        />
-      </Field>
-    </Section>;
+    return (
+      <Section>
+        <Field
+          label="Device"
+          description="Choose a physical device. The binding grants access to all entities the device provides."
+        >
+          <Autocomplete
+            name="deviceId"
+            value={values.deviceId}
+            placeholder="Search devices..."
+            loadOptions={(query) => ui.listDevices(query)}
+            onChange={(deviceId) => setValues({ deviceId })}
+          />
+        </Field>
+      </Section>
+    );
   },
-} satisfies ConfiguratorUISpec<HomeAssistantDeviceConfiguratorRpc, HomeAssistantDeviceConfiguratorValues>;
+} satisfies ConfiguratorUISpec<
+  HomeAssistantDeviceConfiguratorRpc,
+  HomeAssistantDeviceConfiguratorValues
+>;

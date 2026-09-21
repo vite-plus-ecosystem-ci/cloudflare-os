@@ -50,7 +50,10 @@ export function sha256Hex(bytes: Uint8Array): string {
 export function cfAssetHash(bytes: Uint8Array, filePath: string): string {
   const base64 = Buffer.from(bytes).toString("base64");
   const extension = extname(filePath).slice(1);
-  return createHash("sha256").update(base64 + extension, "utf8").digest("hex").slice(0, 32);
+  return createHash("sha256")
+    .update(base64 + extension, "utf8")
+    .digest("hex")
+    .slice(0, 32);
 }
 
 // Module types understood by the script-upload API, keyed by file extension. The manifest
@@ -87,7 +90,7 @@ export function collectModules(outDir: string): {
     const name = relative(outDir, file).split(sep).join("/");
     if (isNonModuleFile(name)) continue;
     const type: ModuleType | undefined =
-        MODULE_TYPE_BY_EXTENSION[extname(name) as keyof typeof MODULE_TYPE_BY_EXTENSION];
+      MODULE_TYPE_BY_EXTENSION[extname(name) as keyof typeof MODULE_TYPE_BY_EXTENSION];
     if (!type) {
       throw new Error(`unrecognized module file in dry-run output: ${name} (${outDir})`);
     }
@@ -99,8 +102,9 @@ export function collectModules(outDir: string): {
   const esmModules = modules.filter((m) => m.type === "esm");
   if (esmModules.length !== 1) {
     throw new Error(
-        `expected exactly one ESM module in ${outDir}, found: ` +
-        `${esmModules.map((m) => m.name).join(", ") || "(none)"}`);
+      `expected exactly one ESM module in ${outDir}, found: ` +
+        `${esmModules.map((m) => m.name).join(", ") || "(none)"}`,
+    );
   }
   return { mainModule: esmModules[0].name, modules };
 }

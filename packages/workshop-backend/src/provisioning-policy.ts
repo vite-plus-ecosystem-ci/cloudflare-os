@@ -20,7 +20,10 @@ export const DEFAULT_AMBIENT_GATEKEEPER_MODE: AmbientGatekeeperMode = "optional"
  * The configured mode for an ambient vendor, defaulting to "optional" when the admin hasn't set one.
  * Tolerates a config persisted before this field existed (ambientGatekeeperModes may be undefined).
  */
-export function ambientGatekeeperMode(config: AdminConfig, vendorId: string): AmbientGatekeeperMode {
+export function ambientGatekeeperMode(
+  config: AdminConfig,
+  vendorId: string,
+): AmbientGatekeeperMode {
   return config.ambientGatekeeperModes?.[vendorId.toLowerCase()] ?? DEFAULT_AMBIENT_GATEKEEPER_MODE;
 }
 

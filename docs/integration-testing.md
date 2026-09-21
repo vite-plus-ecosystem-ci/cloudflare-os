@@ -4,18 +4,18 @@ This is how the integration test suites work, and why they are shaped the way th
 
 There are two kinds of suite:
 
-| | this repo's `packages/integration-tests` | a consumer repo's per-vendor suite |
-|---|---|---|
-| Runs | `pnpm test` (part of CI's normal test job) | its own CI step |
-| Gatekeeper | a fixture Worker whose verification outcome the tests set | a real vendor gatekeeper, unmodified |
-| Covers | the overseer's observer logic | a genuinely expired credential, end to end |
-| Owns | the harness, interceptor, and RPC client | that vendor's handlers and token minting |
+|            | this repo's `packages/integration-tests`                  | a consumer repo's per-vendor suite         |
+| ---------- | --------------------------------------------------------- | ------------------------------------------ |
+| Runs       | `pnpm test` (part of CI's normal test job)                | its own CI step                            |
+| Gatekeeper | a fixture Worker whose verification outcome the tests set | a real vendor gatekeeper, unmodified       |
+| Covers     | the overseer's observer logic                             | a genuinely expired credential, end to end |
+| Owns       | the harness, interceptor, and RPC client                  | that vendor's handlers and token minting   |
 
 A consumer repo is one that vendors this repo as a `public/` submodule and consumes the toolkit as a
 workspace dependency (`public/packages/integration-tests` in its `pnpm-workspace.yaml`).
 
 No such suite lives in this repo, and nothing here depends on one existing. The second column is
-described anyway because it is what the toolkit is parameterised *for*: the harness takes a list of
+described anyway because it is what the toolkit is parameterised _for_: the harness takes a list of
 gatekeepers and the interceptor takes pluggable handler modules precisely so a suite can be added
 outside this repo without forking either. Where this doc describes a per-vendor suite, take it as the
 worked example of that shape — one gatekeeper run unmodified against its vendor's mocked endpoints —
@@ -39,7 +39,7 @@ in another process.** Most of what follows falls out of that.
 of process, so a faked clock is invisible to it. `isTokenExpired()`'s 30-second skew is inside
 `gatekeeper-shared` and evaluated inside the Worker.
 
-(Fake timers *do* work for in-isolate unit tests under `vitest-pool-workers`, where the test runs
+(Fake timers _do_ work for in-isolate unit tests under `vitest-pool-workers`, where the test runs
 inside the same isolate)
 
 ### A fixture gatekeeper, not a real one, for the overseer's own logic
@@ -48,7 +48,7 @@ The overseer cases need a gatekeeper that refuses an observer on command. Every 
 gatekeeper can do that only at a cost that would dominate the test:
 
 - **OAuth gatekeepers** need a whole vendor auth surface mocked before an account exists at all.
-- **The Context Library** only refuses once an observation has been *recorded*, which takes a gadget
+- **The Context Library** only refuses once an observation has been _recorded_, which takes a gadget
   read session (so a Worker Loader), a slash-command invocation, or an AI-chat catalog snapshot. It is
   also a singleton, so it can never produce the two simultaneously-failing bindings one of these cases
   needs.
@@ -59,7 +59,7 @@ very state the tracker maintains, making the test circular.
 So `fixtures/gatekeeper-test/` is a real Worker speaking the real protocol, whose verification outcome
 the tests set over an HTTP control route. **It is scoped to overseer logic, not a long-term substitute
 for per-vendor coverage.** Testing actual gatekeepers is the expected trajectory, which is why the
-harness takes a *list* of gatekeepers and the interceptor takes *pluggable* handler modules: a future
+harness takes a _list_ of gatekeepers and the interceptor takes _pluggable_ handler modules: a future
 `gatekeeper-google` suite is "add `google-handlers.ts`, point the harness at the package" — the same
 shape a consumer repo's per-vendor suite takes, with production code unmodified.
 
@@ -95,7 +95,7 @@ override. Bumping it means bumping the override in step.
 
 ### A consumer in another repo can end up with two copies of capnweb
 
-A consumer repo installs its own workspace *and* the `public/` submodule's, as two separate pnpm
+A consumer repo installs its own workspace _and_ the `public/` submodule's, as two separate pnpm
 stores. So `capnweb` resolves to two different copies: the toolkit's `rpc-client` gets the
 submodule's, while anything importing `capnweb` from one of the consumer's own packages gets the
 other. A stub is only serialisable by the instance that owns the session, so mixing them fails:
@@ -109,7 +109,7 @@ appeared in CI, which runs `pnpm install` and `pnpm --dir public install` separa
 locally, do the same.
 
 The toolkit therefore owns the capnweb boundary: mint callback stubs with `stubFor()` from
-`rpc-client`, never with an imported `RpcStub`. Importing `RpcStub` as a *type* is fine. This is
+`rpc-client`, never with an imported `RpcStub`. Importing `RpcStub` as a _type_ is fine. This is
 enforced structurally in this repo — the lint rules in `vite.config.ts` restrict `capnweb` value
 imports within this package to `rpc-client.ts` (`allowTypeImports` leaves type imports alone). A
 consumer repo without a linter should treat the rule as a convention its test files follow via

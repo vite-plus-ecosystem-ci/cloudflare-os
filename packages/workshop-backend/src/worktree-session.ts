@@ -19,7 +19,10 @@
 import { RpcTarget } from "cloudflare:workers";
 import { validateRpc } from "capnweb-validate";
 import type {
-  GrepFileError, StructuredGrepResult, Worktree, WorktreeFileEntry,
+  GrepFileError,
+  StructuredGrepResult,
+  Worktree,
+  WorktreeFileEntry,
 } from "./worktree-binding";
 import type { AiChatAuthorInfo, WorkpieceId } from "@gadgets/workshop-shared/api";
 import { diffFiles, type FileChange } from "@gadgets/workshop-shared/code-change";
@@ -45,7 +48,7 @@ export interface WorktreeRecordView {
 }
 
 // One file to search: an overlay path (text in hand) or a base tree entry (blob by oid).
-type GrepCandidate = { path: string, oid?: GitOid };
+type GrepCandidate = { path: string; oid?: GitOid };
 
 /**
  * The Worktree binding served to executeCode. One instance per (execution, worktree); see the
@@ -53,8 +56,12 @@ type GrepCandidate = { path: string, oid?: GitOid };
  */
 @validateRpc()
 export class WorktreeSessionImpl extends RpcTarget implements Worktree {
-  constructor(private host: WorktreeSessionHost, private worktreeId: WorkpieceId,
-              private turn: WorktreeTurnAccess, private initiator: AiChatAuthorInfo) {
+  constructor(
+    private host: WorktreeSessionHost,
+    private worktreeId: WorkpieceId,
+    private turn: WorktreeTurnAccess,
+    private initiator: AiChatAuthorInfo,
+  ) {
     super();
   }
 
@@ -71,12 +78,13 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
   // The worktree's HEAD -- the last explicit commit: one buffered earlier in this turn, else
   // the registry record's (advanced at each step's barrier).
   #head(): string {
-    return this.turn.getBufferedHead(this.worktreeId)
-        ?? this.host.getWorktreeRecord(this.worktreeId).headCommit;
+    return (
+      this.turn.getBufferedHead(this.worktreeId) ??
+      this.host.getWorktreeRecord(this.worktreeId).headCommit
+    );
   }
 
-  async listFiles(path?: string, options?: { recursive?: boolean })
-      : Promise<WorktreeFileEntry[]> {
+  async listFiles(path?: string, options?: { recursive?: boolean }): Promise<WorktreeFileEntry[]> {
     let base = this.#pinBase();
     let scope = path ?? "";
     let recursive = options?.recursive ?? false;
@@ -84,8 +92,10 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
     let removed = this.turn.getRemovedPaths(this.worktreeId);
 
     if (overlay.has(scope)) throw new Error(`${scope} is not a directory`);
-    let baseScope = scope === "" || !removed.has(scope)
-        ? await this.host.gitCache.pathEntryAtCommit(base, scope) : undefined;
+    let baseScope =
+      scope === "" || !removed.has(scope)
+        ? await this.host.gitCache.pathEntryAtCommit(base, scope)
+        : undefined;
     if (baseScope !== undefined && baseScope.kind !== "dir") {
       throw new Error(`${scope} is not a directory`);
     }
@@ -98,15 +108,17 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
     let prefix = scope === "" ? "" : `${scope}/`;
     // Any deletion under the scope can hollow out a directory, and judging that takes the full
     // subtree, so it forces the recursive walk even for a non-recursive listing.
-    let removedInScope = [...removed].some(removedPath => removedPath.startsWith(prefix));
+    let removedInScope = [...removed].some((removedPath) => removedPath.startsWith(prefix));
     let entries = new Map<string, WorktreeFileEntry["kind"]>();
     if (baseScope !== undefined) {
       let listing = await this.host.gitCache.listCommitTreePaths(
-          base, scope === "" ? undefined : scope, { recursive: recursive || removedInScope });
+        base,
+        scope === "" ? undefined : scope,
+        { recursive: recursive || removedInScope },
+      );
       for (let entry of listing) {
         if (!recursive && entry.path.slice(prefix.length).includes("/")) continue;
-        if ((entry.kind === "file" || entry.kind === "executable") &&
-            removed.has(entry.path)) {
+        if ((entry.kind === "file" || entry.kind === "executable") && removed.has(entry.path)) {
           continue;
         }
         entries.set(entry.path, entry.kind);
@@ -115,11 +127,12 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
         // A directory survives only if some non-directory entry under it does (symlinks and
         // submodules always do -- they can't be deleted). Overlay additions under a pruned
         // directory re-add it below.
-        let survivors = listing.filter(
-            entry => entry.kind !== "dir" && !removed.has(entry.path));
+        let survivors = listing.filter((entry) => entry.kind !== "dir" && !removed.has(entry.path));
         for (let [entryPath, kind] of entries) {
-          if (kind === "dir" &&
-              !survivors.some(survivor => survivor.path.startsWith(`${entryPath}/`))) {
+          if (
+            kind === "dir" &&
+            !survivors.some((survivor) => survivor.path.startsWith(`${entryPath}/`))
+          ) {
             entries.delete(entryPath);
           }
         }
@@ -143,8 +156,8 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
       throw new Error(`${scope}: no such directory`);
     }
     return [...entries]
-        .map(([entryPath, kind]) => ({ path: entryPath, kind }))
-        .toSorted((a, b) => a.path < b.path ? -1 : 1);
+      .map(([entryPath, kind]) => ({ path: entryPath, kind }))
+      .toSorted((a, b) => (a.path < b.path ? -1 : 1));
   }
 
   async readFile(path: string): Promise<string> {
@@ -172,7 +185,7 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
         if (!(err instanceof UnreadableContentError)) throw err;
       }
     }
-    if (before === text) return;  // no-op: nothing to record
+    if (before === text) return; // no-op: nothing to record
 
     // A readable existing file gets a minimal diffed edit (fast-diff via diffFiles), keeping
     // rows and composed changes bounded by changed regions; a new file -- and an unreadable
@@ -195,7 +208,7 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
       // descriptive errors (deleting a directory's last *file* prunes the directory at commit
       // instead). Unreadable content is deletable -- only the entry's shape matters.
       await this.host.gitCache.assertWorktreePathWritable(base, path);
-      if (await this.host.gitCache.pathEntryAtCommit(base, path) === undefined) {
+      if ((await this.host.gitCache.pathEntryAtCommit(base, path)) === undefined) {
         throw new Error(`${path}: no such file`);
       }
     }
@@ -207,22 +220,22 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
     let out: string[] = [];
     for (let file of files) {
       for (let match of matchLines(file.text, pattern)) {
-        out.push(single
-            ? `${match.line}:${match.text}`
-            : `${file.path}:${match.line}:${match.text}`);
+        out.push(
+          single ? `${match.line}:${match.text}` : `${file.path}:${match.line}:${match.text}`,
+        );
       }
     }
     if (out.length === 0) out.push("(no matches)");
-    out.push(...errors.map(error => `(skipped: ${error.error})`));
+    out.push(...errors.map((error) => `(skipped: ${error.error})`));
     return out.join("\n");
   }
 
-  async structuredGrep(pattern: RegExp, path?: string | string[])
-      : Promise<StructuredGrepResult> {
+  async structuredGrep(pattern: RegExp, path?: string | string[]): Promise<StructuredGrepResult> {
     let { files, errors } = await this.#grepFiles(path);
     return {
-      matches: files.flatMap(file =>
-          matchLines(file.text, pattern).map(match => ({ file: file.path, ...match }))),
+      matches: files.flatMap((file) =>
+        matchLines(file.text, pattern).map((match) => ({ file: file.path, ...match })),
+      ),
       errors,
     };
   }
@@ -237,9 +250,9 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
   // blob (measured, or omitted by the pull's own filter) drops out of the batch with an error
   // entry rather than failing it.
   async #grepFiles(pathArg: string | string[] | undefined): Promise<{
-    files: { path: string, text: string }[],
-    errors: GrepFileError[],
-    single: boolean,
+    files: { path: string; text: string }[];
+    errors: GrepFileError[];
+    single: boolean;
   }> {
     let base = this.#pinBase();
     let overlay = this.turn.getOverlayFiles(this.worktreeId);
@@ -247,7 +260,7 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
 
     // Overlapping scopes (["src", "src/util.js"]) resolve to one candidate per path, and one
     // error entry per unsearchable file, no matter how many scopes cover it.
-    let scopes = [...new Set(typeof pathArg === "string" ? [pathArg] : pathArg ?? [""])];
+    let scopes = [...new Set(typeof pathArg === "string" ? [pathArg] : (pathArg ?? [""]))];
     let candidates = new Map<string, GrepCandidate>();
     let errorByFile = new Map<string, string>();
     let failedScopes = new Map<string, string>();
@@ -263,8 +276,10 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
         single = typeof pathArg === "string";
         continue;
       }
-      let entry = scope !== "" && removed.has(scope)
-          ? undefined : await this.host.gitCache.pathEntryAtCommit(base, scope);
+      let entry =
+        scope !== "" && removed.has(scope)
+          ? undefined
+          : await this.host.gitCache.pathEntryAtCommit(base, scope);
       if (entry !== undefined && entry.kind !== "dir") {
         if (entry.kind === "symlink" || entry.kind === "submodule") {
           failedScopes.set(scope, `${scope} is a ${entry.kind}`);
@@ -283,7 +298,10 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
       if (entry !== undefined) {
         found = true;
         for (let treeEntry of await this.host.gitCache.listCommitTreePaths(
-            base, scope === "" ? undefined : scope, { recursive: true })) {
+          base,
+          scope === "" ? undefined : scope,
+          { recursive: true },
+        )) {
           if (treeEntry.kind === "dir") continue;
           if (treeEntry.kind === "symlink" || treeEntry.kind === "submodule") {
             errorByFile.set(treeEntry.path, `${treeEntry.path} is a ${treeEntry.kind}`);
@@ -309,7 +327,7 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
     for (let candidate of candidates.values()) {
       if (candidate.oid !== undefined) {
         let oidPaths = pathsByOid.get(candidate.oid);
-        if (oidPaths === undefined) pathsByOid.set(candidate.oid, oidPaths = []);
+        if (oidPaths === undefined) pathsByOid.set(candidate.oid, (oidPaths = []));
         oidPaths.push(candidate.path);
       }
     }
@@ -320,9 +338,8 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
       }
     }
 
-    let files: { path: string, text: string }[] = [];
-    for (let candidate of [...candidates.values()]
-        .toSorted((a, b) => a.path < b.path ? -1 : 1)) {
+    let files: { path: string; text: string }[] = [];
+    for (let candidate of [...candidates.values()].toSorted((a, b) => (a.path < b.path ? -1 : 1))) {
       if (candidate.oid === undefined) {
         files.push({ path: candidate.path, text: overlay.get(candidate.path)! });
         continue;
@@ -356,8 +373,8 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
     for (let [file, message] of failedScopes) errorByFile.set(file, message);
 
     let errors = [...errorByFile]
-        .map(([file, message]) => ({ file, error: message }))
-        .toSorted((a, b) => a.file < b.file ? -1 : 1);
+      .map(([file, message]) => ({ file, error: message }))
+      .toSorted((a, b) => (a.file < b.file ? -1 : 1));
     return { files, errors, single };
   }
 
@@ -399,8 +416,8 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
 
   async diff(commitId?: string): Promise<string> {
     let base = this.#pinBase();
-    let target = commitId !== undefined
-        ? this.host.gitCache.resolveCommitRef(commitId) : this.#head();
+    let target =
+      commitId !== undefined ? this.host.gitCache.resolveCommitRef(commitId) : this.#head();
     let overlay = this.turn.getOverlayFiles(this.worktreeId);
     let removed = this.turn.getRemovedPaths(this.worktreeId);
 
@@ -416,8 +433,10 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
     // first and the text read catches exactly UnreadableContentError, so an operational
     // failure (a pull outage, a corrupt object) still fails the diff rather than silently
     // rendering an incomplete one.
-    let readSide = async (commit: string, path: string)
-        : Promise<{ text?: string, note?: string }> => {
+    let readSide = async (
+      commit: string,
+      path: string,
+    ): Promise<{ text?: string; note?: string }> => {
       let entry = await this.host.gitCache.pathEntryAtCommit(commit, path);
       if (entry === undefined || entry.kind === "dir") return {};
       if (entry.kind === "submodule") {
@@ -436,11 +455,11 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
     let parts: string[] = [];
     for (let path of [...paths].toSorted()) {
       let oldSide = await readSide(target, path);
-      let newSide: { text?: string, note?: string };
+      let newSide: { text?: string; note?: string };
       if (overlay.has(path)) {
         newSide = { text: overlay.get(path) };
       } else if (removed.has(path)) {
-        newSide = {};  // removed: no current text
+        newSide = {}; // removed: no current text
       } else {
         newSide = await readSide(base, path);
       }
@@ -449,8 +468,13 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
         continue;
       }
       if (oldSide.text === newSide.text) continue;
-      let diff = formatUnifiedDiff(path, oldSide.text ?? "", newSide.text ?? "",
-                                   oldSide.text !== undefined, newSide.text !== undefined);
+      let diff = formatUnifiedDiff(
+        path,
+        oldSide.text ?? "",
+        newSide.text ?? "",
+        oldSide.text !== undefined,
+        newSide.text !== undefined,
+      );
       if (diff !== undefined) parts.push(diff);
     }
     return parts.join("\n");
@@ -460,11 +484,11 @@ export class WorktreeSessionImpl extends RpcTarget implements Worktree {
 // The lines of `text` matching `pattern`, 1-based, in order. The RegExp arrived over RPC
 // (structured clone); match against a fresh copy with lastIndex reset per line, so a sticky or
 // global flag can't skip lines.
-function matchLines(text: string, pattern: RegExp): { line: number, text: string }[] {
+function matchLines(text: string, pattern: RegExp): { line: number; text: string }[] {
   let re = new RegExp(pattern.source, pattern.flags);
   let lines = text.split("\n");
   if (lines.at(-1) === "") lines.pop();
-  let out: { line: number, text: string }[] = [];
+  let out: { line: number; text: string }[] = [];
   for (let [index, line] of lines.entries()) {
     re.lastIndex = 0;
     if (re.test(line)) out.push({ line: index + 1, text: line });

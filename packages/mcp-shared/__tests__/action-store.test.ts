@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 
 import { ActionStore } from "../src/action-store.js";
@@ -10,11 +10,12 @@ function fakeSql(): TestSql {
   const db = new DatabaseSync(":memory:");
   return {
     exec<T>(query: string, ...bindings: SQLInputValue[]) {
-      const rows = bindings.length > 0
-        ? db.prepare(query).all(...bindings)
-        : /^\s*(?:SELECT|INSERT.*RETURNING)/is.test(query)
-          ? db.prepare(query).all()
-          : (db.exec(query), []);
+      const rows =
+        bindings.length > 0
+          ? db.prepare(query).all(...bindings)
+          : /^\s*(?:SELECT|INSERT.*RETURNING)/is.test(query)
+            ? db.prepare(query).all()
+            : (db.exec(query), []);
       return {
         toArray: () => rows as T[],
         one: () => {
@@ -26,14 +27,22 @@ function fakeSql(): TestSql {
   } as unknown as TestSql;
 }
 
-const log = { debug() {}, info() {}, warn() {}, error() {}, with() { return log; } };
+const log = {
+  debug() {},
+  info() {},
+  warn() {},
+  error() {},
+  with() {
+    return log;
+  },
+};
 const ok = async () => ({ content: [{ type: "text" as const, text: "done" }] });
 
 describe("ActionStore", () => {
   it("keeps a decided action available until the Gadget collects it", async () => {
     const store = new ActionStore(fakeSql());
     const staged = store.stage("send", { to: "a@b.c" });
-    await store.apply(staged.id, fn => fn({ callTool: ok } as never), log);
+    await store.apply(staged.id, (fn) => fn({ callTool: ok } as never), log);
     expect(store.get(staged.id)?.state).toBe("applied");
     expect(store.get(staged.id)?.result?.text).toBe("done");
   });
@@ -44,9 +53,11 @@ describe("ActionStore", () => {
     const pending = store.stage("send", { pending: true });
     for (let i = 0; i < 250; i++) {
       const staged = store.stage("send", { i });
-      await store.apply(staged.id, fn => fn({ callTool: ok } as never), log);
+      await store.apply(staged.id, (fn) => fn({ callTool: ok } as never), log);
     }
-    const { count } = sql.exec<{ count: number }>("SELECT count(*) AS count FROM mcp_actions").one();
+    const { count } = sql
+      .exec<{ count: number }>("SELECT count(*) AS count FROM mcp_actions")
+      .one();
     expect(count).toBe(101);
     expect(store.get(pending.id)?.state).toBe("pending");
     expect(store.get(251)?.state).toBe("applied");
@@ -79,7 +90,7 @@ describe("ActionStore", () => {
     const rejected = store.stage("send", { rejected: true });
     expect(() => store.stage("send", {})).toThrow();
 
-    await store.apply(applied.id, fn => fn({ callTool: ok } as never), log);
+    await store.apply(applied.id, (fn) => fn({ callTool: ok } as never), log);
     store.reject(rejected.id);
     expect(() => store.stage("send", {})).not.toThrow();
     expect(() => store.stage("send", {})).not.toThrow();
@@ -92,8 +103,9 @@ describe("ActionStore", () => {
     const declined = async () => {
       throw new McpProtocolError("MCP server rejected: unknown tool", -32601, "declined");
     };
-    await expect(store.apply(staged.id, fn => fn({ callTool: declined } as never), log))
-      .rejects.toThrow(/unknown tool/);
+    await expect(
+      store.apply(staged.id, (fn) => fn({ callTool: declined } as never), log),
+    ).rejects.toThrow(/unknown tool/);
 
     const record = store.get(staged.id);
     expect(record?.state).toBe("failed");
@@ -101,7 +113,7 @@ describe("ActionStore", () => {
     expect(record?.error).toContain("unknown tool");
 
     // And the retry really is offered.
-    await store.apply(staged.id, fn => fn({ callTool: ok } as never), log);
+    await store.apply(staged.id, (fn) => fn({ callTool: ok } as never), log);
     expect(store.get(staged.id)?.state).toBe("applied");
   });
 
@@ -117,16 +129,18 @@ describe("ActionStore", () => {
       throw new McpProtocolError("MCP server returned a non-JSON response.");
     };
 
-    await expect(store.apply(staged.id, fn => fn({ callTool: dropped } as never), log))
-      .rejects.toThrow(/may or may not have taken effect/);
+    await expect(
+      store.apply(staged.id, (fn) => fn({ callTool: dropped } as never), log),
+    ).rejects.toThrow(/may or may not have taken effect/);
 
     const record = store.get(staged.id);
     expect(record?.state).toBe("failed");
     expect(record?.retryable).toBe(false);
 
     // A second apply is refused without reaching the server.
-    await expect(store.apply(staged.id, fn => fn({ callTool: dropped } as never), log))
-      .rejects.toThrow(/may or may not have taken effect/);
+    await expect(
+      store.apply(staged.id, (fn) => fn({ callTool: dropped } as never), log),
+    ).rejects.toThrow(/may or may not have taken effect/);
     expect(calls).toBe(1);
   });
 
@@ -134,9 +148,12 @@ describe("ActionStore", () => {
     // Fails safe. A throw site that has not said what it means is not evidence the tool never ran.
     const store = new ActionStore(fakeSql());
     const staged = store.stage("send", {});
-    const boom = async () => { throw new Error("upstream exploded"); };
-    await expect(store.apply(staged.id, fn => fn({ callTool: boom } as never), log))
-      .rejects.toThrow(/may or may not have taken effect/);
+    const boom = async () => {
+      throw new Error("upstream exploded");
+    };
+    await expect(
+      store.apply(staged.id, (fn) => fn({ callTool: boom } as never), log),
+    ).rejects.toThrow(/may or may not have taken effect/);
     expect(store.get(staged.id)?.retryable).toBe(false);
   });
 
@@ -152,11 +169,14 @@ describe("ActionStore", () => {
 
     for (let attempt = 0; attempt < 250; attempt++) {
       const staged = store.stage("send", { attempt });
-      await expect(store.apply(staged.id, fn => fn({ callTool: declined } as never), log))
-        .rejects.toThrow();
+      await expect(
+        store.apply(staged.id, (fn) => fn({ callTool: declined } as never), log),
+      ).rejects.toThrow();
     }
 
-    const { count } = sql.exec<{ count: number }>("SELECT count(*) AS count FROM mcp_actions").one();
+    const { count } = sql
+      .exec<{ count: number }>("SELECT count(*) AS count FROM mcp_actions")
+      .one();
     expect(count).toBe(100);
   });
 
@@ -168,8 +188,9 @@ describe("ActionStore", () => {
     const declined = async () => {
       throw new McpProtocolError("MCP server rejected: unknown tool", -32601, "declined");
     };
-    await expect(store.apply(staged.id, fn => fn({ callTool: declined } as never), log))
-      .rejects.toThrow();
+    await expect(
+      store.apply(staged.id, (fn) => fn({ callTool: declined } as never), log),
+    ).rejects.toThrow();
 
     expect(store.get(staged.id)?.state).toBe("failed");
   });
@@ -185,12 +206,14 @@ describe("ActionStore", () => {
       throw new McpSessionExpiredError();
     };
 
-    await expect(store.apply(staged.id, fn => fn({ callTool: expired } as never), log))
-      .rejects.toThrow(/may or may not have taken effect/);
+    await expect(
+      store.apply(staged.id, (fn) => fn({ callTool: expired } as never), log),
+    ).rejects.toThrow(/may or may not have taken effect/);
     expect(store.get(staged.id)?.retryable).toBe(false);
 
-    await expect(store.apply(staged.id, fn => fn({ callTool: expired } as never), log))
-      .rejects.toThrow(/may or may not have taken effect/);
+    await expect(
+      store.apply(staged.id, (fn) => fn({ callTool: expired } as never), log),
+    ).rejects.toThrow(/may or may not have taken effect/);
     expect(calls).toBe(1);
   });
 
@@ -203,13 +226,13 @@ describe("ActionStore", () => {
     let calls = 0;
     const slow = async () => {
       calls++;
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       return { content: [] };
     };
 
     const [first, second] = await Promise.allSettled([
-      store.apply(staged.id, fn => fn({ callTool: slow } as never), log),
-      store.apply(staged.id, fn => fn({ callTool: slow } as never), log),
+      store.apply(staged.id, (fn) => fn({ callTool: slow } as never), log),
+      store.apply(staged.id, (fn) => fn({ callTool: slow } as never), log),
     ]);
 
     expect(calls).toBe(1);
@@ -223,11 +246,17 @@ describe("ActionStore", () => {
     const store = new ActionStore(fakeSql());
     const staged = store.stage("send", {});
     let release!: () => void;
-    const blocked = new Promise<void>(resolve => { release = resolve; });
-    const applying = store.apply(staged.id, async fn => {
-      await blocked;
-      return fn({ callTool: ok } as never);
-    }, log);
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const applying = store.apply(
+      staged.id,
+      async (fn) => {
+        await blocked;
+        return fn({ callTool: ok } as never);
+      },
+      log,
+    );
 
     expect(store.get(staged.id)?.state).toBe("applying");
     expect(() => store.reject(staged.id)).toThrow(/already being applied/);
@@ -252,9 +281,13 @@ describe("ActionStore", () => {
     const recovered = new ActionStore(sql);
 
     let calls = 0;
-    const counting = async () => { calls++; return { content: [] }; };
-    await expect(recovered.apply(staged.id, fn => fn({ callTool: counting } as never), log))
-      .rejects.toThrow(/may or may not have taken effect/);
+    const counting = async () => {
+      calls++;
+      return { content: [] };
+    };
+    await expect(
+      recovered.apply(staged.id, (fn) => fn({ callTool: counting } as never), log),
+    ).rejects.toThrow(/may or may not have taken effect/);
 
     expect(calls).toBe(0);
     expect(recovered.get(staged.id)?.state).toBe("failed");
@@ -279,10 +312,16 @@ describe("ActionStore", () => {
     const store = new ActionStore(sql);
     const staged = store.stage("send", {});
     let release!: () => void;
-    const applying = store.apply(staged.id, async fn => {
-      await new Promise<void>(resolve => { release = resolve; });
-      return fn({ callTool: ok } as never);
-    }, log);
+    const applying = store.apply(
+      staged.id,
+      async (fn) => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return fn({ callTool: ok } as never);
+      },
+      log,
+    );
     sql.exec(
       "UPDATE mcp_actions SET claimed_at = ? WHERE id = ?",
       Date.now() - 5 * 60 * 1000,
@@ -308,10 +347,14 @@ describe("ActionStore", () => {
     }
     store.stage("send", { final: true });
 
-    const { applying } = sql.exec<{ applying: number }>(
-      "SELECT count(*) AS applying FROM mcp_actions WHERE state = 'applying'").one();
-    const { total } = sql.exec<{ total: number }>(
-      "SELECT count(*) AS total FROM mcp_actions").one();
+    const { applying } = sql
+      .exec<{ applying: number }>(
+        "SELECT count(*) AS applying FROM mcp_actions WHERE state = 'applying'",
+      )
+      .one();
+    const { total } = sql
+      .exec<{ total: number }>("SELECT count(*) AS total FROM mcp_actions")
+      .one();
     expect(applying).toBe(0);
     expect(total).toBeLessThanOrEqual(101);
   });
@@ -332,11 +375,11 @@ describe("ActionStore", () => {
       return { content: [{ type: "text" as const, text: "ok" }], structuredContent: circular };
     };
 
-    await store.apply(staged.id, fn => fn({ callTool: poison } as never), log);
+    await store.apply(staged.id, (fn) => fn({ callTool: poison } as never), log);
     expect(store.get(staged.id)?.state).toBe("applied");
 
     // And the settled state is what stops a re-drive: a second apply must not call the tool again.
-    await store.apply(staged.id, fn => fn({ callTool: poison } as never), log);
+    await store.apply(staged.id, (fn) => fn({ callTool: poison } as never), log);
     expect(calls).toBe(1);
   });
 
@@ -344,7 +387,7 @@ describe("ActionStore", () => {
     const store = new ActionStore(fakeSql());
     const staged = store.stage("send", {});
     const big = async () => ({ content: [{ type: "text" as const, text: "😀".repeat(40_000) }] });
-    await store.apply(staged.id, fn => fn({ callTool: big } as never), log);
+    await store.apply(staged.id, (fn) => fn({ callTool: big } as never), log);
     expect(store.get(staged.id)?.state).toBe("applied");
     expect(store.get(staged.id)?.result?.text).toMatch(/too large to retain/);
   });
@@ -353,9 +396,12 @@ describe("ActionStore", () => {
     const store = new ActionStore(fakeSql());
     const staged = store.stage("send", {});
     let calls = 0;
-    const counting = async () => { calls++; return { content: [] }; };
-    await store.apply(staged.id, fn => fn({ callTool: counting } as never), log);
-    await store.apply(staged.id, fn => fn({ callTool: counting } as never), log);
+    const counting = async () => {
+      calls++;
+      return { content: [] };
+    };
+    await store.apply(staged.id, (fn) => fn({ callTool: counting } as never), log);
+    await store.apply(staged.id, (fn) => fn({ callTool: counting } as never), log);
     expect(calls).toBe(1);
   });
 });

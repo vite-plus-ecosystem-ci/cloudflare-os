@@ -26,7 +26,9 @@ export interface Versioned {
 }
 
 /** An item as a client sends it: its new content, and the version the client based it on (0 for one it created). */
-export type VersionedUpsert<Item extends Versioned> = Omit<Item, "version"> & { baseVersion: number };
+export type VersionedUpsert<Item extends Versioned> = Omit<Item, "version"> & {
+  baseVersion: number;
+};
 
 /** A version-checked deletion. */
 export interface VersionedDeletion {
@@ -75,7 +77,10 @@ export interface VersionedOutcome<Item extends Versioned> {
 export type OperationStatus = "applied" | "conflict" | "unchanged";
 
 /** The status of a reply: rejected anything -> `conflict`; changed anything -> `applied`; else `unchanged`. */
-export function operationStatus(changed: boolean, conflicts: ReadonlyArray<unknown>): OperationStatus {
+export function operationStatus(
+  changed: boolean,
+  conflicts: ReadonlyArray<unknown>,
+): OperationStatus {
   if (conflicts.length) return "conflict";
   return changed ? "applied" : "unchanged";
 }
@@ -143,7 +148,14 @@ export function applyVersioned<Item extends Versioned>(
   }
 
   const changed = accepted.length > 0 || deletedIds.length > 0;
-  return { items, accepted, deletedIds, conflicts, changed, status: operationStatus(changed, conflicts) };
+  return {
+    items,
+    accepted,
+    deletedIds,
+    conflicts,
+    changed,
+    status: operationStatus(changed, conflicts),
+  };
 }
 
 /** Whether two flat items hold the same content: the same fields (`version` aside) with `===` values. */
@@ -151,5 +163,7 @@ function sameFields(current: Versioned, incoming: object): boolean {
   const left = Object.keys(current).filter((key) => key !== "version");
   const right = Object.keys(incoming);
   if (left.length !== right.length) return false;
-  return right.every((key) => key in current && Reflect.get(current, key) === Reflect.get(incoming, key));
+  return right.every(
+    (key) => key in current && Reflect.get(current, key) === Reflect.get(incoming, key),
+  );
 }

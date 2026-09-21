@@ -8,7 +8,14 @@
  * an empty one; a function under an `on*` key is a listener; an object under `style` is assigned
  * to the element's style.
  */
-export type ElPropValue = string | number | boolean | null | undefined | EventListener | Partial<CSSStyleDeclaration>;
+export type ElPropValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | EventListener
+  | Partial<CSSStyleDeclaration>;
 
 /** The props of {@link el}: attribute names to values, plus the `class`, `text`, `html`, `style` and `on*` conveniences. */
 export type ElProps = Record<string, ElPropValue>;
@@ -36,7 +43,8 @@ export function el<K extends keyof HTMLElementTagNameMap>(
     else if (key === "text") node.textContent = String(value);
     else if (key === "html") node.innerHTML = String(value);
     else if (key === "style" && typeof value === "object") Object.assign(node.style, value);
-    else if (key.startsWith("on") && typeof value === "function") node.addEventListener(key.slice(2).toLowerCase(), value);
+    else if (key.startsWith("on") && typeof value === "function")
+      node.addEventListener(key.slice(2).toLowerCase(), value);
     else node.setAttribute(key, value === true ? "" : String(value));
   }
   for (const child of Array.isArray(children) ? children : [children]) {

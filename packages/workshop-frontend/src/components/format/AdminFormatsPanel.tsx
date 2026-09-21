@@ -7,93 +7,102 @@
 // Presentation is never authored from scratch: a promoted blueprint arrives with its own noun,
 // plural and icon, and clearing an override falls back to it.
 
-import { useEffect, useMemo, useState } from 'react'
-import { Button, DropdownMenu, Input, Switch, useKumoToastManager } from '@cloudflare/kumo'
-import { ArrowDown, ArrowUp, CaretDown, CaretRight, Plus, Sparkle, Trash, Warning } from '@phosphor-icons/react'
+import { useEffect, useMemo, useState } from "react";
+import { Button, DropdownMenu, Input, Switch, useKumoToastManager } from "@cloudflare/kumo";
+import {
+  ArrowDown,
+  ArrowUp,
+  CaretDown,
+  CaretRight,
+  Plus,
+  Sparkle,
+  Trash,
+  Warning,
+} from "@phosphor-icons/react";
 import type {
   AdminApi,
   AdminFormat,
   BlueprintOutput,
   OutputIcon,
-} from '@gadgets/workshop-shared/api'
-import { OUTPUT_ICONS } from '@gadgets/workshop-shared/api'
-import type { RpcStub } from 'capnweb'
-import { useAuthenticatedApi } from '../../AuthContext'
-import { MENU_CONTENT } from '../menuStyles'
-import { FORMAT_ICONS, GENERIC_OUTPUT } from './formats'
-import { FormatGlyph, FormatPreview } from './FormatVisuals'
-import { isImeComposing } from '../../keyboardEvent'
+} from "@gadgets/workshop-shared/api";
+import { OUTPUT_ICONS } from "@gadgets/workshop-shared/api";
+import type { RpcStub } from "capnweb";
+import { useAuthenticatedApi } from "../../AuthContext";
+import { MENU_CONTENT } from "../menuStyles";
+import { FORMAT_ICONS, GENERIC_OUTPUT } from "./formats";
+import { FormatGlyph, FormatPreview } from "./FormatVisuals";
+import { isImeComposing } from "../../keyboardEvent";
 
 // A blueprint the admin could promote. `declared` is what it says it produces, when we know --
 // known for the deployment's featured blueprints, unknown for the admin's own published ones.
-type Promotable = { id: string; title: string; declared?: BlueprintOutput }
+type Promotable = { id: string; title: string; declared?: BlueprintOutput };
 
 export default function AdminFormatsPanel({
   admin,
   formats,
   onChanged,
 }: {
-  admin: RpcStub<AdminApi>
-  formats: AdminFormat[]
+  admin: RpcStub<AdminApi>;
+  formats: AdminFormat[];
   /**
    * Re-fetch after a mutation. Formats are edited rarely, so re-reading beats an optimistic local
    * copy that could disagree about order.
    */
-  onChanged: () => Promise<void>
+  onChanged: () => Promise<void>;
 }) {
-  const { authenticatedApi } = useAuthenticatedApi()
-  const toasts = useKumoToastManager()
-  const [busy, setBusy] = useState(false)
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [candidates, setCandidates] = useState<Promotable[]>([])
+  const { authenticatedApi } = useAuthenticatedApi();
+  const toasts = useKumoToastManager();
+  const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [candidates, setCandidates] = useState<Promotable[]>([]);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     Promise.all([authenticatedApi.listFeaturedBlueprints(), authenticatedApi.listOwnBlueprints()])
       .then(([featured, own]) => {
-        if (cancelled) return
-        const byId = new Map<string, Promotable>()
+        if (cancelled) return;
+        const byId = new Map<string, Promotable>();
         for (const b of featured) {
-          byId.set(b.id, { id: b.id, title: b.metadata.title, declared: b.metadata.output })
+          byId.set(b.id, { id: b.id, title: b.metadata.title, declared: b.metadata.output });
         }
         for (const b of own) {
-          if (!byId.has(b.id)) byId.set(b.id, { id: b.id, title: b.title })
+          if (!byId.has(b.id)) byId.set(b.id, { id: b.id, title: b.title });
         }
-        setCandidates([...byId.values()])
+        setCandidates([...byId.values()]);
       })
-      .catch((err) => console.error('Failed to list promotable blueprints:', err))
+      .catch((err) => console.error("Failed to list promotable blueprints:", err));
     return () => {
-      cancelled = true
-    }
-  }, [authenticatedApi])
+      cancelled = true;
+    };
+  }, [authenticatedApi]);
 
-  const promoted = useMemo(() => new Set(formats.map((f) => f.blueprintId)), [formats])
-  const available = candidates.filter((c) => !promoted.has(c.id))
-  const offered = formats.filter((f) => f.enabled && f.output && !f.missing)
+  const promoted = useMemo(() => new Set(formats.map((f) => f.blueprintId)), [formats]);
+  const available = candidates.filter((c) => !promoted.has(c.id));
+  const offered = formats.filter((f) => f.enabled && f.output && !f.missing);
 
   // Every mutation funnels through here, so the panel can't issue overlapping writes and always
   // re-reads the authoritative order afterwards.
   const mutate = async (op: () => Promise<void>) => {
-    if (busy) return
-    setBusy(true)
+    if (busy) return;
+    setBusy(true);
     try {
-      await op()
-      await onChanged()
+      await op();
+      await onChanged();
     } catch (err) {
-      console.error('Format update failed:', err)
-      toasts.add({ title: "Couldn't update standard formats", variant: 'error' })
+      console.error("Format update failed:", err);
+      toasts.add({ title: "Couldn't update standard formats", variant: "error" });
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
-  }
+  };
 
   const move = (index: number, delta: number) => {
-    const order = formats.map((f) => f.blueprintId)
-    const target = index + delta
-    if (target < 0 || target >= order.length) return
-    ;[order[index], order[target]] = [order[target], order[index]]
-    return mutate(() => admin.setFormatOrder(order))
-  }
+    const order = formats.map((f) => f.blueprintId);
+    const target = index + delta;
+    if (target < 0 || target >= order.length) return;
+    [order[index], order[target]] = [order[target], order[index]];
+    return mutate(() => admin.setFormatOrder(order));
+  };
 
   return (
     <div className="rounded-xl border border-kumo-line bg-kumo-elevated p-6">
@@ -147,15 +156,19 @@ export default function AdminFormatsPanel({
               className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-kumo-tint"
               onClick={() => mutate(() => admin.promoteFormat(candidate.id))}
             >
-              <FormatGlyph output={candidate.declared} size="lg" className="shrink-0 text-kumo-subtle" />
+              <FormatGlyph
+                output={candidate.declared}
+                size="lg"
+                className="shrink-0 text-kumo-subtle"
+              />
               <span className="min-w-0">
                 <span className="block truncate text-[13px] text-kumo-default">
-                  {candidate.title || 'Untitled blueprint'}
+                  {candidate.title || "Untitled blueprint"}
                 </span>
                 <span className="block truncate text-[11px] text-kumo-inactive">
                   {candidate.declared
                     ? `Produces ${candidate.declared.plural}`
-                    : 'No declared format. You’ll name it.'}
+                    : "No declared format. You’ll name it."}
                 </span>
               </span>
             </DropdownMenu.Item>
@@ -163,7 +176,7 @@ export default function AdminFormatsPanel({
         </DropdownMenu.Content>
       </DropdownMenu>
     </div>
-  )
+  );
 }
 
 // What users will actually get, drawn with the same components the real surfaces use.
@@ -194,7 +207,7 @@ function PreviewStrip({ formats }: { formats: AdminFormat[] }) {
         In the composer’s + menu, the command palette, and on an empty Outputs page, in this order.
       </p>
     </div>
-  )
+  );
 }
 
 function EmptyState() {
@@ -206,7 +219,7 @@ function EmptyState() {
         agent prefer it over building the same thing from scratch.
       </p>
     </div>
-  )
+  );
 }
 
 function FormatRow({
@@ -220,17 +233,17 @@ function FormatRow({
   onPatch,
   onRemove,
 }: {
-  format: AdminFormat
-  busy: boolean
-  open: boolean
-  onToggle: () => void
-  isFirst: boolean
-  isLast: boolean
-  onMove: (delta: number) => void
-  onPatch: (patch: Parameters<AdminApi['updateFormat']>[1]) => void
-  onRemove: () => void
+  format: AdminFormat;
+  busy: boolean;
+  open: boolean;
+  onToggle: () => void;
+  isFirst: boolean;
+  isLast: boolean;
+  onMove: (delta: number) => void;
+  onPatch: (patch: Parameters<AdminApi["updateFormat"]>[1]) => void;
+  onRemove: () => void;
 }) {
-  const needsNaming = !format.missing && !format.output
+  const needsNaming = !format.missing && !format.output;
 
   return (
     <div className="group rounded-lg border border-kumo-line bg-kumo-base">
@@ -257,7 +270,9 @@ function FormatRow({
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
               <span className="truncate text-sm font-medium text-kumo-default">
-                {format.output ? `New ${format.output.noun}` : format.blueprintTitle || format.blueprintId}
+                {format.output
+                  ? `New ${format.output.noun}`
+                  : format.blueprintTitle || format.blueprintId}
               </span>
               {format.bundled && <Badge>Bundled</Badge>}
               {!format.enabled && !format.missing && <Badge>Off</Badge>}
@@ -265,10 +280,10 @@ function FormatRow({
             </span>
             <span className="mt-0.5 block truncate text-xs text-kumo-subtle">
               {format.missing
-                ? 'Blueprint deleted. Remove this entry.'
+                ? "Blueprint deleted. Remove this entry."
                 : needsNaming
-                ? 'This blueprint doesn’t declare what it produces. Give it a name to offer it.'
-                : `${format.blueprintTitle} · shown under ${format.output!.plural} on Outputs`}
+                  ? "This blueprint doesn’t declare what it produces. Give it a name to offer it."
+                  : `${format.blueprintTitle} · shown under ${format.output!.plural} on Outputs`}
             </span>
           </span>
 
@@ -281,7 +296,7 @@ function FormatRow({
             on every glance. */}
         <div
           className={`flex shrink-0 items-center gap-1 transition-opacity ${
-            open ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+            open ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
           }`}
         >
           <IconButton label="Move up" disabled={busy || isFirst} onClick={() => onMove(-1)}>
@@ -311,13 +326,13 @@ function FormatRow({
               <Fieldset
                 title="How it’s presented"
                 detail={
-                  'Leave a field empty to use the name the blueprint declares. ' +
+                  "Leave a field empty to use the name the blueprint declares. " +
                   (format.bundled
-                    ? 'A bundled blueprint can change its declared names when this deployment ' +
-                      'updates; a value you type here stays as you set it. '
-                    : '') +
-                  'Applies to outputs made from now on — existing ones keep the name they were ' +
-                  'made with.'
+                    ? "A bundled blueprint can change its declared names when this deployment " +
+                      "updates; a value you type here stays as you set it. "
+                    : "") +
+                  "Applies to outputs made from now on — existing ones keep the name they were " +
+                  "made with."
                 }
               >
                 <div className="flex items-center gap-4">
@@ -335,14 +350,14 @@ function FormatRow({
                     />
                     <OverrideField
                       label="Name"
-                      value={format.output?.noun ?? format.overrides?.noun ?? ''}
+                      value={format.output?.noun ?? format.overrides?.noun ?? ""}
                       declared={format.declared?.noun}
                       disabled={busy}
                       onCommit={(noun) => onPatch({ overrides: { noun } })}
                     />
                     <OverrideField
                       label="Plural"
-                      value={format.output?.plural ?? format.overrides?.plural ?? ''}
+                      value={format.output?.plural ?? format.overrides?.plural ?? ""}
                       declared={format.declared?.plural}
                       disabled={busy}
                       onCommit={(plural) => onPatch({ overrides: { plural } })}
@@ -370,7 +385,7 @@ function FormatRow({
                   placeholder="e.g. prefer for customer-facing decks"
                   value={format.agentHint}
                   disabled={busy}
-                  onCommit={(agentHint) => onPatch({ agentHint: agentHint ?? '' })}
+                  onCommit={(agentHint) => onPatch({ agentHint: agentHint ?? "" })}
                 />
                 {/* The literal catalog entry, including the blueprint's own description: the hint is
                     only its last line, and showing the label alone made an empty hint look like the
@@ -381,7 +396,7 @@ function FormatRow({
                     <span className="min-w-0">
                       <span className="block">
                         “{format.output.noun}” — a standard format on this deployment
-                        {format.agentHint ? ` -- ${format.agentHint}` : ''}
+                        {format.agentHint ? ` -- ${format.agentHint}` : ""}
                       </span>
                       {format.blueprintDescription && (
                         <span className="mt-0.5 block text-kumo-inactive">
@@ -400,11 +415,11 @@ function FormatRow({
               <div className="flex items-end justify-between gap-4 border-t border-kumo-line pt-3">
                 <p className="text-[12px] leading-4 text-kumo-subtle">
                   {(format.enabled
-                    ? 'Turning this off removes it from the menus above and from the agent’s catalog. Outputs already made from it keep working. '
-                    : 'Currently hidden from the menus above and from the agent’s catalog. ') +
+                    ? "Turning this off removes it from the menus above and from the agent’s catalog. Outputs already made from it keep working. "
+                    : "Currently hidden from the menus above and from the agent’s catalog. ") +
                     (format.bundled
-                      ? 'It ships with the deployment, so it stays in this list either way.'
-                      : '')}
+                      ? "It ships with the deployment, so it stays in this list either way."
+                      : "")}
                 </p>
                 {!format.bundled && (
                   <Button variant="secondary" disabled={busy} onClick={onRemove}>
@@ -427,7 +442,7 @@ function FormatRow({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function Fieldset({
@@ -435,9 +450,9 @@ function Fieldset({
   detail,
   children,
 }: {
-  title: string
-  detail: string
-  children: React.ReactNode
+  title: string;
+  detail: string;
+  children: React.ReactNode;
 }) {
   return (
     <div>
@@ -445,19 +460,25 @@ function Fieldset({
       <p className="mb-2 mt-0.5 text-[12px] leading-4 text-kumo-subtle">{detail}</p>
       {children}
     </div>
-  )
+  );
 }
 
-function Badge({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'neutral' | 'warn' }) {
+function Badge({
+  children,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  tone?: "neutral" | "warn";
+}) {
   return (
     <span
       className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none ${
-        tone === 'warn' ? 'bg-kumo-danger/10 text-kumo-danger' : 'bg-kumo-fill text-kumo-subtle'
+        tone === "warn" ? "bg-kumo-danger/10 text-kumo-danger" : "bg-kumo-fill text-kumo-subtle"
       }`}
     >
       {children}
     </span>
-  )
+  );
 }
 
 // A field that either overrides the blueprint or defers to it. Committing an empty value, or one
@@ -471,23 +492,23 @@ function OverrideField({
   disabled,
   onCommit,
 }: {
-  label: string
-  value: string
-  declared?: string
-  placeholder?: string
-  disabled?: boolean
-  onCommit: (value: string | null) => void
+  label: string;
+  value: string;
+  declared?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  onCommit: (value: string | null) => void;
 }) {
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
 
   const commit = () => {
-    const trimmed = draft.trim()
-    if (trimmed === value.trim()) return
-    onCommit(!trimmed || trimmed === declared ? null : trimmed)
-  }
+    const trimmed = draft.trim();
+    if (trimmed === value.trim()) return;
+    onCommit(!trimmed || trimmed === declared ? null : trimmed);
+  };
 
-  const overridden = declared !== undefined && draft.trim() !== '' && draft.trim() !== declared
+  const overridden = declared !== undefined && draft.trim() !== "" && draft.trim() !== declared;
 
   return (
     <label className="flex flex-col gap-1">
@@ -504,13 +525,13 @@ function OverrideField({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (isImeComposing(e)) return
-          if (e.key === 'Enter') e.currentTarget.blur()
-          if (e.key === 'Escape') setDraft(value)
+          if (isImeComposing(e)) return;
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") setDraft(value);
         }}
       />
     </label>
-  )
+  );
 }
 
 function IconPicker({
@@ -521,10 +542,10 @@ function IconPicker({
 }: {
   // The icon in effect, which the admin may have set on a format whose presentation is otherwise
   // still incomplete.
-  icon?: OutputIcon
-  declaredIcon?: OutputIcon
-  disabled?: boolean
-  onPick: (icon: OutputIcon | null) => void
+  icon?: OutputIcon;
+  declaredIcon?: OutputIcon;
+  disabled?: boolean;
+  onPick: (icon: OutputIcon | null) => void;
 }) {
   return (
     <label className="flex flex-col gap-1">
@@ -547,8 +568,8 @@ function IconPicker({
         <DropdownMenu.Content className={MENU_CONTENT}>
           <div className="grid grid-cols-5 gap-1 p-1">
             {OUTPUT_ICONS.map((icon) => {
-              const Icon = FORMAT_ICONS[icon]
-              const active = selected === icon
+              const Icon = FORMAT_ICONS[icon];
+              const active = selected === icon;
               return (
                 <button
                   key={icon}
@@ -556,18 +577,18 @@ function IconPicker({
                   aria-label={icon}
                   onClick={() => onPick(icon === declaredIcon ? null : icon)}
                   className={`grid h-8 w-8 cursor-pointer place-items-center rounded-md transition-colors ${
-                    active ? 'bg-kumo-fill text-kumo-strong' : 'text-kumo-subtle hover:bg-kumo-tint'
+                    active ? "bg-kumo-fill text-kumo-strong" : "text-kumo-subtle hover:bg-kumo-tint"
                   }`}
                 >
                   <Icon size={16} />
                 </button>
-              )
+              );
             })}
           </div>
         </DropdownMenu.Content>
       </DropdownMenu>
     </label>
-  )
+  );
 }
 
 function IconButton({
@@ -576,10 +597,10 @@ function IconButton({
   onClick,
   children,
 }: {
-  label: string
-  disabled?: boolean
-  onClick: () => void
-  children: React.ReactNode
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
     <button
@@ -592,5 +613,5 @@ function IconButton({
     >
       {children}
     </button>
-  )
+  );
 }

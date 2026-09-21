@@ -12,10 +12,10 @@ Only Atlassian **Cloud** is supported; there is no Server / Data Center adapter.
 
 Three connectable resource granularities:
 
-| Granularity | URL pattern | Session type |
-| --- | --- | --- |
-| **Site** — search and open any space/page/blog post the account can access | `https://*.atlassian.net/wiki` | `ConfluenceSite` |
-| **Space** — list/search/create pages and blog posts within one space | `https://*.atlassian.net/wiki/spaces/:spaceKey` | `ConfluenceSpace` |
+| Granularity                                                                                                              | URL pattern                                                     | Session type        |
+| ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ------------------- |
+| **Site** — search and open any space/page/blog post the account can access                                               | `https://*.atlassian.net/wiki`                                  | `ConfluenceSite`    |
+| **Space** — list/search/create pages and blog posts within one space                                                     | `https://*.atlassian.net/wiki/spaces/:spaceKey`                 | `ConfluenceSpace`   |
 | **Page or blog post** — read/edit the body, manage labels/comments/attachments, and (pages only) read/create child pages | `https://*.atlassian.net/wiki/spaces/:spaceKey/pages/:pageId/*` | `ConfluenceContent` |
 
 Pages and blog posts share the `ConfluenceContent` session type (distinguished by
@@ -58,6 +58,7 @@ See `src/types.d.ts` for the full, agent-facing Session API.
    **Account-level:**
    - `read:me` (authorizing user's identity)
    - `offline_access` (required for refresh tokens)
+
 3. Under **Authorization**, set the callback URL to `<BASE_URL>/oauth`:
    - `http://localhost:8787/gatekeeper/confluence/oauth` for local dev
    - `<PUBLIC_BASE_URL>/gatekeeper/confluence/oauth` otherwise

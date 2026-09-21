@@ -1,5 +1,8 @@
 import type {
-  GoogleDocsTab, ParagraphElement, StructuralElement, TextStyle,
+  GoogleDocsTab,
+  ParagraphElement,
+  StructuralElement,
+  TextStyle,
 } from "../src/docs-api";
 
 /** A styled span of text within a paragraph. */
@@ -26,7 +29,7 @@ export function buildTab(
 
   for (let spec of paragraphs) {
     let start = index;
-    let elements: ParagraphElement[] = spec.runs.map(run => {
+    let elements: ParagraphElement[] = spec.runs.map((run) => {
       let { text, style } = typeof run === "string" ? { text: run, style: undefined } : run;
       let runStart = index;
       index += text.length;

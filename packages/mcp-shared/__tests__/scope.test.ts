@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   endpointOfResourceUrl,
   endpointTag,
@@ -58,7 +58,11 @@ describe("parseToolScope", () => {
   it("fails closed on a key that is present but yields nothing", () => {
     // The alternative is failing open: an absent `tools` key means the whole endpoint, the widest
     // grant there is, so a mangled `#tool=` must not arrive at it.
-    for (const url of [`${ENDPOINT}#server=&tool=`, `${ENDPOINT}#tool=&tool=`, `${ENDPOINT}#tool=`]) {
+    for (const url of [
+      `${ENDPOINT}#server=&tool=`,
+      `${ENDPOINT}#tool=&tool=`,
+      `${ENDPOINT}#tool=`,
+    ]) {
       const scope = parseToolScope(url);
       expect(isWholeEndpoint(scope)).toBe(false);
       expect(scopeAllows(scope, "gh_list_issues", false)).toBe(false);
@@ -76,9 +80,11 @@ describe("parseToolScope", () => {
     const fragment = new URLSearchParams();
     for (let i = 0; i <= MAX_TOOLS_PER_SERVER; i++) fragment.append("tool", `tool_${i}`);
     expect(() => parseToolScope(`${ENDPOINT}#${fragment}`)).toThrow(/at most 200/);
-    expect(() => formatToolScope(ENDPOINT, {
-      tools: Array.from({ length: MAX_TOOLS_PER_SERVER + 1 }, (_, i) => `tool_${i}`),
-    })).toThrow(/at most 200/);
+    expect(() =>
+      formatToolScope(ENDPOINT, {
+        tools: Array.from({ length: MAX_TOOLS_PER_SERVER + 1 }, (_, i) => `tool_${i}`),
+      }),
+    ).toThrow(/at most 200/);
   });
 });
 
@@ -91,8 +97,11 @@ describe("formatToolScope", () => {
       { serverId: "gh", tools: ["gh_a"] },
       { tools: ["weird,name"] },
     ]) {
-      expect(parseToolScope(formatToolScope(ENDPOINT, scope)))
-        .toEqual({ serverId: undefined, tools: undefined, ...scope });
+      expect(parseToolScope(formatToolScope(ENDPOINT, scope))).toEqual({
+        serverId: undefined,
+        tools: undefined,
+        ...scope,
+      });
     }
   });
 
@@ -112,7 +121,9 @@ describe("sameEndpoint", () => {
     // from `/mcp` to `/mcp-v2` kept every existing binding valid. The facet calls whatever endpoint
     // the account recorded, so the grant said one server and the calls went to another.
     expect(sameEndpoint("https://gw.example.com/mcp", "https://gw.example.com/mcp-v2")).toBe(false);
-    expect(sameEndpoint("https://gw.example.com/mcp?v=1", "https://gw.example.com/mcp")).toBe(false);
+    expect(sameEndpoint("https://gw.example.com/mcp?v=1", "https://gw.example.com/mcp")).toBe(
+      false,
+    );
   });
 
   it("still refuses a different host", () => {
@@ -157,8 +168,9 @@ describe("scopeAllows", () => {
     // These toggle which upstream servers the session can reach, so granting one would let a Gadget
     // widen its own authority.
     expect(scopeAllows({}, "portal_toggle_servers", true)).toBe(false);
-    expect(scopeAllows({ tools: ["portal_toggle_servers"] }, "portal_toggle_servers", true))
-      .toBe(false);
+    expect(scopeAllows({ tools: ["portal_toggle_servers"] }, "portal_toggle_servers", true)).toBe(
+      false,
+    );
   });
 
   it("does not withhold a plain server's coincidentally named tool", () => {
@@ -174,36 +186,45 @@ describe("validateToolScopeAgainstCatalog", () => {
   };
 
   it("rejects a named tool absent from a complete catalog", () => {
-    expect(() => validateToolScopeAgainstCatalog({ tools: ["missing"] }, catalog))
-      .toThrow(/missing.*current tool catalog/i);
+    expect(() => validateToolScopeAgainstCatalog({ tools: ["missing"] }, catalog)).toThrow(
+      /missing.*current tool catalog/i,
+    );
   });
 
   it("accepts named tools present in a complete catalog", () => {
-    expect(() => validateToolScopeAgainstCatalog({ tools: ["gh_list_issues"] }, catalog))
-      .not.toThrow();
+    expect(() =>
+      validateToolScopeAgainstCatalog({ tools: ["gh_list_issues"] }, catalog),
+    ).not.toThrow();
   });
 
   it("accepts named tools that were found before an exact-name listing stopped", () => {
-    expect(() => validateToolScopeAgainstCatalog(
-      { tools: ["gh_list_issues"] }, { ...catalog, truncated: true }))
-      .not.toThrow();
+    expect(() =>
+      validateToolScopeAgainstCatalog(
+        { tools: ["gh_list_issues"] },
+        { ...catalog, truncated: true },
+      ),
+    ).not.toThrow();
   });
 
   it("refuses an unresolved named tool when its listing was truncated", () => {
-    expect(() => validateToolScopeAgainstCatalog(
-      { tools: ["missing"] }, { ...catalog, truncated: true }))
-      .toThrow(/truncated/i);
+    expect(() =>
+      validateToolScopeAgainstCatalog({ tools: ["missing"] }, { ...catalog, truncated: true }),
+    ).toThrow(/truncated/i);
   });
 
   it("accepts a reported server-wide grant despite a truncated tool catalog", () => {
     const github = { id: "gh", name: "GitHub", enabled: true };
-    expect(validateToolScopeAgainstCatalog(
-      { serverId: "gh" }, { ...catalog, truncated: true }, [github])).toEqual(github);
+    expect(
+      validateToolScopeAgainstCatalog({ serverId: "gh" }, { ...catalog, truncated: true }, [
+        github,
+      ]),
+    ).toEqual(github);
   });
 
   it("rejects a portal server absent from both the catalog and reported server list", () => {
-    expect(() => validateToolScopeAgainstCatalog({ serverId: "jira" }, catalog, []))
-      .toThrow(/jira.*current portal catalog/i);
+    expect(() => validateToolScopeAgainstCatalog({ serverId: "jira" }, catalog, [])).toThrow(
+      /jira.*current portal catalog/i,
+    );
   });
 
   it("accepts an all-tools grant for a currently reported server with no tools", () => {
@@ -220,8 +241,7 @@ describe("validateToolScopeAgainstCatalog", () => {
   });
 
   it("uses current tool evidence to validate a pinned-empty grant", () => {
-    expect(validateToolScopeAgainstCatalog(
-      { serverId: "gh", tools: [] }, catalog, [])).toEqual({
+    expect(validateToolScopeAgainstCatalog({ serverId: "gh", tools: [] }, catalog, [])).toEqual({
       id: "gh",
       name: "gh",
       enabled: true,
@@ -229,19 +249,20 @@ describe("validateToolScopeAgainstCatalog", () => {
   });
 
   it("rejects named tools outside or absent from the selected portal server", () => {
-    expect(() => validateToolScopeAgainstCatalog(
-      { serverId: "gh", tools: ["linear_list_comments"] }, catalog))
-      .toThrow(/does not belong.*gh/i);
-    expect(() => validateToolScopeAgainstCatalog(
-      { serverId: "gh", tools: ["gh_missing"] }, catalog))
-      .toThrow(/gh_missing.*current tool catalog/i);
+    expect(() =>
+      validateToolScopeAgainstCatalog({ serverId: "gh", tools: ["linear_list_comments"] }, catalog),
+    ).toThrow(/does not belong.*gh/i);
+    expect(() =>
+      validateToolScopeAgainstCatalog({ serverId: "gh", tools: ["gh_missing"] }, catalog),
+    ).toThrow(/gh_missing.*current tool catalog/i);
   });
 });
 
 describe("requireCompleteCatalogForToolSelection", () => {
   it("refuses individual selection from a truncated catalog", () => {
-    expect(() => requireCompleteCatalogForToolSelection(true))
-      .toThrow(/too large.*individual tools/i);
+    expect(() => requireCompleteCatalogForToolSelection(true)).toThrow(
+      /too large.*individual tools/i,
+    );
     expect(() => requireCompleteCatalogForToolSelection(false)).not.toThrow();
   });
 });

@@ -67,9 +67,14 @@ export class Gadget extends DurableObject<GadgetEnv, unknown> implements GadgetS
     // Presence is announced in this gadget's own callback vocabulary: a caret
     // with no position yet on arrival, and a bare id on departure.
     this.subscribers = new SubscriberRegistry({
-      join: (subscriber, who) => subscriber.presence({
-        type: "join", clientId: who.clientId, name: who.name, color: who.color, blockId: null,
-      }),
+      join: (subscriber, who) =>
+        subscriber.presence({
+          type: "join",
+          clientId: who.clientId,
+          name: who.name,
+          color: who.color,
+          blockId: null,
+        }),
       leave: (subscriber, who) => subscriber.presence({ type: "leave", clientId: who.clientId }),
     });
   }
@@ -112,8 +117,8 @@ export class Gadget extends DurableObject<GadgetEnv, unknown> implements GadgetS
       // blank revision-1 shell before an agent seeds generated content. Treat
       // only that exact shell as replaceable; later empty documents may be an
       // intentional user edit and are never overwritten by initialization.
-      const isBlankBootstrap = current.revision === 1 &&
-        current.title === DEFAULT_TITLE && current.blocks.length === 0;
+      const isBlankBootstrap =
+        current.revision === 1 && current.title === DEFAULT_TITLE && current.blocks.length === 0;
       const hasSeedContent = cleanBlocks.length > 0 || cleanTitle !== DEFAULT_TITLE;
       if (!isBlankBootstrap || !hasSeedContent) return current;
     }
@@ -143,7 +148,9 @@ export class Gadget extends DurableObject<GadgetEnv, unknown> implements GadgetS
 
   async setDocumentLocked({ blocks, title, senderId }: DocumentInit): Promise<StoredDocument> {
     const previous = await this.ctx.storage.get<StoredDocument>("document:v2");
-    const previousById = new Map((previous?.blocks || []).map((block): [string, StoredBlock] => [block.id, block]));
+    const previousById = new Map(
+      (previous?.blocks || []).map((block): [string, StoredBlock] => [block.id, block]),
+    );
     const cleanBlocks = sanitizeBlocks(blocks);
     const document: StoredDocument = {
       revision: (previous?.revision || 0) + 1,
@@ -170,19 +177,23 @@ export class Gadget extends DurableObject<GadgetEnv, unknown> implements GadgetS
     let doc = await this.ctx.storage.get<StoredDocument>("document:v2");
     if (!doc) throw new Error("Document must be initialized first.");
 
-    const outcome = applyVersioned(doc.blocks, {
-      upserts: sanitizeBlocks(operation.upserts || []),
-      deletes: (operation.deletes || []).map((deletion) => ({
-        id: String(deletion?.id || ""),
-        baseVersion: normalizeBaseVersion(deletion?.baseVersion),
-      })),
-    }, {
-      // Every accepted upsert takes a new version, even one whose HTML already
-      // matches what is stored: the reply is how a client learns which version
-      // its draft now rests on, and a block left out of it would keep looking
-      // unsaved to the sender.
-      isUnchanged: () => false,
-    });
+    const outcome = applyVersioned(
+      doc.blocks,
+      {
+        upserts: sanitizeBlocks(operation.upserts || []),
+        deletes: (operation.deletes || []).map((deletion) => ({
+          id: String(deletion?.id || ""),
+          baseVersion: normalizeBaseVersion(deletion?.baseVersion),
+        })),
+      },
+      {
+        // Every accepted upsert takes a new version, even one whose HTML already
+        // matches what is stored: the reply is how a client learns which version
+        // its draft now rests on, and a block left out of it would keep looking
+        // unsaved to the sender.
+        isUnchanged: () => false,
+      },
+    );
     const byId = outcome.items;
     const { accepted, deletedIds } = outcome;
     // A rejection travels as the authoritative block, which the client rebases
@@ -190,7 +201,10 @@ export class Gadget extends DurableObject<GadgetEnv, unknown> implements GadgetS
     // to rebase onto and is dropped instead: the client re-creates it from its
     // draft on the next save, with no base version.
     const conflicts = outcome.conflicts
-      .filter((conflict): conflict is Extract<VersionConflict<StoredBlock>, { reason: "stale" }> => conflict.reason === "stale")
+      .filter(
+        (conflict): conflict is Extract<VersionConflict<StoredBlock>, { reason: "stale" }> =>
+          conflict.reason === "stale",
+      )
       .map((conflict) => conflict.current);
 
     // Ordering is intentionally last-writer-wins. Text/content remains guarded
@@ -200,17 +214,25 @@ export class Gadget extends DurableObject<GadgetEnv, unknown> implements GadgetS
     const order: string[] = [];
     const seen = new Set<string>();
     for (const id of requestedOrder) {
-      if (byId.has(id) && !seen.has(id)) { order.push(id); seen.add(id); }
+      if (byId.has(id) && !seen.has(id)) {
+        order.push(id);
+        seen.add(id);
+      }
     }
     for (const block of doc.blocks) {
-      if (byId.has(block.id) && !seen.has(block.id)) { order.push(block.id); seen.add(block.id); }
+      if (byId.has(block.id) && !seen.has(block.id)) {
+        order.push(block.id);
+        seen.add(block.id);
+      }
     }
     for (const id of byId.keys()) {
       if (!seen.has(id)) order.push(id);
     }
 
     const titleChanged = typeof operation.title === "string" && operation.title !== doc.title;
-    const changed = outcome.changed || titleChanged ||
+    const changed =
+      outcome.changed ||
+      titleChanged ||
       order.join("\n") !== doc.blocks.map((b) => b.id).join("\n");
 
     if (!changed) {
@@ -243,7 +265,10 @@ export class Gadget extends DurableObject<GadgetEnv, unknown> implements GadgetS
     };
   }
 
-  async subscribe(callback: SubscriberCallbacks, client: Partial<Collaborator> = {}): Promise<DocumentSnapshot> {
+  async subscribe(
+    callback: SubscriberCallbacks,
+    client: Partial<Collaborator> = {},
+  ): Promise<DocumentSnapshot> {
     // The registry keeps the stub, seeds the newcomer with everyone already
     // connected, announces it to them, and drops it when its connection breaks.
     this.subscribers.add(callback, normalizeCollaborator(client));
@@ -318,7 +343,6 @@ function sanitizeBlocks(blocks: unknown): BlockUpsert[] {
   return result;
 }
 
-
 // An export format as the Workshop lists it: a `server` format is produced by ExportHandler.export,
 // a `browser` one by the client, opened with `gadgetExportFormatId` set.
 interface ExportFormat {
@@ -330,9 +354,21 @@ interface ExportFormat {
 }
 
 const DOC_EXPORT_FORMATS: ExportFormat[] = [
-  { id: "markdown", label: "Markdown", mode: "server", contentType: "text/markdown", fileExtension: ".md" },
+  {
+    id: "markdown",
+    label: "Markdown",
+    mode: "server",
+    contentType: "text/markdown",
+    fileExtension: ".md",
+  },
   { id: "html", label: "HTML", mode: "browser", contentType: "text/html", fileExtension: ".html" },
-  { id: "pdf", label: "PDF", mode: "browser", contentType: "application/pdf", fileExtension: ".pdf" },
+  {
+    id: "pdf",
+    label: "PDF",
+    mode: "browser",
+    contentType: "application/pdf",
+    fileExtension: ".pdf",
+  },
 ];
 
 export class ExportHandler extends WorkerEntrypoint {
@@ -377,57 +413,134 @@ function htmlToMarkdown(html: string): string {
 
     if (closing) {
       switch (tag) {
-        case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
-        case "p": case "div":
+        case "h1":
+        case "h2":
+        case "h3":
+        case "h4":
+        case "h5":
+        case "h6":
+        case "p":
+        case "div":
           markdown += "\n\n";
           break;
         case "blockquote": {
           const start = blockquotes.pop();
-          const content = markdown.slice(start).trim().replace(/\n{3,}/g, "\n\n");
+          const content = markdown
+            .slice(start)
+            .trim()
+            .replace(/\n{3,}/g, "\n\n");
           const quoted = content
-            ? content.split("\n").map((line) => line ? "> " + line : ">").join("\n")
+            ? content
+                .split("\n")
+                .map((line) => (line ? "> " + line : ">"))
+                .join("\n")
             : ">";
           markdown = markdown.slice(0, start) + quoted + "\n\n";
           break;
         }
-        case "strong": case "b": markdown += "**"; break;
-        case "em": case "i": markdown += "*"; break;
-        case "s": case "strike": case "del": markdown += "~~"; break;
-        case "code": if (!inPre) markdown += "\x60"; break;
-        case "pre": markdown += "\n\x60\x60\x60\n\n"; inPre = false; break;
-        case "a": markdown += "](" + (links.pop() || "") + ")"; break;
-        case "li": if (!markdown.endsWith("\n")) markdown += "\n"; break;
-        case "ul": case "ol": lists.pop(); break;
-        case "td": case "th": markdown += "\t"; break;
-        case "tr": markdown += "\n"; break;
+        case "strong":
+        case "b":
+          markdown += "**";
+          break;
+        case "em":
+        case "i":
+          markdown += "*";
+          break;
+        case "s":
+        case "strike":
+        case "del":
+          markdown += "~~";
+          break;
+        case "code":
+          if (!inPre) markdown += "\x60";
+          break;
+        case "pre":
+          markdown += "\n\x60\x60\x60\n\n";
+          inPre = false;
+          break;
+        case "a":
+          markdown += "](" + (links.pop() || "") + ")";
+          break;
+        case "li":
+          if (!markdown.endsWith("\n")) markdown += "\n";
+          break;
+        case "ul":
+        case "ol":
+          lists.pop();
+          break;
+        case "td":
+        case "th":
+          markdown += "\t";
+          break;
+        case "tr":
+          markdown += "\n";
+          break;
       }
       continue;
     }
 
     switch (tag) {
-      case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
+      case "h1":
+      case "h2":
+      case "h3":
+      case "h4":
+      case "h5":
+      case "h6":
         markdown += "\n\n" + "#".repeat(Number(tag[1])) + " ";
         break;
-      case "p": case "div": markdown += "\n\n"; break;
-      case "br": markdown += "  \n"; break;
-      case "strong": case "b": markdown += "**"; break;
-      case "em": case "i": markdown += "*"; break;
-      case "s": case "strike": case "del": markdown += "~~"; break;
-      case "code": if (!inPre) markdown += "\x60"; break;
-      case "pre": markdown += "\n\n\x60\x60\x60\n"; inPre = true; break;
-      case "blockquote": markdown += "\n\n"; blockquotes.push(markdown.length); break;
-      case "hr": markdown += "\n\n---\n\n"; break;
-      case "ul": lists.push({ type: "ul", count: 0 }); break;
-      case "ol": lists.push({ type: "ol", count: 0 }); break;
+      case "p":
+      case "div":
+        markdown += "\n\n";
+        break;
+      case "br":
+        markdown += "  \n";
+        break;
+      case "strong":
+      case "b":
+        markdown += "**";
+        break;
+      case "em":
+      case "i":
+        markdown += "*";
+        break;
+      case "s":
+      case "strike":
+      case "del":
+        markdown += "~~";
+        break;
+      case "code":
+        if (!inPre) markdown += "\x60";
+        break;
+      case "pre":
+        markdown += "\n\n\x60\x60\x60\n";
+        inPre = true;
+        break;
+      case "blockquote":
+        markdown += "\n\n";
+        blockquotes.push(markdown.length);
+        break;
+      case "hr":
+        markdown += "\n\n---\n\n";
+        break;
+      case "ul":
+        lists.push({ type: "ul", count: 0 });
+        break;
+      case "ol":
+        lists.push({ type: "ol", count: 0 });
+        break;
       case "li": {
         const list = lists.at(-1) || { type: "ul", count: 0 };
         list.count += 1;
-        markdown += (markdown.endsWith("\n") ? "" : "\n") +
+        markdown +=
+          (markdown.endsWith("\n") ? "" : "\n") +
           "  ".repeat(Math.max(0, lists.length - 1)) +
           (list.type === "ol" ? list.count + ". " : "- ");
         break;
       }
-      case "a": links.push(readHtmlAttribute(attributes, "href")); markdown += "["; break;
+      case "a":
+        links.push(readHtmlAttribute(attributes, "href"));
+        markdown += "[";
+        break;
       case "img": {
         const alt = readHtmlAttribute(attributes, "alt").replace(/[\\[\]]/g, "\\$&");
         markdown += "![" + alt + "](" + readHtmlAttribute(attributes, "src") + ")";
@@ -446,15 +559,25 @@ function htmlToMarkdown(html: string): string {
 function readHtmlAttribute(source: string, name: string): string {
   const pattern = new RegExp(name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", "i");
   const match = pattern.exec(source);
-  return decodeHtml(match ? match[1] ?? match[2] ?? match[3] ?? "" : "");
+  return decodeHtml(match ? (match[1] ?? match[2] ?? match[3] ?? "") : "");
 }
 
 function decodeHtml(value: string): string {
-  return String(value).replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi, (_: string, entity: string) => {
-    const lower = entity.toLowerCase();
-    if (lower.startsWith("#x")) return String.fromCodePoint(Number.parseInt(lower.slice(2), 16));
-    if (lower.startsWith("#")) return String.fromCodePoint(Number.parseInt(lower.slice(1), 10));
-    const named: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " };
-    return named[lower];
-  });
+  return String(value).replace(
+    /&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi,
+    (_: string, entity: string) => {
+      const lower = entity.toLowerCase();
+      if (lower.startsWith("#x")) return String.fromCodePoint(Number.parseInt(lower.slice(2), 16));
+      if (lower.startsWith("#")) return String.fromCodePoint(Number.parseInt(lower.slice(1), 10));
+      const named: Record<string, string> = {
+        amp: "&",
+        lt: "<",
+        gt: ">",
+        quot: '"',
+        apos: "'",
+        nbsp: " ",
+      };
+      return named[lower];
+    },
+  );
 }

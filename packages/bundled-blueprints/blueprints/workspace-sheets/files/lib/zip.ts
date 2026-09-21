@@ -32,14 +32,15 @@ const CRC32_TABLE = new Uint32Array(256);
 for (let i = 0; i < CRC32_TABLE.length; ++i) {
   let value = i;
   for (let bit = 0; bit < 8; ++bit) {
-    value = (value & 1) ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
   }
   CRC32_TABLE[i] = value >>> 0;
 }
 
 export function crc32(bytes: Uint8Array, previous = 0): number {
   let value = (previous ^ 0xffffffff) >>> 0;
-  for (let i = 0; i < bytes.length; ++i) value = CRC32_TABLE[(value ^ bytes[i]) & 0xff] ^ (value >>> 8);
+  for (let i = 0; i < bytes.length; ++i)
+    value = CRC32_TABLE[(value ^ bytes[i]) & 0xff] ^ (value >>> 8);
   return (value ^ 0xffffffff) >>> 0;
 }
 
@@ -87,7 +88,11 @@ function centralHeader(entry: CentralEntry): Uint8Array {
   });
 }
 
-function endOfCentralDirectory(entryCount: number, centralSize: number, centralOffset: number): Uint8Array {
+function endOfCentralDirectory(
+  entryCount: number,
+  centralSize: number,
+  centralOffset: number,
+): Uint8Array {
   return record(22, (view) => {
     view.setUint32(0, 0x06054b50, true);
     view.setUint16(8, entryCount, true);
@@ -107,7 +112,9 @@ function byteStream(data: ZipEntryData): ReadableStream<Uint8Array> {
   });
 }
 
-async function* generateZip(entries: Iterable<ZipEntry>): AsyncGenerator<Uint8Array, void, unknown> {
+async function* generateZip(
+  entries: Iterable<ZipEntry>,
+): AsyncGenerator<Uint8Array, void, unknown> {
   const centralEntries: CentralEntry[] = [];
   let offset = 0;
   const emit = (bytes: Uint8Array) => {
@@ -115,7 +122,7 @@ async function* generateZip(entries: Iterable<ZipEntry>): AsyncGenerator<Uint8Ar
     return bytes;
   };
 
-  for (const {name: rawName, data} of entries) {
+  for (const { name: rawName, data } of entries) {
     const name = encoder.encode(rawName);
     const localOffset = offset;
     yield emit(localHeader(name.byteLength));
@@ -124,20 +131,22 @@ async function* generateZip(entries: Iterable<ZipEntry>): AsyncGenerator<Uint8Ar
     let crc = 0;
     let compressedSize = 0;
     let uncompressedSize = 0;
-    const measured = byteStream(data).pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        uncompressedSize += chunk.byteLength;
-        crc = crc32(chunk, crc);
-        controller.enqueue(chunk);
-      },
-    }));
+    const measured = byteStream(data).pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, controller) {
+          uncompressedSize += chunk.byteLength;
+          crc = crc32(chunk, crc);
+          controller.enqueue(chunk);
+        },
+      }),
+    );
     for await (const chunk of measured.pipeThrough(new CompressionStream("deflate-raw"))) {
       compressedSize += chunk.byteLength;
       yield emit(chunk);
     }
 
     yield emit(dataDescriptor(crc, compressedSize, uncompressedSize));
-    centralEntries.push({name, crc, compressedSize, uncompressedSize, localOffset});
+    centralEntries.push({ name, crc, compressedSize, uncompressedSize, localOffset });
   }
 
   const centralOffset = offset;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { deserialize, serialize } from "capnweb";
 import {
   MAX_CODE_CHANGE_SIZE,
@@ -51,7 +51,21 @@ function pick<T>(rng: () => number, items: readonly T[]): T {
 // (two code points, four UTF-16 units), combining text, and every line-separator exotic the
 // codebase promises to round-trip (bare \r, \u2028, \u2029, NUL).
 const ALPHABET = [
-  "a", "b", "x", " ", "é", "😀", "🧠", "👍🏽", "\n", "\n", "\r", "\r\n", "\u2028", "\u2029", "\0",
+  "a",
+  "b",
+  "x",
+  " ",
+  "é",
+  "😀",
+  "🧠",
+  "👍🏽",
+  "\n",
+  "\n",
+  "\r",
+  "\r\n",
+  "\u2028",
+  "\u2029",
+  "\0",
 ];
 
 function randomText(rng: () => number, maxPieces: number): string {
@@ -74,7 +88,9 @@ function codePointBoundaries(text: string): number[] {
 
 // Builds the compact-JSON TextChange for a sorted list of non-overlapping replacements.
 function makeEdit(
-    baseLength: number, specs: { from: number, to: number, insert: string }[]): TextChange {
+  baseLength: number,
+  specs: { from: number; to: number; insert: string }[],
+): TextChange {
   let change: TextChange = [];
   let pos = 0;
   for (let { from, to, insert } of specs) {
@@ -90,7 +106,7 @@ function makeEdit(
 // boundaries, each possibly a pure insert, deletion, or replacement.
 function randomEdit(rng: () => number, base: string): TextChange {
   let bounds = codePointBoundaries(base);
-  let specs: { from: number, to: number, insert: string }[] = [];
+  let specs: { from: number; to: number; insert: string }[] = [];
   let i = 0;
   while (i < bounds.length) {
     if (rng() < 0.4) {
@@ -160,8 +176,9 @@ function toPlain(value: CodeContent): Record<string, Record<string, string>> {
 }
 
 function content(gadgets: Record<string, Record<string, string>>): CodeContent {
-  return new Map(Object.entries(gadgets).map(
-      ([id, files]) => [Number(id), new Map(Object.entries(files))]));
+  return new Map(
+    Object.entries(gadgets).map(([id, files]) => [Number(id), new Map(Object.entries(files))]),
+  );
 }
 
 // =======================================================================================
@@ -217,10 +234,12 @@ describe("transformCodeChange convergence", () => {
     let a: CodeChange = { 1: [["f.txt", { edit: [[0, "A"], 2] }]] };
     let b: CodeChange = { 1: [["f.txt", { edit: [[0, "B"], 2] }]] };
     let t = transformCodeChange(a, b);
-    expect(toPlain(applyCodeChange(applyCodeChange(c, a), t.b)))
-        .toEqual({ 1: { "f.txt": "ABxy" } });
-    expect(toPlain(applyCodeChange(applyCodeChange(c, b), t.a)))
-        .toEqual({ 1: { "f.txt": "ABxy" } });
+    expect(toPlain(applyCodeChange(applyCodeChange(c, a), t.b))).toEqual({
+      1: { "f.txt": "ABxy" },
+    });
+    expect(toPlain(applyCodeChange(applyCodeChange(c, b), t.a))).toEqual({
+      1: { "f.txt": "ABxy" },
+    });
   });
 
   it("leaves disjoint gadgets and paths untouched", () => {
@@ -234,8 +253,13 @@ describe("transformCodeChange set/remove last-writer-wins", () => {
   const BASE = content({ 1: { "f.txt": "hello" } });
 
   // Each case: [a, b, expected t.a, expected t.b, expected converged file state].
-  const CASES: [FileChange, FileChange, FileChange | undefined, FileChange | undefined,
-                string | undefined][] = [
+  const CASES: [
+    FileChange,
+    FileChange,
+    FileChange | undefined,
+    FileChange | undefined,
+    string | undefined,
+  ][] = [
     [{ set: "A" }, { set: "B" }, undefined, { set: "B" }, "B"],
     [{ set: "A" }, { remove: true }, undefined, { remove: true }, undefined],
     [{ remove: true }, { set: "B" }, undefined, { set: "B" }, "B"],
@@ -273,8 +297,9 @@ describe("composeCodeChange", () => {
       let a = randomCodeChange(rng, c);
       let c2 = applyCodeChange(c, a);
       let b = randomCodeChange(rng, c2);
-      expect(toPlain(applyCodeChange(c, composeCodeChange(a, b))))
-          .toEqual(toPlain(applyCodeChange(c2, b)));
+      expect(toPlain(applyCodeChange(c, composeCodeChange(a, b)))).toEqual(
+        toPlain(applyCodeChange(c2, b)),
+      );
     }
   });
 
@@ -305,9 +330,9 @@ describe("diffFiles", () => {
         let newFiles = new Map<string, string>();
         for (let [path, text] of files) {
           let r = rng();
-          if (r < 0.25) continue;  // removed
-          else if (r < 0.5) newFiles.set(path, text);  // untouched
-          else newFiles.set(path, randomText(rng, 12));  // replaced
+          if (r < 0.25) continue; // removed
+          else if (r < 0.5) newFiles.set(path, text); // untouched
+          else newFiles.set(path, randomText(rng, 12)); // replaced
         }
         if (rng() < 0.4) newFiles.set("added.txt", randomText(rng, 8));
         after.set(gadgetId, newFiles);
@@ -356,14 +381,15 @@ describe("replaceSpanChange", () => {
   // Validates the change against a one-file document, applies it, and asserts the result equals the
   // plain string splice the span replacement describes.
   function applySpan(doc: string, from: number, replaced: string, insert: string): TextChange {
-    expect(doc.slice(from, from + replaced.length)).toBe(replaced);  // test self-check
+    expect(doc.slice(from, from + replaced.length)).toBe(replaced); // test self-check
     let edit = replaceSpanChange(doc.length, from, replaced, insert);
     let change: CodeChange = { 1: [["f.txt", { edit }]] };
     let before = content({ 1: { "f.txt": doc } });
     validateCodeChangeSchema(change);
     validateCodeChangeContent(change, before);
-    expect(applyCodeChange(before, change).get(1)!.get("f.txt"))
-        .toBe(doc.slice(0, from) + insert + doc.slice(from + replaced.length));
+    expect(applyCodeChange(before, change).get(1)!.get("f.txt")).toBe(
+      doc.slice(0, from) + insert + doc.slice(from + replaced.length),
+    );
     return edit;
   }
 
@@ -383,10 +409,10 @@ describe("replaceSpanChange", () => {
   });
 
   it("handles span edges and whole-document replacement", () => {
-    applySpan("abc", 0, "abc", "xyz");            // whole document
+    applySpan("abc", 0, "abc", "xyz"); // whole document
     expect(applySpan("abc", 0, "a", "A")).toEqual(makeEdit(3, [{ from: 0, to: 1, insert: "A" }]));
     expect(applySpan("abc", 2, "c", "C")).toEqual(makeEdit(3, [{ from: 2, to: 3, insert: "C" }]));
-    applySpan("", 0, "", "hello");                // insertion into an empty document
+    applySpan("", 0, "", "hello"); // insertion into an empty document
   });
 
   it("yields the identity change when nothing changed", () => {
@@ -401,11 +427,11 @@ describe("replaceSpanChange", () => {
 
   it("never lets trimming split a surrogate pair", () => {
     // Prefix back-off: 😀 (D83D DE00) and 😂 (D83D DE02) share their high surrogate.
-    expect(applySpan("😀x", 0, "😀x", "😂x"))
-        .toEqual(makeEdit(3, [{ from: 0, to: 2, insert: "😂" }]));
+    expect(applySpan("😀x", 0, "😀x", "😂x")).toEqual(
+      makeEdit(3, [{ from: 0, to: 2, insert: "😂" }]),
+    );
     // Suffix back-off: 𐐀 (D801 DC00) and 𝐀 (D835 DC00) share their low surrogate.
-    expect(applySpan("a𐐀", 1, "𐐀", "𝐀"))
-        .toEqual(makeEdit(3, [{ from: 1, to: 3, insert: "𝐀" }]));
+    expect(applySpan("a𐐀", 1, "𐐀", "𝐀")).toEqual(makeEdit(3, [{ from: 1, to: 3, insert: "𝐀" }]));
   });
 
   it("fuzz: padded random spans validate and apply over astral-heavy text", () => {
@@ -462,7 +488,12 @@ describe("line separator handling", () => {
 describe("applyCodeChange", () => {
   it("does not modify its input", () => {
     let c = content({ 1: { "f.txt": "hello" } });
-    applyCodeChange(c, { 1: [["f.txt", { set: "changed" }], ["g.txt", { set: "new" }]] });
+    applyCodeChange(c, {
+      1: [
+        ["f.txt", { set: "changed" }],
+        ["g.txt", { set: "new" }],
+      ],
+    });
     expect(toPlain(c)).toEqual({ 1: { "f.txt": "hello" } });
   });
 
@@ -474,16 +505,19 @@ describe("applyCodeChange", () => {
 
   it("treats remove of an absent file as a no-op", () => {
     let c = content({ 1: { "f.txt": "hello" } });
-    let result = applyCodeChange(
-        c, { 1: [["g.txt", { remove: true }]], 9: [["x", { remove: true }]] });
+    let result = applyCodeChange(c, {
+      1: [["g.txt", { remove: true }]],
+      9: [["x", { remove: true }]],
+    });
     expect(toPlain(result)).toEqual({ 1: { "f.txt": "hello" } });
   });
 });
 
 describe("changedGadgets", () => {
   it("returns touched gadget ids ascending", () => {
-    expect(changedGadgets({ 10: [["a", { remove: true }]], 2: [["b", { set: "x" }]] }))
-        .toEqual([2, 10]);
+    expect(changedGadgets({ 10: [["a", { remove: true }]], 2: [["b", { set: "x" }]] })).toEqual([
+      2, 10,
+    ]);
     expect(changedGadgets({})).toEqual([]);
   });
 });
@@ -496,7 +530,10 @@ describe("validateCodeChangeSchema", () => {
     validateCodeChangeSchema({});
     validateCodeChangeSchema({
       0: [["a.txt", { set: "" }]],
-      12: [["b/c.txt", { edit: [1, [2, "x", ""], 3] }], ["d.txt", { remove: true }]],
+      12: [
+        ["b/c.txt", { edit: [1, [2, "x", ""], 3] }],
+        ["d.txt", { remove: true }],
+      ],
     });
   });
 
@@ -505,19 +542,30 @@ describe("validateCodeChangeSchema", () => {
   // established before a change reaches this module (see the trust boundary note in
   // code-change.ts). These cases cover only what a well-typed CodeChange can still get wrong.
   it("rejects malformed outer shapes", () => {
-    expect(() => validateCodeChangeSchema({ "01": [["a", { remove: true }]] }))
-        .toThrow(/canonical gadget id/);
-    expect(() => validateCodeChangeSchema({ "-1": [["a", { remove: true }]] }))
-        .toThrow(/canonical gadget id/);
-    expect(() => validateCodeChangeSchema({ "1.5": [["a", { remove: true }]] }))
-        .toThrow(/canonical gadget id/);
-    expect(() => validateCodeChangeSchema({ "abc": [["a", { remove: true }]] }))
-        .toThrow(/canonical gadget id/);
+    expect(() => validateCodeChangeSchema({ "01": [["a", { remove: true }]] })).toThrow(
+      /canonical gadget id/,
+    );
+    expect(() => validateCodeChangeSchema({ "-1": [["a", { remove: true }]] })).toThrow(
+      /canonical gadget id/,
+    );
+    expect(() => validateCodeChangeSchema({ "1.5": [["a", { remove: true }]] })).toThrow(
+      /canonical gadget id/,
+    );
+    expect(() => validateCodeChangeSchema({ abc: [["a", { remove: true }]] })).toThrow(
+      /canonical gadget id/,
+    );
     expect(() => validateCodeChangeSchema({ 1: [] })).toThrow(/is empty/);
-    expect(() => validateCodeChangeSchema({ 1: [["", { remove: true }]] }))
-        .toThrow(/path is empty/);
-    expect(() => validateCodeChangeSchema(
-        { 1: [["f", { remove: true }], ["f", { set: "x" }]] })).toThrow(/duplicate/);
+    expect(() => validateCodeChangeSchema({ 1: [["", { remove: true }]] })).toThrow(
+      /path is empty/,
+    );
+    expect(() =>
+      validateCodeChangeSchema({
+        1: [
+          ["f", { remove: true }],
+          ["f", { set: "x" }],
+        ],
+      }),
+    ).toThrow(/duplicate/);
   });
 
   // The wire validator's FileChange union is first-match and tolerates extra properties, so a
@@ -525,7 +573,7 @@ describe("validateCodeChangeSchema", () => {
   // read it differently and diverge two replicas).
   it("rejects file changes that are not exactly one variant", () => {
     let bad = (fileChange: unknown) =>
-        expect(() => validateCodeChangeSchema({ 1: [["f", fileChange as FileChange]] }));
+      expect(() => validateCodeChangeSchema({ 1: [["f", fileChange as FileChange]] }));
     bad({}).toThrow(/exactly one/);
     bad({ set: "x", remove: true }).toThrow(/exactly one/);
     bad({ frobnicate: 1 }).toThrow(/exactly one/);
@@ -535,7 +583,7 @@ describe("validateCodeChangeSchema", () => {
   // integrality or sign.
   it("rejects malformed text changes", () => {
     let bad = (edit: TextChange) =>
-        expect(() => validateCodeChangeSchema({ 1: [["f", { edit }]] }));
+      expect(() => validateCodeChangeSchema({ 1: [["f", { edit }]] }));
     bad([-1]).toThrow(/invalid section length/);
     bad([1.5]).toThrow(/invalid section length/);
     bad([[-2, "x"]]).toThrow(/invalid section length/);
@@ -543,7 +591,7 @@ describe("validateCodeChangeSchema", () => {
 
   it("rejects do-nothing sections and embedded newlines in inserted lines", () => {
     let bad = (edit: unknown) =>
-        expect(() => validateCodeChangeSchema({ 1: [["f", { edit: edit as TextChange }]] }));
+      expect(() => validateCodeChangeSchema({ 1: [["f", { edit: edit as TextChange }]] }));
     // Zero-progress padding would evade the size caps.
     bad([0]).toThrow(/do-nothing/);
     bad([1, 0, 1]).toThrow(/do-nothing/);
@@ -552,22 +600,24 @@ describe("validateCodeChangeSchema", () => {
     // An inserted "line" containing "\n" desynchronizes line metadata from the text.
     bad([[0, "a\nb"], 3]).toThrow(/contains a newline/);
     // The legitimate forms of the same content still pass.
-    validateCodeChangeSchema({ 1: [["f", { edit: [[0, "a", "b"], 3] }]] });  // multi-line insert
-    validateCodeChangeSchema({ 1: [["f", { edit: [[0, "", ""], 3] }]] });  // pure "\n" insert
+    validateCodeChangeSchema({ 1: [["f", { edit: [[0, "a", "b"], 3] }]] }); // multi-line insert
+    validateCodeChangeSchema({ 1: [["f", { edit: [[0, "", ""], 3] }]] }); // pure "\n" insert
   });
 
   it("enforces the per-file, per-path, and per-change size caps", () => {
     let big = "x".repeat(MAX_FILE_TEXT_LENGTH + 1);
     expect(() => validateCodeChangeSchema({ 1: [["f", { set: big }]] })).toThrow(/too large/);
-    expect(() => validateCodeChangeSchema({ 1: [["f", { edit: [[0, big]] }]] }))
-        .toThrow(/too large/);
+    expect(() => validateCodeChangeSchema({ 1: [["f", { edit: [[0, big]] }]] })).toThrow(
+      /too large/,
+    );
     // Growing an existing file past the cap trips on newLength even with a small insertion.
-    expect(() => validateCodeChangeSchema(
-        { 1: [["f", { edit: [MAX_FILE_TEXT_LENGTH, [0, "!"]] }]] })).toThrow(/too large/);
+    expect(() =>
+      validateCodeChangeSchema({ 1: [["f", { edit: [MAX_FILE_TEXT_LENGTH, [0, "!"]] }]] }),
+    ).toThrow(/too large/);
 
-    expect(() => validateCodeChangeSchema(
-        { 1: [["p".repeat(MAX_FILE_PATH_LENGTH + 1), { remove: true }]] }))
-        .toThrow(/path is too long/);
+    expect(() =>
+      validateCodeChangeSchema({ 1: [["p".repeat(MAX_FILE_PATH_LENGTH + 1), { remove: true }]] }),
+    ).toThrow(/path is too long/);
 
     let chunk = "x".repeat(MAX_FILE_TEXT_LENGTH);
     let files: [string, FileChange][] = [];
@@ -599,23 +649,26 @@ describe("validateCodeChangeSchema", () => {
     // ChangeSet.fromJSON, a second multi-million-element representation would be allocated).
     let holes: TextChange = [];
     holes.length = 100_000_000;
-    expect(() => validateCodeChangeSchema({ 1: [["f", { edit: holes }]] }))
-        .toThrow(/code change is too large/);
+    expect(() => validateCodeChangeSchema({ 1: [["f", { edit: holes }]] })).toThrow(
+      /code change is too large/,
+    );
 
     // Inserted text is budget-checked as it accrues: this edit's total insertion exceeds the
     // *change* budget mid-walk, which fires before the per-file newLength check ("file is too
     // large") that runs after fromJSON.
     let chunk = "x".repeat(MAX_FILE_TEXT_LENGTH);
     let inserts: TextChange = Array.from({ length: 5 }, () => [0, chunk] as [number, string]);
-    expect(() => validateCodeChangeSchema({ 1: [["f", { edit: inserts }]] }))
-        .toThrow(/code change is too large/);
+    expect(() => validateCodeChangeSchema({ 1: [["f", { edit: inserts }]] })).toThrow(
+      /code change is too large/,
+    );
 
     // A single section padded with empty lines is rejected on its separator count alone,
     // before its lines are walked: the poisoned last line would otherwise report "contains a
     // newline".
     let padded: TextChange = [[0, ...Array.from({ length: 2_100_000 }, () => ""), "a\nb"]];
-    expect(() => validateCodeChangeSchema({ 1: [["f", { edit: padded }]] }))
-        .toThrow(/code change is too large/);
+    expect(() => validateCodeChangeSchema({ 1: [["f", { edit: padded }]] })).toThrow(
+      /code change is too large/,
+    );
   });
 });
 
@@ -653,7 +706,12 @@ describe("file names colliding with Object.prototype members", () => {
 
   it("keeps them intact through transform and compose", () => {
     let c = content({ 1: { "f.txt": "hello" } });
-    let a: CodeChange = { 1: [["constructor", { set: "x" }], ["__proto__", { set: "y" }]] };
+    let a: CodeChange = {
+      1: [
+        ["constructor", { set: "x" }],
+        ["__proto__", { set: "y" }],
+      ],
+    };
     let b: CodeChange = { 1: [["f.txt", { set: "z" }]] };
 
     // The expected content is built with JSON.parse: a literal "__proto__" property in source
@@ -662,8 +720,9 @@ describe("file names colliding with Object.prototype members", () => {
     let expected = JSON.parse('{"1": {"f.txt": "z", "constructor": "x", "__proto__": "y"}}');
 
     let t = transformCodeChange(a, b);
-    expect(toPlain(applyCodeChange(applyCodeChange(c, a), t.b)))
-        .toEqual(toPlain(applyCodeChange(applyCodeChange(c, b), t.a)));
+    expect(toPlain(applyCodeChange(applyCodeChange(c, a), t.b))).toEqual(
+      toPlain(applyCodeChange(applyCodeChange(c, b), t.a)),
+    );
     expect(toPlain(applyCodeChange(applyCodeChange(c, a), t.b))).toEqual(expected);
 
     let composed = composeCodeChange(a, b);
@@ -675,38 +734,43 @@ describe("validateCodeChangeContent", () => {
   const CONTENT = content({ 1: { "f.txt": "😀x" } });
 
   it("accepts boundary-clean edits, sets, and removes of anything", () => {
-    validateCodeChangeContent({ 1: [["f.txt", { edit: [[2], 1] }]] }, CONTENT);  // delete the 😀
-    validateCodeChangeContent({ 1: [["f.txt", { edit: [3] }]] }, CONTENT);  // identity retain
+    validateCodeChangeContent({ 1: [["f.txt", { edit: [[2], 1] }]] }, CONTENT); // delete the 😀
+    validateCodeChangeContent({ 1: [["f.txt", { edit: [3] }]] }, CONTENT); // identity retain
     validateCodeChangeContent({ 1: [["f.txt", { edit: [[0, "🧠"], 3] }]] }, CONTENT);
     validateCodeChangeContent({ 1: [["absent.txt", { set: "hi" }]] }, CONTENT);
     validateCodeChangeContent({ 9: [["nowhere.txt", { remove: true }]] }, CONTENT);
   });
 
   it("rejects edits of absent files and wrong-length bases", () => {
-    expect(() => validateCodeChangeContent({ 1: [["g.txt", { edit: [3] }]] }, CONTENT))
-        .toThrow(/absent file/);
-    expect(() => validateCodeChangeContent({ 2: [["f.txt", { edit: [3] }]] }, CONTENT))
-        .toThrow(/absent file/);
-    expect(() => validateCodeChangeContent({ 1: [["f.txt", { edit: [7] }]] }, CONTENT))
-        .toThrow(/length mismatch/);
+    expect(() => validateCodeChangeContent({ 1: [["g.txt", { edit: [3] }]] }, CONTENT)).toThrow(
+      /absent file/,
+    );
+    expect(() => validateCodeChangeContent({ 2: [["f.txt", { edit: [3] }]] }, CONTENT)).toThrow(
+      /absent file/,
+    );
+    expect(() => validateCodeChangeContent({ 1: [["f.txt", { edit: [7] }]] }, CONTENT)).toThrow(
+      /length mismatch/,
+    );
   });
 
   it("rejects boundaries that split a surrogate pair", () => {
     // Delete just the high half of the 😀.
-    expect(() => validateCodeChangeContent({ 1: [["f.txt", { edit: [[1], 2] }]] }, CONTENT))
-        .toThrow(/splits a surrogate pair/);
+    expect(() =>
+      validateCodeChangeContent({ 1: [["f.txt", { edit: [[1], 2] }]] }, CONTENT),
+    ).toThrow(/splits a surrogate pair/);
     // Replace starting mid-pair.
-    expect(() => validateCodeChangeContent({ 1: [["f.txt", { edit: [1, [1, "y"], 1] }]] }, CONTENT))
-        .toThrow(/splits a surrogate pair/);
+    expect(() =>
+      validateCodeChangeContent({ 1: [["f.txt", { edit: [1, [1, "y"], 1] }]] }, CONTENT),
+    ).toThrow(/splits a surrogate pair/);
   });
 
   it("rejects lone surrogates in inserted and set text", () => {
-    expect(() => validateCodeChangeContent(
-        { 1: [["f.txt", { edit: [[0, "\ud83d"], 3] }]] }, CONTENT))
-        .toThrow(/lone surrogate/);
-    expect(() => validateCodeChangeContent(
-        { 1: [["g.txt", { set: "ok\udc00" }]] }, CONTENT))
-        .toThrow(/lone surrogate/);
+    expect(() =>
+      validateCodeChangeContent({ 1: [["f.txt", { edit: [[0, "\ud83d"], 3] }]] }, CONTENT),
+    ).toThrow(/lone surrogate/);
+    expect(() =>
+      validateCodeChangeContent({ 1: [["g.txt", { set: "ok\udc00" }]] }, CONTENT),
+    ).toThrow(/lone surrogate/);
     // A well-formed pair in an insert passes.
     validateCodeChangeContent({ 1: [["f.txt", { edit: [[0, "😀"], 3] }]] }, CONTENT);
   });

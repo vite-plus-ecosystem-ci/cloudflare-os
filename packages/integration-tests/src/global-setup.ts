@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { TestProject } from "vitest/node";
+import type { TestProject } from "vite-plus/test/node";
 import { pnpmCommand } from "@gadgets/scripts/pnpm-command";
 import { isWorkerInput } from "./worker-inputs.js";
 
@@ -19,7 +19,7 @@ function rebuildWorkshopForWatch(): void {
 
 /** Share validated Worker builds across isolated test-file processes. */
 export default function setup(project: TestProject): () => void {
-  const missingEntries = VALIDATED_ENTRIES.filter(entry => !existsSync(entry));
+  const missingEntries = VALIDATED_ENTRIES.filter((entry) => !existsSync(entry));
   if (missingEntries.length > 0) {
     throw new Error(`Integration-test builds did not produce: ${missingEntries.join(", ")}`);
   }

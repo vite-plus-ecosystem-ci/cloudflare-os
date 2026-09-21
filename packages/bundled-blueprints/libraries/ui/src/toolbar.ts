@@ -33,7 +33,12 @@ function toolButton(
  * that text instead of an icon and `paths` may be `null`. Mousedown is prevented so the editor's
  * selection survives the click.
  */
-export function iconBtn(paths: string | null, title: string, onClick: ClickHandler, label?: string): HTMLButtonElement {
+export function iconBtn(
+  paths: string | null,
+  title: string,
+  onClick: ClickHandler,
+  label?: string,
+): HTMLButtonElement {
   return toolButton("icon-btn", paths, title, onClick, label);
 }
 
@@ -60,11 +65,20 @@ export function group(prio: string | null, items: Node[], first = false): HTMLDi
  * the CSS hex colour. Mousedown is prevented, as on {@link iconBtn}; a gadget that has to capture
  * its selection first adds its own `mousedown` listener to the returned element.
  */
-export function colorBtn(paths: string, title: string, defaultColor: string, onChange: (color: string) => void): HTMLDivElement {
+export function colorBtn(
+  paths: string,
+  title: string,
+  defaultColor: string,
+  onChange: (color: string) => void,
+): HTMLDivElement {
   const bar = el("span", { class: "bar" });
   bar.style.background = defaultColor;
   const input = el("input", { type: "color", value: defaultColor });
-  const button = el("div", { class: "color-btn", title }, [el("span", { html: icon(paths) }), bar, input]);
+  const button = el("div", { class: "color-btn", title }, [
+    el("span", { html: icon(paths) }),
+    bar,
+    input,
+  ]);
   button.addEventListener("mousedown", (event) => event.preventDefault());
   input.addEventListener("input", () => {
     bar.style.background = input.value;
@@ -82,13 +96,13 @@ export type SelectValue = string | number;
 /** An entry of {@link customSelect}: a choice, or a separator line between choices. */
 export type SelectOption =
   | {
-    value: SelectValue;
-    label: string;
-    /** Inline CSS for the menu item, e.g. `font-family:Georgia;` to preview a font. */
-    style?: string;
-    /** An example rendered right-aligned after the label (`span.ex`), e.g. `1,000.12` for a number format. */
-    ex?: string;
-  }
+      value: SelectValue;
+      label: string;
+      /** Inline CSS for the menu item, e.g. `font-family:Georgia;` to preview a font. */
+      style?: string;
+      /** An example rendered right-aligned after the label (`span.ex`), e.g. `1,000.12` for a number format. */
+      ex?: string;
+    }
   | { sep: true };
 
 /** What {@link customSelect} takes. */
@@ -122,7 +136,13 @@ const CHEVRON = icon('<polyline points="6 9 12 15 18 9"/>');
  * choice, a mousedown outside, a scroll anywhere or a resize. A value none of the options carries
  * shows the first choice's label and selects nothing.
  */
-export function customSelect({ className, title, options, value, onChange }: CustomSelectOptions): CustomSelect {
+export function customSelect({
+  className,
+  title,
+  options,
+  value,
+  onChange,
+}: CustomSelectOptions): CustomSelect {
   let current: string | undefined;
   const labelSpan = el("span", { class: "cs-label" });
   const button = el("button", { type: "button", class: "cselect " + (className ?? ""), title }, [
@@ -130,7 +150,9 @@ export function customSelect({ className, title, options, value, onChange }: Cus
     el("span", { class: "cs-chev", html: CHEVRON }),
   ]);
   const menu = el("div", { class: "cmenu" });
-  const choices = options.filter((option): option is Exclude<SelectOption, { sep: true }> => !("sep" in option));
+  const choices = options.filter(
+    (option): option is Exclude<SelectOption, { sep: true }> => !("sep" in option),
+  );
   const items: HTMLDivElement[] = [];
   for (const option of options) {
     if ("sep" in option) {
@@ -180,8 +202,16 @@ export function customSelect({ className, title, options, value, onChange }: Cus
     const target = event.target as Node | null;
     if (open && !menu.contains(target) && !button.contains(target)) closeMenu();
   });
-  window.addEventListener("scroll", () => { if (open) closeMenu(); }, true);
-  window.addEventListener("resize", () => { if (open) closeMenu(); });
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (open) closeMenu();
+    },
+    true,
+  );
+  window.addEventListener("resize", () => {
+    if (open) closeMenu();
+  });
 
   setValue(value);
   return { el: button, setValue, getValue: () => current };

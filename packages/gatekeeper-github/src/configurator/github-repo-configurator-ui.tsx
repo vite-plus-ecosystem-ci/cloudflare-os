@@ -1,5 +1,8 @@
 import { Autocomplete, Field, h, Section, type ConfiguratorUISpec } from "@gadgets/configurator-ui";
-import type { GitHubRepoConfiguratorRpc, GitHubRepoConfiguratorValues } from "./github-repo-configurator-types";
+import type {
+  GitHubRepoConfiguratorRpc,
+  GitHubRepoConfiguratorValues,
+} from "./github-repo-configurator-types";
 
 export default {
   initial: {},
@@ -18,16 +21,18 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return <Section>
-      <Field label="Repository" description="Search your repositories, or enter a GitHub URL.">
-        <Autocomplete
-          name="repoFullName"
-          value={values.repoFullName}
-          placeholder="Search or paste a repository URL..."
-          loadOptions={query => ui.listRepos(query)}
-          onChange={repoFullName => setValues({ repoFullName })}
-        />
-      </Field>
-    </Section>;
+    return (
+      <Section>
+        <Field label="Repository" description="Search your repositories, or enter a GitHub URL.">
+          <Autocomplete
+            name="repoFullName"
+            value={values.repoFullName}
+            placeholder="Search or paste a repository URL..."
+            loadOptions={(query) => ui.listRepos(query)}
+            onChange={(repoFullName) => setValues({ repoFullName })}
+          />
+        </Field>
+      </Section>
+    );
   },
 } satisfies ConfiguratorUISpec<GitHubRepoConfiguratorRpc, GitHubRepoConfiguratorValues>;

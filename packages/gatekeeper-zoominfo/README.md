@@ -29,6 +29,7 @@ is **not** offered as a "Continue with…" sign-in method (`getAuthenticatedEmai
    ```
 
    For local development that is `http://localhost:8787/gatekeeper/zoominfo/oauth`.
+
 3. Enable all API scopes the account is entitled to. The gatekeeper requests exactly the scopes
    ZoomInfo's authorization server recognizes:
 
@@ -38,6 +39,7 @@ is **not** offered as a "Continue with…" sign-in method (`getAuthenticatedEmai
    ```
 
    There is no `lookup` scope — lookup/enrich-field reference data comes with the data scopes.
+
 4. Copy the **Client ID** and **Client Secret**.
 
 > Use the OAuth app's **Client ID + Client Secret**. The `authorization_code` exchange posts them to
@@ -72,7 +74,7 @@ Optional overrides read by the Worker:
   `getEnrichmentResult(ticket)`. Enrichments are **not** simulated — the action carries
   `awaitDecision`, so the agent turn suspends until the decision rather than reading back
   un-enriched state.
-- **Intent/scoop company targeting.** Intent and scoop *search* filter by firmographics only —
+- **Intent/scoop company targeting.** Intent and scoop _search_ filter by firmographics only —
   ZoomInfo has no company-identity inputs there. To pull intent or scoops for a specific known
   company, use `enrichIntent` / `enrichScoops` (which take a company identifier). The API surface and
   a runtime guard both enforce this with a clear message instead of ZoomInfo's opaque 400.

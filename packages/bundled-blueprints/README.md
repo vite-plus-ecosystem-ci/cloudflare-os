@@ -107,13 +107,13 @@ pnpm --filter @gadgets/bundled-blueprints test:watch
 each other, since a Durable Object has no `document`, iframe code cannot import
 `cloudflare:workers`, and neither has Node's `fs`:
 
-| config | covers | globals |
-| --- | --- | --- |
-| `tsconfig.client.json` | every `client.ts` (blueprints and libraries) and what it imports | DOM |
-| `tsconfig.server.json` | every `server.ts` and what it imports | Workers |
-| `tsconfig.tests.json` | the blueprints' and libraries' `__tests__/` and what they import | DOM + Node |
+| config                       | covers                                                                                  | globals        |
+| ---------------------------- | --------------------------------------------------------------------------------------- | -------------- |
+| `tsconfig.client.json`       | every `client.ts` (blueprints and libraries) and what it imports                        | DOM            |
+| `tsconfig.server.json`       | every `server.ts` and what it imports                                                   | Workers        |
+| `tsconfig.tests.json`        | the blueprints' and libraries' `__tests__/` and what they import                        | DOM + Node     |
 | `tsconfig.server-tests.json` | `__tests__/server.test.ts` and `__tests__/*.server.test.ts`, the tests of a server side | Workers + Node |
-| `tsconfig.node.json` | `src/` and `__tests__/`, the build and its tests | Node |
+| `tsconfig.node.json`         | `src/` and `__tests__/`, the build and its tests                                        | Node           |
 
 Each follows its entries' imports, so a `lib/` or `src/` module is checked under the globals of
 whichever side imports it, and a module both sides import under both -- which is what keeps a

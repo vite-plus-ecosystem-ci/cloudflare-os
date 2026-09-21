@@ -10,9 +10,12 @@ export const DRIVE_BASELINE_DENIED_MESSAGE =
 
 function scopeRootId(scope: DriveBindingScope): string | undefined {
   switch (scope.kind) {
-    case "account": return undefined;
-    case "sharedDrive": return scope.driveId;
-    case "file": return scope.fileId;
+    case "account":
+      return undefined;
+    case "sharedDrive":
+      return scope.driveId;
+    case "file":
+      return scope.fileId;
   }
 }
 
@@ -44,7 +47,7 @@ export function driveObserverTracker<V>(
     decode: decodeURIComponent,
     verifyBatch,
     baselineDeniedMessage: DRIVE_BASELINE_DENIED_MESSAGE,
-    deniedMessage: fileId =>
+    deniedMessage: (fileId) =>
       `This collaborator cannot access Drive file ${fileId}, whose metadata this workspace has read.`,
     // checkFileAccess issues ceil(N/100) sequential subrequests. The overseer re-runs addObserver
     // on every open, per observer, at concurrency 6. 2000 files → 20 subrequests per observer, 120

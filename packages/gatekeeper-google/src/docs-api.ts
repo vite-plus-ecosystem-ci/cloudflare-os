@@ -25,7 +25,7 @@ export type GoogleDocsDocument = {
   revisionId?: string;
   /** Every tab, depth-first, parents before children. Never empty. */
   tabs: GoogleDocsTab[];
-}
+};
 
 /** One tab's content and its place in the document's tab tree. */
 export type GoogleDocsTab = {
@@ -43,19 +43,22 @@ export type GoogleDocsTab = {
   lists: Record<string, DocList>;
   /** Named ranges anchored in this tab. */
   namedRanges: NamedRanges;
-}
+};
 
 /** Named ranges grouped by name, as `documents.get` returns them. */
-export type NamedRanges = Record<string, {
-  namedRanges: { namedRangeId: string; name?: string }[];
-}>
+export type NamedRanges = Record<
+  string,
+  {
+    namedRanges: { namedRangeId: string; name?: string }[];
+  }
+>;
 
 /** A list definition, referenced by paragraphs that are list items. */
 export type DocList = {
   listProperties: {
     nestingLevels: NestingLevel[];
   };
-}
+};
 
 /** Describes the glyph style for one nesting level of a list. */
 export type NestingLevel = {
@@ -63,7 +66,7 @@ export type NestingLevel = {
   glyphType?: string;
   /** If set, this is an unordered (bullet) list level. e.g. "●" */
   glyphSymbol?: string;
-}
+};
 
 /** A structural element in the document body. */
 export type StructuralElement = {
@@ -73,24 +76,24 @@ export type StructuralElement = {
   sectionBreak?: {};
   table?: {};
   tableOfContents?: {};
-}
+};
 
 /** A paragraph (including headings, list items, etc.). */
 export type Paragraph = {
   elements: ParagraphElement[];
   paragraphStyle: ParagraphStyle;
   bullet?: Bullet;
-}
+};
 
 export type ParagraphStyle = {
   namedStyleType: string;
-}
+};
 
 /** Present on paragraphs that are list items. */
 export type Bullet = {
   listId: string;
   nestingLevel: number;
-}
+};
 
 /** An element within a paragraph (text run, horizontal rule, etc.). */
 export type ParagraphElement = {
@@ -98,23 +101,23 @@ export type ParagraphElement = {
   endIndex: number;
   textRun?: TextRun;
   horizontalRule?: {};
-}
+};
 
 export type TextRun = {
   content: string;
   textStyle: TextStyle;
-}
+};
 
 export type TextStyle = {
   bold?: boolean;
   italic?: boolean;
   strikethrough?: boolean;
   link?: { url: string };
-}
+};
 
-type GoogleDocsResponse = Pick<
-  GoogleDocsDocument, "documentId" | "title" | "revisionId"
-> & { tabs?: unknown };
+type GoogleDocsResponse = Pick<GoogleDocsDocument, "documentId" | "title" | "revisionId"> & {
+  tabs?: unknown;
+};
 
 /** Where one write's marker range goes: one character at `rangeStart` inside tab `tabId`. */
 type GoogleDocsWriteMarker = { name: string; rangeStart: number; tabId: string };
@@ -159,8 +162,13 @@ function normalizeDocumentTabs(tabs: unknown): GoogleDocsTab[] {
       let { body, lists, namedRanges } = documentTab as Record<string, unknown>;
       // A real body always holds at least a section break, and `bodyEndIndex` arithmetic assumes
       // it: an empty one would place an append at index -1.
-      if (!body || typeof body !== "object" || !("content" in body) ||
-          !Array.isArray(body.content) || body.content.length === 0) {
+      if (
+        !body ||
+        typeof body !== "object" ||
+        !("content" in body) ||
+        !Array.isArray(body.content) ||
+        body.content.length === 0
+      ) {
         throw new Error(INVALID_TAB);
       }
       // Structural elements stay unvalidated here; the converter reads them defensively.
@@ -169,7 +177,7 @@ function normalizeDocumentTabs(tabs: unknown): GoogleDocsTab[] {
       normalized.push({
         tabId,
         title,
-        ...parentTabId === undefined ? {} : { parentTabId },
+        ...(parentTabId === undefined ? {} : { parentTabId }),
         index,
         nestingLevel,
         body: { content },
@@ -199,22 +207,25 @@ const REQUEST_TIMEOUT_MS = 30_000;
 export class GoogleDocsApi {
   constructor(private getAccessToken: AccessTokenProvider) {}
 
-  async #request<T>(
-    url: string,
-    init: RequestInit,
-    operation: string,
-  ): Promise<T> {
-    let response = await fetchWithAuthRetry(
-      url, init, this.getAccessToken, { timeoutMs: REQUEST_TIMEOUT_MS },
-    );
+  async #request<T>(url: string, init: RequestInit, operation: string): Promise<T> {
+    let response = await fetchWithAuthRetry(url, init, this.getAccessToken, {
+      timeoutMs: REQUEST_TIMEOUT_MS,
+    });
     return readGoogleJson<T>(response, {
-      provider: "Google Docs", operation, maxBytes: MAX_RESPONSE_BYTES,
+      provider: "Google Docs",
+      operation,
+      maxBytes: MAX_RESPONSE_BYTES,
     });
   }
 
   /** Fetch a document and flatten its tab tree. */
   async getDocument(documentId: string): Promise<GoogleDocsDocument> {
-    let { documentId: id, title, revisionId, tabs } = await this.#request<GoogleDocsResponse>(
+    let {
+      documentId: id,
+      title,
+      revisionId,
+      tabs,
+    } = await this.#request<GoogleDocsResponse>(
       `${DOCS_API_BASE}/${encodeURIComponent(documentId)}?includeTabsContent=true`,
       {},
       "get document",
@@ -270,16 +281,19 @@ export class GoogleDocsApi {
     writeMarker?: GoogleDocsWriteMarker,
   ): Promise<{ revisionId: string; writeMarkerId?: string }> {
     let markedRequests = writeMarker
-      ? [{
-          createNamedRange: {
-            name: writeMarker.name,
-            range: {
-              startIndex: writeMarker.rangeStart,
-              endIndex: writeMarker.rangeStart + 1,
-              tabId: writeMarker.tabId,
+      ? [
+          {
+            createNamedRange: {
+              name: writeMarker.name,
+              range: {
+                startIndex: writeMarker.rangeStart,
+                endIndex: writeMarker.rangeStart + 1,
+                tabId: writeMarker.tabId,
+              },
             },
           },
-        }, ...requests]
+          ...requests,
+        ]
       : requests;
     let body: {
       requests: unknown[];

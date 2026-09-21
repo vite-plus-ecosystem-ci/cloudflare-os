@@ -103,9 +103,10 @@ export function formatTiming(
   return {
     relative: `Expired ${formatRelative(schedule.expiredAt - now, locale)}`,
     absolute,
-    diagnostic: schedule.cadence.kind === "once"
-      ? "This one-time task passed without delivery."
-      : "This recurring task's cutoff passed before its first occurrence.",
+    diagnostic:
+      schedule.cadence.kind === "once"
+        ? "This one-time task passed without delivery."
+        : "This recurring task's cutoff passed before its first occurrence.",
   };
 }
 

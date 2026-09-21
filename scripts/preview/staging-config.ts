@@ -30,8 +30,13 @@ import { createHash } from "node:crypto";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
-  gatekeeperShortName, isGatekeeperPackage, readDeployablePackages,
-  type BindingDecl, type DeployablePackage, type ObservabilityConfig, type ServiceBinding,
+  gatekeeperShortName,
+  isGatekeeperPackage,
+  readDeployablePackages,
+  type BindingDecl,
+  type DeployablePackage,
+  type ObservabilityConfig,
+  type ServiceBinding,
   type WranglerConfig,
 } from "../release/manifest-lib.ts";
 
@@ -127,7 +132,6 @@ export const R2_MAX_BUCKET_NAME_LENGTH = 63;
 export const MAX_PREVIEW_NAME_LENGTH = 28;
 const PREVIEW_NAME_HASH_LENGTH = 8;
 
-
 /**
  * The service binding name a gatekeeper is bound as: `gatekeeper-mcp-portal` ->
  * `GATEKEEPER_MCP_PORTAL`. Both the router (router/src/index.ts) and the backend
@@ -171,7 +175,10 @@ export function slugifyPreviewName(
   { reserve = 0 }: { reserve?: number } = {},
 ): string {
   const budget = MAX_PREVIEW_NAME_LENGTH - reserve;
-  const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const slug = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
   if (!slug) return "preview";
   if (slug.length <= budget) return slug;
 
@@ -182,10 +189,16 @@ export function slugifyPreviewName(
 
 // Local fallback when PREVIEW_NAME is unset: the current branch, else the current revision.
 function localRefName(): string {
-  for (const argv of [["branch", "--show-current"], ["rev-parse", "--short", "HEAD"]]) {
+  for (const argv of [
+    ["branch", "--show-current"],
+    ["rev-parse", "--short", "HEAD"],
+  ]) {
     try {
-      const out = execFileSync("git", argv,
-          { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+      const out = execFileSync("git", argv, {
+        cwd: ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
       if (out) return argv[0] === "branch" ? out : `local-${out}`;
     } catch {
       // Not a git checkout, or a detached HEAD with no branch: try the next form.
@@ -205,10 +218,10 @@ function localRefName(): string {
  * reads none back out of it. The residual is that renaming a branch mid-review orphans the preview
  * deployed under the old name, until the nightly sweep collects it.
  */
-export function resolvePreviewName(
-  { name = process.env.PREVIEW_NAME, prNumber = process.env.PREVIEW_PR_NUMBER }:
-      { name?: string; prNumber?: string } = {},
-): string {
+export function resolvePreviewName({
+  name = process.env.PREVIEW_NAME,
+  prNumber = process.env.PREVIEW_PR_NUMBER,
+}: { name?: string; prNumber?: string } = {}): string {
   const ref = name || localRefName();
   // Anything that is not a number is treated as absent: on a scheduled run the workflow's
   // interpolation is the empty string, and no other value names a pull request.
@@ -228,13 +241,18 @@ export function previewPullRequestNumber(previewName: string): number | undefine
  * PREVIEW_ADMINS. These are Cloudflare Access identities — an email each, since that is what
  * {@link resolveAccess} makes the account name — so an entry that is not an email matches nobody.
  */
-export function resolveAdmins(
-  { list = process.env.PREVIEW_ADMINS }: { list?: string } = {},
-): string[] {
-  const admins = (list ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+export function resolveAdmins({
+  list = process.env.PREVIEW_ADMINS,
+}: { list?: string } = {}): string[] {
+  const admins = (list ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (admins.length === 0) {
-    console.warn("PREVIEW_ADMINS is unset: the preview will have no deployment admins, so the " +
-        "/admin panel will be unreachable.");
+    console.warn(
+      "PREVIEW_ADMINS is unset: the preview will have no deployment admins, so the " +
+        "/admin panel will be unreachable.",
+    );
   }
   return admins;
 }
@@ -246,8 +264,8 @@ export function resolveAdmins(
 function previewResourceBindings(resources: unknown): BindingDecl[] | undefined {
   if (!Array.isArray(resources)) return undefined;
   const bindings = (resources as { binding?: unknown }[])
-      .map((resource) => ({ binding: resource.binding }))
-      .filter((resource): resource is BindingDecl => typeof resource.binding === "string");
+    .map((resource) => ({ binding: resource.binding }))
+    .filter((resource): resource is BindingDecl => typeof resource.binding === "string");
   return bindings.length > 0 ? bindings : undefined;
 }
 
@@ -255,7 +273,10 @@ function previewResourceBindings(resources: unknown): BindingDecl[] | undefined 
 // config was written for. All four hold `{ binding }`-shaped entries, which is what lets one loop
 // do all of them.
 const BASELINE_RESOURCE_KEYS = [
-  "kv_namespaces", "r2_buckets", "d1_databases", "worker_loaders",
+  "kv_namespaces",
+  "r2_buckets",
+  "d1_databases",
+  "worker_loaders",
 ] as const satisfies readonly (keyof StagingConfig)[];
 
 /**
@@ -338,10 +359,7 @@ function applyGatekeeper(
   if (r2Buckets) config.previews.r2_buckets = r2Buckets;
 }
 
-function applyBackend(
-  config: StagingConfig,
-  { baseUrl, gatekeepers }: PreviewContext,
-): void {
+function applyBackend(config: StagingConfig, { baseUrl, gatekeepers }: PreviewContext): void {
   // Injected rather than read from wrangler.jsonc, mirroring what manifest-lib.ts hardcodes for
   // every deployed backend (webFetch's toMarkdown conversion depends on it).
   config.ai = { binding: "WORKERS_AI" };
@@ -404,7 +422,10 @@ export function buildPreviewConfigs({
     throw new Error("buildPreviewConfigs needs both accountId and workersDevHost");
   }
   const baseUrl = routerPreviewUrl(previewName, workersDevHost);
-  const gatekeepers = packages.map((pkg) => pkg.name).filter(isGatekeeperPackage).toSorted();
+  const gatekeepers = packages
+    .map((pkg) => pkg.name)
+    .filter(isGatekeeperPackage)
+    .toSorted();
   const context: PreviewContext = { baseUrl, gatekeepers };
   const configs = new Map<string, StagingConfig>();
 
@@ -414,8 +435,10 @@ export function buildPreviewConfigs({
       // Checked before the rename below, not after: every URL and service binding here is
       // derived from the package directory name, so a worker whose own name diverges from it
       // would be silently misconfigured rather than merely renamed.
-      throw new Error(`${pkg.name}/wrangler.jsonc declares worker name "${config.name}"; the ` +
-          `preview generator requires them to match`);
+      throw new Error(
+        `${pkg.name}/wrangler.jsonc declares worker name "${config.name}"; the ` +
+          `preview generator requires them to match`,
+      );
     }
 
     // `preview_urls` defaults to `workers_dev` when unset, but both are stated so a preview's
@@ -455,10 +478,12 @@ function assertBucketNamesFit(configs: Map<string, StagingConfig>): void {
       const suffix = binding.toLowerCase().replaceAll("_", "-");
       const length = `${config.name}-`.length + MAX_PREVIEW_NAME_LENGTH + `-${suffix}`.length;
       if (length <= R2_MAX_BUCKET_NAME_LENGTH) continue;
-      throw new Error(`${pkgName}'s ${binding} bucket would be ${length} characters for a ` +
+      throw new Error(
+        `${pkgName}'s ${binding} bucket would be ${length} characters for a ` +
           `${MAX_PREVIEW_NAME_LENGTH}-character preview name, over R2's ` +
           `${R2_MAX_BUCKET_NAME_LENGTH}; lower MAX_PREVIEW_NAME_LENGTH to ` +
-          `${MAX_PREVIEW_NAME_LENGTH - (length - R2_MAX_BUCKET_NAME_LENGTH)}`);
+          `${MAX_PREVIEW_NAME_LENGTH - (length - R2_MAX_BUCKET_NAME_LENGTH)}`,
+      );
     }
   }
 }
@@ -487,8 +512,10 @@ export function resolveTarget({
       ...(accountId ? [] : ["CLOUDFLARE_ACCOUNT_ID"]),
       ...(workersDevHost ? [] : ["PREVIEW_WORKERS_DEV_HOST"]),
     ];
-    throw new Error(`${missing.join(" and ")} must be set: together they name the Cloudflare ` +
-        "account previews deploy to, and this repository deliberately hardcodes no default");
+    throw new Error(
+      `${missing.join(" and ")} must be set: together they name the Cloudflare ` +
+        "account previews deploy to, and this repository deliberately hardcodes no default",
+    );
   }
   return { accountId, workersDevHost };
 }
@@ -518,13 +545,12 @@ export function resolveAccess({
   iss = process.env.CF_ACCESS_ISS,
 }: { aud?: string; iss?: string } = {}): AccessConfig {
   if (!aud || !iss) {
-    const missing = [
-      ...(aud ? [] : ["CF_ACCESS_AUD"]),
-      ...(iss ? [] : ["CF_ACCESS_ISS"]),
-    ];
-    throw new Error(`${missing.join(" and ")} must be set: together they name the Cloudflare ` +
+    const missing = [...(aud ? [] : ["CF_ACCESS_AUD"]), ...(iss ? [] : ["CF_ACCESS_ISS"])];
+    throw new Error(
+      `${missing.join(" and ")} must be set: together they name the Cloudflare ` +
         "Access application that authenticates a preview, and a preview deployed without it " +
-        "would fall back to password signup on a public URL");
+        "would fall back to password signup on a public URL",
+    );
   }
   return { aud, iss };
 }
@@ -565,40 +591,56 @@ export function resolveAiGateway({
   // Normalized here rather than in the parameter default, which only runs when the caller omits
   // the value -- an explicitly passed " FALSE " would skip it and fail validation below.
   const useBinding = rawUseBinding?.trim().toLowerCase();
-  const rest = { CF_AI_GATEWAY_ACCOUNT_ID: accountId, CF_AI_GATEWAY_API_TOKEN: apiToken,
-    CF_AI_GATEWAY_PROVIDERS: providers, CF_AI_GATEWAY_USE_BINDING: useBinding };
+  const rest = {
+    CF_AI_GATEWAY_ACCOUNT_ID: accountId,
+    CF_AI_GATEWAY_API_TOKEN: apiToken,
+    CF_AI_GATEWAY_PROVIDERS: providers,
+    CF_AI_GATEWAY_USE_BINDING: useBinding,
+  };
   if (!gateway) {
     // Every one of these does nothing without a gateway name, so a set of them without it is a
     // half-finished configuration rather than a deliberate BYOK preview.
-    const orphans = Object.entries(rest).filter(([, value]) => value).map(([name]) => name);
+    const orphans = Object.entries(rest)
+      .filter(([, value]) => value)
+      .map(([name]) => name);
     if (orphans.length > 0) {
-      console.warn(`CF_AI_GATEWAY is unset, so ${orphans.join(", ")} will be ignored: the preview ` +
-          "will ask each user for their own model API keys.");
+      console.warn(
+        `CF_AI_GATEWAY is unset, so ${orphans.join(", ")} will be ignored: the preview ` +
+          "will ask each user for their own model API keys.",
+      );
     }
     return {};
   }
   if (!accountId) {
-    throw new Error("CF_AI_GATEWAY_ACCOUNT_ID must be set when CF_AI_GATEWAY is: the backend " +
-        "cannot discover its own account, and refuses to start a chat without it");
+    throw new Error(
+      "CF_AI_GATEWAY_ACCOUNT_ID must be set when CF_AI_GATEWAY is: the backend " +
+        "cannot discover its own account, and refuses to start a chat without it",
+    );
   }
   if (useBinding !== undefined && useBinding !== "true" && useBinding !== "false") {
     // The backend compares against those two strings and treats anything else as unset, which for
     // an intended "false" is the opposite of what was asked for -- silently, and in a preview
     // nobody is reading the logs of.
-    throw new Error(`CF_AI_GATEWAY_USE_BINDING must be "true" or "false", not ` +
-        `"${rawUseBinding}": the backend reads any other value as unset.`);
+    throw new Error(
+      `CF_AI_GATEWAY_USE_BINDING must be "true" or "false", not ` +
+        `"${rawUseBinding}": the backend reads any other value as unset.`,
+    );
   }
   // The two AiGatewayConfig throws the Workers AI binding does not cover. Raised here so a
   // half-configured preview fails its deploy rather than its first chat.
   if (!apiToken && useBinding === "false") {
-    throw new Error("CF_AI_GATEWAY_API_TOKEN must be set when CF_AI_GATEWAY_USE_BINDING is " +
+    throw new Error(
+      "CF_AI_GATEWAY_API_TOKEN must be set when CF_AI_GATEWAY_USE_BINDING is " +
         "false: opting out of the binding leaves the HTTPS transport, which needs a Run + Read " +
-        "token. Drop the opt-out unless the gateway is in another account.");
+        "token. Drop the opt-out unless the gateway is in another account.",
+    );
   }
-  if (!apiToken && providers?.split(",").some(p => p.trim() === "google")) {
-    throw new Error("CF_AI_GATEWAY_API_TOKEN must be set when the google provider is enabled: " +
+  if (!apiToken && providers?.split(",").some((p) => p.trim() === "google")) {
+    throw new Error(
+      "CF_AI_GATEWAY_API_TOKEN must be set when the google provider is enabled: " +
         "pi's Google adapter refuses a custom fetch, so Google inference cannot ride the Workers " +
-        "AI binding.");
+        "AI binding.",
+    );
   }
   return {
     CF_AI_GATEWAY: gateway,
@@ -631,11 +673,15 @@ function addOAuthApp(
     return;
   }
   if (clientId || clientSecret) {
-    throw new Error(`${envPrefix}_CLIENT_ID and ${envPrefix}_CLIENT_SECRET must be set together: ` +
-        `they are one OAuth app, and ${pkgName} refuses to start a flow with half of it`);
+    throw new Error(
+      `${envPrefix}_CLIENT_ID and ${envPrefix}_CLIENT_SECRET must be set together: ` +
+        `they are one OAuth app, and ${pkgName} refuses to start a flow with half of it`,
+    );
   }
-  console.warn(`${envPrefix}_CLIENT_ID is unset: ${pkgName} is deployed unconfigured, and ` +
-      "connecting it in this preview will fail.");
+  console.warn(
+    `${envPrefix}_CLIENT_ID is unset: ${pkgName} is deployed unconfigured, and ` +
+      "connecting it in this preview will fail.",
+  );
 }
 
 /**
@@ -673,7 +719,13 @@ export function resolveGatekeeperSecrets({
   githubClientSecret?: string;
 } = {}): Map<string, Record<string, string>> {
   const configured = new Map<string, Record<string, string>>();
-  addOAuthApp(configured, "gatekeeper-github", "PREVIEW_GITHUB", githubClientId, githubClientSecret);
+  addOAuthApp(
+    configured,
+    "gatekeeper-github",
+    "PREVIEW_GITHUB",
+    githubClientId,
+    githubClientSecret,
+  );
   return configured;
 }
 
@@ -714,7 +766,6 @@ export function backendSecrets({
   };
 }
 
-
 /** Write one package's generated preview config to its `wrangler.staging.jsonc`. */
 export function writePreviewConfig(pkgDir: string, config: StagingConfig): void {
   writeFileSync(join(pkgDir, STAGING_CONFIG_NAME), JSON.stringify(config, null, 2) + "\n");
@@ -724,9 +775,11 @@ export function writePreviewConfig(pkgDir: string, config: StagingConfig): void 
  * Generate and write every package's preview config. Returns what the deploy/delete commands
  * need: the resolved preview name, the origin, and the packages in no particular order.
  */
-export function generatePreviewConfigs(options: {
-  previewName?: string;
-} = {}): {
+export function generatePreviewConfigs(
+  options: {
+    previewName?: string;
+  } = {},
+): {
   previewName: string;
   workersDevHost: string;
   baseUrl: string;

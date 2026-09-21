@@ -25,16 +25,18 @@ export interface CloudflareAccount {
 
 async function cfRequest<T>(token: string, path: string): Promise<CfEnvelope<T> | null> {
   const resp = await fetch(`${API_BASE}${path}`, {
-    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
   if (!resp.ok) {
     logger.error("cf-account GET failed", {
       event: "cloudflare.account.get.failed",
-      path, status: resp.status, statusText: resp.statusText,
+      path,
+      status: resp.status,
+      statusText: resp.statusText,
     });
     return null;
   }
-  const data = await resp.json() as CfEnvelope<T>;
+  const data = (await resp.json()) as CfEnvelope<T>;
   if (!data.success || data.result === undefined) return null;
   return data;
 }
@@ -58,7 +60,8 @@ export async function listAccounts(token: string): Promise<CloudflareAccount[]> 
       per_page: String(ACCOUNTS_PER_PAGE),
     });
     let envelope = await cfRequest<Array<{ id: string; name: string }>>(
-      token, `/accounts?${query}`,
+      token,
+      `/accounts?${query}`,
     );
     // A page that fails mid-walk yields what was gathered: a partial list beats none, and cfRequest
     // has already logged the failure.
@@ -79,7 +82,8 @@ export async function listAccounts(token: string): Promise<CloudflareAccount[]> 
  */
 export async function fetchCreditBalance(token: string, accountId: string): Promise<number | null> {
   const result = await cfGet<{ balance?: number }>(
-    token, `/accounts/${accountId}/ai-gateway-billing/credit_balance`,
+    token,
+    `/accounts/${accountId}/ai-gateway-billing/credit_balance`,
   );
   if (!result || typeof result.balance !== "number") return null;
   // The API reports the balance in cents.

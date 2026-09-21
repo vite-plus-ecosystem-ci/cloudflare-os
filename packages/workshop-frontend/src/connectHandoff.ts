@@ -5,16 +5,16 @@
 // ticket in the URL fragment, and ConnectHandoffPage redeems ticket and nonce together over the
 // popup's own session. Redeeming is what activates the grant.
 
-import type { ConnectFlowStart } from '@gadgets/workshop-shared/api'
+import type { ConnectFlowStart } from "@gadgets/workshop-shared/api";
 
 /** Host the backend (and, through the router, every gatekeeper) is served from. */
 export function getBackendHost(): string {
   // Only the Vite dev server is hosted separately from the backend. Built assets are served from
   // the same origin in both production and run-local mode.
   if (import.meta.env.DEV) {
-    return import.meta.env.VITE_BACKEND_HOST?.trim() || 'localhost:8787'
+    return import.meta.env.VITE_BACKEND_HOST?.trim() || "localhost:8787";
   }
-  return window.location.host
+  return window.location.host;
 }
 
 /**
@@ -22,34 +22,34 @@ export function getBackendHost(): string {
  * URL fragment. gatekeeper-kit duplicates the literal, since it must not depend on this package;
  * each package pins it with a test.
  */
-export const HANDOFF_PATH = '/connect/handoff'
+export const HANDOFF_PATH = "/connect/handoff";
 
-const HEX_256_PATTERN = /^[0-9a-f]{64}$/
+const HEX_256_PATTERN = /^[0-9a-f]{64}$/;
 
 /**
  * The ticket a handoff URL fragment carries (`window.location.hash`, with or without its leading
  * '#', percent-encoded or not), or null unless it decodes to 64 lowercase hex characters.
  */
 export function ticketFromHandoffFragment(hash: string): string | null {
-  const encoded = hash.startsWith('#') ? hash.slice(1) : hash
-  let ticket: string
+  const encoded = hash.startsWith("#") ? hash.slice(1) : hash;
+  let ticket: string;
   try {
-    ticket = decodeURIComponent(encoded)
+    ticket = decodeURIComponent(encoded);
   } catch {
-    return null
+    return null;
   }
-  return HEX_256_PATTERN.test(ticket) ? ticket : null
+  return HEX_256_PATTERN.test(ticket) ? ticket : null;
 }
 
 /** sessionStorage key under which the Workshop writes a `PopupHandoff` into a popup it opened. */
-export const HANDOFF_KEY = 'gadgets.handoff'
+export const HANDOFF_KEY = "gadgets.handoff";
 
 /**
  * The record the Workshop tab writes into a popup's own sessionStorage before navigating it: which
  * kind of flow the popup runs, and the flow's nonce, which the handoff page presents with the
  * ticket (`completeConnectHandoff` for a connect, `confirmLogin` for a sign-in).
  */
-export type PopupHandoff = { kind: 'connect' | 'login'; nonce: string }
+export type PopupHandoff = { kind: "connect" | "login"; nonce: string };
 
 /**
  * Opens `url` as a popup that holds `handoff` and nothing else of this tab. The popup is opened
@@ -73,17 +73,19 @@ export type PopupHandoff = { kind: 'connect' | 'login'; nonce: string }
  * flow could never complete, so it is not started, and the popup is closed again.
  */
 export function openDisownedPopup(url: string, name: string, handoff: PopupHandoff): Window {
-  const popup = window.open('', name, 'popup,width=520,height=680')
-  if (!popup) throw new Error('Pop-up blocked. Please allow pop-ups and try again.')
-  popup.opener = null
+  const popup = window.open("", name, "popup,width=520,height=680");
+  if (!popup) throw new Error("Pop-up blocked. Please allow pop-ups and try again.");
+  popup.opener = null;
   try {
-    popup.sessionStorage.setItem(HANDOFF_KEY, JSON.stringify(handoff))
+    popup.sessionStorage.setItem(HANDOFF_KEY, JSON.stringify(handoff));
   } catch {
-    popup.close()
-    throw new Error('This browser blocks storage in pop-ups, so the flow cannot complete. Allow site data for this site and try again.')
+    popup.close();
+    throw new Error(
+      "This browser blocks storage in pop-ups, so the flow cannot complete. Allow site data for this site and try again.",
+    );
   }
-  popup.location.replace(url)
-  return popup
+  popup.location.replace(url);
+  return popup;
 }
 
 /**
@@ -92,12 +94,12 @@ export function openDisownedPopup(url: string, name: string, handoff: PopupHando
  * page, keeps its name, and `window.open('', thatName)` would hand that cross-origin window back.
  */
 export function uniquePopupName(prefix: string): string {
-  return `${prefix}-${crypto.randomUUID()}`
+  return `${prefix}-${crypto.randomUUID()}`;
 }
 
 // The connect popup this document opened last, closed before the next one opens: a stale popup
 // still parked on a provider page is otherwise left behind the new one.
-let lastConnectPopup: Window | null = null
+let lastConnectPopup: Window | null = null;
 
 /**
  * Opens a connect / reconnect / ensure-resources flow as a disowned popup carrying the flow's
@@ -107,12 +109,18 @@ let lastConnectPopup: Window | null = null
  */
 export function openConnectWindow(flow: ConnectFlowStart): Window {
   if (lastConnectPopup) {
-    try { lastConnectPopup.close() } catch { /* cross-origin or already gone */ }
+    try {
+      lastConnectPopup.close();
+    } catch {
+      /* cross-origin or already gone */
+    }
   }
-  const popup = openDisownedPopup(
-    flow.url, uniquePopupName('gadgets-connect'), { kind: 'connect', nonce: flow.nonce })
-  lastConnectPopup = popup
-  return popup
+  const popup = openDisownedPopup(flow.url, uniquePopupName("gadgets-connect"), {
+    kind: "connect",
+    nonce: flow.nonce,
+  });
+  lastConnectPopup = popup;
+  return popup;
 }
 
 /**
@@ -121,23 +129,23 @@ export function openConnectWindow(flow: ConnectFlowStart): Window {
  * malformed, or storage is unavailable.
  */
 export function readPopupHandoff(): PopupHandoff | null {
-  let raw: string | null
+  let raw: string | null;
   try {
-    raw = sessionStorage.getItem(HANDOFF_KEY)
-    sessionStorage.removeItem(HANDOFF_KEY)
+    raw = sessionStorage.getItem(HANDOFF_KEY);
+    sessionStorage.removeItem(HANDOFF_KEY);
   } catch {
-    return null
+    return null;
   }
-  if (raw === null) return null
-  let parsed: unknown
+  if (raw === null) return null;
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw)
+    parsed = JSON.parse(raw);
   } catch {
-    return null
+    return null;
   }
-  if (typeof parsed !== 'object' || parsed === null) return null
-  const { kind, nonce } = parsed as { kind?: unknown; nonce?: unknown }
-  if (kind !== 'connect' && kind !== 'login') return null
-  if (typeof nonce !== 'string' || !HEX_256_PATTERN.test(nonce)) return null
-  return { kind, nonce }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const { kind, nonce } = parsed as { kind?: unknown; nonce?: unknown };
+  if (kind !== "connect" && kind !== "login") return null;
+  if (typeof nonce !== "string" || !HEX_256_PATTERN.test(nonce)) return null;
+  return { kind, nonce };
 }

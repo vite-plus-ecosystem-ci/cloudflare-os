@@ -19,7 +19,7 @@ import type {
 // (not bound as a parameter) since they are fixed, code-controlled constants — this keeps the
 // query independent of array-parameter binding semantics.
 const SYSTEM_SCHEMAS = ["pg_catalog", "information_schema", "pg_toast"];
-const SYSTEM_SCHEMAS_SQL = SYSTEM_SCHEMAS.map(name => `'${name}'`).join(", ");
+const SYSTEM_SCHEMAS_SQL = SYSTEM_SCHEMAS.map((name) => `'${name}'`).join(", ");
 
 function str(value: unknown): string {
   return typeof value === "string" ? value : String(value ?? "");
@@ -68,7 +68,7 @@ export async function listSchemas(api: SupabaseApi, ref: string): Promise<string
         and n.nspname not like 'pg_toast_temp%'
       order by n.nspname`,
   );
-  return rows.map(row => str(row.schema));
+  return rows.map((row) => str(row.schema));
 }
 
 function rowToTable(row: SqlRow): SupabaseTable {
@@ -92,7 +92,9 @@ export async function listTables(
   const includeViews = options?.includeViews ?? true;
   // relkind: r = table, p = partitioned table, v = view, m = materialized view. Inlined as a
   // fixed, code-controlled literal so we don't depend on array-parameter binding.
-  const relkindsSql = (includeViews ? ["r", "p", "v", "m"] : ["r", "p"]).map(k => `'${k}'`).join(", ");
+  const relkindsSql = (includeViews ? ["r", "p", "v", "m"] : ["r", "p"])
+    .map((k) => `'${k}'`)
+    .join(", ");
   const rows = await api.runReadOnlyQuery(
     ref,
     `select n.nspname as schema,
@@ -159,7 +161,7 @@ async function getColumns(
       order by a.attnum`,
     [schema, name],
   );
-  return rows.map(row => ({
+  return rows.map((row) => ({
     name: str(row.name),
     dataType: str(row.data_type),
     nullable: bool(row.nullable),
@@ -187,7 +189,7 @@ async function getPrimaryKey(
       order by k.ord`,
     [schema, name],
   );
-  return rows.map(row => str(row.name));
+  return rows.map((row) => str(row.name));
 }
 
 async function getForeignKeys(
@@ -217,7 +219,7 @@ async function getForeignKeys(
       order by con.conname`,
     [schema, name],
   );
-  return rows.map(row => ({
+  return rows.map((row) => ({
     columns: stringArray(row.columns),
     referencedSchema: str(row.ref_schema),
     referencedTable: str(row.ref_table),
@@ -234,8 +236,12 @@ export async function describeTable(
   const summary = await getTableSummary(api, ref, schema, name);
   const [columns, primaryKey, foreignKeys] = await Promise.all([
     getColumns(api, ref, schema, name),
-    summary.kind === "table" ? getPrimaryKey(api, ref, schema, name) : Promise.resolve<string[]>([]),
-    summary.kind === "table" ? getForeignKeys(api, ref, schema, name) : Promise.resolve<SupabaseForeignKey[]>([]),
+    summary.kind === "table"
+      ? getPrimaryKey(api, ref, schema, name)
+      : Promise.resolve<string[]>([]),
+    summary.kind === "table"
+      ? getForeignKeys(api, ref, schema, name)
+      : Promise.resolve<SupabaseForeignKey[]>([]),
   ]);
   return { ...summary, columns, primaryKey, foreignKeys };
 }

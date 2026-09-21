@@ -4,7 +4,10 @@
 //
 // The sync library's vocabulary (a collaborator, an operation's status) is exported from both of
 // its entries; it is taken from the server's here because `OperationStatus` is only there.
-import type { Collaborator, OperationStatus } from "@gadgets/bundled-blueprints/libraries/sync/server";
+import type {
+  Collaborator,
+  OperationStatus,
+} from "@gadgets/bundled-blueprints/libraries/sync/server";
 
 /** A top-level block's identity and content, as the client serializes it from the DOM. */
 export interface BlockContent {
@@ -162,7 +165,10 @@ export interface GadgetStub {
   initializeBlocks(args: DocumentInit): Promise<StoredDocument>;
   setDocument(args: DocumentInit): Promise<StoredDocument>;
   applyOperation(operation: Operation): Promise<ApplyOperationResult>;
-  subscribe(callback: SubscriberCallbacks, client?: Partial<Collaborator>): Promise<DocumentSnapshot>;
+  subscribe(
+    callback: SubscriberCallbacks,
+    client?: Partial<Collaborator>,
+  ): Promise<DocumentSnapshot>;
   updatePresence(presence: PresenceUpdate): Promise<void>;
   leavePresence(clientId: string): Promise<void>;
   getGoogleDocInfo(): Promise<GoogleDocInfo | null>;

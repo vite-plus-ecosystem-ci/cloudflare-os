@@ -28,7 +28,9 @@ async function main(argv: string[]): Promise<void> {
   try {
     text = await readFile(resultsPath, "utf8");
   } catch (error) {
-    throw new Error(`cannot read results at ${resultsPath}: ${errorMessage(error)}`, { cause: error });
+    throw new Error(`cannot read results at ${resultsPath}: ${errorMessage(error)}`, {
+      cause: error,
+    });
   }
   validateEvalResults(text, trials);
   console.log(`${resultsPath} is a complete ${trials}-trial baseline.`);

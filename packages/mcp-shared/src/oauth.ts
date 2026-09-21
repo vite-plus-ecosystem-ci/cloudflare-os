@@ -36,8 +36,9 @@ export function safeOAuthError(
   const encodedBasic = client?.client_secret
     ? btoa(`${encodeURIComponent(client.client_id)}:${encodeURIComponent(client.client_secret)}`)
     : undefined;
-  const detail = safeServerText(redactSecrets(
-    text, [...secrets, client?.client_secret, basic, encodedBasic]));
+  const detail = safeServerText(
+    redactSecrets(text, [...secrets, client?.client_secret, basic, encodedBasic]),
+  );
   return new Error(detail ?? "The authorization server refused the request.");
 }
 
@@ -50,8 +51,12 @@ export async function revokeToken(
   fetchFn: FetchLike,
 ): Promise<void> {
   const metadata = discovery.authorizationServerMetadata;
-  const endpoint = metadata && "revocation_endpoint" in metadata &&
-    typeof metadata.revocation_endpoint === "string" ? metadata.revocation_endpoint : undefined;
+  const endpoint =
+    metadata &&
+    "revocation_endpoint" in metadata &&
+    typeof metadata.revocation_endpoint === "string"
+      ? metadata.revocation_endpoint
+      : undefined;
   if (!endpoint) return;
   const body = new URLSearchParams({
     token,

@@ -50,8 +50,8 @@ export type WebFetchResult = {
 };
 
 // Hard server-side limits.
-const HARD_MAX_BYTES = 5 * 1024 * 1024;     // 5 MiB after which we always truncate
-const DEFAULT_MAX_BYTES = 1 * 1024 * 1024;  // 1 MiB default cap when caller didn't specify
+const HARD_MAX_BYTES = 5 * 1024 * 1024; // 5 MiB after which we always truncate
+const DEFAULT_MAX_BYTES = 1 * 1024 * 1024; // 1 MiB default cap when caller didn't specify
 const FETCH_TIMEOUT_MS = 30_000;
 const USER_AGENT = "GadgetsWebFetch/1.0";
 
@@ -168,21 +168,19 @@ const TO_MARKDOWN_MIME_TYPES = new Set([
   "text/csv",
   // Office / OpenDocument
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",       // .xlsx
-  "application/vnd.ms-excel",                                                // .xls
-  "application/vnd.ms-excel.sheet.macroenabled.12",                          // .xlsm
-  "application/vnd.ms-excel.sheet.binary.macroenabled.12",                   // .xlsb
-  "application/vnd.oasis.opendocument.spreadsheet",                          // .ods
-  "application/vnd.oasis.opendocument.text",                                 // .odt
-  "application/vnd.apple.numbers",                                           // .numbers
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+  "application/vnd.ms-excel", // .xls
+  "application/vnd.ms-excel.sheet.macroenabled.12", // .xlsm
+  "application/vnd.ms-excel.sheet.binary.macroenabled.12", // .xlsb
+  "application/vnd.oasis.opendocument.spreadsheet", // .ods
+  "application/vnd.oasis.opendocument.text", // .odt
+  "application/vnd.apple.numbers", // .numbers
 ]);
 
 // `toMarkdown()` uses the Workers AI binding, and binding calls only reach gateways in the
 // Worker's own account -- so apply the platform gateway only when AiGatewayConfig resolves it
 // as same-account (CF_AI_GATEWAY_USE_BINDING=false marks it cross-account).
-function buildGatewayOptions(
-  gateway: AiGatewayConfig | null,
-): GatewayOptions | undefined {
+function buildGatewayOptions(gateway: AiGatewayConfig | null): GatewayOptions | undefined {
   if (!gateway) return undefined;
   if (!gateway.sameAccountGateway) return undefined;
   return { id: gateway.sameAccountGateway, metadata: { tool: "webFetch", automated: true } };
@@ -231,8 +229,6 @@ async function convertToMarkdown(
   return result.data;
 }
 
-
-
 // Parse the Content-Signal response header (https://contentsignals.org/) and check whether
 // a specific signal is present and set to "no". The header is a comma-separated list of
 // key=value pairs, e.g. `ai-train=yes, search=yes, ai-input=no`.
@@ -265,17 +261,11 @@ export function formatWebFetchResult(result: WebFetchResult): string {
   return lines.join("\n");
 }
 
-export async function webFetch(
-  env: WebFetchEnv,
-  input: WebFetchInput,
-): Promise<WebFetchResult> {
+export async function webFetch(env: WebFetchEnv, input: WebFetchInput): Promise<WebFetchResult> {
   const parsed = validateWebFetchUrl(input.url);
 
   const requestedMax = input.maxBytes ?? DEFAULT_MAX_BYTES;
-  const maxBytes = Math.min(
-    Math.max(1, Math.floor(requestedMax)),
-    HARD_MAX_BYTES,
-  );
+  const maxBytes = Math.min(Math.max(1, Math.floor(requestedMax)), HARD_MAX_BYTES);
 
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), FETCH_TIMEOUT_MS);
@@ -287,15 +277,13 @@ export async function webFetch(
       redirect: "follow",
       headers: {
         "user-agent": USER_AGENT,
-        "accept": "text/markdown,text/html;q=0.9,text/plain;q=0.9,application/json;q=0.9,application/xhtml+xml;q=0.9,*/*;q=0.8",
+        accept:
+          "text/markdown,text/html;q=0.9,text/plain;q=0.9,application/json;q=0.9,application/xhtml+xml;q=0.9,*/*;q=0.8",
       },
       signal: abortController.signal,
     });
   } catch (err) {
-    if (
-      err instanceof Error &&
-      (err.name === "AbortError" || /abort/i.test(err.message))
-    ) {
+    if (err instanceof Error && (err.name === "AbortError" || /abort/i.test(err.message))) {
       throw new Error(`Fetch timed out after ${FETCH_TIMEOUT_MS}ms`, { cause: err });
     }
     throw err;

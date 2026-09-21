@@ -7,11 +7,13 @@
 // `encodeURIComponent`, a normalization one side does and the other does not -- shows up here
 // rather than as a resource the backend rejects after the user has filled the form.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("@gadgets/configurator-ui", () => ({
   h: (component: unknown, props: unknown, ...children: unknown[]) => ({
-    component, props, children,
+    component,
+    props,
+    children,
   }),
   Autocomplete: "Autocomplete",
   Field: "Field",
@@ -25,26 +27,39 @@ import type { CalendarConfiguratorRpc } from "../src/configurator/calendar-confi
 import gmailConfigurator from "../src/configurator/gmail-configurator-ui";
 import sharedDriveConfigurator from "../src/configurator/shared-drive-configurator-ui";
 import {
-  GMAIL_RESOURCE, GOOGLE_CALENDAR_RESOURCE, GOOGLE_DRIVE_FILE_RESOURCE, GOOGLE_DRIVE_RESOURCE,
-  GOOGLE_SHARED_DRIVE_RESOURCE, parseResourceUrl,
+  GMAIL_RESOURCE,
+  GOOGLE_CALENDAR_RESOURCE,
+  GOOGLE_DRIVE_FILE_RESOURCE,
+  GOOGLE_DRIVE_RESOURCE,
+  GOOGLE_SHARED_DRIVE_RESOURCE,
+  parseResourceUrl,
 } from "../src/resources";
 
 // The configurators never call `ui` from these two methods; it is present only to satisfy the
 // context type, and touching it is a bug.
-const noUi = new Proxy({}, {
-  get() { throw new Error("must not call the ui capability"); },
-}) as never;
+const noUi = new Proxy(
+  {},
+  {
+    get() {
+      throw new Error("must not call the ui capability");
+    },
+  },
+) as never;
 
 const gmailUrl = (values: Record<string, unknown>) =>
   gmailConfigurator.resourceUrl!({ values, ui: noUi }) as string;
 
 const gmailValues = (resourceUrl: string) =>
   gmailConfigurator.initialValuesFromResourceUrl!({
-    resourceUrl, resourceUrlPattern: GMAIL_RESOURCE.urlPattern, ui: noUi,
+    resourceUrl,
+    resourceUrlPattern: GMAIL_RESOURCE.urlPattern,
+    ui: noUi,
   });
 
 const configurableUrl = (
-  configurator: { resourceUrl?: (context: { values: Record<string, unknown>; ui: never }) => string },
+  configurator: {
+    resourceUrl?: (context: { values: Record<string, unknown>; ui: never }) => string;
+  },
   values: Record<string, unknown>,
 ) => configurator.resourceUrl!({ values, ui: noUi });
 
@@ -68,16 +83,28 @@ const renderedCopy = (configurator: { render?: (context: never) => unknown }) =>
 describe("Gmail configurator URLs", () => {
   it.for([
     ["the whole mailbox", { mode: "all" }, { kind: "gmail" }],
-    ["a search", { mode: "search", query: "from:alerts@example.com" },
-      { kind: "gmail", searchQuery: "from:alerts@example.com" }],
-    ["a search with spaces", { mode: "search", query: "is:unread subject:invoice" },
-      { kind: "gmail", searchQuery: "is:unread subject:invoice" }],
+    [
+      "a search",
+      { mode: "search", query: "from:alerts@example.com" },
+      { kind: "gmail", searchQuery: "from:alerts@example.com" },
+    ],
+    [
+      "a search with spaces",
+      { mode: "search", query: "is:unread subject:invoice" },
+      { kind: "gmail", searchQuery: "is:unread subject:invoice" },
+    ],
     // A literal `+` in an address must survive as a `+`, not become a space.
-    ["a search naming a plus address", { mode: "search", query: "to:nathan+receipts@example.com" },
-      { kind: "gmail", searchQuery: "to:nathan+receipts@example.com" }],
+    [
+      "a search naming a plus address",
+      { mode: "search", query: "to:nathan+receipts@example.com" },
+      { kind: "gmail", searchQuery: "to:nathan+receipts@example.com" },
+    ],
     ["a label", { mode: "label", label: "Receipts" }, { kind: "gmail", labelName: "Receipts" }],
-    ["a label with a slash", { mode: "label", label: "Work/Invoices" },
-      { kind: "gmail", labelName: "Work/Invoices" }],
+    [
+      "a label with a slash",
+      { mode: "label", label: "Work/Invoices" },
+      { kind: "gmail", labelName: "Work/Invoices" },
+    ],
   ] as const)("builds a URL the server parses back for %s", ([, values, target]) => {
     expect(parseResourceUrl(gmailUrl(values))).toEqual(target);
   });
@@ -99,17 +126,21 @@ describe("Gmail configurator URLs", () => {
 
     expect(gmailValues(pasted)).toEqual({ mode: "search", query: "is:unread subject:invoice" });
     expect(parseResourceUrl(pasted)).toEqual({
-      kind: "gmail", searchQuery: "is:unread subject:invoice",
+      kind: "gmail",
+      searchQuery: "is:unread subject:invoice",
     });
   });
 
   it("keeps an escaped plus literal in a pasted URL", () => {
     const pasted = "https://mail.google.com/mail/u/0/#search/to%3Anathan%2Breceipts%40example.com";
 
-    expect(gmailValues(pasted))
-      .toEqual({ mode: "search", query: "to:nathan+receipts@example.com" });
+    expect(gmailValues(pasted)).toEqual({
+      mode: "search",
+      query: "to:nathan+receipts@example.com",
+    });
     expect(parseResourceUrl(pasted)).toEqual({
-      kind: "gmail", searchQuery: "to:nathan+receipts@example.com",
+      kind: "gmail",
+      searchQuery: "to:nathan+receipts@example.com",
     });
   });
 
@@ -134,7 +165,8 @@ describe("Calendar configurator URLs", () => {
       ui,
     });
     const resourceUrl = calendarConfigurator.resourceUrl!({
-      values, ui,
+      values,
+      ui,
     });
 
     expect(calendarConfigurator.isReady!({ values: { calendarId: "primary" } })).toBe(false);
@@ -171,7 +203,10 @@ describe("Drive configurator URLs", () => {
     let values = { driveId: "shared/id with spaces" };
     let url = configurableUrl(sharedDriveConfigurator, values);
     expect(url).toBe(
-      GOOGLE_SHARED_DRIVE_RESOURCE.urlPattern.replace(":driveId", encodeURIComponent(values.driveId)),
+      GOOGLE_SHARED_DRIVE_RESOURCE.urlPattern.replace(
+        ":driveId",
+        encodeURIComponent(values.driveId),
+      ),
     );
     expect(parseResourceUrl(url)).toEqual({ kind: "sharedDrive", driveId: values.driveId });
   });
@@ -190,12 +225,14 @@ describe("Drive configurator URLs", () => {
   it("prefills encoded IDs from urlPattern named groups", () => {
     let driveValues = { driveId: "shared/id with spaces" };
     let driveUrl = configurableUrl(sharedDriveConfigurator, driveValues);
-    expect(valuesFromUrlPattern(driveUrl, GOOGLE_SHARED_DRIVE_RESOURCE.urlPattern))
-      .toEqual(driveValues);
+    expect(valuesFromUrlPattern(driveUrl, GOOGLE_SHARED_DRIVE_RESOURCE.urlPattern)).toEqual(
+      driveValues,
+    );
 
     let fileValues = { fileId: "file/id with spaces" };
     let fileUrl = configurableUrl(driveFileConfigurator, fileValues);
-    expect(valuesFromUrlPattern(fileUrl, GOOGLE_DRIVE_FILE_RESOURCE.urlPattern))
-      .toEqual(fileValues);
+    expect(valuesFromUrlPattern(fileUrl, GOOGLE_DRIVE_FILE_RESOURCE.urlPattern)).toEqual(
+      fileValues,
+    );
   });
 });

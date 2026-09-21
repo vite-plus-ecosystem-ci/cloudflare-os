@@ -115,73 +115,75 @@ function fsError(code: string, message: string): Error {
  *   (the gitdir itself, `shallow`, and `objects/pack` reads all take those paths).
  */
 export function makeGitObjectsFs(objects: Collection<GitObjectRecord, string>): PromiseFsClient {
-  return { promises: {
-    async readFile(path: unknown): Promise<Uint8Array> {
-      let oid = oidFromLoosePath(path);
-      if (oid === undefined) throw fsError("ENOENT", `unsupported read: ${String(path)}`);
-      let record = objects.get(oid);
-      if (record === undefined) throw fsError("ENOENT", `no such object: ${oid}`);
-      return record.data;
-    },
+  return {
+    promises: {
+      async readFile(path: unknown): Promise<Uint8Array> {
+        let oid = oidFromLoosePath(path);
+        if (oid === undefined) throw fsError("ENOENT", `unsupported read: ${String(path)}`);
+        let record = objects.get(oid);
+        if (record === undefined) throw fsError("ENOENT", `no such object: ${oid}`);
+        return record.data;
+      },
 
-    async writeFile(path: unknown, data: unknown): Promise<void> {
-      let oid = oidFromLoosePath(path);
-      if (oid === undefined) throw fsError("EPERM", `unsupported write: ${String(path)}`);
-      if (!(data instanceof Uint8Array)) throw fsError("EINVAL", "expected binary object data");
-      // Copy: the input is typically a Buffer view over a shared pool, and the record outlives
-      // the call.
-      objects.put({ oid, data: new Uint8Array(data) });
-    },
+      async writeFile(path: unknown, data: unknown): Promise<void> {
+        let oid = oidFromLoosePath(path);
+        if (oid === undefined) throw fsError("EPERM", `unsupported write: ${String(path)}`);
+        if (!(data instanceof Uint8Array)) throw fsError("EINVAL", "expected binary object data");
+        // Copy: the input is typically a Buffer view over a shared pool, and the record outlives
+        // the call.
+        objects.put({ oid, data: new Uint8Array(data) });
+      },
 
-    async stat(path: unknown): Promise<{
-      isFile(): boolean;
-      isDirectory(): boolean;
-      isSymbolicLink(): boolean;
-      size: number;
-    }> {
-      // Only existing loose objects stat successfully. The gitdir itself rejecting is fine:
-      // discoverGitdir treats a failed stat as "neither file nor directory" and uses the path
-      // as-is.
-      let oid = oidFromLoosePath(path);
-      let record = oid === undefined ? undefined : objects.get(oid);
-      if (record === undefined) throw fsError("ENOENT", `no such file: ${String(path)}`);
-      let size = record.data.byteLength;
-      return {
-        isFile: () => true,
-        isDirectory: () => false,
-        isSymbolicLink: () => false,
-        size,
-      };
-    },
+      async stat(path: unknown): Promise<{
+        isFile(): boolean;
+        isDirectory(): boolean;
+        isSymbolicLink(): boolean;
+        size: number;
+      }> {
+        // Only existing loose objects stat successfully. The gitdir itself rejecting is fine:
+        // discoverGitdir treats a failed stat as "neither file nor directory" and uses the path
+        // as-is.
+        let oid = oidFromLoosePath(path);
+        let record = oid === undefined ? undefined : objects.get(oid);
+        if (record === undefined) throw fsError("ENOENT", `no such file: ${String(path)}`);
+        let size = record.data.byteLength;
+        return {
+          isFile: () => true,
+          isDirectory: () => false,
+          isSymbolicLink: () => false,
+          size,
+        };
+      },
 
-    async mkdir(_path: unknown): Promise<void> {
-      // Directories don't exist in this store; object writes succeed without them. Accept and
-      // ignore so `FileSystem.write`'s mkdirp fallback can't fail.
-    },
+      async mkdir(_path: unknown): Promise<void> {
+        // Directories don't exist in this store; object writes succeed without them. Accept and
+        // ignore so `FileSystem.write`'s mkdirp fallback can't fail.
+      },
 
-    async readdir(path: unknown): Promise<string[]> {
-      // The packed-object probe lists `objects/pack`; we store no packfiles, so it's empty.
-      if (path === `${GITDIR}/objects/pack`) return [];
-      throw fsError("ENOENT", `unsupported readdir: ${String(path)}`);
-    },
+      async readdir(path: unknown): Promise<string[]> {
+        // The packed-object probe lists `objects/pack`; we store no packfiles, so it's empty.
+        if (path === `${GITDIR}/objects/pack`) return [];
+        throw fsError("ENOENT", `unsupported readdir: ${String(path)}`);
+      },
 
-    // Never used for object-database work, but bindFs requires them to exist.
-    async lstat(path: unknown): Promise<never> {
-      throw fsError("ENOSYS", `lstat unsupported by git-store: ${String(path)}`);
+      // Never used for object-database work, but bindFs requires them to exist.
+      async lstat(path: unknown): Promise<never> {
+        throw fsError("ENOSYS", `lstat unsupported by git-store: ${String(path)}`);
+      },
+      async unlink(path: unknown): Promise<never> {
+        throw fsError("ENOSYS", `unlink unsupported by git-store: ${String(path)}`);
+      },
+      async rmdir(path: unknown): Promise<never> {
+        throw fsError("ENOSYS", `rmdir unsupported by git-store: ${String(path)}`);
+      },
+      async readlink(path: unknown): Promise<never> {
+        throw fsError("ENOSYS", `readlink unsupported by git-store: ${String(path)}`);
+      },
+      async symlink(path: unknown): Promise<never> {
+        throw fsError("ENOSYS", `symlink unsupported by git-store: ${String(path)}`);
+      },
     },
-    async unlink(path: unknown): Promise<never> {
-      throw fsError("ENOSYS", `unlink unsupported by git-store: ${String(path)}`);
-    },
-    async rmdir(path: unknown): Promise<never> {
-      throw fsError("ENOSYS", `rmdir unsupported by git-store: ${String(path)}`);
-    },
-    async readlink(path: unknown): Promise<never> {
-      throw fsError("ENOSYS", `readlink unsupported by git-store: ${String(path)}`);
-    },
-    async symlink(path: unknown): Promise<never> {
-      throw fsError("ENOSYS", `symlink unsupported by git-store: ${String(path)}`);
-    },
-  } };
+  };
 }
 
 // =======================================================================================
@@ -232,7 +234,9 @@ export class GitStore {
    * oids.
    */
   async writeFilesAsCommit(
-      files: ReadonlyMap<string, string>, options: WriteCommitOptions): Promise<string> {
+    files: ReadonlyMap<string, string>,
+    options: WriteCommitOptions,
+  ): Promise<string> {
     let tree = await this.#writeTreeNode(buildTreeNode(files));
     let when = { timestamp: Math.floor(options.timestamp.getTime() / 1000), timezoneOffset: 0 };
     return await writeCommit({
@@ -276,7 +280,7 @@ export class GitStore {
       depth: options.depth,
       cache: this.#cache,
     });
-    return entries.map(entry => ({
+    return entries.map((entry) => ({
       oid: entry.oid,
       parents: entry.commit.parent,
       message: entry.commit.message,
@@ -307,10 +311,13 @@ export class GitStore {
    * pruned, as git requires.
    */
   async writeChangedFilesAsCommit(
-      changes: ReadonlyMap<string, string | null>,
-      options: WriteCommitOptions & { treeBase: string }): Promise<string> {
+    changes: ReadonlyMap<string, string | null>,
+    options: WriteCommitOptions & { treeBase: string },
+  ): Promise<string> {
     return await this.writeCommitForTree(
-        await this.writeChangedTree(options.treeBase, changes), options);
+      await this.writeChangedTree(options.treeBase, changes),
+      options,
+    );
   }
 
   /**
@@ -322,9 +329,13 @@ export class GitStore {
    * to write any commit at all.
    */
   async writeChangedTree(
-      treeBase: string, changes: ReadonlyMap<string, string | null>): Promise<string> {
-    return await this.#rebuildTree(await this.commitTree(treeBase), buildChangeNode(changes), "")
-        ?? await writeTree({ fs: this.#fs, gitdir: GITDIR, tree: [] });
+    treeBase: string,
+    changes: ReadonlyMap<string, string | null>,
+  ): Promise<string> {
+    return (
+      (await this.#rebuildTree(await this.commitTree(treeBase), buildChangeNode(changes), "")) ??
+      (await writeTree({ fs: this.#fs, gitdir: GITDIR, tree: [] }))
+    );
   }
 
   /** The commit half of `writeChangedFilesAsCommit`: writes a commit for an existing tree oid. */
@@ -346,12 +357,19 @@ export class GitStore {
   // Rebuilds one tree level for writeChangedFilesAsCommit: base entries are copied through
   // untouched (mode + oid verbatim) except where the change node names them. Returns the new
   // tree oid, or undefined when the resulting tree is empty (the entry is then pruned).
-  async #rebuildTree(baseTreeOid: string | undefined, node: ChangeNode, prefix: string)
-      : Promise<string | undefined> {
+  async #rebuildTree(
+    baseTreeOid: string | undefined,
+    node: ChangeNode,
+    prefix: string,
+  ): Promise<string | undefined> {
     let entries = new Map<string, TreeEntry>();
     if (baseTreeOid !== undefined) {
-      let { tree } = await readTree(
-          { fs: this.#fs, gitdir: GITDIR, oid: baseTreeOid, cache: this.#cache });
+      let { tree } = await readTree({
+        fs: this.#fs,
+        gitdir: GITDIR,
+        oid: baseTreeOid,
+        cache: this.#cache,
+      });
       for (let entry of tree) entries.set(entry.path, entry);
     }
     for (let [name, child] of node) {
@@ -371,10 +389,12 @@ export class GitStore {
         if (base !== undefined && base.type === "tree") {
           throw new Error(`cannot delete ${path}: it is a directory`);
         }
-        entries.delete(name);  // deleting an absent file is a no-op
+        entries.delete(name); // deleting an absent file is a no-op
       } else {
-        if (base !== undefined &&
-            (base.type !== "blob" || (base.mode !== "100644" && base.mode !== "100755"))) {
+        if (
+          base !== undefined &&
+          (base.type !== "blob" || (base.mode !== "100644" && base.mode !== "100755"))
+        ) {
           throw new Error(`cannot write ${path}: not a regular file`);
         }
         let oid = await writeBlob({
@@ -410,16 +430,27 @@ export class GitStore {
   }
 
   async #collectTreeFiles(
-      treeOid: string, prefix: string, out: Map<string, string>): Promise<void> {
-    let { tree } = await readTree(
-        { fs: this.#fs, gitdir: GITDIR, oid: treeOid, cache: this.#cache });
+    treeOid: string,
+    prefix: string,
+    out: Map<string, string>,
+  ): Promise<void> {
+    let { tree } = await readTree({
+      fs: this.#fs,
+      gitdir: GITDIR,
+      oid: treeOid,
+      cache: this.#cache,
+    });
     for (let entry of tree) {
       let path = prefix + entry.path;
       if (entry.type === "tree") {
         await this.#collectTreeFiles(entry.oid, `${path}/`, out);
       } else if (entry.type === "blob" && (entry.mode === "100644" || entry.mode === "100755")) {
-        let { blob } = await readBlob(
-            { fs: this.#fs, gitdir: GITDIR, oid: entry.oid, cache: this.#cache });
+        let { blob } = await readBlob({
+          fs: this.#fs,
+          gitdir: GITDIR,
+          oid: entry.oid,
+          cache: this.#cache,
+        });
         out.set(path, new TextDecoder().decode(blob));
       } else {
         throw new Error(`unsupported tree entry at ${path}: mode ${entry.mode}`);
@@ -505,7 +536,9 @@ export async function blobOid(text: string): Promise<string> {
 
 /** Compares two flattened file maps for identical content. */
 export function filesEqual(
-    a: ReadonlyMap<string, string>, b: ReadonlyMap<string, string>): boolean {
+  a: ReadonlyMap<string, string>,
+  b: ReadonlyMap<string, string>,
+): boolean {
   if (a.size !== b.size) return false;
   for (let [name, content] of a) {
     if (b.get(name) !== content) return false;
@@ -556,10 +589,11 @@ export interface MergeResult {
  *   marked.
  */
 export function threeWayMerge(
-    base: ReadonlyMap<string, string>,
-    ours: ReadonlyMap<string, string>,
-    theirs: ReadonlyMap<string, string>,
-    labels: MergeLabels = {}): MergeResult {
+  base: ReadonlyMap<string, string>,
+  ours: ReadonlyMap<string, string>,
+  theirs: ReadonlyMap<string, string>,
+  labels: MergeLabels = {},
+): MergeResult {
   let files = new Map<string, string>();
   let conflictPaths: string[] = [];
 
@@ -617,14 +651,17 @@ function withFinalNewline(text: string): string {
   return text === "" || text.endsWith("\n") ? text : `${text}\n`;
 }
 
-function mergeText(base: string, ours: string, theirs: string, labels: MergeLabels):
-    { clean: boolean, text: string } {
+function mergeText(
+  base: string,
+  ours: string,
+  theirs: string,
+  labels: MergeLabels,
+): { clean: boolean; text: string } {
   // diff3 operates on arrays of lines; splitLines keeps each line's terminator, so join("")
   // reassembles losslessly. (isomorphic-git's mergeFile splits with a regex that treats bare
   // "\r"/U+2028/U+2029 as boundaries it then drops, corrupting content that uses them; ours
   // keeps such characters inside their line instead.)
-  let regions = diff3Merge(
-      splitLines(ours), splitLines(base), splitLines(theirs));
+  let regions = diff3Merge(splitLines(ours), splitLines(base), splitLines(theirs));
 
   let clean = true;
   let text = "";

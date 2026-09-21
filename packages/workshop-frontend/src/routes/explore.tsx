@@ -1,13 +1,13 @@
-import { createFileRoute } from '@tanstack/react-router'
-import BlueprintsPage from '../BlueprintsPage'
-import { useDocumentTitle } from '../useDocumentTitle'
+import { createFileRoute } from "@tanstack/react-router";
+import BlueprintsPage from "../BlueprintsPage";
+import { useDocumentTitle } from "../useDocumentTitle";
 
-export const Route = createFileRoute('/explore')({
+export const Route = createFileRoute("/explore")({
   component: ExplorePage,
-})
+});
 
 function ExplorePage() {
-  useDocumentTitle('Explore')
+  useDocumentTitle("Explore");
 
-  return <BlueprintsPage />
+  return <BlueprintsPage />;
 }

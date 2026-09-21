@@ -153,7 +153,7 @@ export interface GitObjectMetadataRecord {
    * grant that lets the destination gatekeeper simulate a queued push as if it had already
    * landed.
    */
-  pendingPush: { gatekeeperId: WorkpieceId, actionId: number }[];
+  pendingPush: { gatekeeperId: WorkpieceId; actionId: number }[];
 }
 
 /**
@@ -169,7 +169,7 @@ export function gitObjectMetadataCollection() {
     primaryKey: "oid",
     nonUniqueIndexes: {
       byPendingPushAction(record: GitObjectMetadataRecord) {
-        return record.pendingPush.map(entry => entry.actionId);
+        return record.pendingPush.map((entry) => entry.actionId);
       },
     },
   });
@@ -207,10 +207,15 @@ export interface GitPullDelegate {
  * translate this into a path-specific "file is too large" error.
  */
 export class GitObjectTooLargeError extends Error {
-  constructor(public readonly oid: GitOid, size?: number) {
-    super(size !== undefined
+  constructor(
+    public readonly oid: GitOid,
+    size?: number,
+  ) {
+    super(
+      size !== undefined
         ? `git object ${oid} is ${size} bytes, over the ${MAX_GIT_OBJECT_SIZE}-byte limit`
-        : `git object ${oid} exceeds the ${MAX_GIT_OBJECT_SIZE}-byte limit`);
+        : `git object ${oid} exceeds the ${MAX_GIT_OBJECT_SIZE}-byte limit`,
+    );
   }
 }
 
@@ -276,7 +281,10 @@ const TEXT_DECODER_STRICT = new TextDecoder("utf-8", { fatal: true, ignoreBOM: t
  * reads) all funnel through it.
  */
 export class WorkspaceGitCache {
-  constructor(private storage: GitCacheStorage, private puller: GitPullDelegate) {}
+  constructor(
+    private storage: GitCacheStorage,
+    private puller: GitPullDelegate,
+  ) {}
 
   // -------------------------------------------------------------------------------------
   // Local object access
@@ -302,18 +310,23 @@ export class WorkspaceGitCache {
    * object over MAX_GIT_OBJECT_SIZE is measured (type + size recorded) but not stored, and the
    * call throws.
    */
-  async putFromGatekeeper(gatekeeperId: WorkpieceId, type: GitObjectType, payload: Uint8Array)
-      : Promise<GitOid> {
+  async putFromGatekeeper(
+    gatekeeperId: WorkpieceId,
+    type: GitObjectType,
+    payload: Uint8Array,
+  ): Promise<GitOid> {
     validateGitObjectType(type);
     let oid = await gitObjectOid(type, payload);
     if (payload.byteLength > MAX_GIT_OBJECT_SIZE) {
-      this.storage.transaction(
-          () => this.#recordOversized(gatekeeperId, oid, type, payload.byteLength));
+      this.storage.transaction(() =>
+        this.#recordOversized(gatekeeperId, oid, type, payload.byteLength),
+      );
       throw new GitObjectTooLargeError(oid, payload.byteLength);
     }
     let data = encodeLooseObject(type, payload);
-    this.storage.transaction(
-        () => this.#storeVerifiedObject(gatekeeperId, oid, type, payload, data));
+    this.storage.transaction(() =>
+      this.#storeVerifiedObject(gatekeeperId, oid, type, payload, data),
+    );
     return oid;
   }
 
@@ -335,21 +348,27 @@ export class WorkspaceGitCache {
    * absent from the returned list, which is how a gitPull implementation notices). Returns the
    * stored oids in pack order.
    */
-  async consumePackFromGatekeeper(gatekeeperId: WorkpieceId, pack: ReadableStream<Uint8Array>)
-      : Promise<GitOid[]> {
+  async consumePackFromGatekeeper(
+    gatekeeperId: WorkpieceId,
+    pack: ReadableStream<Uint8Array>,
+  ): Promise<GitOid[]> {
     let bytes = await collectByteStream(pack, MAX_GIT_PACK_BYTES);
     let objects = await decodePackBytes(bytes, {
       maxObjectSize: MAX_GIT_PACK_BYTES,
-      resolveBase: oid => this.readLocalObject(oid),
+      resolveBase: (oid) => this.readLocalObject(oid),
     });
     // Hash and deflate outside the storage transaction (hashing is async; deflate is just CPU
     // that needn't run under the write lock).
-    let entries = await Promise.all(objects.map(async object => ({
-      ...object,
-      oid: await gitObjectOid(object.type, object.payload),
-      data: object.payload.byteLength <= MAX_GIT_OBJECT_SIZE
-          ? encodeLooseObject(object.type, object.payload) : undefined,
-    })));
+    let entries = await Promise.all(
+      objects.map(async (object) => ({
+        ...object,
+        oid: await gitObjectOid(object.type, object.payload),
+        data:
+          object.payload.byteLength <= MAX_GIT_OBJECT_SIZE
+            ? encodeLooseObject(object.type, object.payload)
+            : undefined,
+      })),
+    );
 
     let stored: GitOid[] = [];
     let seen = new Set<GitOid>();
@@ -378,13 +397,16 @@ export class WorkspaceGitCache {
    * is what lets G simulate a queued cross-remote push); an absent onRemote object is not
    * pulled -- G's own remote has it, and null tells G to ask its remote itself.
    */
-  async readForGatekeeper(gatekeeperId: WorkpieceId, oid: GitOid, hints?: GitPullHints)
-      : Promise<PackableObject | null> {
+  async readForGatekeeper(
+    gatekeeperId: WorkpieceId,
+    oid: GitOid,
+    hints?: GitPullHints,
+  ): Promise<PackableObject | null> {
     validateGitOid(oid);
     let meta = this.storage.gitObjectMetadata.get(oid);
     if (meta === undefined) return null;
     let onRemote = meta.onRemote.includes(gatekeeperId);
-    let pendingPush = meta.pendingPush.some(p => p.gatekeeperId === gatekeeperId);
+    let pendingPush = meta.pendingPush.some((p) => p.gatekeeperId === gatekeeperId);
     if (!onRemote && !pendingPush) return null;
 
     let local = this.readLocalObject(oid);
@@ -410,7 +432,7 @@ export class WorkspaceGitCache {
    * a gatekeeper bug that wrongly omits a blob self-heals instead of wedging the file.
    */
   async ensureGitObjects(oids: GitOid[], hints: GitPullHints): Promise<void> {
-    let missing = [...new Set(oids)].filter(oid => !this.hasLocalObject(oid));
+    let missing = [...new Set(oids)].filter((oid) => !this.hasLocalObject(oid));
     if (missing.length === 0) return;
 
     // Fail fast on objects whose measured size already proves them unstorable.
@@ -424,7 +446,7 @@ export class WorkspaceGitCache {
     let triedSources = new Map<GitOid, Set<WorkpieceId>>();
     let lastError: unknown;
     while (true) {
-      missing = missing.filter(oid => !this.hasLocalObject(oid));
+      missing = missing.filter((oid) => !this.hasLocalObject(oid));
       if (missing.length === 0) return;
 
       // Group the still-missing objects by each one's next untried recorded source.
@@ -433,24 +455,25 @@ export class WorkspaceGitCache {
         let meta = this.storage.gitObjectMetadata.get(oid);
         let sources = [...new Set([...(meta?.onRemote ?? []), ...(meta?.pullableFrom ?? [])])];
         let tried = triedSources.get(oid) ?? new Set();
-        let next = sources.find(source => !tried.has(source));
+        let next = sources.find((source) => !tried.has(source));
         if (next === undefined) {
           throw new Error(
-              `Could not pull git object ${oid}: ` +
+            `Could not pull git object ${oid}: ` +
               (sources.length === 0
-                  ? "no connection is known to provide it."
-                  : `every connection that could provide it failed. Last error: ` +
-                    `${lastError instanceof Error ? lastError.message : String(lastError)}`));
+                ? "no connection is known to provide it."
+                : `every connection that could provide it failed. Last error: ` +
+                  `${lastError instanceof Error ? lastError.message : String(lastError)}`),
+          );
         }
         let group = groups.get(next);
-        if (group === undefined) groups.set(next, group = []);
+        if (group === undefined) groups.set(next, (group = []));
         group.push(oid);
       }
 
       for (let [gatekeeperId, groupOids] of groups) {
         for (let oid of groupOids) {
           let tried = triedSources.get(oid);
-          if (tried === undefined) triedSources.set(oid, tried = new Set());
+          if (tried === undefined) triedSources.set(oid, (tried = new Set()));
           tried.add(gatekeeperId);
         }
         try {
@@ -458,7 +481,9 @@ export class WorkspaceGitCache {
         } catch (err) {
           lastError = err;
           logger.warn("git pull from source failed", {
-            event: "git.pull.source.failed", gatekeeperId, oidCount: groupOids.length,
+            event: "git.pull.source.failed",
+            gatekeeperId,
+            oidCount: groupOids.length,
             error: err,
           });
           continue;
@@ -466,7 +491,7 @@ export class WorkspaceGitCache {
         // The filtered-omission carve-out: a blob the pull's own filter suppressed is "too
         // large", not "pull failed" (see the method doc).
         if (hints.type === "blob" && hints.filterBlobSize !== undefined) {
-          let omitted = groupOids.find(oid => !this.hasLocalObject(oid));
+          let omitted = groupOids.find((oid) => !this.hasLocalObject(oid));
           if (omitted !== undefined) throw new GitObjectTooLargeError(omitted);
         }
       }
@@ -483,19 +508,25 @@ export class WorkspaceGitCache {
    * instead of one object per fault. It changes only how much a *miss* pulls; a locally present
    * object never pulls anything.
    */
-  async ensureObject(oid: GitOid,
-                     expected: { type: GitObjectType, referencedBy?: GitOid, eagerTree?: boolean })
-      : Promise<PackableObject> {
+  async ensureObject(
+    oid: GitOid,
+    expected: { type: GitObjectType; referencedBy?: GitOid; eagerTree?: boolean },
+  ): Promise<PackableObject> {
     let local = this.readLocalObject(oid);
     if (local === undefined) {
-      await this.ensureGitObjects([oid],
-          expected.eagerTree && expected.type !== "blob"
-              ? { type: expected.type,
-                  ...(expected.referencedBy !== undefined
-                      ? { referencedBy: expected.referencedBy } : {}),
-                  commitHistory: { kind: "depth", depth: 1 },
-                  filterBlobSize: EAGER_BLOB_LIMIT }
-              : this.#exactObjectHints(expected.type, expected.referencedBy));
+      await this.ensureGitObjects(
+        [oid],
+        expected.eagerTree && expected.type !== "blob"
+          ? {
+              type: expected.type,
+              ...(expected.referencedBy !== undefined
+                ? { referencedBy: expected.referencedBy }
+                : {}),
+              commitHistory: { kind: "depth", depth: 1 },
+              filterBlobSize: EAGER_BLOB_LIMIT,
+            }
+          : this.#exactObjectHints(expected.type, expected.referencedBy),
+      );
       local = this.readLocalObject(oid);
       if (local === undefined) {
         // ensureGitObjects throws on failure; this is a defensive backstop.
@@ -555,8 +586,10 @@ export class WorkspaceGitCache {
    * which a later `fileOidAtCommit` on another commit compares equal iff the content is
    * byte-identical. Same rules and errors otherwise.
    */
-  async readFileAtCommitWithOid(commitOid: GitOid, path: string)
-      : Promise<{ text: string, oid: GitOid } | undefined> {
+  async readFileAtCommitWithOid(
+    commitOid: GitOid,
+    path: string,
+  ): Promise<{ text: string; oid: GitOid } | undefined> {
     let { tree, entry } = await this.#resolveEntryAt(commitOid, path);
     if (entry === undefined || entry.mode === "40000") return undefined;
     switch (entry.mode) {
@@ -566,8 +599,10 @@ export class WorkspaceGitCache {
         // The symlink target *is* the blob's content, so the error tells the agent everything.
         throw new Error(symlinkMessage(path, await this.#readBlob(entry.oid, tree, path)));
       default:
-        return { text: decodeBlobText(await this.#readBlob(entry.oid, tree, path), path),
-                 oid: entry.oid };
+        return {
+          text: decodeBlobText(await this.#readBlob(entry.oid, tree, path), path),
+          oid: entry.oid,
+        };
     }
   }
 
@@ -603,7 +638,7 @@ export class WorkspaceGitCache {
       referencedBy = resolved.tree;
     }
     let tree = await this.ensureObject(treeOid, { type: "tree", referencedBy });
-    return parseGitTree(tree.payload, treeOid).map(entry => ({
+    return parseGitTree(tree.payload, treeOid).map((entry) => ({
       name: entry.name,
       kind: MODE_KINDS[entry.mode],
       oid: entry.oid,
@@ -619,8 +654,10 @@ export class WorkspaceGitCache {
   // (`eagerTree`): the first fault against a base commit brings the whole tree closure and
   // every small blob in one round trip -- the same shape as the worktree-creation pull --
   // rather than one gatekeeper round trip per path segment. Reads that follow hit locally.
-  async #resolveEntryAt(commitOid: GitOid, path: string)
-      : Promise<{ tree: GitOid, entry: GitTreeEntry | undefined }> {
+  async #resolveEntryAt(
+    commitOid: GitOid,
+    path: string,
+  ): Promise<{ tree: GitOid; entry: GitTreeEntry | undefined }> {
     let segments = splitTreePath(path);
     let name = segments.pop()!;
     let commit = await this.ensureObject(commitOid, { type: "commit", eagerTree: true });
@@ -628,7 +665,7 @@ export class WorkspaceGitCache {
     let referencedBy = commitOid;
     for (let segment of segments) {
       let tree = await this.ensureObject(treeOid, { type: "tree", referencedBy, eagerTree: true });
-      let entry = parseGitTree(tree.payload, treeOid).find(e => e.name === segment);
+      let entry = parseGitTree(tree.payload, treeOid).find((e) => e.name === segment);
       if (entry === undefined || entry.mode !== "40000") {
         return { tree: treeOid, entry: undefined };
       }
@@ -636,7 +673,10 @@ export class WorkspaceGitCache {
       treeOid = entry.oid;
     }
     let tree = await this.ensureObject(treeOid, { type: "tree", referencedBy, eagerTree: true });
-    return { tree: treeOid, entry: parseGitTree(tree.payload, treeOid).find(e => e.name === name) };
+    return {
+      tree: treeOid,
+      entry: parseGitTree(tree.payload, treeOid).find((e) => e.name === name),
+    };
   }
 
   /**
@@ -647,12 +687,16 @@ export class WorkspaceGitCache {
   async pathEntryAtCommit(commitOid: GitOid, path: string): Promise<GitPathEntry | undefined> {
     if (path === "") {
       let commit = await this.ensureObject(commitOid, { type: "commit", eagerTree: true });
-      return { kind: "dir", oid: parseGitCommitRefs(commit.payload, commitOid).tree,
-               referencedBy: commitOid };
+      return {
+        kind: "dir",
+        oid: parseGitCommitRefs(commit.payload, commitOid).tree,
+        referencedBy: commitOid,
+      };
     }
     let { tree, entry } = await this.#resolveEntryAt(commitOid, path);
-    return entry === undefined ? undefined
-        : { kind: MODE_KINDS[entry.mode], oid: entry.oid, referencedBy: tree };
+    return entry === undefined
+      ? undefined
+      : { kind: MODE_KINDS[entry.mode], oid: entry.oid, referencedBy: tree };
   }
 
   /**
@@ -662,8 +706,11 @@ export class WorkspaceGitCache {
    * as needed (eagerly, like every worktree base walk); blob content is never read, so listings
    * carry no sizes.
    */
-  async listCommitTreePaths(commitOid: GitOid, path?: string, options?: { recursive?: boolean })
-      : Promise<GitTreePathEntry[]> {
+  async listCommitTreePaths(
+    commitOid: GitOid,
+    path?: string,
+    options?: { recursive?: boolean },
+  ): Promise<GitTreePathEntry[]> {
     let scope = path ?? "";
     let root = await this.pathEntryAtCommit(commitOid, scope);
     if (root === undefined || root.kind !== "dir") {
@@ -697,9 +744,11 @@ export class WorkspaceGitCache {
       let nodes: TreeNode[] = [];
       for (let entry of parseGitTree(tree.payload, treeOid)) {
         let kind = MODE_KINDS[entry.mode];
-        nodes.push(kind === "dir"
+        nodes.push(
+          kind === "dir"
             ? { name: entry.name, kind, children: await walk(entry.oid, treeOid) }
-            : { name: entry.name, kind });
+            : { name: entry.name, kind },
+        );
       }
       return nodes;
     };
@@ -714,8 +763,10 @@ export class WorkspaceGitCache {
    * READ_FILES_RESPONSE_BUDGET, so the remaining paths are simply omitted. Per-file conditions
    * become `absent`/`unreadable` entries; a pull failure throws.
    */
-  async readFilesAtCommit(commitOid: GitOid, paths: string[])
-      : Promise<[path: string, FileAtCommit][]> {
+  async readFilesAtCommit(
+    commitOid: GitOid,
+    paths: string[],
+  ): Promise<[path: string, FileAtCommit][]> {
     let entries = new Map<string, GitPathEntry | undefined>();
     for (let path of paths) {
       if (!entries.has(path)) entries.set(path, await this.pathEntryAtCommit(commitOid, path));
@@ -776,19 +827,31 @@ export class WorkspaceGitCache {
       return parseGitCommitRefs(commit.payload, oid).tree;
     };
     await this.#diffTreesLazy(
-        await treeOf(aCommit), aCommit, await treeOf(bCommit), bCommit, "", out);
+      await treeOf(aCommit),
+      aCommit,
+      await treeOf(bCommit),
+      bCommit,
+      "",
+      out,
+    );
     return out;
   }
 
   // Accumulates the differing non-directory paths of two trees (either may be absent) into
   // `out`. `aRef`/`bRef` are the referencing objects for pull hints.
-  async #diffTreesLazy(aOid: GitOid | undefined, aRef: GitOid, bOid: GitOid | undefined,
-                       bRef: GitOid, prefix: string, out: Set<string>): Promise<void> {
+  async #diffTreesLazy(
+    aOid: GitOid | undefined,
+    aRef: GitOid,
+    bOid: GitOid | undefined,
+    bRef: GitOid,
+    prefix: string,
+    out: Set<string>,
+  ): Promise<void> {
     if (aOid === bOid) return;
     let entriesOf = async (oid: GitOid | undefined, referencedBy: GitOid) => {
       if (oid === undefined) return new Map<string, GitTreeEntry>();
       let tree = await this.ensureObject(oid, { type: "tree", referencedBy, eagerTree: true });
-      return new Map(parseGitTree(tree.payload, oid).map(entry => [entry.name, entry]));
+      return new Map(parseGitTree(tree.payload, oid).map((entry) => [entry.name, entry]));
     };
     let aEntries = await entriesOf(aOid, aRef);
     let bEntries = await entriesOf(bOid, bRef);
@@ -801,8 +864,14 @@ export class WorkspaceGitCache {
       let bDir = b?.mode === "40000";
       if (aDir || bDir) {
         // Descend the tree side(s); a non-tree entry opposite a tree is one more difference.
-        await this.#diffTreesLazy(aDir ? a!.oid : undefined, aOid ?? aRef,
-                                  bDir ? b!.oid : undefined, bOid ?? bRef, `${path}/`, out);
+        await this.#diffTreesLazy(
+          aDir ? a!.oid : undefined,
+          aOid ?? aRef,
+          bDir ? b!.oid : undefined,
+          bOid ?? bRef,
+          `${path}/`,
+          out,
+        );
         if ((a !== undefined && !aDir) || (b !== undefined && !bDir)) out.add(path);
       } else {
         out.add(path);
@@ -856,13 +925,16 @@ export class WorkspaceGitCache {
     let normalized = ref.toLowerCase();
     if (!/^[0-9a-f]{4,40}$/.test(normalized)) {
       throw new Error(
-          `"${ref}" is not a git commit id: expected a 40-hex SHA-1, or a prefix of at least ` +
-          `4 hex digits.`);
+        `"${ref}" is not a git commit id: expected a 40-hex SHA-1, or a prefix of at least ` +
+          `4 hex digits.`,
+      );
     }
-    let unknown = () => new Error(
+    let unknown = () =>
+      new Error(
         `Commit ${ref} is not known to this workspace. Look it up through the connection that ` +
-        `provides the repository first (e.g. its commit or branch APIs), which makes it ` +
-        `available here.`);
+          `provides the repository first (e.g. its commit or branch APIs), which makes it ` +
+          `available here.`,
+      );
 
     if (normalized.length === 40) {
       let local = this.readLocalObject(normalized);
@@ -889,8 +961,9 @@ export class WorkspaceGitCache {
     if (commits.length === 1) return commits[0];
     if (commits.length > 1) {
       throw new Error(
-          `Commit id prefix ${ref} is ambiguous between: ${commits.toSorted().join(", ")}. ` +
-          `Use a longer prefix.`);
+        `Commit id prefix ${ref} is ambiguous between: ${commits.toSorted().join(", ")}. ` +
+          `Use a longer prefix.`,
+      );
     }
     throw unknown();
   }
@@ -902,8 +975,7 @@ export class WorkspaceGitCache {
    * For batch callers (grep) that ensured the blobs beforehand -- and for re-reading a blob an
    * earlier read already pulled, where no referencing object is known -- this is a local read.
    */
-  async readTextBlob(oid: GitOid, referencedBy: GitOid | undefined, path: string)
-      : Promise<string> {
+  async readTextBlob(oid: GitOid, referencedBy: GitOid | undefined, path: string): Promise<string> {
     return decodeBlobText(await this.#readBlob(oid, referencedBy, path), path);
   }
 
@@ -917,7 +989,7 @@ export class WorkspaceGitCache {
    * first.
    */
   async ensureBlobs(oids: Iterable<GitOid>): Promise<Set<GitOid>> {
-    let missing = new Set([...oids].filter(oid => !this.hasLocalObject(oid)));
+    let missing = new Set([...oids].filter((oid) => !this.hasLocalObject(oid)));
     let tooLarge = new Set<GitOid>();
     while (missing.size > 0) {
       try {
@@ -927,7 +999,7 @@ export class WorkspaceGitCache {
         if (err instanceof GitObjectTooLargeError && missing.has(err.oid)) {
           tooLarge.add(err.oid);
           missing.delete(err.oid);
-          continue;  // retry the rest of the batch (already-pulled blobs are skipped)
+          continue; // retry the rest of the batch (already-pulled blobs are skipped)
         }
         throw err;
       }
@@ -936,8 +1008,11 @@ export class WorkspaceGitCache {
   }
 
   // Reads a blob for a file path, translating unavailable-at-size into the path-specific error.
-  async #readBlob(oid: GitOid, referencedBy: GitOid | undefined, path: string)
-      : Promise<Uint8Array> {
+  async #readBlob(
+    oid: GitOid,
+    referencedBy: GitOid | undefined,
+    path: string,
+  ): Promise<Uint8Array> {
     let blob: PackableObject;
     try {
       blob = await this.ensureObject(oid, { type: "blob", referencedBy });
@@ -982,18 +1057,19 @@ export class WorkspaceGitCache {
         if (type !== "commit") {
           throw new Error(`Cannot push ${oid}: it is a ${type}, not a commit.`);
         }
-        continue;  // proven on the destination
+        continue; // proven on the destination
       }
       let local = this.readLocalObject(oid);
       if (local === undefined) {
         throw new Error(
-            `Cannot push: commit ${oid} in the pushed history is not available in the ` +
+          `Cannot push: commit ${oid} in the pushed history is not available in the ` +
             `workspace's git cache, so the history cannot be verified against the destination. ` +
             `A push requires the commit chain from each pushed head down to a commit pulled ` +
             `from (or already pushed to) the destination to be locally available -- in ` +
             `practice, commits authored here on top of a base pulled from that destination. ` +
             `Pushing a pre-existing branch whose intermediate history was never pulled is not ` +
-            `supported yet.`);
+            `supported yet.`,
+        );
       }
       if (local.type !== "commit") {
         throw new Error(`Cannot push ${oid}: it is a ${local.type}, not a commit.`);
@@ -1001,11 +1077,12 @@ export class WorkspaceGitCache {
       let refs = parseGitCommitRefs(local.payload, oid);
       if (refs.parents.length === 0) {
         throw new Error(
-            `Cannot push: the pushed history reaches root commit ${oid}, which is not known ` +
+          `Cannot push: the pushed history reaches root commit ${oid}, which is not known ` +
             `to the destination. Pushing a history unrelated to the destination is not ` +
             `supported (this protects against accidentally pushing to the wrong repository). ` +
             `If the repositories are genuinely related, first pull a shared ancestor commit ` +
-            `from the destination.`);
+            `from the destination.`,
+        );
       }
       stack.push(...refs.parents);
     }
@@ -1026,7 +1103,8 @@ export class WorkspaceGitCache {
     let start = this.readLocalObject(descendant);
     if (start === undefined || start.type !== "commit") {
       throw new Error(
-          `Cannot check ancestry: ${descendant} is not a commit in the workspace's git cache.`);
+        `Cannot check ancestry: ${descendant} is not a commit in the workspace's git cache.`,
+      );
     }
     if (ancestor === descendant) return true;
     let visited = new Set<GitOid>([descendant]);
@@ -1058,28 +1136,37 @@ export class WorkspaceGitCache {
    * submit strands no marks.
    */
   markPushClosure(gatekeeperId: WorkpieceId, actionId: number, heads: GitOid[]): void {
-    this.#markForPush(gatekeeperId, actionId,
-        heads.map(oid => ({ oid: validateGitOid(oid), type: "commit" as GitObjectType })));
+    this.#markForPush(
+      gatekeeperId,
+      actionId,
+      heads.map((oid) => ({ oid: validateGitOid(oid), type: "commit" as GitObjectType })),
+    );
   }
 
   // The marking walk worker, shared by markPushClosure (from the declared heads) and lazy
   // propagation at object arrival (from a marked object's referents). Each entry's type comes
   // from its referencing context (assertion-grade).
-  #markForPush(gatekeeperId: WorkpieceId, actionId: number,
-               initial: { oid: GitOid, type: GitObjectType }[]): void {
+  #markForPush(
+    gatekeeperId: WorkpieceId,
+    actionId: number,
+    initial: { oid: GitOid; type: GitObjectType }[],
+  ): void {
     let stack = [...initial];
     while (stack.length > 0) {
       let { oid, type } = stack.pop()!;
       let { meta, dirty } = this.#metaFor(gatekeeperId, oid, type, "asserted");
-      if (meta.onRemote.includes(gatekeeperId) || meta.pullableFrom.includes(gatekeeperId) ||
-          meta.pendingPush.some(p => p.actionId === actionId)) {
+      if (
+        meta.onRemote.includes(gatekeeperId) ||
+        meta.pullableFrom.includes(gatekeeperId) ||
+        meta.pendingPush.some((p) => p.actionId === actionId)
+      ) {
         // Remote-known (skip without descending) or already visited; still persist a type
         // reconciliation so the log never claims a correction that didn't land.
         if (dirty) this.storage.gitObjectMetadata.put(meta);
         continue;
       }
       meta.pendingPush.push({ gatekeeperId, actionId });
-      this.storage.gitObjectMetadata.put(meta);  // also lands in byPendingPushAction
+      this.storage.gitObjectMetadata.put(meta); // also lands in byPendingPushAction
       let local = this.readLocalObject(oid);
       if (local !== undefined) stack.push(...this.#referentEntries(oid, local));
     }
@@ -1088,17 +1175,17 @@ export class WorkspaceGitCache {
   // The containment edges of an object, for the marking walk and mark propagation: a commit
   // points at its tree and parents, a tree at its non-gitlink entries. Gitlink targets are
   // foreign repos' commits and are never walked, pulled, or pushed.
-  #referentEntries(oid: GitOid, object: PackableObject): { oid: GitOid, type: GitObjectType }[] {
+  #referentEntries(oid: GitOid, object: PackableObject): { oid: GitOid; type: GitObjectType }[] {
     if (object.type === "commit") {
       let refs = parseGitCommitRefs(object.payload, oid);
       return [
         { oid: refs.tree, type: "tree" },
-        ...refs.parents.map(parent => ({ oid: parent, type: "commit" as GitObjectType })),
+        ...refs.parents.map((parent) => ({ oid: parent, type: "commit" as GitObjectType })),
       ];
     } else if (object.type === "tree") {
       return scanGitTree(object.payload, oid)
-          .filter(entry => entry.mode !== "160000")
-          .map(entry => ({ oid: entry.oid, type: treeEntryObjectType(entry.mode) }));
+        .filter((entry) => entry.mode !== "160000")
+        .map((entry) => ({ oid: entry.oid, type: treeEntryObjectType(entry.mode) }));
     }
     return [];
   }
@@ -1111,10 +1198,10 @@ export class WorkspaceGitCache {
    */
   convertPushMarksToOnRemote(actionId: number): void {
     for (let meta of this.#recordsMarkedFor(actionId)) {
-      let converted = meta.pendingPush.filter(p => p.actionId === actionId);
-      meta.pendingPush = meta.pendingPush.filter(p => p.actionId !== actionId);
+      let converted = meta.pendingPush.filter((p) => p.actionId === actionId);
+      meta.pendingPush = meta.pendingPush.filter((p) => p.actionId !== actionId);
       for (let entry of converted) addUnique(meta.onRemote, entry.gatekeeperId);
-      this.storage.gitObjectMetadata.put(meta);  // the index entry drops with the array element
+      this.storage.gitObjectMetadata.put(meta); // the index entry drops with the array element
     }
   }
 
@@ -1126,9 +1213,13 @@ export class WorkspaceGitCache {
    */
   clearPushMarks(actionId: number): void {
     for (let meta of this.#recordsMarkedFor(actionId)) {
-      meta.pendingPush = meta.pendingPush.filter(p => p.actionId !== actionId);
-      if (meta.pendingPush.length === 0 && meta.onRemote.length === 0 &&
-          meta.pullableFrom.length === 0 && meta.size === undefined) {
+      meta.pendingPush = meta.pendingPush.filter((p) => p.actionId !== actionId);
+      if (
+        meta.pendingPush.length === 0 &&
+        meta.onRemote.length === 0 &&
+        meta.pullableFrom.length === 0 &&
+        meta.size === undefined
+      ) {
         this.storage.gitObjectMetadata.delete(meta.oid);
       } else {
         this.storage.gitObjectMetadata.put(meta);
@@ -1150,17 +1241,20 @@ export class WorkspaceGitCache {
    * marked object is absent. A mid-stream provenance loss fails the apply with the "reconnect"
    * error from the pull delegate.
    */
-  async buildPackForAction(gatekeeperId: WorkpieceId, actionId: number)
-      : Promise<ReadableStream<Uint8Array>> {
+  async buildPackForAction(
+    gatekeeperId: WorkpieceId,
+    actionId: number,
+  ): Promise<ReadableStream<Uint8Array>> {
     for (;;) {
-      let missing = this.#recordsMarkedFor(actionId)
-          .filter(mark => !this.hasLocalObject(mark.oid));
+      let missing = this.#recordsMarkedFor(actionId).filter(
+        (mark) => !this.hasLocalObject(mark.oid),
+      );
       if (missing.length === 0) break;
       // One batched fetch per expected type (a fetch's hints carry a single type).
       let byType = new Map<GitObjectType, GitOid[]>();
       for (let mark of missing) {
         let group = byType.get(mark.type);
-        if (group === undefined) byType.set(mark.type, group = []);
+        if (group === undefined) byType.set(mark.type, (group = []));
         group.push(mark.oid);
       }
       for (let [type, oids] of byType) {
@@ -1171,7 +1265,7 @@ export class WorkspaceGitCache {
       // rather than silently not delivering, so this terminates.
     }
 
-    let objects = this.#recordsMarkedFor(actionId).map(mark => this.readLocalObject(mark.oid)!);
+    let objects = this.#recordsMarkedFor(actionId).map((mark) => this.readLocalObject(mark.oid)!);
     let chunks = await buildPackBytes(objects);
     return new ReadableStream<Uint8Array>({
       start(controller) {
@@ -1197,25 +1291,31 @@ export class WorkspaceGitCache {
   // is fatal -- a wrong type only mis-shapes advisory pull hints until measured bytes correct
   // it. `dirty` reports a type correction on an existing row, so callers that otherwise skip
   // redundant puts still persist it.
-  #metaFor(gatekeeperId: WorkpieceId, oid: GitOid, type: GitObjectType,
-           grade: "measured" | "asserted")
-      : { meta: GitObjectMetadataRecord, dirty: boolean } {
+  #metaFor(
+    gatekeeperId: WorkpieceId,
+    oid: GitOid,
+    type: GitObjectType,
+    grade: "measured" | "asserted",
+  ): { meta: GitObjectMetadataRecord; dirty: boolean } {
     let meta = this.storage.gitObjectMetadata.get(oid);
     if (meta === undefined) {
-      return { meta: { oid, type, onRemote: [], pullableFrom: [], pendingPush: [] },
-               dirty: false };
+      return { meta: { oid, type, onRemote: [], pullableFrom: [], pendingPush: [] }, dirty: false };
     }
     let dirty = false;
     if (meta.type !== type) {
       let wins = grade === "measured" || (meta.size === undefined && type === "commit");
-      logger.warn(wins ? "correcting git object type from conflicting claim"
-                       : "ignoring conflicting git object type claim", {
-        event: wins ? "git.metadata.type.corrected" : "git.metadata.type.conflict",
-        gatekeeperId,
-        oidPrefix: oid.slice(0, 12),  // truncated: full oids are capabilities, keep them out
-        recordedType: meta.type,
-        claimedType: type,
-      });
+      logger.warn(
+        wins
+          ? "correcting git object type from conflicting claim"
+          : "ignoring conflicting git object type claim",
+        {
+          event: wins ? "git.metadata.type.corrected" : "git.metadata.type.conflict",
+          gatekeeperId,
+          oidPrefix: oid.slice(0, 12), // truncated: full oids are capabilities, keep them out
+          recordedType: meta.type,
+          claimedType: type,
+        },
+      );
       if (wins) {
         meta.type = type;
         dirty = true;
@@ -1234,8 +1334,12 @@ export class WorkspaceGitCache {
 
   // Records the measurement of an object too large to store: type and exact size (proof-grade,
   // from bytes in hand) plus possession -- the bytes were hash-verified even though declined.
-  #recordOversized(gatekeeperId: WorkpieceId, oid: GitOid, type: GitObjectType, size: number)
-      : void {
+  #recordOversized(
+    gatekeeperId: WorkpieceId,
+    oid: GitOid,
+    type: GitObjectType,
+    size: number,
+  ): void {
     let { meta } = this.#metaFor(gatekeeperId, oid, type, "measured");
     meta.size = size;
     addUnique(meta.onRemote, gatekeeperId);
@@ -1245,8 +1349,13 @@ export class WorkspaceGitCache {
   // The shared put()-equivalent store step (callers wrap in a transaction): store the object,
   // record proof of possession and referent pull-routing rows, and propagate pending-push marks
   // to the referents now that they are visible.
-  #storeVerifiedObject(gatekeeperId: WorkpieceId, oid: GitOid, type: GitObjectType,
-                       payload: Uint8Array, data: Uint8Array): void {
+  #storeVerifiedObject(
+    gatekeeperId: WorkpieceId,
+    oid: GitOid,
+    type: GitObjectType,
+    payload: Uint8Array,
+    data: Uint8Array,
+  ): void {
     this.storage.gitObjects.put({ oid, data });
     let { meta } = this.#metaFor(gatekeeperId, oid, type, "measured");
     addUnique(meta.onRemote, gatekeeperId);
@@ -1278,22 +1387,27 @@ export class WorkspaceGitCache {
  */
 @validateRpc()
 export class GitCacheImpl extends RpcTarget implements GitCache {
-  constructor(private cache: WorkspaceGitCache, private gatekeeperId: WorkpieceId,
-              private actionId?: number) {
+  constructor(
+    private cache: WorkspaceGitCache,
+    private gatekeeperId: WorkpieceId,
+    private actionId?: number,
+  ) {
     super();
   }
 
-  async get(id: GitOid, hints?: GitPullHints)
-      : Promise<{ type: GitObjectType, content: Uint8Array } | null> {
+  async get(
+    id: GitOid,
+    hints?: GitPullHints,
+  ): Promise<{ type: GitObjectType; content: Uint8Array } | null> {
     let object = await this.cache.readForGatekeeper(this.gatekeeperId, id, hints);
     return object === null ? null : { type: object.type, content: object.payload };
   }
 
   async has(id: GitOid): Promise<boolean> {
-    return await this.cache.readForGatekeeper(this.gatekeeperId, id) !== null;
+    return (await this.cache.readForGatekeeper(this.gatekeeperId, id)) !== null;
   }
 
-  async stat(id: GitOid): Promise<{ type: GitObjectType, size: number } | null> {
+  async stat(id: GitOid): Promise<{ type: GitObjectType; size: number } | null> {
     let object = await this.cache.readForGatekeeper(this.gatekeeperId, id);
     return object === null ? null : { type: object.type, size: object.payload.byteLength };
   }
@@ -1309,8 +1423,9 @@ export class GitCacheImpl extends RpcTarget implements GitCache {
   async buildPack(): Promise<ReadableStream<Uint8Array>> {
     if (this.actionId === undefined) {
       throw new Error(
-          "buildPack() is only available on the action-scoped GitCache stub passed to " +
-          "applyAction(); a session-time stub has no action.");
+        "buildPack() is only available on the action-scoped GitCache stub passed to " +
+          "applyAction(); a session-time stub has no action.",
+      );
     }
     return this.cache.buildPackForAction(this.gatekeeperId, this.actionId);
   }
@@ -1372,8 +1487,10 @@ function splitTreePath(path: string): string[] {
 }
 
 // Collects a byte stream into one buffer, enforcing a size cap as chunks arrive.
-async function collectByteStream(stream: ReadableStream<Uint8Array>, maxBytes: number)
-    : Promise<Uint8Array> {
+async function collectByteStream(
+  stream: ReadableStream<Uint8Array>,
+  maxBytes: number,
+): Promise<Uint8Array> {
   let chunks: Uint8Array[] = [];
   let total = 0;
   let reader = stream.getReader();

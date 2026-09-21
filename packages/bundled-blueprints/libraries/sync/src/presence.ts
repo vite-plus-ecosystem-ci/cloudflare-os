@@ -50,7 +50,11 @@ export class PresenceRoster<Cursor extends object = Record<never, never>> {
 
   /** Everyone currently known, in order of first hearing from them, for a "who is here" strip. */
   people(): Collaborator[] {
-    return Array.from(this.#people.values(), ({ clientId, name, color }) => ({ clientId, name, color }));
+    return Array.from(this.#people.values(), ({ clientId, name, color }) => ({
+      clientId,
+      name,
+      color,
+    }));
   }
 
   /** Everyone currently known, with their positions, for drawing. */
@@ -95,8 +99,17 @@ export class PresenceRoster<Cursor extends object = Record<never, never>> {
  * The gadget's position fields of a cursor event: everything it carries beyond identity and time.
  * The rest of a spread over a type parameter is opaque to the compiler, hence the cast.
  */
-function cursorOf<Cursor extends object>(event: { type: "cursor"; at?: number } & Collaborator & Cursor): Cursor {
-  const { type: _type, at: _at, clientId: _clientId, name: _name, color: _color, ...cursor } = event;
+function cursorOf<Cursor extends object>(
+  event: { type: "cursor"; at?: number } & Collaborator & Cursor,
+): Cursor {
+  const {
+    type: _type,
+    at: _at,
+    clientId: _clientId,
+    name: _name,
+    color: _color,
+    ...cursor
+  } = event;
   return cursor as unknown as Cursor;
 }
 

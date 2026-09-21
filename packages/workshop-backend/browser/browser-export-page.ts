@@ -41,7 +41,7 @@ export async function waitForClientModule(): Promise<void> {
 
 /** Waits until the rendered DOM has remained unchanged for the requested interval. */
 export function waitForDomSettled(quietMs: number): Promise<void> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     let timer: ReturnType<typeof setTimeout>;
     const observer = new MutationObserver(() => {
       clearTimeout(timer);
@@ -90,9 +90,14 @@ export function getValidatedScreenshotClip(maxPixels: number) {
   const root = document.documentElement;
   const width = root.scrollWidth;
   const height = root.scrollHeight;
-  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||
-      width <= 0 || height <= 0 || width > Math.floor(maxPixels / height)) {
+  if (
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width <= 0 ||
+    height <= 0 ||
+    width > Math.floor(maxPixels / height)
+  ) {
     throw new Error(`Gadget screenshots may not exceed ${maxPixels} pixels.`);
   }
-  return {x: 0, y: 0, width, height};
+  return { x: 0, y: 0, width, height };
 }

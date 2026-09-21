@@ -24,7 +24,8 @@ export class ResponseTooLargeError extends Error {}
  * ```
  */
 export async function readTextCapped(
-  response: Response, maxBytes: number = MAX_RESPONSE_BYTES,
+  response: Response,
+  maxBytes: number = MAX_RESPONSE_BYTES,
 ): Promise<string> {
   requirePositiveInt("maxBytes", maxBytes);
   const tooLarge = `The server's response exceeded ${maxBytes} bytes.`;

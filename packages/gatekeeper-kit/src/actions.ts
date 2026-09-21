@@ -25,8 +25,12 @@ export {
 /** The queue surface staging needs; a session's own approval-queue stub satisfies it. */
 export type ActionSubmitter = Pick<RpcStub<ApprovalQueue>, "submitAction">;
 
-type ActionLogFields =
-  { outcome: ResolveOutcome; vendorId: string; action: number; stranded: number };
+type ActionLogFields = {
+  outcome: ResolveOutcome;
+  vendorId: string;
+  action: number;
+  stranded: number;
+};
 
 const logger = createLogger<ActionLogFields>({ component: "gatekeeper.actions" });
 
@@ -52,7 +56,7 @@ export function stageAction<A>(
   // Snapshotted before the lane yields, as `submit` does before `describe`.
   const staged = fence && { generation: fence.generation };
   let lane = submissions.get(journal);
-  if (!lane) submissions.set(journal, lane = new SerialTaskQueue());
+  if (!lane) submissions.set(journal, (lane = new SerialTaskQueue()));
   return lane.run(async () => {
     const id = journal.allocate(action, staged);
     try {
@@ -97,8 +101,9 @@ export class ActionApplyError extends Error {}
 export class ActionOutcomeUnknownError extends Error {}
 
 /** Message stored when a dispatched action's outcome is unknown. */
-export const APPLY_OUTCOME_UNKNOWN_MESSAGE = "This action was interrupted after it was dispatched, "
-  + "so it may or may not have taken effect. Check the provider before submitting it again.";
+export const APPLY_OUTCOME_UNKNOWN_MESSAGE =
+  "This action was interrupted after it was dispatched, " +
+  "so it may or may not have taken effect. Check the provider before submitting it again.";
 
 type KitOwnedField = "awaitDecision" | "autoApprovable" | "actionKind";
 type ProviderOwnedField = "title" | "description" | "pushedCommits" | "implementsRevert";
@@ -408,8 +413,7 @@ export function defineActions<Host, M extends Record<string, unknown>>(
     // Without it apply passes provisional strings to the provider, and the cascade's `unbound`
     // predicate reads every reference as dead. One omission, wrong in both directions.
     if (definition.dependsOn && options.isResolvedReference === undefined) {
-      throw new Error(
-        `Action "${name}" declares dependsOn, so the set needs isResolvedReference.`);
+      throw new Error(`Action "${name}" declares dependsOn, so the set needs isResolvedReference.`);
     }
     // Auto-approval rules key on the tag, so without a kind the flag could never take effect.
     if (definition.autoApprovable === true && !definition.kind) {
@@ -424,7 +428,8 @@ export function defineActions<Host, M extends Record<string, unknown>>(
     if (declaredLabel === undefined) labelByTag.set(tag, label);
     else if (declaredLabel !== label) {
       throw new Error(
-        `Action tag "${tag}" is declared with two labels, "${declaredLabel}" and "${label}".`);
+        `Action tag "${tag}" is declared with two labels, "${declaredLabel}" and "${label}".`,
+      );
     }
     if (definition.autoApprovable === true) autoApprovableByTag.set(tag, definition.kind);
   }
@@ -455,8 +460,10 @@ export function defineActions<Host, M extends Record<string, unknown>>(
       const definitionFor = (entry: TaggedAction<M>) => byName.get(String(entry.kind));
       const requireGeneration = (id: number, at?: { generation?: string }): string => {
         if (at?.generation === undefined) {
-          throw new Error(`Action ${id} is fenced to a connection generation; pass the current `
-            + "generation to apply().");
+          throw new Error(
+            `Action ${id} is fenced to a connection generation; pass the current ` +
+              "generation to apply().",
+          );
         }
         return at.generation;
       };
@@ -492,21 +499,27 @@ export function defineActions<Host, M extends Record<string, unknown>>(
 
           // The walk itself prunes through `unbound`, so a stranded action's bound references stop
           // the cascade. A staged dependent can race this scan; apply rejects it later.
-          const stranded = strandedBy(dead, journal.listUndecided().map(record => {
-            const definition = definitionFor(record.action);
-            return {
-              id: record.id,
-              provides: definition?.provides?.(record.action.payload) ?? [],
-              dependsOn: definition?.dependsOn?.(record.action.payload) ?? [],
-            };
-          }), unbound);
+          const stranded = strandedBy(
+            dead,
+            journal.listUndecided().map((record) => {
+              const definition = definitionFor(record.action);
+              return {
+                id: record.id,
+                provides: definition?.provides?.(record.action.payload) ?? [],
+                dependsOn: definition?.dependsOn?.(record.action.payload) ?? [],
+              };
+            }),
+            unbound,
+          );
           // Undispatched: a stranded dependent never reached its handler, so its rejection still
           // owes the cleanup. The reason states only what this scan established -- the reference
           // was never bound -- rather than asserting anything about the provider call.
           for (const strandedId of stranded) {
             journal.markFailed(
-              strandedId, `This action needed action ${id}, which did not complete.`,
-              { undispatched: true });
+              strandedId,
+              `This action needed action ${id}, which did not complete.`,
+              { undispatched: true },
+            );
           }
           if (stranded.length > 0) {
             attributed.debug("retired actions left unresolvable by a decision", {
@@ -580,13 +593,14 @@ export function defineActions<Host, M extends Record<string, unknown>>(
         }
         // `submit` refuses an unfenced authority kind, so an unfenced record under that policy is
         // a port's: `upgradeRecord` cannot know what staged one, and applying it would pin nothing.
-        const unpinned = record.fence === undefined
-          ? fencePolicyFor(action.kind) === "authority"
-            && "This action was submitted before this gatekeeper pinned actions to an account."
-          // The early gate against the common case. A reconnect landing after it is caught only by
-          // a handler comparing `ctx.fence` against its own operation's read.
-          : record.fence.generation !== requireGeneration(id, context)
-            && "This action was approved under a connection that has since been replaced.";
+        const unpinned =
+          record.fence === undefined
+            ? fencePolicyFor(action.kind) === "authority" &&
+              "This action was submitted before this gatekeeper pinned actions to an account."
+            : // The early gate against the common case. A reconnect landing after it is caught only by
+              // a handler comparing `ctx.fence` against its own operation's read.
+              record.fence.generation !== requireGeneration(id, context) &&
+              "This action was approved under a connection that has since been replaced.";
         if (unpinned) {
           const message = `${unpinned} Reject it and submit it again.`;
           journal.markFailed(id, message, { undispatched: true });
@@ -599,8 +613,10 @@ export function defineActions<Host, M extends Record<string, unknown>>(
         // refused without a resolver, so an absent one here can only mean an empty loop.
         for (const ref of definition.dependsOn?.(action.payload) ?? []) {
           if (options.isResolvedReference?.(host, ref) === true) continue;
-          throw new Error(`Action ${id} depends on ${ref}, which is not applied yet. Apply its `
-            + "providing action first, or reject this action.");
+          throw new Error(
+            `Action ${id} depends on ${ref}, which is not applied yet. Apply its ` +
+              "providing action first, or reject this action.",
+          );
         }
         try {
           let result: void | { action?: unknown };
@@ -635,9 +651,10 @@ export function defineActions<Host, M extends Record<string, unknown>>(
           }
 
           // Persist apply artifacts outside the handler catch so a failed write cannot replay the effect.
-          const applied = result?.action === undefined
-            ? undefined
-            : { kind: action.kind, payload: result.action } as TaggedAction<M>;
+          const applied =
+            result?.action === undefined
+              ? undefined
+              : ({ kind: action.kind, payload: result.action } as TaggedAction<M>);
           if (options.retainApplied) journal.retain(id, applied);
           else journal.retire(id);
           await resolved("applied");
@@ -694,12 +711,16 @@ export function defineActions<Host, M extends Record<string, unknown>>(
           // connection-scoped kind is the silent failure this policy exists to prevent, and a
           // fence on an authority-independent one would pin an action nothing needed pinned.
           if (policy === "authority" && fence === undefined) {
-            throw new Error(`Action kind "${String(kind)}" is authority-fenced; stage it with the `
-              + "authority this operation ran under -- usually its `CredentialRead` -- as `fence`.");
+            throw new Error(
+              `Action kind "${String(kind)}" is authority-fenced; stage it with the ` +
+                "authority this operation ran under -- usually its `CredentialRead` -- as `fence`.",
+            );
           }
           if (policy === "none" && fence !== undefined) {
-            throw new Error(`Action kind "${String(kind)}" is declared authority-independent; `
-              + "remove the `fence`, or declare the kind \"authority\".");
+            throw new Error(
+              `Action kind "${String(kind)}" is declared authority-independent; ` +
+                'remove the `fence`, or declare the kind "authority".',
+            );
           }
           // Snapshotted before the first await: the payload must be the one describe rendered, the
           // fence the connection this call staged under.
@@ -707,27 +728,34 @@ export function defineActions<Host, M extends Record<string, unknown>>(
           const staged = fence && { generation: fence.generation };
           // Cloned for the same reason as the payload: staging serializes behind the journal's
           // lane, and `describe` may still own what it returned.
-          const { title, description, pushedCommits, implementsRevert } =
-            structuredClone(await definition.describe(payload, host));
+          const { title, description, pushedCommits, implementsRevert } = structuredClone(
+            await definition.describe(payload, host),
+          );
           const action = { kind, payload } as TaggedAction<M>;
-          return stageAction(journal, queue, action, {
-            // Destructured, not spread: a port returning a full `ActionDescription` here would
-            // otherwise carry its own `awaitDecision` past the delivery the definition declares.
-            title,
-            description,
-            implementsRevert,
-            // Spread, so an action with no git, no kind, or no awaited decision puts no key on the
-            // wire at all.
-            ...(pushedCommits ? { pushedCommits } : {}),
-            autoApprovable: definition.autoApprovable === true,
-            ...(definition.kind ? { actionKind: definition.kind } : {}),
-            ...(definition.delivery === "await-decision" ? { awaitDecision: true } : {}),
-          }, staged);
+          return stageAction(
+            journal,
+            queue,
+            action,
+            {
+              // Destructured, not spread: a port returning a full `ActionDescription` here would
+              // otherwise carry its own `awaitDecision` past the delivery the definition declares.
+              title,
+              description,
+              implementsRevert,
+              // Spread, so an action with no git, no kind, or no awaited decision puts no key on the
+              // wire at all.
+              ...(pushedCommits ? { pushedCommits } : {}),
+              autoApprovable: definition.autoApprovable === true,
+              ...(definition.kind ? { actionKind: definition.kind } : {}),
+              ...(definition.delivery === "await-decision" ? { awaitDecision: true } : {}),
+            },
+            staged,
+          );
         },
 
         apply: (id, context) => resolutionQueue.run(() => applyRecord(id, context)),
 
-        reject: id => resolutionQueue.run(() => rejectRecord(id)),
+        reject: (id) => resolutionQueue.run(() => rejectRecord(id)),
 
         autoApprovableKinds: () => [...autoApprovableByTag.values()],
 
@@ -735,7 +763,7 @@ export function defineActions<Host, M extends Record<string, unknown>>(
 
         resolved,
 
-        runExclusive: hook => resolutionQueue.run(hook),
+        runExclusive: (hook) => resolutionQueue.run(hook),
       };
       bound.set(journal, { host, set });
       return set;

@@ -1,5 +1,8 @@
 import {
-  AiChatAuthorInfo, AiModelConfig, HTTPS_ONLY_PROVIDERS, SUGGESTED_MODELS,
+  AiChatAuthorInfo,
+  AiModelConfig,
+  HTTPS_ONLY_PROVIDERS,
+  SUGGESTED_MODELS,
 } from "@gadgets/workshop-shared/api";
 import { UserAiModelRecord } from "./user.js";
 
@@ -45,30 +48,34 @@ export class AiGatewayConfig {
     // Normalized once, so a stray " False " opts out rather than reading as unset and silently
     // picking the other transport.
     const useBinding = env.CF_AI_GATEWAY_USE_BINDING?.trim().toLowerCase();
-    this.binding = useBinding === "false"
-        ? undefined
-        : (env as { WORKERS_AI?: Ai }).WORKERS_AI;
+    this.binding = useBinding === "false" ? undefined : (env as { WORKERS_AI?: Ai }).WORKERS_AI;
     if (useBinding === "true" && !this.binding) {
       throw new Error(
-          "CF_AI_GATEWAY_USE_BINDING requires the WORKERS_AI binding; without it the config " +
-          "would silently fall back to the HTTPS transport.");
+        "CF_AI_GATEWAY_USE_BINDING requires the WORKERS_AI binding; without it the config " +
+          "would silently fall back to the HTTPS transport.",
+      );
     }
     if (!this.apiToken && !this.binding) {
       throw new Error(
-          "AI Gateway mode needs a transport: bind Workers AI (WORKERS_AI; in local dev start " +
-          "with --use-workers-ai-binding) or set CF_AI_GATEWAY_API_TOKEN (a Run + Read token).");
+        "AI Gateway mode needs a transport: bind Workers AI (WORKERS_AI; in local dev start " +
+          "with --use-workers-ai-binding) or set CF_AI_GATEWAY_API_TOKEN (a Run + Read token).",
+      );
     }
     this.sameAccountGateway = this.binding ? this.gateway : undefined;
     this.providers = new Set(
-      (env.CF_AI_GATEWAY_PROVIDERS || "").split(",").map(s => s.trim()).filter(s => s !== "")
+      (env.CF_AI_GATEWAY_PROVIDERS || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s !== ""),
     );
-    const httpsOnly = [...this.providers].filter(p => HTTPS_ONLY_PROVIDERS.has(p));
+    const httpsOnly = [...this.providers].filter((p) => HTTPS_ONLY_PROVIDERS.has(p));
     if (httpsOnly.length > 0 && !this.apiToken) {
       const names = httpsOnly.join(", ");
       throw new Error(
-          `${names} inference cannot ride the Workers AI binding transport, so enabling the ` +
+        `${names} inference cannot ride the Workers AI binding transport, so enabling the ` +
           `${names} provider${httpsOnly.length > 1 ? "s" : ""} requires ` +
-          "CF_AI_GATEWAY_API_TOKEN.");
+          "CF_AI_GATEWAY_API_TOKEN.",
+      );
     }
   }
 
@@ -161,7 +168,10 @@ function validateLogCost(cost: unknown): number {
 
 /** Retrieve the cost recorded for an AI Gateway log. */
 export async function getAiGatewayLogCost(
-    env: Cloudflare.Env, route: AiGatewayLogRoute, logId: string): Promise<number> {
+  env: Cloudflare.Env,
+  route: AiGatewayLogRoute,
+  logId: string,
+): Promise<number> {
   if (!("accountId" in route)) {
     let log: AiGatewayLog;
     try {
@@ -174,9 +184,10 @@ export async function getAiGatewayLogCost(
     return validateLogCost(log.cost);
   }
 
-  let url = "https://api.cloudflare.com/client/v4/accounts/" +
-      `${encodeURIComponent(route.accountId)}/ai-gateway/gateways/` +
-      `${encodeURIComponent(route.gateway)}/logs/${encodeURIComponent(logId)}`;
+  let url =
+    "https://api.cloudflare.com/client/v4/accounts/" +
+    `${encodeURIComponent(route.accountId)}/ai-gateway/gateways/` +
+    `${encodeURIComponent(route.gateway)}/logs/${encodeURIComponent(logId)}`;
   let response: Response;
   try {
     response = await fetch(url, {
@@ -187,10 +198,15 @@ export async function getAiGatewayLogCost(
     throw new AiGatewayLogRetryableError("AI Gateway log request failed.", { cause: error });
   }
   if (!response.ok) {
-    if (response.status === 404 || response.status === 408 || response.status === 429 ||
-        response.status >= 500) {
+    if (
+      response.status === 404 ||
+      response.status === 408 ||
+      response.status === 429 ||
+      response.status >= 500
+    ) {
       throw new AiGatewayLogRetryableError(
-          `AI Gateway log request failed with status ${response.status}.`);
+        `AI Gateway log request failed with status ${response.status}.`,
+      );
     }
     throw new Error(`AI Gateway log request failed with status ${response.status}.`);
   }
@@ -203,9 +219,15 @@ export async function getAiGatewayLogCost(
       cause: error,
     });
   }
-  if (typeof body !== "object" || body === null || !("success" in body) ||
-      body.success !== true || !("result" in body) ||
-      typeof body.result !== "object" || body.result === null) {
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("success" in body) ||
+    body.success !== true ||
+    !("result" in body) ||
+    typeof body.result !== "object" ||
+    body.result === null
+  ) {
     throw new Error("AI Gateway log response was malformed.");
   }
 

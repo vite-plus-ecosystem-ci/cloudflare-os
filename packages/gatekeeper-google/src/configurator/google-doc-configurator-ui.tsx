@@ -1,5 +1,8 @@
 import { Autocomplete, Field, h, Section, type ConfiguratorUISpec } from "@gadgets/configurator-ui";
-import type { GoogleDocConfiguratorRpc, GoogleDocConfiguratorValues } from "./google-doc-configurator-types";
+import type {
+  GoogleDocConfiguratorRpc,
+  GoogleDocConfiguratorValues,
+} from "./google-doc-configurator-types";
 
 export default {
   initial: {},
@@ -13,16 +16,18 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return <Section>
-      <Field label="Document" description="Search recent documents from Drive.">
-        <Autocomplete
-          name="docId"
-          value={values.docId}
-          placeholder="Search recent docs..."
-          loadOptions={query => ui.listDocs(query)}
-          onChange={docId => setValues({ docId })}
-        />
-      </Field>
-    </Section>;
+    return (
+      <Section>
+        <Field label="Document" description="Search recent documents from Drive.">
+          <Autocomplete
+            name="docId"
+            value={values.docId}
+            placeholder="Search recent docs..."
+            loadOptions={(query) => ui.listDocs(query)}
+            onChange={(docId) => setValues({ docId })}
+          />
+        </Field>
+      </Section>
+    );
   },
 } satisfies ConfiguratorUISpec<GoogleDocConfiguratorRpc, GoogleDocConfiguratorValues>;

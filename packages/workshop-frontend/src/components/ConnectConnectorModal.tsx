@@ -1,38 +1,38 @@
-import { Dialog, Switch } from '@cloudflare/kumo'
-import { X, ShieldCheck } from '@phosphor-icons/react'
-import { useEffect, useMemo, useState } from 'react'
+import { Dialog, Switch } from "@cloudflare/kumo";
+import { X, ShieldCheck } from "@phosphor-icons/react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AccountDescription,
   SupportedResource,
   VendorDescription,
-} from '@gadgets/workshop-shared/gatekeeper'
-import { WorkshopButton, WorkshopIconButton } from './WorkshopControls'
+} from "@gadgets/workshop-shared/gatekeeper";
+import { WorkshopButton, WorkshopIconButton } from "./WorkshopControls";
 
 interface ConnectConnectorModalProps {
-  open: boolean
-  mode: 'connect' | 'manage'
-  vendorDescription: VendorDescription
-  supportedResources: SupportedResource[]
-  logoUrl?: string
-  color?: string
+  open: boolean;
+  mode: "connect" | "manage";
+  vendorDescription: VendorDescription;
+  supportedResources: SupportedResource[];
+  logoUrl?: string;
+  color?: string;
   // True for an auto-provisioning ("ambient") gatekeeper: confirming adds it directly (no OAuth
   // redirect), so the call-to-action reads "Add …" rather than "Continue to …".
-  autoProvisions?: boolean
-  onOpenChange: (open: boolean) => void
-  connecting?: boolean
+  autoProvisions?: boolean;
+  onOpenChange: (open: boolean) => void;
+  connecting?: boolean;
   // Connect mode: invoked with the `urlPattern`s of the grantable resources the user chose to
   // enable. `undefined` means "enable everything" (no toggle was deselected), matching the
   // gatekeeper's default behavior.
-  onConfirm?: (resourceUrlPatterns?: string[]) => void
-  accountDescription?: AccountDescription
-  credentialsValid?: boolean
-  disconnecting?: boolean
-  onDisconnect?: () => void
-  grantedResourceUrlPatterns?: string[]
+  onConfirm?: (resourceUrlPatterns?: string[]) => void;
+  accountDescription?: AccountDescription;
+  credentialsValid?: boolean;
+  disconnecting?: boolean;
+  onDisconnect?: () => void;
+  grantedResourceUrlPatterns?: string[];
   // Manage mode: invoked to expand the grant to include the given resource `urlPattern`s.
-  onEnsureResources?: (resourceUrlPatterns: string[]) => void
+  onEnsureResources?: (resourceUrlPatterns: string[]) => void;
   // Resource `urlPattern`s currently being granted (shows a busy state on the relevant toggle).
-  ensuringResourceUrlPatterns?: string[]
+  ensuringResourceUrlPatterns?: string[];
 }
 
 export default function ConnectConnectorModal({
@@ -54,7 +54,7 @@ export default function ConnectConnectorModal({
   onEnsureResources,
   ensuringResourceUrlPatterns = [],
 }: ConnectConnectorModalProps) {
-  const isManage = mode === 'manage'
+  const isManage = mode === "manage";
 
   // Resource types the user can individually enable/disable at connect time. Resources without
   // `grantable` are shown for information but aren't toggleable -- the account grant covers them
@@ -62,101 +62,86 @@ export default function ConnectConnectorModal({
   const grantableResources = useMemo(
     () => supportedResources.filter((r) => r.grantable),
     [supportedResources],
-  )
-  const granular = grantableResources.length > 0
-  const grantableKey = grantableResources.map((r) => r.urlPattern).join(',')
+  );
+  const granular = grantableResources.length > 0;
+  const grantableKey = grantableResources.map((r) => r.urlPattern).join(",");
 
   const isGranted = (urlPattern: string) =>
-    grantedResourceUrlPatterns === undefined ||
-    grantedResourceUrlPatterns.includes(urlPattern)
+    grantedResourceUrlPatterns === undefined || grantedResourceUrlPatterns.includes(urlPattern);
 
-  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!open) return
-    setConfirmingDisconnect(false)
-  }, [open])
+    if (!open) return;
+    setConfirmingDisconnect(false);
+  }, [open]);
 
-  const grantedKey = (grantedResourceUrlPatterns ?? []).join(',')
+  const grantedKey = (grantedResourceUrlPatterns ?? []).join(",");
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     if (isManage) {
-      setSelected(
-        new Set(
-          grantableResources
-            .map((r) => r.urlPattern)
-            .filter((p) => isGranted(p)),
-        ),
-      )
+      setSelected(new Set(grantableResources.map((r) => r.urlPattern).filter((p) => isGranted(p))));
     } else {
-      setSelected(new Set(grantableResources.map((r) => r.urlPattern)))
+      setSelected(new Set(grantableResources.map((r) => r.urlPattern)));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isManage, grantableKey, grantedKey])
+  }, [open, isManage, grantableKey, grantedKey]);
 
-  const noneSelected = granular && selected.size === 0
+  const noneSelected = granular && selected.size === 0;
 
-  const pendingPatterns = isManage
-    ? [...selected].filter((p) => !isGranted(p))
-    : []
-  const hasPending = pendingPatterns.length > 0
+  const pendingPatterns = isManage ? [...selected].filter((p) => !isGranted(p)) : [];
+  const hasPending = pendingPatterns.length > 0;
 
   function toggleResource(urlPattern: string, checked: boolean) {
     setSelected((prev) => {
-      const next = new Set(prev)
-      if (checked) next.add(urlPattern)
-      else next.delete(urlPattern)
-      return next
-    })
+      const next = new Set(prev);
+      if (checked) next.add(urlPattern);
+      else next.delete(urlPattern);
+      return next;
+    });
   }
 
   function handleAddResources() {
-    if (hasPending) onEnsureResources?.(pendingPatterns)
+    if (hasPending) onEnsureResources?.(pendingPatterns);
   }
 
   function discardPending() {
-    setSelected(
-      new Set(
-        grantableResources.map((r) => r.urlPattern).filter((p) => isGranted(p)),
-      ),
-    )
+    setSelected(new Set(grantableResources.map((r) => r.urlPattern).filter((p) => isGranted(p))));
   }
 
-  const ensuringBusy = ensuringResourceUrlPatterns.length > 0
+  const ensuringBusy = ensuringResourceUrlPatterns.length > 0;
 
   function handleConfirm() {
-    if (!onConfirm) return
+    if (!onConfirm) return;
     if (granular) {
-      const allSelected = selected.size === grantableResources.length
-      onConfirm(allSelected ? undefined : [...selected])
+      const allSelected = selected.size === grantableResources.length;
+      onConfirm(allSelected ? undefined : [...selected]);
     } else {
-      onConfirm(undefined)
+      onConfirm(undefined);
     }
   }
 
   function handleDisconnect() {
     if (!confirmingDisconnect) {
-      setConfirmingDisconnect(true)
-      return
+      setConfirmingDisconnect(true);
+      return;
     }
-    onDisconnect?.()
+    onDisconnect?.();
   }
 
   const accountDisplayName =
-    accountDescription?.displayName ??
-    accountDescription?.uniqueName ??
-    'Connected'
+    accountDescription?.displayName ?? accountDescription?.uniqueName ?? "Connected";
 
   const headerTitle = isManage
     ? vendorDescription.displayName
-    : `Connect ${vendorDescription.displayName}`
+    : `Connect ${vendorDescription.displayName}`;
 
   const headerSubline = isManage ? (
     <div className="mt-0.5 flex items-center gap-1.5 text-[13px] leading-[18px] font-normal tracking-[-0.25px] text-kumo-subtle">
       <span
         className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-          credentialsValid ? 'bg-kumo-success' : 'bg-kumo-danger'
+          credentialsValid ? "bg-kumo-success" : "bg-kumo-danger"
         }`}
         aria-hidden
       />
@@ -165,7 +150,7 @@ export default function ConnectConnectorModal({
           ? accountDescription?.uniqueName
             ? `${accountDisplayName} / ${accountDescription.uniqueName}`
             : accountDisplayName
-          : 'Credentials expired; reconnect from the Gatekeepers page'}
+          : "Credentials expired; reconnect from the Gatekeepers page"}
       </span>
     </div>
   ) : (
@@ -174,17 +159,17 @@ export default function ConnectConnectorModal({
         {vendorDescription.tagline}
       </Dialog.Description>
     )
-  )
+  );
 
-  const busy = connecting || disconnecting
+  const busy = connecting || disconnecting;
 
   // Resource icon helper shared by every resource row.
   function resourceIcon(resource?: SupportedResource) {
-    const icon = resource?.icon?.url ?? logoUrl
+    const icon = resource?.icon?.url ?? logoUrl;
     return (
       <div
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-kumo-strong"
-        style={{ backgroundColor: color ?? 'var(--color-kumo-tint)' }}
+        style={{ backgroundColor: color ?? "var(--color-kumo-tint)" }}
       >
         {icon ? (
           <img src={icon} alt="" className="h-4 w-4 object-contain" />
@@ -192,15 +177,15 @@ export default function ConnectConnectorModal({
           <ResourceIconGlyph />
         )}
       </div>
-    )
+    );
   }
 
   return (
     <Dialog.Root
       open={open}
       onOpenChange={(nextOpen) => {
-        if (busy) return
-        onOpenChange(nextOpen)
+        if (busy) return;
+        onOpenChange(nextOpen);
       }}
     >
       <Dialog
@@ -211,7 +196,7 @@ export default function ConnectConnectorModal({
           <div className="flex min-w-0 items-start gap-3">
             <div
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-              style={{ backgroundColor: color ?? 'var(--color-kumo-tint)' }}
+              style={{ backgroundColor: color ?? "var(--color-kumo-tint)" }}
             >
               {logoUrl ? (
                 <img src={logoUrl} alt="" className="h-5 w-5 object-contain" />
@@ -249,21 +234,17 @@ export default function ConnectConnectorModal({
               <h3 className="mb-2 text-[12px] leading-4 font-semibold uppercase tracking-[0.6px] text-kumo-inactive">
                 {granular
                   ? isManage
-                    ? 'Resources'
-                    : 'Resources to enable'
-                  : 'What this gatekeeper can do'}
+                    ? "Resources"
+                    : "Resources to enable"
+                  : "What this gatekeeper can do"}
               </h3>
               <ul className="space-y-2">
                 {supportedResources.map((resource) => {
-                  const grantable = Boolean(resource.grantable)
-                  const granted = isManage && grantable && isGranted(resource.urlPattern)
-                  const ensuring = ensuringResourceUrlPatterns.includes(
-                    resource.urlPattern,
-                  )
-                  const checked =
-                    grantable &&
-                    (selected.has(resource.urlPattern) || ensuring)
-                  const disabled = isManage && (granted || ensuring)
+                  const grantable = Boolean(resource.grantable);
+                  const granted = isManage && grantable && isGranted(resource.urlPattern);
+                  const ensuring = ensuringResourceUrlPatterns.includes(resource.urlPattern);
+                  const checked = grantable && (selected.has(resource.urlPattern) || ensuring);
+                  const disabled = isManage && (granted || ensuring);
                   return (
                     <li
                       key={resource.urlPattern}
@@ -283,19 +264,15 @@ export default function ConnectConnectorModal({
                           size="sm"
                           className="shrink-0"
                           aria-label={
-                            isManage
-                              ? `Grant ${resource.title}`
-                              : `Enable ${resource.title}`
+                            isManage ? `Grant ${resource.title}` : `Enable ${resource.title}`
                           }
                           checked={checked}
                           disabled={disabled}
-                          onCheckedChange={(next) =>
-                            toggleResource(resource.urlPattern, next)
-                          }
+                          onCheckedChange={(next) => toggleResource(resource.urlPattern, next)}
                         />
                       )}
                     </li>
-                  )
+                  );
                 })}
               </ul>
             </div>
@@ -306,7 +283,7 @@ export default function ConnectConnectorModal({
               className="relative mt-5 overflow-hidden rounded-lg border border-kumo-line px-4 py-3"
               style={{
                 background:
-                  'linear-gradient(180deg, rgba(255, 72, 1, 0.04) 0%, rgba(255, 72, 1, 0.02) 100%)',
+                  "linear-gradient(180deg, rgba(255, 72, 1, 0.04) 0%, rgba(255, 72, 1, 0.02) 100%)",
               }}
             >
               <div className="flex items-start gap-3">
@@ -318,7 +295,7 @@ export default function ConnectConnectorModal({
                 <div className="text-[12px] leading-[17px] font-normal tracking-[-0.2px] text-kumo-default">
                   <span className="font-medium">
                     Gatekeeper sits between {vendorDescription.displayName} and your Gadgets.
-                  </span>{' '}
+                  </span>{" "}
                   <span className="text-kumo-subtle">
                     Each Gadget only sees the resources you connect. If the workspace is shared,
                     Gatekeeper verifies other users have the required permissions before they can
@@ -344,7 +321,7 @@ export default function ConnectConnectorModal({
             </p>
           ) : isManage && hasPending ? (
             <p className="m-0 min-w-0 flex-1 text-[12px] leading-4 font-normal tracking-[-0.2px] text-kumo-subtle">
-              {pendingPatterns.length} resource{pendingPatterns.length === 1 ? '' : 's'} to add
+              {pendingPatterns.length} resource{pendingPatterns.length === 1 ? "" : "s"} to add
             </p>
           ) : !isManage && granular && noneSelected ? (
             <p className="m-0 min-w-0 flex-1 text-[12px] leading-4 font-normal tracking-[-0.2px] text-kumo-subtle">
@@ -371,12 +348,16 @@ export default function ConnectConnectorModal({
                       disabled={disconnecting}
                       className="!h-9 min-w-[140px]"
                     >
-                      {disconnecting ? 'Disconnecting...' : 'Yes, disconnect'}
+                      {disconnecting ? "Disconnecting..." : "Yes, disconnect"}
                     </WorkshopButton>
                   </>
                 ) : hasPending ? (
                   <>
-                    <WorkshopButton onClick={discardPending} disabled={ensuringBusy} className="!h-9">
+                    <WorkshopButton
+                      onClick={discardPending}
+                      disabled={ensuringBusy}
+                      className="!h-9"
+                    >
                       Cancel
                     </WorkshopButton>
                     <WorkshopButton
@@ -385,9 +366,7 @@ export default function ConnectConnectorModal({
                       disabled={ensuringBusy}
                       className="min-w-[140px]"
                     >
-                      {ensuringBusy
-                        ? 'Opening...'
-                        : `Continue to ${vendorDescription.displayName}`}
+                      {ensuringBusy ? "Opening..." : `Continue to ${vendorDescription.displayName}`}
                     </WorkshopButton>
                   </>
                 ) : (
@@ -427,11 +406,11 @@ export default function ConnectConnectorModal({
                 >
                   {autoProvisions
                     ? connecting
-                      ? 'Adding...'
+                      ? "Adding..."
                       : `Add ${vendorDescription.displayName}`
                     : connecting
-                    ? 'Opening...'
-                    : `Continue to ${vendorDescription.displayName}`}
+                      ? "Opening..."
+                      : `Continue to ${vendorDescription.displayName}`}
                 </WorkshopButton>
               </>
             )}
@@ -439,15 +418,24 @@ export default function ConnectConnectorModal({
         </div>
       </Dialog>
     </Dialog.Root>
-  )
+  );
 }
 
 function ResourceIconGlyph() {
-  const size = 14
+  const size = 14;
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="12" cy="12" r="3" />
       <circle cx="12" cy="12" r="8" />
     </svg>
-  )
+  );
 }

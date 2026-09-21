@@ -36,13 +36,22 @@ export interface PrepareImageOptions extends Partial<ImageLimits> {
 }
 
 /** Image types accepted from the clipboard, a drop or the file picker. */
-export const IMAGE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+export const IMAGE_TYPES: ReadonlySet<string> = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
 
 /**
  * Defaults: 1600px on the longest edge, roughly a megabyte of encoded image, and about 2 MB for a
  * GIF kept animated.
  */
-export const DEFAULT_IMAGE_LIMITS: ImageLimits = { maxDimension: 1600, maxDataUrlLength: 1_400_000, maxGifDataUrlLength: 2_700_000 };
+export const DEFAULT_IMAGE_LIMITS: ImageLimits = {
+  maxDimension: 1600,
+  maxDataUrlLength: 1_400_000,
+  maxGifDataUrlLength: 2_700_000,
+};
 
 /** Encoding quality steps tried in turn until the result fits the budget. */
 const QUALITY_STEPS = [0.86, 0.74, 0.62, 0.5];
@@ -70,7 +79,10 @@ export function imageFilesFrom(transfer: DataTransfer | null): File[] {
  * `maxDataUrlLength`. Rejects when even the smallest encoding is over budget, or when the file is
  * not an image the browser can decode.
  */
-export async function prepareImage(file: File, options: PrepareImageOptions = {}): Promise<PreparedImage> {
+export async function prepareImage(
+  file: File,
+  options: PrepareImageOptions = {},
+): Promise<PreparedImage> {
   // Each limit falls back on its own, so an option passed as `undefined` does not unset the default.
   const limits: ImageLimits = {
     maxDimension: options.maxDimension ?? DEFAULT_IMAGE_LIMITS.maxDimension,
@@ -83,7 +95,11 @@ export async function prepareImage(file: File, options: PrepareImageOptions = {}
   const naturalHeight = image.naturalHeight || image.height;
   const alt = options.alt ?? altFromFileName(file.name);
 
-  if (file.type === "image/gif" && original.length <= limits.maxGifDataUrlLength && Math.max(naturalWidth, naturalHeight) <= limits.maxDimension) {
+  if (
+    file.type === "image/gif" &&
+    original.length <= limits.maxGifDataUrlLength &&
+    Math.max(naturalWidth, naturalHeight) <= limits.maxDimension
+  ) {
     return { src: original, alt, width: naturalWidth, height: naturalHeight };
   }
 
@@ -108,7 +124,12 @@ export async function prepareImage(file: File, options: PrepareImageOptions = {}
 
 /** A readable default alt text: the file name without its extension and separators, or `Image`. */
 export function altFromFileName(name: string): string {
-  return name.replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " ").trim() || "Image";
+  return (
+    name
+      .replace(/\.[a-z0-9]+$/i, "")
+      .replace(/[-_]+/g, " ")
+      .trim() || "Image"
+  );
 }
 
 function encode(canvas: HTMLCanvasElement, quality: number): string {
@@ -121,7 +142,11 @@ export function readFileAsDataURL(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.addEventListener("load", () => resolve(String(reader.result)), { once: true });
-    reader.addEventListener("error", () => reject(reader.error ?? new Error("Could not read the image.")), { once: true });
+    reader.addEventListener(
+      "error",
+      () => reject(reader.error ?? new Error("Could not read the image.")),
+      { once: true },
+    );
     reader.readAsDataURL(file);
   });
 }
@@ -131,7 +156,11 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.addEventListener("load", () => resolve(image), { once: true });
-    image.addEventListener("error", () => reject(new Error("That file is not an image this browser can decode.")), { once: true });
+    image.addEventListener(
+      "error",
+      () => reject(new Error("That file is not an image this browser can decode.")),
+      { once: true },
+    );
     image.src = src;
   });
 }

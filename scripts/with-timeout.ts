@@ -64,7 +64,8 @@ function parseArgs(args: string[]): Options {
     else fail(`unknown option ${flag}\n${USAGE}`);
   }
   const argv = args.slice(index);
-  if (idleMs === undefined || maxMs === undefined) fail(`--idle and --max are both required\n${USAGE}`);
+  if (idleMs === undefined || maxMs === undefined)
+    fail(`--idle and --max are both required\n${USAGE}`);
   if (argv.length === 0) fail(`no command given\n${USAGE}`);
   return { idleMs, maxMs, argv };
 }
@@ -105,7 +106,7 @@ async function describeTree(pid: number): Promise<string> {
   // the child listers find nothing (see the note in kill-process-tree.ts). The escalating kill
   // walks again afterwards, and that second walk -- not this one -- is what drives its SIGKILL.
   const pids = await collectTree(pid);
-  const listing = await new Promise<string>(resolve => {
+  const listing = await new Promise<string>((resolve) => {
     execFile("ps", ["-o", "pid=,command=", "-p", pids.join(",")], (_error, stdout) => {
       resolve(stdout.trimEnd());
     });
@@ -119,8 +120,14 @@ async function describeTree(pid: number): Promise<string> {
  * pending write when the stream is a pipe, which is exactly what it is under `vp run`.
  */
 async function flushOutput(): Promise<void> {
-  await Promise.all([process.stdout, process.stderr].map(
-      stream => new Promise<void>(resolve => { stream.write("", () => resolve()); })));
+  await Promise.all(
+    [process.stdout, process.stderr].map(
+      (stream) =>
+        new Promise<void>((resolve) => {
+          stream.write("", () => resolve());
+        }),
+    ),
+  );
 }
 
 function exitCodeForSignal(signal: NodeJS.Signals): number {
@@ -156,7 +163,9 @@ function clearTimers(): void {
 function armIdleTimer(): void {
   clearTimeout(idleTimer);
   if (terminating || watchdogsDisabled) return;
-  idleTimer = setTimeout(() => { void onThreshold("no output", idleMs); }, idleMs);
+  idleTimer = setTimeout(() => {
+    void onThreshold("no output", idleMs);
+  }, idleMs);
 }
 
 // Straight through to this process's own streams, resetting the idle timer on every chunk. vp
@@ -177,11 +186,12 @@ async function onThreshold(reason: string, thresholdMs: number): Promise<void> {
   clearTimers();
   const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
   process.stderr.write(
-      `\nwith-timeout: ${reason} for ${thresholdMs / 1000}s -- killing the process tree\n` +
+    `\nwith-timeout: ${reason} for ${thresholdMs / 1000}s -- killing the process tree\n` +
       `  command: ${argv.join(" ")}\n` +
       `  cwd: ${process.cwd()}\n` +
       `  elapsed: ${elapsed}s\n` +
-      await describeTree(child.pid));
+      (await describeTree(child.pid)),
+  );
   await killProcessTreeEscalating(child.pid, { graceMs: KILL_GRACE_MS });
   await flushOutput();
   process.exit(TIMED_OUT_EXIT_CODE);
@@ -202,18 +212,22 @@ async function onSignal(signal: NodeJS.Signals): Promise<void> {
   terminating = true;
   clearTimers();
   if (child.pid !== undefined) {
-    await killProcessTreeEscalating(
-        child.pid, { graceMs: KILL_GRACE_MS, forceSignal: force.signal });
+    await killProcessTreeEscalating(child.pid, {
+      graceMs: KILL_GRACE_MS,
+      forceSignal: force.signal,
+    });
   }
   await flushOutput();
   process.exit(exitCodeForSignal(signal));
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => { void onSignal(signal); });
+  process.on(signal, () => {
+    void onSignal(signal);
+  });
 }
 
-child.on("error", error => {
+child.on("error", (error) => {
   process.stderr.write(`with-timeout: could not start ${argv.join(" ")}: ${error.message}\n`);
   process.exit(127);
 });
@@ -224,7 +238,7 @@ child.on("close", (code, signal) => {
   if (terminating) return;
   clearTimers();
   void flushOutput().then(() => {
-    process.exit(signal ? exitCodeForSignal(signal) : code ?? 1);
+    process.exit(signal ? exitCodeForSignal(signal) : (code ?? 1));
   });
 });
 
@@ -232,5 +246,7 @@ if (child.stdout) forward(child.stdout, process.stdout);
 if (child.stderr) forward(child.stderr, process.stderr);
 if (!watchdogsDisabled) {
   armIdleTimer();
-  maxTimer = setTimeout(() => { void onThreshold("still running", maxMs); }, maxMs);
+  maxTimer = setTimeout(() => {
+    void onThreshold("still running", maxMs);
+  }, maxMs);
 }

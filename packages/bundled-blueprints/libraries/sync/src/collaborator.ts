@@ -27,7 +27,8 @@ export interface Collaborator {
  * run of spaces every possible way when the match then fails; tested only on strings within
  * {@link MAX_COLOR_LENGTH}, since what arrives over RPC is whatever the client sent.
  */
-const SAFE_COLOR = /^(?:#[0-9a-f]{3,8}|hsl\([\s,]*\d{1,3}(?:deg)?[\s,]*\d{1,3}%[\s,]*\d{1,3}%\s*\))$/i;
+const SAFE_COLOR =
+  /^(?:#[0-9a-f]{3,8}|hsl\([\s,]*\d{1,3}(?:deg)?[\s,]*\d{1,3}%[\s,]*\d{1,3}%\s*\))$/i;
 
 /** Longest colour considered; the longest {@link SAFE_COLOR} accepts is well under this. */
 const MAX_COLOR_LENGTH = 40;
@@ -44,7 +45,11 @@ export const DEFAULT_NAME = "Guest";
  */
 export function collaboratorFor(clientId: string): Collaborator {
   const hue = parseInt(clientId.slice(0, 6), 36) % 360;
-  return { clientId, name: `${DEFAULT_NAME} ${clientId.slice(0, 4).toUpperCase()}`, color: `hsl(${hue} 62% 48%)` };
+  return {
+    clientId,
+    name: `${DEFAULT_NAME} ${clientId.slice(0, 4).toUpperCase()}`,
+    color: `hsl(${hue} 62% 48%)`,
+  };
 }
 
 /**
@@ -52,10 +57,15 @@ export function collaboratorFor(clientId: string): Collaborator {
  * name bounded, a blank name defaulted and an unusable colour replaced. Accepts anything, since
  * what arrives over RPC is whatever the client sent.
  */
-export function normalizeCollaborator(input: Partial<Collaborator> | null | undefined): Collaborator {
+export function normalizeCollaborator(
+  input: Partial<Collaborator> | null | undefined,
+): Collaborator {
   return {
     clientId: String(input?.clientId ?? "").slice(0, MAX_CLIENT_ID_LENGTH),
-    name: String(input?.name ?? "").trim().slice(0, MAX_NAME_LENGTH) || DEFAULT_NAME,
+    name:
+      String(input?.name ?? "")
+        .trim()
+        .slice(0, MAX_NAME_LENGTH) || DEFAULT_NAME,
     color: safeColor(String(input?.color ?? "")),
   };
 }

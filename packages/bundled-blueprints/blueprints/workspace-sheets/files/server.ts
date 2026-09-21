@@ -1,5 +1,8 @@
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
-import { MutationQueue, SubscriberRegistry } from "@gadgets/bundled-blueprints/libraries/sync/server";
+import {
+  MutationQueue,
+  SubscriberRegistry,
+} from "@gadgets/bundled-blueprints/libraries/sync/server";
 import { workbookToXlsx } from "./lib/xlsx.ts";
 import type {
   Cell,
@@ -64,7 +67,13 @@ export class Gadget extends DurableObject<unknown, unknown> {
     // Presence is announced in this gadget's own callback vocabulary: who arrived, and the bare id
     // of whoever dropped out.
     this.subscribers = new SubscriberRegistry({
-      join: (subscriber, who) => subscriber.presence({ type: "join", clientId: who.clientId, name: who.name, color: who.color }),
+      join: (subscriber, who) =>
+        subscriber.presence({
+          type: "join",
+          clientId: who.clientId,
+          name: who.name,
+          color: who.color,
+        }),
       leave: (subscriber, who) => subscriber.presence({ type: "leave", clientId: who.clientId }),
     });
     // Overlapping RPC calls are serialized so each observes/commits one
@@ -74,7 +83,8 @@ export class Gadget extends DurableObject<unknown, unknown> {
   }
 
   newId(): string {
-    if ((globalThis as typeof globalThis & { crypto?: Crypto }).crypto?.randomUUID) return "s_" + crypto.randomUUID().slice(0, 8);
+    if ((globalThis as typeof globalThis & { crypto?: Crypto }).crypto?.randomUUID)
+      return "s_" + crypto.randomUUID().slice(0, 8);
     return "s_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
@@ -194,12 +204,18 @@ export class Gadget extends DurableObject<unknown, unknown> {
         const isDelete = op.value == null && op.fmt == null;
         if (isDelete) {
           if (!cur) continue;
-          if (cur.version !== base) { conflicts.push({ sheetId, ref, cell: cur }); continue; }
+          if (cur.version !== base) {
+            conflicts.push({ sheetId, ref, cell: cur });
+            continue;
+          }
           delete cells[ref];
           deletes.push({ sheetId, ref });
           dirty = true;
         } else {
-          if (cur && cur.version !== base) { conflicts.push({ sheetId, ref, cell: cur }); continue; }
+          if (cur && cur.version !== base) {
+            conflicts.push({ sheetId, ref, cell: cur });
+            continue;
+          }
           const next: Cell = {
             value: op.value == null ? "" : String(op.value).slice(0, 8192),
             fmt: sanitizeFmt(op.fmt),
@@ -215,7 +231,13 @@ export class Gadget extends DurableObject<unknown, unknown> {
     if (upserts.length || deletes.length) changed = true;
 
     if (!changed) {
-      return { result: { status: conflicts.length ? "conflict" : "unchanged", revision: meta.revision, conflicts } };
+      return {
+        result: {
+          status: conflicts.length ? "conflict" : "unchanged",
+          revision: meta.revision,
+          conflicts,
+        },
+      };
     }
 
     meta.revision += 1;
@@ -240,11 +262,17 @@ export class Gadget extends DurableObject<unknown, unknown> {
       event.replacedCells = {};
       for (const id of event.replacedSheets) event.replacedCells[id] = await this.loadCells(id);
     }
-    return { result: { status: conflicts.length ? "conflict" : "applied", ...event, conflicts }, event };
+    return {
+      result: { status: conflicts.length ? "conflict" : "applied", ...event, conflicts },
+      event,
+    };
   }
 
   // --- Presence & subscription ------------------------------------------
-  async subscribe(callback: SubscriberCallbacks, client: Partial<CollaboratorInfo> = {}): Promise<SheetsDocument> {
+  async subscribe(
+    callback: SubscriberCallbacks,
+    client: Partial<CollaboratorInfo> = {},
+  ): Promise<SheetsDocument> {
     const info: CollaboratorInfo = {
       clientId: String(client.clientId || ""),
       name: String(client.name || "Guest").slice(0, 40),
@@ -269,8 +297,10 @@ export class Gadget extends DurableObject<unknown, unknown> {
       name: String(presence.name || "Guest").slice(0, 40),
       color: String(presence.color || "#e1632e"),
       sheetId: presence.sheetId ? String(presence.sheetId) : null,
-      r1: int(presence.r1), c1: int(presence.c1),
-      r2: int(presence.r2), c2: int(presence.c2),
+      r1: int(presence.r1),
+      c1: int(presence.c1),
+      r2: int(presence.r2),
+      c2: int(presence.c2),
       at: Date.now(),
     });
   }
@@ -292,7 +322,10 @@ export class Gadget extends DurableObject<unknown, unknown> {
 }
 
 // --- Sanitizers -------------------------------------------------------------
-function int(v: unknown): number { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(0, n) : 0; }
+function int(v: unknown): number {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
 function clampInt(v: unknown, lo: number, hi: number, dflt: number): number {
   const n = Math.round(Number(v));
   if (!Number.isFinite(n)) return dflt;
@@ -325,7 +358,9 @@ function sheetMeta(s: Partial<SheetMeta> & Pick<SheetMeta, "id">): SheetMeta {
 }
 
 const FMT_KEYS = new Set(["b", "i", "u", "s", "c", "bg", "a", "nf", "d", "fs", "wrap"]);
-function isFmtKey(k: string): k is keyof CellFmt { return FMT_KEYS.has(k); }
+function isFmtKey(k: string): k is keyof CellFmt {
+  return FMT_KEYS.has(k);
+}
 function sanitizeFmt(fmt: unknown): CellFmt | null {
   if (!fmt || typeof fmt !== "object") return null;
   const out: CellFmt = {};
@@ -333,12 +368,19 @@ function sanitizeFmt(fmt: unknown): CellFmt | null {
     if (!isFmtKey(k) || v == null || v === false || v === "") continue;
     // A colour is a string or nothing: `RegExp.test` would stringify an array like `["#abc"]` into
     // a match and store the array itself.
-    if (k === "c" || k === "bg") { if (typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v)) out[k] = v; }
-    else if (k === "a") { if (v === "l" || v === "c" || v === "r") out[k] = v; }
-    else if (k === "nf") { out[k] = String(v).slice(0, 20); }
-    else if (k === "d") { const n = Math.round(Number(v)); if (n >= 0 && n <= 10) out[k] = n; }
-    else if (k === "fs") { const n = Math.round(Number(v)); if (n >= 6 && n <= 96) out[k] = n; }
-    else out[k] = true;
+    if (k === "c" || k === "bg") {
+      if (typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v)) out[k] = v;
+    } else if (k === "a") {
+      if (v === "l" || v === "c" || v === "r") out[k] = v;
+    } else if (k === "nf") {
+      out[k] = String(v).slice(0, 20);
+    } else if (k === "d") {
+      const n = Math.round(Number(v));
+      if (n >= 0 && n <= 10) out[k] = n;
+    } else if (k === "fs") {
+      const n = Math.round(Number(v));
+      if (n >= 6 && n <= 96) out[k] = n;
+    } else out[k] = true;
   }
   return Object.keys(out).length ? out : null;
 }
@@ -347,7 +389,9 @@ function sanitizeCellMap(map: unknown): CellMap {
   const out: CellMap = {};
   if (!map || typeof map !== "object") return out;
   let count = 0;
-  for (const [ref, cell] of Object.entries(map as Record<string, Partial<Record<keyof Cell, unknown>> | null | undefined>)) {
+  for (const [ref, cell] of Object.entries(
+    map as Record<string, Partial<Record<keyof Cell, unknown>> | null | undefined>,
+  )) {
     if (!/^[A-Z]+[0-9]+$/.test(ref) || count++ > 200000) continue;
     out[ref] = {
       value: cell?.value == null ? "" : String(cell.value).slice(0, 8192),
@@ -372,7 +416,9 @@ const XLSX_FORMAT: ExportFormat = {
 // Sheet ids are client-chosen, so duplicates and over-long ids are possible in
 // stored structure. Either would fail format validation and disable every export.
 function csvSheetIds(document: SheetsDocument): string[] {
-  const ids = document.sheetOrder.filter((id) => (CSV_FORMAT_PREFIX + id).length <= MAX_EXPORT_ID_LENGTH);
+  const ids = document.sheetOrder.filter(
+    (id) => (CSV_FORMAT_PREFIX + id).length <= MAX_EXPORT_ID_LENGTH,
+  );
   return Array.from(new Set(ids)).slice(0, MAX_CSV_SHEETS);
 }
 
@@ -380,13 +426,16 @@ export class ExportHandler extends WorkerEntrypoint {
   async getExportFormats(gadget: GadgetStub): Promise<ExportFormat[]> {
     const document = await gadget.getDocument();
     const sheetIds = csvSheetIds(document);
-    return [XLSX_FORMAT, ...sheetIds.map((sheetId): ExportFormat => ({
-      id: CSV_FORMAT_PREFIX + sheetId,
-      label: sheetIds.length === 1 ? "CSV" : "CSV (" + document.sheets[sheetId].name + ")",
-      mode: "server",
-      contentType: "text/csv",
-      fileExtension: ".csv",
-    }))];
+    return [
+      XLSX_FORMAT,
+      ...sheetIds.map((sheetId): ExportFormat => ({
+        id: CSV_FORMAT_PREFIX + sheetId,
+        label: sheetIds.length === 1 ? "CSV" : "CSV (" + document.sheets[sheetId].name + ")",
+        mode: "server",
+        contentType: "text/csv",
+        fileExtension: ".csv",
+      })),
+    ];
   }
 
   async export(gadget: GadgetStub, id: string): Promise<ReadableStream<Uint8Array>> {
@@ -442,12 +491,12 @@ function parseCsvCellRef(ref: string): { row: number; column: number } | null {
 function csvCellRef(row: number, column: number): string {
   let letters = "";
   for (let value = column + 1; value > 0; value = Math.floor((value - 1) / 26)) {
-    letters = String.fromCharCode(65 + (value - 1) % 26) + letters;
+    letters = String.fromCharCode(65 + ((value - 1) % 26)) + letters;
   }
   return letters + (row + 1);
 }
 
 function escapeCsvField(value: string): string {
   const text = String(value);
-  return /[",\r\n]/.test(text) ? "\"" + text.replace(/\"/g, "\"\"") + "\"" : text;
+  return /[",\r\n]/.test(text) ? '"' + text.replace(/\"/g, '""') + '"' : text;
 }

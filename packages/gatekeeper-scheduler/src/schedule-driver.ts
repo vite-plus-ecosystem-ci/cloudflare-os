@@ -532,12 +532,12 @@ export class ScheduleDriver extends DurableObject {
     failedAt: number,
   ): void {
     this.#settle(prepared, "delivery", (state) =>
-      failRun(state, prepared.runId, failureCode, failedAt));
+      failRun(state, prepared.runId, failureCode, failedAt),
+    );
   }
 
   #completePending(prepared: PreparedRun, completedAt: number): void {
-    this.#settle(prepared, "delivery", (state) =>
-      completeRun(state, prepared.runId, completedAt));
+    this.#settle(prepared, "delivery", (state) => completeRun(state, prepared.runId, completedAt));
   }
 
   #isPendingDelivery(prepared: PreparedRun): boolean {
@@ -674,7 +674,7 @@ function toScheduleSummary(schedule: StoredSchedule): ScheduleSummary {
     description: schedule.description,
     cadence: toScheduleCadence(schedule.state.spec),
     occurrences: schedule.state.occurrences,
-    occurrenceCount: schedule.state.occurrences ? schedule.state.occurrenceCount ?? 0 : undefined,
+    occurrenceCount: schedule.state.occurrences ? (schedule.state.occurrenceCount ?? 0) : undefined,
   };
   const state = schedule.state;
   switch (state.status) {

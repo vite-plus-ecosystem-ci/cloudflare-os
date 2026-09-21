@@ -5,7 +5,7 @@ export type DocMetadata = {
 
   /** When the document was last modified. */
   lastModified: Date;
-}
+};
 
 /**
  * One tab of a native Google Doc.
@@ -28,7 +28,7 @@ export type GoogleDocTab = {
 
   /** Depth in the tab tree: 0 for a top-level tab, 1 for its child, and so on. */
   nestingLevel: number;
-}
+};
 
 /**
  * Read-only access to one native Google Doc.

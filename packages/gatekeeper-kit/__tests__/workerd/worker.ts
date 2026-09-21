@@ -2,7 +2,11 @@
 
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 import { ObserverTracker } from "../../src/observers";
-export { ConformanceAccount, ConformanceResource, ConformanceVerifier } from "./conformance/gatekeeper";
+export {
+  ConformanceAccount,
+  ConformanceResource,
+  ConformanceVerifier,
+} from "./conformance/gatekeeper";
 
 type VerifierProps = { allowed: readonly string[]; dropVerdicts?: number };
 
@@ -13,7 +17,9 @@ type VerifierProps = { allowed: readonly string[]; dropVerdicts?: number };
  */
 export class FixtureVerifier extends WorkerEntrypoint<unknown, VerifierProps> {
   async hasSets(collectionIds: readonly string[]): Promise<boolean[]> {
-    const verdicts = collectionIds.map(collectionId => this.ctx.props.allowed.includes(collectionId));
+    const verdicts = collectionIds.map((collectionId) =>
+      this.ctx.props.allowed.includes(collectionId),
+    );
     return verdicts.slice(0, verdicts.length - (this.ctx.props.dropVerdicts ?? 0));
   }
 }

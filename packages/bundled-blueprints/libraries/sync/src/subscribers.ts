@@ -95,7 +95,9 @@ export class SubscriberRegistry<Callbacks extends object, Info = void> {
         // A newcomer gone already -- removed or broken since it was added -- was announced as it
         // went (see remove and the broken handler), and is seeded and announced no further.
         if (!this.#subscribers.has(stub)) return;
-        const seeds = await Promise.allSettled(others.map((person) => Promise.resolve().then(() => presence.join(stub, person))));
+        const seeds = await Promise.allSettled(
+          others.map((person) => Promise.resolve().then(() => presence.join(stub, person))),
+        );
         // One that fails a seed is dropped the same way a failed delivery drops it. Its join was
         // never broadcast, but a subscriber added while it was seeding took it from the members
         // and was seeded with it, so its leave has to be announced all the same.

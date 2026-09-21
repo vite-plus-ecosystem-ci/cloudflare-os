@@ -112,9 +112,7 @@ export type ScheduleOccurrences =
     };
 
 /** A validated recurrence bound returned by `list()`; `until` resolves to epoch milliseconds. */
-export type NormalizedScheduleOccurrences =
-  | { count: number }
-  | { until: number };
+export type NormalizedScheduleOccurrences = { count: number } | { until: number };
 
 /** Registration metadata for an elapsed or calendar recurrence. */
 export interface RecurringScheduleOptions extends ScheduleOptions {

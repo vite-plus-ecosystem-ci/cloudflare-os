@@ -21,11 +21,13 @@ export default {
   },
 
   render() {
-    return <Section>
-      <Field
-        label="Whole-account access"
-        description="This binding grants access to the connected Spotify account: profile, catalog search, your library, your playlists, and playback control on your Spotify Connect devices.">
-      </Field>
-    </Section>;
+    return (
+      <Section>
+        <Field
+          label="Whole-account access"
+          description="This binding grants access to the connected Spotify account: profile, catalog search, your library, your playlists, and playback control on your Spotify Connect devices."
+        ></Field>
+      </Section>
+    );
   },
 } satisfies ConfiguratorUISpec<SpotifyAccountConfiguratorRpc, SpotifyAccountConfiguratorValues>;

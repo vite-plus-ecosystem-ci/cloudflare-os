@@ -17,16 +17,26 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BUNDLED_BLUEPRINTS_DIR, generateBundledBlueprintsModule } from "@gadgets/bundled-blueprints";
+import {
+  BUNDLED_BLUEPRINTS_DIR,
+  generateBundledBlueprintsModule,
+} from "@gadgets/bundled-blueprints";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = join(here, "..");
 const sourceDir = process.env.BUNDLED_BLUEPRINTS_DIR
-    ? resolve(pkgRoot, process.env.BUNDLED_BLUEPRINTS_DIR)
-    : BUNDLED_BLUEPRINTS_DIR;
-const outFile = resolve(pkgRoot, parseOutFlag() ?? join("src", "generated", "bundled-blueprints.ts"));
+  ? resolve(pkgRoot, process.env.BUNDLED_BLUEPRINTS_DIR)
+  : BUNDLED_BLUEPRINTS_DIR;
+const outFile = resolve(
+  pkgRoot,
+  parseOutFlag() ?? join("src", "generated", "bundled-blueprints.ts"),
+);
 
-const { text: generated, count, totalBytes } = await generateBundledBlueprintsModule(sourceDir, {
+const {
+  text: generated,
+  count,
+  totalBytes,
+} = await generateBundledBlueprintsModule(sourceDir, {
   builtFrom: process.env.BUNDLED_BLUEPRINTS_DIR ? "BUNDLED_BLUEPRINTS_DIR" : "blueprints/",
 });
 
@@ -36,7 +46,7 @@ const { text: generated, count, totalBytes } = await generateBundledBlueprintsMo
 // two SPA builds compare before writing.
 let unchanged = false;
 try {
-  unchanged = await readFile(outFile, "utf8") === generated;
+  unchanged = (await readFile(outFile, "utf8")) === generated;
 } catch (err) {
   if (!isErrorCode(err, "ENOENT")) throw err;
 }
@@ -46,8 +56,10 @@ if (unchanged) {
 } else {
   await mkdir(dirname(outFile), { recursive: true });
   await writeFile(outFile, generated);
-  console.log(`Bundled ${count} blueprint(s) from ${sourceDir}, ` +
-      `${(totalBytes / 1024).toFixed(0)} KiB raw -> ${outFile}`);
+  console.log(
+    `Bundled ${count} blueprint(s) from ${sourceDir}, ` +
+      `${(totalBytes / 1024).toFixed(0)} KiB raw -> ${outFile}`,
+  );
 }
 
 function isErrorCode(err: unknown, code: string): boolean {

@@ -23,19 +23,43 @@ export interface PromptOptions {
  * {@link PromptOptions}. The gadget's stylesheet styles the classes; {@link PROMPT_STYLES} is a
  * ready-made rule set for one that has none.
  */
-export function promptInline(message: string, initial = "", options: string | PromptOptions = {}): Promise<string | null> {
-  const { placeholder = "", okLabel = "OK" } = typeof options === "string" ? { placeholder: options } : options;
+export function promptInline(
+  message: string,
+  initial = "",
+  options: string | PromptOptions = {},
+): Promise<string | null> {
+  const { placeholder = "", okLabel = "OK" } =
+    typeof options === "string" ? { placeholder: options } : options;
   return new Promise((resolve) => {
     const input = el("input", { value: initial, placeholder });
     const done = (value: string | null) => {
       overlay.remove();
       resolve(value);
     };
-    const ok = el("button", { class: "text-btn primary", type: "button", onclick: () => done(input.value) }, [okLabel]);
-    const cancel = el("button", { class: "text-btn", type: "button", onclick: () => done(null) }, ["Cancel"]);
-    const overlay = el("div", { class: "prompt-overlay", onmousedown: (event: Event) => { if (event.target === overlay) done(null); } }, [
-      el("div", { class: "prompt-card" }, [el("div", { class: "muted" }, [message]), input, el("div", { class: "composer-actions" }, [cancel, ok])]),
+    const ok = el(
+      "button",
+      { class: "text-btn primary", type: "button", onclick: () => done(input.value) },
+      [okLabel],
+    );
+    const cancel = el("button", { class: "text-btn", type: "button", onclick: () => done(null) }, [
+      "Cancel",
     ]);
+    const overlay = el(
+      "div",
+      {
+        class: "prompt-overlay",
+        onmousedown: (event: Event) => {
+          if (event.target === overlay) done(null);
+        },
+      },
+      [
+        el("div", { class: "prompt-card" }, [
+          el("div", { class: "muted" }, [message]),
+          input,
+          el("div", { class: "composer-actions" }, [cancel, ok]),
+        ]),
+      ],
+    );
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") done(input.value);
       if (event.key === "Escape") done(null);

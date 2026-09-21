@@ -46,7 +46,8 @@ export class CloudflareObservabilityApiError extends Error {
 /** The provider returned something we refuse to interpret; never echoes the body. */
 export function invalidResponse(): CloudflareObservabilityApiError {
   return new CloudflareObservabilityApiError(
-    502, "Cloudflare returned an invalid Workers Observability response.",
+    502,
+    "Cloudflare returned an invalid Workers Observability response.",
   );
 }
 
@@ -72,9 +73,13 @@ function optionalString(value: unknown): string | undefined {
 
 /** Narrow the `statistics` block every view returns, mapping provider snake_case to camelCase. */
 export function parseStatistics(value: unknown): CloudflareObservabilityStatistics {
-  if (!isRecord(value) || !isFiniteNumber(value.elapsed) ||
-      !isFiniteNumber(value.rows_read) || !isFiniteNumber(value.bytes_read) ||
-      (value.abr_level !== undefined && !isFiniteNumber(value.abr_level))) {
+  if (
+    !isRecord(value) ||
+    !isFiniteNumber(value.elapsed) ||
+    !isFiniteNumber(value.rows_read) ||
+    !isFiniteNumber(value.bytes_read) ||
+    (value.abr_level !== undefined && !isFiniteNumber(value.abr_level))
+  ) {
     throw invalidResponse();
   }
   return {
@@ -91,9 +96,14 @@ export function parseStatistics(value: unknown): CloudflareObservabilityStatisti
  * `$metadata.service`.
  */
 function parseEvent(value: unknown): CloudflareObservabilityEvent {
-  if (!isRecord(value) || typeof value.dataset !== "string" || !isFiniteNumber(value.timestamp) ||
-      !isRecord(value.$metadata) || typeof value.$metadata.id !== "string" ||
-      (value.$metadata.service !== undefined && typeof value.$metadata.service !== "string")) {
+  if (
+    !isRecord(value) ||
+    typeof value.dataset !== "string" ||
+    !isFiniteNumber(value.timestamp) ||
+    !isRecord(value.$metadata) ||
+    typeof value.$metadata.id !== "string" ||
+    (value.$metadata.service !== undefined && typeof value.$metadata.service !== "string")
+  ) {
     throw invalidResponse();
   }
   // Validated above. Metadata beyond the load-bearing fields travels through as the provider sent
@@ -107,9 +117,10 @@ export function parseEvents(value: unknown): CloudflareObservabilityEvent[] {
 }
 
 /** Narrow the `{count?, events?}` container the events view wraps its page in. */
-export function parseEventsContainer(
-  value: unknown,
-): { count?: number; events: CloudflareObservabilityEvent[] } {
+export function parseEventsContainer(value: unknown): {
+  count?: number;
+  events: CloudflareObservabilityEvent[];
+} {
   if (value === undefined) return { events: [] };
   if (!isRecord(value)) throw invalidResponse();
   return {
@@ -132,7 +143,7 @@ export function parseInvocationsContainer(
 
 export function parseKeys(value: unknown): CloudflareObservabilityKey[] {
   if (!Array.isArray(value)) throw invalidResponse();
-  return value.map(entry => {
+  return value.map((entry) => {
     if (!isRecord(entry) || typeof entry.key !== "string" || !isValueType(entry.type)) {
       throw invalidResponse();
     }
@@ -146,9 +157,13 @@ export function parseKeys(value: unknown): CloudflareObservabilityKey[] {
 
 export function parseValues(value: unknown): CloudflareObservabilityValue[] {
   if (!Array.isArray(value)) throw invalidResponse();
-  return value.map(entry => {
-    if (!isRecord(entry) || typeof entry.key !== "string" || !isValueType(entry.type) ||
-        !isPrimitive(entry.value)) {
+  return value.map((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.key !== "string" ||
+      !isValueType(entry.type) ||
+      !isPrimitive(entry.value)
+    ) {
       throw invalidResponse();
     }
     return {
@@ -167,11 +182,17 @@ export function parseValues(value: unknown): CloudflareObservabilityValue[] {
 export function parseTraceSummaries(value: unknown): CloudflareObservabilityTraceSummary[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw invalidResponse();
-  return value.map(entry => {
-    if (!isRecord(entry) || typeof entry.traceId !== "string" ||
-        !Array.isArray(entry.service) || entry.service.some(name => typeof name !== "string") ||
-        !isFiniteNumber(entry.traceStartMs) || !isFiniteNumber(entry.traceEndMs) ||
-        !isFiniteNumber(entry.traceDurationMs) || !isFiniteNumber(entry.spans)) {
+  return value.map((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.traceId !== "string" ||
+      !Array.isArray(entry.service) ||
+      entry.service.some((name) => typeof name !== "string") ||
+      !isFiniteNumber(entry.traceStartMs) ||
+      !isFiniteNumber(entry.traceEndMs) ||
+      !isFiniteNumber(entry.traceDurationMs) ||
+      !isFiniteNumber(entry.spans)
+    ) {
       throw invalidResponse();
     }
     return {
@@ -202,16 +223,15 @@ export function parseTraceSummaries(value: unknown): CloudflareObservabilityTrac
 export function parseCalculations(value: unknown): CloudflareObservabilityCalculationSeries[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw invalidResponse();
-  return value.map(entry => {
-    if (!isRecord(entry) || typeof entry.calculation !== "string" ||
-        !Array.isArray(entry.series)) {
+  return value.map((entry) => {
+    if (!isRecord(entry) || typeof entry.calculation !== "string" || !Array.isArray(entry.series)) {
       throw invalidResponse();
     }
     return {
       calculation: entry.calculation,
       alias: optionalString(entry.alias),
       aggregates: parseAggregates(entry.aggregates),
-      series: entry.series.map(bucket => {
+      series: entry.series.map((bucket) => {
         if (!isRecord(bucket) || typeof bucket.time !== "string") throw invalidResponse();
         return { time: bucket.time, data: parseAggregates(bucket.data) };
       }),
@@ -221,9 +241,14 @@ export function parseCalculations(value: unknown): CloudflareObservabilityCalcul
 
 function parseAggregates(value: unknown): CloudflareObservabilityAggregate[] {
   if (!Array.isArray(value)) throw invalidResponse();
-  return value.map(entry => {
-    if (!isRecord(entry) || !isFiniteNumber(entry.value) || !isFiniteNumber(entry.count) ||
-        !isFiniteNumber(entry.interval) || !isFiniteNumber(entry.sampleInterval)) {
+  return value.map((entry) => {
+    if (
+      !isRecord(entry) ||
+      !isFiniteNumber(entry.value) ||
+      !isFiniteNumber(entry.count) ||
+      !isFiniteNumber(entry.interval) ||
+      !isFiniteNumber(entry.sampleInterval)
+    ) {
       throw invalidResponse();
     }
     return {
@@ -242,7 +267,7 @@ function parseAggregateGroups(
   value: unknown,
 ): NonNullable<CloudflareObservabilityAggregate["groups"]> {
   if (!Array.isArray(value)) throw invalidResponse();
-  return value.map(entry => {
+  return value.map((entry) => {
     if (!isRecord(entry) || typeof entry.key !== "string" || !isPrimitive(entry.value)) {
       throw invalidResponse();
     }

@@ -11,12 +11,7 @@ import type {
 } from "@gadgets/workshop-shared/gatekeeper";
 
 import { ActionStore, REVERT_UNSUPPORTED_MESSAGE } from "./action-store.js";
-import {
-  CATALOG_TTL_MS,
-  HydratedTools,
-  scopedCatalog,
-  type ScopedCatalog,
-} from "./catalog.js";
+import { CATALOG_TTL_MS, HydratedTools, scopedCatalog, type ScopedCatalog } from "./catalog.js";
 import type { McpClient } from "./client.js";
 import {
   withClient,
@@ -31,12 +26,7 @@ import { matchesToolQuery, toolQueryTerms, MAX_SEARCH_RESULTS } from "./tool-sea
 import { McpSessionBase, type McpSessionHost, type StoredAction } from "./session.js";
 import { installToolMethods } from "./session-methods.js";
 import { observerRefusalMessage } from "./sharing-policy.js";
-import {
-  actionKindFor,
-  classifyTool,
-  type ClassifiedTool,
-  type ServerTrust,
-} from "./tools.js";
+import { actionKindFor, classifyTool, type ClassifiedTool, type ServerTrust } from "./tools.js";
 
 type FacetProps = {
   endpoint: string;
@@ -56,7 +46,10 @@ export abstract class McpFacetBase<
   Env extends ConnectionEnv,
   Props extends FacetProps,
   Session extends McpSessionBase,
-> extends DurableObject<Env, Props> implements Gatekeeper<Session>, McpSessionHost {
+>
+  extends DurableObject<Env, Props>
+  implements Gatekeeper<Session>, McpSessionHost
+{
   #catalogPromise: Promise<ScopedCatalog> | undefined;
   #toolsFetchedAt = 0;
   #toolsTrust: ServerTrust | undefined;
@@ -66,7 +59,7 @@ export abstract class McpFacetBase<
   #waitingDiscoveries: Array<() => void> = [];
 
   #actions(): ActionStore {
-    return this.#actionStore ??= new ActionStore(this.ctx.storage.sql);
+    return (this.#actionStore ??= new ActionStore(this.ctx.storage.sql));
   }
 
   /** Connector-owned logger carrying the facet's safe identifying fields. */
@@ -114,22 +107,26 @@ export abstract class McpFacetBase<
   /** Returns this facet's scoped catalog and endpoint kind. */
   protected catalog(deadline?: number): Promise<ScopedCatalog> {
     const trust = this.trust;
-    if (!this.#catalogPromise || this.#toolsTrust !== trust
-        || Date.now() - this.#toolsFetchedAt > CATALOG_TTL_MS) {
+    if (
+      !this.#catalogPromise ||
+      this.#toolsTrust !== trust ||
+      Date.now() - this.#toolsFetchedAt > CATALOG_TTL_MS
+    ) {
       this.#toolsFetchedAt = Date.now();
       this.#toolsTrust = trust;
-      const load = (operationDeadline: number) => scopedCatalog({
-        store: this.ctx.storage.kv,
-        log: this.log,
-        env: this.env,
-        account: this.account(),
-        endpoint: this.endpoint,
-        scope: this.scope,
-        trust,
-        deadline: operationDeadline,
-      });
+      const load = (operationDeadline: number) =>
+        scopedCatalog({
+          store: this.ctx.storage.kv,
+          log: this.log,
+          env: this.env,
+          account: this.account(),
+          endpoint: this.endpoint,
+          scope: this.scope,
+          trust,
+          deadline: operationDeadline,
+        });
       const loading = deadline === undefined ? this.runDiscovery(load) : load(deadline);
-      this.#catalogPromise = loading.catch(err => {
+      this.#catalogPromise = loading.catch((err) => {
         this.#catalogPromise = undefined;
         throw err;
       });
@@ -154,11 +151,14 @@ export abstract class McpFacetBase<
           clearTimeout(timer);
           resolve();
         };
-        const timer = setTimeout(() => {
-          const index = this.#waitingDiscoveries.indexOf(resume);
-          if (index >= 0) this.#waitingDiscoveries.splice(index, 1);
-          reject(new Error("Timed out waiting to discover MCP tools."));
-        }, Math.max(0, deadline - Date.now()));
+        const timer = setTimeout(
+          () => {
+            const index = this.#waitingDiscoveries.indexOf(resume);
+            if (index >= 0) this.#waitingDiscoveries.splice(index, 1);
+            reject(new Error("Timed out waiting to discover MCP tools."));
+          },
+          Math.max(0, deadline - Date.now()),
+        );
         this.#waitingDiscoveries.push(resume);
       });
     } else {
@@ -177,21 +177,23 @@ export abstract class McpFacetBase<
   /** Searches the endpoint for granted tools by name, title, and description. */
   async searchTools(query: string): Promise<ClassifiedTool[]> {
     const terms = toolQueryTerms(query);
-    return this.runDiscovery(async deadline => {
+    return this.runDiscovery(async (deadline) => {
       const catalog = await this.catalog(deadline);
       if (!catalog.truncated) {
-        return catalog.tools.filter(entry => matchesToolQuery(entry.tool, terms))
+        return catalog.tools
+          .filter((entry) => matchesToolQuery(entry.tool, terms))
           .slice(0, MAX_SEARCH_RESULTS);
       }
       const { isPortal } = catalog;
       const tools = await this.call(
-        client => client.listMatchingToolSummaries(
-          MAX_SEARCH_RESULTS,
-          tool => scopeAllows(this.scope, tool.name, isPortal) && matchesToolQuery(tool, terms),
-        ),
+        (client) =>
+          client.listMatchingToolSummaries(
+            MAX_SEARCH_RESULTS,
+            (tool) => scopeAllows(this.scope, tool.name, isPortal) && matchesToolQuery(tool, terms),
+          ),
         { deadline },
       );
-      return tools.map(tool => classifyTool(tool, this.trust));
+      return tools.map((tool) => classifyTool(tool, this.trust));
     });
   }
 
@@ -201,15 +203,15 @@ export abstract class McpFacetBase<
     // the endpoint kind below, except for a server scope, which by definition belongs to a portal.
     if (!scopeAllows(this.scope, name, this.scope.serverId !== undefined)) return undefined;
 
-    return this.runDiscovery(async deadline => {
+    return this.runDiscovery(async (deadline) => {
       const catalog = await this.catalog(deadline);
       if (!scopeAllows(this.scope, name, catalog.isPortal)) return undefined;
-      const described = catalog.tools.find(entry => entry.tool.name === name);
+      const described = catalog.tools.find((entry) => entry.tool.name === name);
       if (described) return described;
       if (!catalog.truncated) return undefined;
 
       const load = (candidate: string) =>
-        this.call(client => client.findTool(candidate), { deadline });
+        this.call((client) => client.findTool(candidate), { deadline });
       const tool = await this.#hydrated.resolve(name, load);
       return tool && classifyTool(tool, this.trust);
     });
@@ -218,8 +220,8 @@ export abstract class McpFacetBase<
   /** Returns action kinds that this facet's current catalog permits auto-approving. */
   async getAutoApprovableActions(): Promise<ActionKind[]> {
     return (await this.tools())
-      .filter(entry => entry.autoApprovable)
-      .map(entry => actionKindFor(this.actionScopeTag, entry.tool.name));
+      .filter((entry) => entry.autoApprovable)
+      .map((entry) => actionKindFor(this.actionScopeTag, entry.tool.name));
   }
 
   /** Starts a session with generated per-tool methods when the catalog is available. */
@@ -229,7 +231,8 @@ export abstract class McpFacetBase<
       SessionClass = installToolMethods(SessionClass, await this.tools());
     } catch (err) {
       this.log.warn("starting session without per-tool methods", {
-        event: "session.tool-methods.unavailable", error: err,
+        event: "session.tool-methods.unavailable",
+        error: err,
       });
     }
     return new SessionClass(this, approvalQueue.dup());
@@ -260,8 +263,7 @@ export abstract class McpFacetBase<
 
   /** Applies an approved action without retrying an outcome-unknown write. */
   async applyAction(action: number): Promise<void> {
-    await this.#actions().apply(
-      action, fn => this.call(fn, { retryOnExpiry: false }), this.log);
+    await this.#actions().apply(action, (fn) => this.call(fn, { retryOnExpiry: false }), this.log);
   }
 
   /** Rejects a pending action. */
@@ -275,10 +277,7 @@ export abstract class McpFacetBase<
   }
 
   /** Runs a call against this facet's endpoint and account. */
-  call<T>(
-    fn: (client: McpClient) => Promise<T>,
-    options?: WithClientOptions,
-  ): Promise<T> {
+  call<T>(fn: (client: McpClient) => Promise<T>, options?: WithClientOptions): Promise<T> {
     return withClient(this.env, this.account(), this.endpoint, fn, options);
   }
 

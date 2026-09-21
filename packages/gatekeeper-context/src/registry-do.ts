@@ -28,7 +28,9 @@ export class LibraryRegistryDurableObject extends DurableObject<Cloudflare.Env> 
   async #writeSnapshot(domain: string): Promise<void> {
     let collections = [...this.storage.publicCollections.list()];
     await this.env.CONTEXT_COLLECTIONS.put(
-      publicCollectionsKvKey(domain), JSON.stringify(collections));
+      publicCollectionsKvKey(domain),
+      JSON.stringify(collections),
+    );
   }
 
   isPublic(collectionId: string): boolean {

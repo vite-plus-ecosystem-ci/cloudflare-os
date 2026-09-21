@@ -35,12 +35,19 @@
 // reconnects for the account reach its user DO.
 
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
-import { ConnectHandoff, GatekeeperConnectCallback, GatekeeperUser } from "@gadgets/workshop-shared/gatekeeper";
+import {
+  ConnectHandoff,
+  GatekeeperConnectCallback,
+  GatekeeperUser,
+} from "@gadgets/workshop-shared/gatekeeper";
 import { createWorkshopLogger } from "../observability";
 import { CLOUDFLARE_VENDOR_ID, type UserDurableObject } from "../user.js";
 import { readAdminConfig } from "../admin-config.js";
 import {
-  CONNECT_FLOW_LIFETIME_MS, handoffTargetOrigin, hashPresentedSecret, newSecretToken,
+  CONNECT_FLOW_LIFETIME_MS,
+  handoffTargetOrigin,
+  hashPresentedSecret,
+  newSecretToken,
   PENDING_HANDOFF_LIFETIME_MS,
 } from "../connect-handoff.js";
 
@@ -177,8 +184,9 @@ export class PendingLogin extends DurableObject<Cloudflare.Env> {
 type LoginCallbackProps = { pendingId: string; vendorId: string };
 
 export class LoginConnectCallbackImpl
-    extends WorkerEntrypoint<Cloudflare.Env, LoginCallbackProps>
-    implements GatekeeperConnectCallback {
+  extends WorkerEntrypoint<Cloudflare.Env, LoginCallbackProps>
+  implements GatekeeperConnectCallback
+{
   #pending() {
     const id = this.ctx.exports.PendingLogin.idFromString(this.ctx.props.pendingId);
     return this.ctx.exports.PendingLogin.get(id);
@@ -195,8 +203,11 @@ export class LoginConnectCallbackImpl
     return { targetOrigin, ticket: secret.toHex() };
   }
 
-  async #deliver(account: Fetcher<GatekeeperUser>, expiresAt: Date | undefined,
-                 ticketHash: string): Promise<void> {
+  async #deliver(
+    account: Fetcher<GatekeeperUser>,
+    expiresAt: Date | undefined,
+    ticketHash: string,
+  ): Promise<void> {
     const loginLogger = logger.with({
       operation: "gatekeeper.login",
       vendorId: this.ctx.props.vendorId,
@@ -209,20 +220,23 @@ export class LoginConnectCallbackImpl
       const email = await account.getAuthenticatedEmail();
       if (!email) {
         loginLogger.info("gatekeeper login finished", {
-          event: "gatekeeper.login.finished", outcome: "no_email",
+          event: "gatekeeper.login.finished",
+          outcome: "no_email",
         });
         await pending.fail("This account has no verified email, so it can't be used to sign in.");
         return;
       }
       const userStub = this.ctx.exports.UserDurableObject.get(
-          this.ctx.exports.UserDurableObject.idFromName(email));
+        this.ctx.exports.UserDurableObject.idFromName(email),
+      );
       // Closed signups block first-time account creation here too (not just password signup); an
       // existing user signing in is unaffected.
       const signupsEnabled = (await readAdminConfig(this.env)).signupsEnabled;
       const secret = await userStub.loginOrCreateViaGatekeeper(email, signupsEnabled);
       if (secret === null) {
         loginLogger.info("gatekeeper login finished", {
-          event: "gatekeeper.login.finished", outcome: "signups_disabled",
+          event: "gatekeeper.login.finished",
+          outcome: "signups_disabled",
         });
         await pending.fail("New sign-ups are currently disabled on this deployment.");
         return;
@@ -232,21 +246,27 @@ export class LoginConnectCallbackImpl
       // handing back the session. Other providers use minimal, transient sign-in grants (no persist).
       if (this.ctx.props.vendorId === CLOUDFLARE_VENDOR_ID) {
         const accountId = await userStub.linkConnectedAccountFromLogin(
-            account, this.ctx.props.vendorId, expiresAt);
+          account,
+          this.ctx.props.vendorId,
+          expiresAt,
+        );
         await pending.link(userStub.id.toString(), accountId);
       }
       // Session tokens are "<doName>:<secret>"; PublicApi.authenticate() routes via idFromName of
       // the first part. The user DO is keyed by email, so the prefix must be the email.
       await pending.deliver(`${email}:${secret}`, ticketHash);
       loginLogger.info("gatekeeper login finished", {
-        event: "gatekeeper.login.finished", outcome: "ok",
+        event: "gatekeeper.login.finished",
+        outcome: "ok",
       });
     } catch (err) {
       loginLogger.error("gatekeeper login failed", {
-        event: "gatekeeper.login.failed", error: err,
+        event: "gatekeeper.login.failed",
+        error: err,
       });
       loginLogger.info("gatekeeper login finished", {
-        event: "gatekeeper.login.finished", outcome: "error",
+        event: "gatekeeper.login.finished",
+        outcome: "error",
       });
       await pending.fail("Sign-in failed. Please try again.");
     }
@@ -254,7 +274,10 @@ export class LoginConnectCallbackImpl
 
   // The user DO and account id a sign-in linked (Cloudflare), or null for a transient sign-in
   // grant, which persists nothing there is to update.
-  async #linked(): Promise<{ user: DurableObjectStub<UserDurableObject>; accountId: number } | null> {
+  async #linked(): Promise<{
+    user: DurableObjectStub<UserDurableObject>;
+    accountId: number;
+  } | null> {
     const link = await this.#pending().getLink();
     if (!link) return null;
     const id = this.ctx.exports.UserDurableObject.idFromString(link.userId);

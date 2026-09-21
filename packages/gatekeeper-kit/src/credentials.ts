@@ -58,8 +58,11 @@ export class CredentialsChangedError extends MarkedError {
    * @param options Optional error cause — typically the stale provider rejection.
    */
   constructor(options?: { cause?: unknown }) {
-    super("CredentialsChangedError",
-      "This account's credentials changed during the operation; retry it.", options);
+    super(
+      "CredentialsChangedError",
+      "This account's credentials changed during the operation; retry it.",
+      options,
+    );
   }
 }
 
@@ -78,16 +81,20 @@ export class ConnectionSupersededError extends MarkedError {
    * @param options Optional error cause.
    */
   constructor(options?: { cause?: unknown }) {
-    super("ConnectionSupersededError",
-      "This account was reconnected or disconnected while the connect flow was completing; "
-      + "the credentials it produced were discarded. Start the connection again.", options);
+    super(
+      "ConnectionSupersededError",
+      "This account was reconnected or disconnected while the connect flow was completing; " +
+        "the credentials it produced were discarded. Start the connection again.",
+      options,
+    );
   }
 }
 
 /** @returns Whether the error carries the mark as its `name` or its transport-surviving `code`. */
 function marked(error: unknown, mark: string): boolean {
-  return error instanceof Error
-    && (error.name === mark || (error as { code?: unknown }).code === mark);
+  return (
+    error instanceof Error && (error.name === mark || (error as { code?: unknown }).code === mark)
+  );
 }
 
 /**
@@ -143,8 +150,13 @@ const CONNECTION_KEY = `${CREDENTIALS_KEY}:connection`;
 // One identity: the fence of the grant the provider confirmed dead, or absent for no death.
 const EXPIRED_IDENTITY_KEY = `${CREDENTIALS_KEY}:expired`;
 
-const OWNED_KEYS: readonly string[] =
-  [CREDENTIALS_KEY, IDENTITY_KEY, MIGRATED_KEY, CONNECTION_KEY, EXPIRED_IDENTITY_KEY];
+const OWNED_KEYS: readonly string[] = [
+  CREDENTIALS_KEY,
+  IDENTITY_KEY,
+  MIGRATED_KEY,
+  CONNECTION_KEY,
+  EXPIRED_IDENTITY_KEY,
+];
 
 const EXPIRED_MESSAGE = "This account's credentials have expired.";
 
@@ -478,8 +490,9 @@ export class CredentialCoordinator<Creds> {
   #overtaken(cause?: unknown): Creds {
     const latest = this.stored();
     if (latest === undefined) {
-      throw new CredentialsExpiredError(
-        "This account was disconnected while refreshing.", { cause });
+      throw new CredentialsExpiredError("This account was disconnected while refreshing.", {
+        cause,
+      });
     }
     if (this.#isExpired(this.identity())) {
       throw new CredentialsExpiredError(EXPIRED_MESSAGE, { cause });
@@ -525,8 +538,12 @@ export class CredentialCoordinator<Creds> {
     try {
       await this.fresh(refresh);
     } catch (error) {
-      if (!isCredentialsExpired(error) || this.stored() === undefined
-        || options.notify === undefined) throw error;
+      if (
+        !isCredentialsExpired(error) ||
+        this.stored() === undefined ||
+        options.notify === undefined
+      )
+        throw error;
       // This reads the dead grant's own fence: only microtasks separate it from `#refresh`'s
       // `identity() === fence` check, and a `connect()` arrives on an I/O turn. A reconnect
       // landing mid-notify replaced the dead grant: serve it instead of stale death.
@@ -605,7 +622,7 @@ export class CredentialCoordinator<Creds> {
    * @returns `"expired"`, or the moved-fence verdict when the fence moved mid-notify.
    */
   async #expired(identity: string, notify: () => Promise<void>): Promise<RejectionVerdict> {
-    return await this.#notified(identity, notify) ? "expired" : this.#moved();
+    return (await this.#notified(identity, notify)) ? "expired" : this.#moved();
   }
 
   /**
@@ -910,8 +927,12 @@ export class CredentialSource<Creds> {
    * successor.
    */
   #successorTo(identity: string): boolean {
-    return this.#generation !== undefined && this.#identity !== undefined
-      && this.#identity !== identity && !this.#dead.has(this.#identity);
+    return (
+      this.#generation !== undefined &&
+      this.#identity !== undefined &&
+      this.#identity !== identity &&
+      !this.#dead.has(this.#identity)
+    );
   }
 
   /**
@@ -977,8 +998,9 @@ export class CredentialSource<Creds> {
     const fence = this.#clearFence;
     let current: CredentialsWithIdentity<Creds>;
     try {
-      current = await this.#fetches.run(
-        CREDENTIALS_FLIGHT, () => this.#options.account().getCredentials());
+      current = await this.#fetches.run(CREDENTIALS_FLIGHT, () =>
+        this.#options.account().getCredentials(),
+      );
     } catch (error) {
       // A fetch rejecting with confirmed expiry (a failed refresh) reports the grant as dead as a
       // 401 does. Fenced like adoption: a straggler's stale rejection must not clear a revival.
@@ -992,8 +1014,9 @@ export class CredentialSource<Creds> {
       // rejection above, so a straggler's malformed answer cannot clear a revival that overtook it.
       if (fence === this.#clearFence) this.#supersede();
       throw new Error(
-        'The account served credentials under the reserved "" identity; '
-        + "getCredentials must fence every read.");
+        'The account served credentials under the reserved "" identity; ' +
+          "getCredentials must fence every read.",
+      );
     }
     // Three guards, none subsuming another: the fence blocks fetches started before an expiry
     // report (a straggler can carry any old identity, not just a marked one), the dead set blocks
@@ -1002,8 +1025,11 @@ export class CredentialSource<Creds> {
     // readers bypass for the whole round trip. The fence holds even against a read resolving a
     // reconnect: generations are opaque and equality-only, so a fenced response cannot prove
     // itself newest — authority stays the last unfenced fetch.
-    if (fence === this.#clearFence && !this.#dead.has(current.identity)
-      && !this.#asks.pending(current.identity)) {
+    if (
+      fence === this.#clearFence &&
+      !this.#dead.has(current.identity) &&
+      !this.#asks.pending(current.identity)
+    ) {
       this.#generation = current.generation;
       this.#identity = current.identity;
     }

@@ -10,7 +10,7 @@
 
 // gatekeeper-email's entrypoint: a WorkerEntrypoint whose optional email() handler is present.
 type EmailEntrypoint = CloudflareWorkersModule.WorkerEntrypoint &
-    Required<Pick<CloudflareWorkersModule.WorkerEntrypoint, "email">>;
+  Required<Pick<CloudflareWorkersModule.WorkerEntrypoint, "email">>;
 
 export interface Env {
   WORKSHOP_BACKEND: Fetcher;
@@ -34,9 +34,12 @@ export default {
       }
     }
 
-    if (url.pathname === "/api" || url.pathname.startsWith("/api/") ||
-        url.pathname === "/blueprint-screenshot" ||
-        url.pathname.startsWith("/blueprint-screenshot/")) {
+    if (
+      url.pathname === "/api" ||
+      url.pathname.startsWith("/api/") ||
+      url.pathname === "/blueprint-screenshot" ||
+      url.pathname.startsWith("/blueprint-screenshot/")
+    ) {
       return env.WORKSHOP_BACKEND.fetch(req);
     }
 

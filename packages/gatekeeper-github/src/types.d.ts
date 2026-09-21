@@ -250,7 +250,7 @@ export type GitHubActor = {
   displayName?: string;
   url: string;
   avatarUrl?: string;
-}
+};
 
 /** A repository identifier. */
 export type GitHubRepoRef = {
@@ -258,7 +258,7 @@ export type GitHubRepoRef = {
   name: string;
   fullName: string;
   url: string;
-}
+};
 
 /** Basic repository metadata. */
 export type GitHubRepoMetadata = GitHubRepoRef & {
@@ -266,14 +266,14 @@ export type GitHubRepoMetadata = GitHubRepoRef & {
   visibility: "public" | "private" | "internal";
   /** Name of the repository's default branch (e.g. `"main"`). */
   defaultBranch: string;
-}
+};
 
 /** A GitHub label attached to an issue or pull request. */
 export type GitHubLabel = {
   name: string;
   color?: string;
   description?: string;
-}
+};
 
 /**
  * Identifies an issue or pull request within a repository.
@@ -292,7 +292,7 @@ export type GitHubIssueId = {
    *  provisional ID like `"~1"` for issues whose creation is still pending. */
   id: string;
   url: string;
-}
+};
 
 /** A compact issue summary returned from list and search operations. */
 export type GitHubIssueSummary = GitHubIssueId & {
@@ -305,19 +305,19 @@ export type GitHubIssueSummary = GitHubIssueId & {
   updatedAt: Date;
   closedAt?: Date;
   commentCount: number;
-}
+};
 
 /** Full issue details returned by `GitHubIssue.getDetails()`. */
 export type GitHubIssueDetails = GitHubIssueSummary & {
   bodyMarkdown: string;
-}
+};
 
 /** A branch reference in a pull request. */
 export type GitHubPullRequestBranchRef = {
   ref: string;
   sha: string;
   repo: GitHubRepoRef;
-}
+};
 
 /** A compact pull request summary returned from list and search operations. */
 export type GitHubPullRequestSummary = GitHubIssueSummary & {
@@ -325,23 +325,24 @@ export type GitHubPullRequestSummary = GitHubIssueSummary & {
   merged: boolean;
   head: GitHubPullRequestBranchRef;
   base: GitHubPullRequestBranchRef;
-}
+};
 
 /** Full pull request details returned by `GitHubPullRequest.getDetails()`. */
-export type GitHubPullRequestDetails = GitHubIssueDetails & GitHubPullRequestSummary & {
-  /** Whether the pull request can currently be merged. */
-  mergeable?: boolean;
-  /** Requested reviewers who have not yet submitted a review. */
-  requestedReviewers: GitHubActor[];
-  /** Number of commits in the pull request. */
-  commits: number;
-  /** Total lines added. */
-  additions: number;
-  /** Total lines deleted. */
-  deletions: number;
-  /** Number of changed files. */
-  changedFiles: number;
-}
+export type GitHubPullRequestDetails = GitHubIssueDetails &
+  GitHubPullRequestSummary & {
+    /** Whether the pull request can currently be merged. */
+    mergeable?: boolean;
+    /** Requested reviewers who have not yet submitted a review. */
+    requestedReviewers: GitHubActor[];
+    /** Number of commits in the pull request. */
+    commits: number;
+    /** Total lines added. */
+    additions: number;
+    /** Total lines deleted. */
+    deletions: number;
+    /** Number of changed files. */
+    changedFiles: number;
+  };
 
 /** A branch returned by `GitHubRepo.listBranches()`. */
 export type GitHubBranchSummary = {
@@ -350,21 +351,21 @@ export type GitHubBranchSummary = {
   headCommit: string;
   /** Whether the branch is covered by a branch protection rule. */
   protected: boolean;
-}
+};
 
 /** A tag returned by `GitHubRepo.listTags()`. */
 export type GitHubTagSummary = {
   name: string;
   /** Commit id the tag points at. */
   commit: string;
-}
+};
 
 /** The author or committer of a commit, as recorded in the commit itself. */
 export type GitHubCommitIdentity = {
   name?: string;
   email?: string;
   date?: Date;
-}
+};
 
 /**
  * A commit, as returned from commit lookups and history enumeration.
@@ -389,7 +390,7 @@ export type GitHubCommitSummary = {
   parents: string[];
   /** The github.com web page where this commit can be viewed in a browser. */
   url: string;
-}
+};
 
 /** Full commit details returned by `GitHubRepo.getCommit()`. */
 export type GitHubCommitDetails = GitHubCommitSummary & {
@@ -399,7 +400,7 @@ export type GitHubCommitDetails = GitHubCommitSummary & {
     deletions: number;
     total: number;
   };
-}
+};
 
 /**
  * A pagination cursor.
@@ -415,7 +416,7 @@ export interface Cursor<T> {
 /** Generic paging options for a cursor-backed result set. */
 export type GitHubPageOptions = {
   resultsPerPage?: number;
-}
+};
 
 /** Filters for listing issues. */
 export type GitHubIssueFilter = GitHubPageOptions & {
@@ -425,12 +426,12 @@ export type GitHubIssueFilter = GitHubPageOptions & {
   assignee?: string;
   sort?: "created" | "updated" | "comments";
   direction?: "asc" | "desc";
-}
+};
 
 /** Filters for searching issues. */
 export type GitHubIssueSearch = GitHubIssueFilter & {
   text: string;
-}
+};
 
 /** Filters for listing pull requests. */
 export type GitHubPullRequestFilter = GitHubPageOptions & {
@@ -441,7 +442,7 @@ export type GitHubPullRequestFilter = GitHubPageOptions & {
   base?: string;
   sort?: "created" | "updated" | "popularity" | "long-running";
   direction?: "asc" | "desc";
-}
+};
 
 /** Filters for searching pull requests. */
 export type GitHubPullRequestSearch = GitHubPageOptions & {
@@ -452,13 +453,13 @@ export type GitHubPullRequestSearch = GitHubPageOptions & {
   labels?: string[];
   author?: string;
   assignee?: string;
-}
+};
 
 /** Filters for listing branches. */
 export type GitHubBranchFilter = GitHubPageOptions & {
   /** When set, return only protected (`true`) or only unprotected (`false`) branches. */
   protected?: boolean;
-}
+};
 
 /** Filters for listing commit history. */
 export type GitHubCommitFilter = GitHubPageOptions & {
@@ -475,7 +476,7 @@ export type GitHubCommitFilter = GitHubPageOptions & {
   since?: Date;
   /** Only commits dated before this time. */
   until?: Date;
-}
+};
 
 export type GitHubIssueState = "open" | "closed";
 
@@ -524,7 +525,7 @@ export type GitHubPullRequestDiffFile = {
   /** True when the patch is not included (e.g. binary files, very large files or diffs). */
   diffOmitted?: boolean;
   hunks: GitHubPullRequestDiffHunk[];
-}
+};
 
 /** Identifies the specific revision of a pull request diff. */
 export type GitHubPullRequestRevision = {
@@ -537,19 +538,19 @@ export type GitHubPullRequestRevision = {
    *  diff is computed against. To review the changes in a worktree, mount `headSha` and diff it
    *  against this commit. Omitted only when the merge base could not be determined. */
   mergeBaseSha?: string;
-}
+};
 
 /** A pull request diff pinned to a specific revision. */
 export type GitHubPullRequestDiff = {
   revision: GitHubPullRequestRevision;
   files: Cursor<GitHubPullRequestDiffFile>;
-}
+};
 
 /** One hunk inside a changed file. */
 export type GitHubPullRequestDiffHunk = {
   header: string;
   lines: GitHubPullRequestDiffLine[];
-}
+};
 
 /** One line inside a diff hunk. */
 export type GitHubPullRequestDiffLine = {
@@ -557,7 +558,7 @@ export type GitHubPullRequestDiffLine = {
   text: string;
   oldLineNumber?: number;
   newLineNumber?: number;
-}
+};
 
 /**
  * A location in a pull request diff.
@@ -593,7 +594,7 @@ export type GitHubSubmittedDiffComment = {
   createdAt: Date;
   updatedAt?: Date;
   url: string;
-}
+};
 
 /** One comment inside a diff thread. */
 export type GitHubDiffThreadComment = {
@@ -605,7 +606,7 @@ export type GitHubDiffThreadComment = {
   createdAt: Date;
   updatedAt?: Date;
   url: string;
-}
+};
 
 /** A diff thread attached to one diff location. */
 export type GitHubDiffThread = {
@@ -614,13 +615,13 @@ export type GitHubDiffThread = {
   isOutdated: boolean;
   isResolved?: boolean;
   comments: GitHubDiffThreadComment[];
-}
+};
 
 /** A single diff comment to include in a review submission. */
 export type GitHubDraftDiffComment = {
   target: GitHubDiffCommentTarget;
   bodyMarkdown: string;
-}
+};
 
 /** A full review to submit on a pull request. */
 export type GitHubPullRequestReviewDraft = {
@@ -628,7 +629,7 @@ export type GitHubPullRequestReviewDraft = {
   decision: GitHubReviewDecision;
   bodyMarkdown?: string;
   diffComments?: GitHubDraftDiffComment[];
-}
+};
 
 /** Options for creating a new issue. */
 export type GitHubCreateIssueOptions = {
@@ -636,7 +637,7 @@ export type GitHubCreateIssueOptions = {
   bodyMarkdown?: string;
   labels?: string[];
   assignees?: string[];
-}
+};
 
 /** Options for creating a new pull request. */
 export type GitHubCreatePullRequestOptions = {
@@ -647,7 +648,7 @@ export type GitHubCreatePullRequestOptions = {
   base: string;
   bodyMarkdown?: string;
   draft?: boolean;
-}
+};
 
 /** Options for merging a pull request. */
 export type GitHubPullRequestMergeOptions = {
@@ -657,4 +658,4 @@ export type GitHubPullRequestMergeOptions = {
   /** Expected HEAD SHA of the pull request. If provided, the merge will fail if the
    *  current HEAD doesn't match, preventing races with concurrent pushes. */
   expectedHeadSha?: string;
-}
+};

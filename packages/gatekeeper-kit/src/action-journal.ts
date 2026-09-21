@@ -18,20 +18,20 @@ export type ActionJournalKv = KvScannable;
  */
 export type JournalKeys =
   | {
-    /** Distinguishes this journal's keys from every other journal over the same storage. */
-    namespace: string;
-    legacyKeys?: never;
-  }
+      /** Distinguishes this journal's keys from every other journal over the same storage. */
+      namespace: string;
+      legacyKeys?: never;
+    }
   | {
-    namespace?: never;
-    /** The exact pre-kit key layout. Only a port with existing records passes this. */
-    legacyKeys: {
-      /** Stores the next unused ID, never the last issued ID. */
-      nextIdKey: string;
-      /** Must not contain `nextIdKey`, which would then be scanned as a record. */
-      recordPrefix: string;
+      namespace?: never;
+      /** The exact pre-kit key layout. Only a port with existing records passes this. */
+      legacyKeys: {
+        /** Stores the next unused ID, never the last issued ID. */
+        nextIdKey: string;
+        /** Must not contain `nextIdKey`, which would then be scanned as a record. */
+        recordPrefix: string;
+      };
     };
-  };
 
 /**
  * Journal lifecycle state. Applied records live only in retained storage; claimed records have a
@@ -57,21 +57,28 @@ export type ActionFence = { generation: string };
  */
 export type JournalRecord<A> =
   | {
-    state: Exclude<JournalState, "failed">; action: A; fence?: ActionFence; error?: never;
-    undispatched?: never; outcome?: never;
-  }
+      state: Exclude<JournalState, "failed">;
+      action: A;
+      fence?: ActionFence;
+      error?: never;
+      undispatched?: never;
+      outcome?: never;
+    }
   | {
-    state: "failed"; action: A; fence?: ActionFence; error: string;
-    /** The apply refused before the handler ran, so a rejection still owes its cleanup. */
-    undispatched?: true;
-    /**
-     * Whether the provider effect is known absent. `"unknown"` means the handler may have
-     * committed it: the record is never replayed, never pruned, and strands no dependents, since
-     * the reference it provides may in fact exist. Absent reads as `"not-applied"`, which is the
-     * only classification a record written before this field could have had.
-     */
-    outcome?: "not-applied" | "unknown";
-  };
+      state: "failed";
+      action: A;
+      fence?: ActionFence;
+      error: string;
+      /** The apply refused before the handler ran, so a rejection still owes its cleanup. */
+      undispatched?: true;
+      /**
+       * Whether the provider effect is known absent. `"unknown"` means the handler may have
+       * committed it: the record is never replayed, never pruned, and strands no dependents, since
+       * the reference it provides may in fact exist. Absent reads as `"not-applied"`, which is the
+       * only classification a record written before this field could have had.
+       */
+      outcome?: "not-applied" | "unknown";
+    };
 
 /** An action ID and payload used by simulation. */
 export type JournalEntry<A> = { readonly id: number; readonly action: A };
@@ -168,15 +175,19 @@ export class ActionJournal<A> {
 
     if (options.legacyKeys === undefined && !JOURNAL_NAMESPACE.test(options.namespace ?? "")) {
       throw new Error(
-        `Journal namespace "${options.namespace}" must match ${JOURNAL_NAMESPACE.source}.`);
+        `Journal namespace "${options.namespace}" must match ${JOURNAL_NAMESPACE.source}.`,
+      );
     }
     // A silent overlap corrupts the keyspace: a counter under the record prefix is scanned as a
     // record, and a record prefix under the retained one un-tiers the scan. Only reachable through
     // `legacyKeys`, since a derived pair cannot collide.
     if (!this.#prefix) throw new Error("recordPrefix must not be empty.");
-    if (this.#nextIdKey.startsWith(this.#prefix) || this.#prefix.startsWith(this.#nextIdKey)
-      || this.#nextIdKey.startsWith(this.#retainedPrefix)
-      || this.#nextIdKey === this.#appliedIdsKey) {
+    if (
+      this.#nextIdKey.startsWith(this.#prefix) ||
+      this.#prefix.startsWith(this.#nextIdKey) ||
+      this.#nextIdKey.startsWith(this.#retainedPrefix) ||
+      this.#nextIdKey === this.#appliedIdsKey
+    ) {
       throw new Error(`nextIdKey "${this.#nextIdKey}" overlaps a record prefix.`);
     }
     if (this.#retainedPrefix.startsWith(this.#prefix)) {
@@ -184,8 +195,8 @@ export class ActionJournal<A> {
     }
     // Observer storage is scanned by prefix, so records landing inside it come back as verifiers
     // or as an unsettled withheld read -- type-confused ACL checks, and sharing fenced for good.
-    const observerOverlap = reservedObserverOverlap(this.#prefix)
-      ?? reservedObserverOverlap(this.#nextIdKey);
+    const observerOverlap =
+      reservedObserverOverlap(this.#prefix) ?? reservedObserverOverlap(this.#nextIdKey);
     if (observerOverlap !== undefined) {
       throw new Error(`Journal keys overlap the reserved observer prefix "${observerOverlap}".`);
     }
@@ -203,14 +214,22 @@ export class ActionJournal<A> {
     // Occupancy or retired-id memory at this id means the counter is behind -- a port pointed
     // `nextIdKey` at a last-issued counter. Raw reads, not `get`: a legacy row `upgradeRecord`
     // cannot convert still occupies the id, and staging over it would corrupt a live or settled id.
-    if (this.#kv.get(this.#pendingKey(id)) !== undefined
-      || this.#kv.get(this.#retainedKey(id)) !== undefined || this.wasApplied(id)) {
-      throw new Error(`Action ${id} was already issued; `
-        + `"${this.#nextIdKey}" must hold the next unused id, not the last issued one.`);
+    if (
+      this.#kv.get(this.#pendingKey(id)) !== undefined ||
+      this.#kv.get(this.#retainedKey(id)) !== undefined ||
+      this.wasApplied(id)
+    ) {
+      throw new Error(
+        `Action ${id} was already issued; ` +
+          `"${this.#nextIdKey}" must hold the next unused id, not the last issued one.`,
+      );
     }
     this.#kv.put(this.#nextIdKey, id + 1);
-    this.#write(this.#pendingKey(id),
-      { state: "staged", action, ...(fence ? { fence: { generation: fence.generation } } : {}) });
+    this.#write(this.#pendingKey(id), {
+      state: "staged",
+      action,
+      ...(fence ? { fence: { generation: fence.generation } } : {}),
+    });
     return id;
   }
 
@@ -252,16 +271,15 @@ export class ActionJournal<A> {
   ): void {
     const record = this.#transitionable(id, ["staged", "pending", "claimed"]);
     if (record) {
-      const reason = error.length > MAX_FAILURE_REASON
-        ? `${error.slice(0, MAX_FAILURE_REASON)}\u2026`
-        : error;
+      const reason =
+        error.length > MAX_FAILURE_REASON ? `${error.slice(0, MAX_FAILURE_REASON)}\u2026` : error;
       this.#write(this.#pendingKey(id), {
         state: "failed",
         action: record.action,
         error: reason,
-        ...(options.undispatched ? { undispatched: true } as const : {}),
+        ...(options.undispatched ? ({ undispatched: true } as const) : {}),
         // Only the non-default is stored, so a record carries no key for the ordinary case.
-        ...(options.outcome === "unknown" ? { outcome: "unknown" } as const : {}),
+        ...(options.outcome === "unknown" ? ({ outcome: "unknown" } as const) : {}),
         ...(record.fence ? { fence: record.fence } : {}),
       });
     }
@@ -366,9 +384,7 @@ export class ActionJournal<A> {
    * @param options Storage page size and the previous page's opaque cursor.
    * @returns Retained actions from this storage page and its continuation position.
    */
-  listRetained(
-    options: { limit: number; cursor?: string },
-  ): RetainedActionPage<A> {
+  listRetained(options: { limit: number; cursor?: string }): RetainedActionPage<A> {
     const limit = requirePositiveInt("limit", options.limit);
     const entries: JournalEntry<A>[] = [];
     // A `retire` whose delete threw leaves a tombstoned row here. Finish that delete rather than
@@ -453,13 +469,14 @@ export class ActionJournal<A> {
       // those artifacts for good. An unknown outcome holds one for the opposite reason -- it is
       // the only record saying the provider may already have changed, and pruning it would evict
       // that warning first. Blocking is recoverable -- the user rejects it.
-      else if (record.state !== "failed" || record.undispatched
-        || record.outcome === "unknown") unresolved += 1;
+      else if (record.state !== "failed" || record.undispatched || record.outcome === "unknown")
+        unresolved += 1;
       else failed.push(id);
     }
     if (unresolved >= this.#maxPending) {
       throw new Error(
-        "Too many pending actions; approve or reject some in the approval queue first.");
+        "Too many pending actions; approve or reject some in the approval queue first.",
+      );
     }
 
     // Staged first whatever their age: one is plumbing a submission left behind, while a `failed`
@@ -566,16 +583,18 @@ export class ActionJournal<A> {
     if ("v" in raw && raw.v === JOURNAL_VERSION) {
       // The marker is storage detail; callers see the record only. One fallback here, not one per
       // reader, keeps the type's promise that a failed record explains itself.
-      const { state, action, error, fence, undispatched, outcome } =
-        raw as StoredJournalRecord<A>;
+      const { state, action, error, fence, undispatched, outcome } = raw as StoredJournalRecord<A>;
       const carried = fence ? { fence: { generation: fence.generation } } : {};
       return state === "failed"
         ? {
-          state, action, error: error ?? FAILURE_REASON_LOST, ...carried,
-          ...(undispatched ? { undispatched: true } as const : {}),
-          // A record written before this field existed reads as the default, `"not-applied"`.
-          ...(outcome === "unknown" ? { outcome: "unknown" } as const : {}),
-        }
+            state,
+            action,
+            error: error ?? FAILURE_REASON_LOST,
+            ...carried,
+            ...(undispatched ? ({ undispatched: true } as const) : {}),
+            // A record written before this field existed reads as the default, `"not-applied"`.
+            ...(outcome === "unknown" ? ({ outcome: "unknown" } as const) : {}),
+          }
         : { state, action, ...carried };
     }
     // Anything else was written by whatever this gatekeeper stored before adopting the journal,

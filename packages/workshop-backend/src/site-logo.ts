@@ -15,16 +15,26 @@ export function validateSiteLogo(data: Uint8Array): void {
   if (data.byteLength > MAX_SITE_LOGO_BYTES) {
     throw new Error(`Site logo too large (max ${MAX_SITE_LOGO_BYTES} bytes).`);
   }
-  if (data.byteLength < 33 || !PNG_SIGNATURE.every((byte, index) => data[index] === byte) ||
-      data[8] !== 0 || data[9] !== 0 || data[10] !== 0 || data[11] !== 13 ||
-      String.fromCharCode(...data.subarray(12, 16)) !== "IHDR") {
+  if (
+    data.byteLength < 33 ||
+    !PNG_SIGNATURE.every((byte, index) => data[index] === byte) ||
+    data[8] !== 0 ||
+    data[9] !== 0 ||
+    data[10] !== 0 ||
+    data[11] !== 13 ||
+    String.fromCharCode(...data.subarray(12, 16)) !== "IHDR"
+  ) {
     throw new Error("Site logo must be a PNG image.");
   }
   let view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let width = view.getUint32(16);
   let height = view.getUint32(20);
-  if (width === 0 || height === 0 ||
-      width > MAX_SITE_LOGO_DIMENSION || height > MAX_SITE_LOGO_DIMENSION) {
+  if (
+    width === 0 ||
+    height === 0 ||
+    width > MAX_SITE_LOGO_DIMENSION ||
+    height > MAX_SITE_LOGO_DIMENSION
+  ) {
     throw new Error(`Site logo dimensions must be between 1 and ${MAX_SITE_LOGO_DIMENSION}px.`);
   }
 }
@@ -37,7 +47,9 @@ export function siteLogoImage(configured: boolean): AvatarImage | undefined {
 
 /** Serves the current logo bytes from R2 as a safely typed public image. */
 export async function serveSiteLogo(
-    request: Request, bucket: Pick<R2Bucket, "get">): Promise<Response> {
+  request: Request,
+  bucket: Pick<R2Bucket, "get">,
+): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
   }

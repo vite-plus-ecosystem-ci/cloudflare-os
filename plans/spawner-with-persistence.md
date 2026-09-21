@@ -47,7 +47,7 @@ of freeform prompts. But the machinery underneath is a mismatch with how agents 
    outcome is what it does with the capabilities it was given. Flagging a thread as needing human
    attention (the role `giveUp` was meant to grow into) is future work and out of scope.
 2. **All stubs passed to an agent must be persistent.** The runtime throws `DataCloneError` when
-   asked to persist a non-persistent stub, so writing the args to storage *is* the enforcement.
+   asked to persist a non-persistent stub, so writing the args to storage _is_ the enforcement.
    `TransientStubLoopback` and everything behind it is deleted.
 3. **`spawn(title, prompt)` is unchanged.** It is useful for simple tasks that need nothing beyond
    the agent's environment, and depends on nothing being removed. Only `spawnCallable()` changes.
@@ -64,7 +64,7 @@ of freeform prompts. But the machinery underneath is a mismatch with how agents 
 5. **The kernel owns the prompt framing; the gadget owns the interface text.** The system prompt
    explains the model ("the Gadget calls methods of an interface you implement; here are the
    declarations") and embeds the gadget-supplied `types` verbatim; per-call messages just name the
-   method. The gadget never writes prose about *how* calls are delivered or what to do with
+   method. The gadget never writes prose about _how_ calls are delivered or what to do with
    arguments -- that framing is kernel text, which is where per-model tuning lives.
 6. **Callback args are named after the method.** `env.composeEmail_ARGS`, with a `_2`, `_3`...
    suffix only on collision. The name is stamped on the `agentCallback` message when it is written
@@ -146,9 +146,9 @@ export type CallableAgent = { [method: string]: (...args: unknown[]) => Promise<
 **Migration guard.** Existing gadgets call `spawnCallable(title, prompt)`. So that they fail with
 an explanation rather than a validator's type error, `AgentSpawnerBindingImpl.spawnCallable`
 (`overseer.ts:13033`) declares its second parameter as `SpawnCallableOptions | string` and throws
-when given a string: *"spawnCallable(title, prompt) has been replaced by spawnCallable(title,
+when given a string: _"spawnCallable(title, prompt) has been replaced by spawnCallable(title,
 {types, mainType}); the agent no longer receives a prompt and calls no longer return values. Update
-the calling code -- call describeBinding on the spawner for the new interface."* The served
+the calling code -- call describeBinding on the spawner for the new interface."_ The served
 `.d.ts` keeps the clean signature. capnweb-validate builds the validator from the class method's
 signature, and the README says an `implements` clause "can sharpen matching signatures" -- verify
 that the union survives (if the interface's narrower type wins, drop `implements
@@ -166,14 +166,14 @@ Add to `makeOverseerStorage` beside `agentCallbackArgs` (`overseer.ts:1368`):
 // synchronously by deliverAgentCallback so a call is durable the moment the caller's RPC returns;
 // drained into agentCallback messages by drainPendingAgentCalls at turn boundaries.
 pendingAgentCalls: collection<{
-  chatId: number,
-  callId: number,          // from a new nextAgentCallId singleton; key is chatId.callId
-  methodName: string,
-  args: unknown[],         // persistent stubs only -- put() throws DataCloneError otherwise
-  argsSummary: string,     // summary created using the existing summarizeArgs() function
-  initiatorUserId: string,
-  initiatorModelId: string,
-}>
+  chatId: number;
+  callId: number; // from a new nextAgentCallId singleton; key is chatId.callId
+  methodName: string;
+  args: unknown[]; // persistent stubs only -- put() throws DataCloneError otherwise
+  argsSummary: string; // summary created using the existing summarizeArgs() function
+  initiatorUserId: string;
+  initiatorModelId: string;
+}>;
 ```
 
 This replaces the existing `LiveChatContext.pendingAgentCallbacks` (`overseer.ts:223-256`), which
@@ -192,13 +192,13 @@ this change and its arguments are gone. Every consumer of the `PARAMS_<n>` simul
 reads `msg.bindingName` and does nothing when it is absent: the replay loop (`agent.ts:2122-2144`,
 and the counter at `1559-1563`), `agent-compaction.ts:398-403`, `chatScopeNames` (`7574-7581`), and
 `prepareChatBindings` (`7806-7813`). The "keep in sync" comments at those sites go with them. The
-replay text for a legacy message is *"A callback was received: `self.foo()`. Its arguments are no
-longer available."*
+replay text for a legacy message is _"A callback was received: `self.foo()`. Its arguments are no
+longer available."_
 
 Legacy `agentCallbackArgs` records, which hold `TransientStubLoopback` Fetchers, are left in
 place; no migration. Restoring a Fetcher whose entrypoint class no longer exists yields a stub
 that fails when invoked, not at deserialization, so nothing that lists the records breaks. The
-only path that can still put one in front of the agent is a chat compacted *before* this change
+only path that can still put one in front of the agent is a chat compacted _before_ this change
 while it had callbacks: its checkpoint (`CompactionCheckpoint.chatBindings`, `agent.ts:225`,
 seeded at `1263`) carries `PARAMS_<n>` as `{type: "value", messageSequence}` entries, and
 `getEnvForAgent` (`overseer.ts:3460-3470`) resolves them to the bare args array with dead stubs
@@ -213,8 +213,8 @@ for the bare-array shape, which also describes these correctly.
 
 1. Validate the chat exists.
 2. `pendingAgentCalls.put(...)` inside try/catch. On `DataCloneError`, rethrow with:
-   *"Arguments to a callable agent must be storable. RPC stubs must be persistent stubs created
-   with ctx.restore(); see the agent spawner binding documentation."* (Verify the serializer runs
+   _"Arguments to a callable agent must be storable. RPC stubs must be persistent stubs created
+   with ctx.restore(); see the agent spawner binding documentation."_ (Verify the serializer runs
    synchronously at `put()` time under the typed-storage wrapper, so the error surfaces here and
    not on a later flush.)
 3. If no agent is active for the chat and no message is being prepared, kick
@@ -242,6 +242,7 @@ memory:
   rejecting callers -- the callers have already been answered.
 
 Drain points:
+
 - `deliverAgentCallback` when idle (above).
 - The turn `finally` (`overseer.ts:7189`): replace the `pendingAgentCallbacks.length` check with a
   storage lookup for the chat's pending records. This covers user-initiated turns too, so a call
@@ -269,10 +270,10 @@ Drain points:
 ### `executeCode` environment
 
 - `CODE_MODE_HARNESS` (`75-113`): drop the `callbackResolvers` parameter and the `env[index] =
-  {args, resolve, reject}` loop. `env.<name>` is the args array. `CodeModeEntrypoint.run`
+{args, resolve, reject}` loop. `env.<name>` is the args array. `CodeModeEntrypoint.run`
   (`180-188`) loses the parameter too.
 - `executeCodeMode` (`8617-8641`): drop `callbackResolvers` construction; `entrypoint.run(selfStub,
-  restoreForger)`.
+restoreForger)`.
 - `getEnvForAgent` `"value"` case (`3460`): unchanged apart from the comment.
 
 ### Transient stubs
@@ -361,6 +362,7 @@ it.
 ## Tests
 
 `workshop-backend` (workerd project):
+
 - A call delivered while no agent is running produces a pending record, then an `agentCallback`
   message with `bindingName` `foo_ARGS`, and the record is gone.
 - Two calls to `foo` in one drain get `foo_ARGS` and `foo_ARGS_2`; a method name colliding with a
@@ -387,7 +389,7 @@ it.
    `LiveChatContext.pendingAgentCallbacks`; the drain points; the `DataCloneError` rethrow with
    the instructive message; `modelId: null` handling.
 3. **Interface-driven spawning** (`workshop-backend` + `workshop-shared`): `spawnCallable(title,
-   options)` with the string guard, `spawnerTypes` on the chat context, system-prompt and per-call
+options)` with the string guard, `spawnerTypes` on the chat context, system-prompt and per-call
    text, `.d.ts` rewrite, `bindingName` stamping and removal of the `PARAMS_<n>` simulation
    from all four sites, doc-comment fixes.
 4. Frontend and evals touch-ups.

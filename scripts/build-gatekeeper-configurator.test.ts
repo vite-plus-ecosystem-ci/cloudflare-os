@@ -17,22 +17,22 @@ const configuratorSource =
   'export default { render() { throw new Error("mapped configurator failure"); return <div />; } };\n';
 const checkboxConfiguratorSource =
   'import { CheckboxList, h } from "@gadgets/configurator-ui";\n' +
-  'const options = Array.from({ length: 12 }, (_, index) => ({\n' +
-  '  value: `tool-${index}`, title: `Tool ${index}`,\n' +
-  '}));\n' +
-  'export default {\n' +
+  "const options = Array.from({ length: 12 }, (_, index) => ({\n" +
+  "  value: `tool-${index}`, title: `Tool ${index}`,\n" +
+  "}));\n" +
+  "export default {\n" +
   '  initial: { tools: null, failRender: false, listName: "tools" },\n' +
-  '  resourceUrl({ ui }) { return ui.resourceUrl(); },\n' +
-  '  render({ ui, values, setValues }) {\n' +
+  "  resourceUrl({ ui }) { return ui.resourceUrl(); },\n" +
+  "  render({ ui, values, setValues }) {\n" +
   '    if (values.failRender) throw new Error("state-driven render failure");\n' +
   '    return <div><button id="fail-render" onClick={() => setValues({ failRender: true })}>Fail</button>\n' +
   '      <button id="recover-render" onClick={() => setValues({ failRender: false })}>Recover</button>\n' +
   '      <button id="fail-options" onClick={() => setValues({ listName: "failing" })}>Fail options</button>\n' +
-  '      <CheckboxList name={values.listName} value={values.tools}\n' +
+  "      <CheckboxList name={values.listName} value={values.tools}\n" +
   '        loadOptions={values.listName === "tools" ? async () => options : () => ui.failOptions()}\n' +
-  '        onChange={tools => setValues({ tools })} /></div>;\n' +
-  '  },\n' +
-  '};\n';
+  "        onChange={tools => setValues({ tools })} /></div>;\n" +
+  "  },\n" +
+  "};\n";
 let fixtureDir: string;
 let disabledFixtureDir: string;
 let devModeFixtureDir: string;
@@ -41,12 +41,20 @@ let checkboxFixtureDir: string;
 
 // `envFile` is the `.env.*` file that enables reporting, so which one is written decides which build
 // mode picks it up. `staleArtifacts` pre-seeds the outputs a reporting-disabled build must remove.
-async function createFixture(prefix: string, { envFile, builderArgs = [], staleArtifacts = false, source }: {
-  envFile?: string;
-  builderArgs?: string[];
-  staleArtifacts?: boolean;
-  source?: string;
-} = {}): Promise<string> {
+async function createFixture(
+  prefix: string,
+  {
+    envFile,
+    builderArgs = [],
+    staleArtifacts = false,
+    source,
+  }: {
+    envFile?: string;
+    builderArgs?: string[];
+    staleArtifacts?: boolean;
+    source?: string;
+  } = {},
+): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), prefix));
   await mkdir(join(directory, "src", "configurator"), { recursive: true });
   await mkdir(join(directory, "node_modules", "capnweb", "dist"), { recursive: true });
@@ -58,9 +66,14 @@ async function createFixture(prefix: string, { envFile, builderArgs = [], staleA
     await writeFile(join(directory, "src", "generated", "test-ui.js"), "stale");
     await writeFile(join(directory, "src", "generated", "test-ui.js.map"), "stale");
   }
-  await writeFile(join(directory, "node_modules", "capnweb", "dist", "index.js"),
-    "export class RpcTarget {}\nexport function newMessagePortRpcSession() {}\n");
-  await writeFile(join(directory, "src", "configurator", "test-ui.tsx"), source ?? configuratorSource);
+  await writeFile(
+    join(directory, "node_modules", "capnweb", "dist", "index.js"),
+    "export class RpcTarget {}\nexport function newMessagePortRpcSession() {}\n",
+  );
+  await writeFile(
+    join(directory, "src", "configurator", "test-ui.tsx"),
+    source ?? configuratorSource,
+  );
   await execFileAsync(process.execPath, [builder, directory, ...builderArgs]);
   return directory;
 }
@@ -68,7 +81,8 @@ async function createFixture(prefix: string, { envFile, builderArgs = [], staleA
 async function readRuntime(directory: string): Promise<string> {
   const html = await readFile(join(directory, "src", "generated", "test-ui.txt"), "utf8");
   const match = html.match(
-    /<script type="module" src="data:text\/javascript;charset=utf-8,([^"]+)"/);
+    /<script type="module" src="data:text\/javascript;charset=utf-8,([^"]+)"/,
+  );
   assert.ok(match, "generated HTML should contain its runtime module");
   return decodeURIComponent(match[1]);
 }
@@ -77,7 +91,7 @@ async function runConfiguratorRuntime(
   directory: string,
   waitFor: "checkbox" | "render-error" = "checkbox",
 ) {
-  const dom = new JSDOM("<!DOCTYPE html><div id=\"root\"></div>", {
+  const dom = new JSDOM('<!DOCTYPE html><div id="root"></div>', {
     pretendToBeVisual: true,
     runScripts: "outside-only",
   });
@@ -120,10 +134,13 @@ async function runConfiguratorRuntime(
   `);
 
   for (let attempt = 0; attempt < 20; attempt++) {
-    if (waitFor === "checkbox"
+    if (
+      waitFor === "checkbox"
         ? dom.window.document.querySelector(".checkbox-rows")
-        : dom.window.document.querySelector(".error")) return dom;
-    await new Promise(done => setTimeout(done, 0));
+        : dom.window.document.querySelector(".error")
+    )
+      return dom;
+    await new Promise((done) => setTimeout(done, 0));
   }
   const error = dom.window.document.getElementById("root")?.textContent;
   dom.window.close();
@@ -144,8 +161,8 @@ function readRuntimeFunctions(
   runtime: string,
   ...names: string[]
 ): Record<string, (...args: any[]) => any> {
-  const constants = [...runtime.matchAll(/^const [A-Z_]+ = .*;$/gm)].map(match => match[0]);
-  const definitions = names.map(name => {
+  const constants = [...runtime.matchAll(/^const [A-Z_]+ = .*;$/gm)].map((match) => match[0]);
+  const definitions = names.map((name) => {
     const match = runtime.match(new RegExp(`function ${name}\\([^)]*\\) \\{[\\s\\S]*?\\n\\}`));
     assert.ok(match, `generated runtime should define ${name}`);
     return match[0];
@@ -153,7 +170,8 @@ function readRuntimeFunctions(
   // The generated runtime is trusted build output and production executes the same function.
   // oxlint-disable-next-line no-new-func
   return new Function(
-    `${constants.join("\n")}\n${definitions.join("\n")}\nreturn { ${names.join(", ")} };`)();
+    `${constants.join("\n")}\n${definitions.join("\n")}\nreturn { ${names.join(", ")} };`,
+  )();
 }
 
 /** The source map the builder writes beside each configurator artifact. */
@@ -178,20 +196,27 @@ interface DecodedMapping {
 }
 
 // `decodeMappings` is part of TypeScript's internal API, so it is absent from the public types.
-const decodeMappings = (ts as unknown as {
-  decodeMappings(mappings: string): Iterable<DecodedMapping>;
-}).decodeMappings;
+const decodeMappings = (
+  ts as unknown as {
+    decodeMappings(mappings: string): Iterable<DecodedMapping>;
+  }
+).decodeMappings;
 
-function originalPositionFor(sourceMap: RawSourceMap, line: number, column: number): {
+function originalPositionFor(
+  sourceMap: RawSourceMap,
+  line: number,
+  column: number,
+): {
   source: string;
   line: number;
   column: number;
 } {
-  const mapping = [...decodeMappings(sourceMap.mappings)]
-    .findLast((candidate): candidate is Required<DecodedMapping> =>
+  const mapping = [...decodeMappings(sourceMap.mappings)].findLast(
+    (candidate): candidate is Required<DecodedMapping> =>
       candidate.sourceIndex !== undefined &&
       candidate.generatedLine === line - 1 &&
-      candidate.generatedCharacter <= column - 1);
+      candidate.generatedCharacter <= column - 1,
+  );
   assert.ok(mapping, "reported position should have a source-map mapping");
   return {
     source: sourceMap.sources[mapping.sourceIndex],
@@ -203,12 +228,17 @@ function originalPositionFor(sourceMap: RawSourceMap, line: number, column: numb
 before(async () => {
   fixtureDir = await createFixture("configurator-reporting-", { envFile: ".env.production" });
   disabledFixtureDir = await createFixture("configurator-no-reporting-", { staleArtifacts: true });
-  devModeFixtureDir = await createFixture("configurator-dev-mode-",
-    { envFile: ".env.development", builderArgs: ["--dev"] });
-  devEnvWithoutDevFlagFixtureDir = await createFixture("configurator-dev-env-oneshot-",
-    { envFile: ".env.development", staleArtifacts: true });
-  checkboxFixtureDir = await createFixture(
-    "configurator-checkbox-", { source: checkboxConfiguratorSource });
+  devModeFixtureDir = await createFixture("configurator-dev-mode-", {
+    envFile: ".env.development",
+    builderArgs: ["--dev"],
+  });
+  devEnvWithoutDevFlagFixtureDir = await createFixture("configurator-dev-env-oneshot-", {
+    envFile: ".env.development",
+    staleArtifacts: true,
+  });
+  checkboxFixtureDir = await createFixture("configurator-checkbox-", {
+    source: checkboxConfiguratorSource,
+  });
 });
 
 after(async () => {
@@ -237,7 +267,8 @@ describe("generated configurator error reporting", () => {
     const frame = stack.match(/app:\/\/\/gatekeeper\/[^/]+\/configurator\/test-ui\.js:(\d+):(\d+)/);
     assert.ok(frame, "stack should contain the configurator virtual source URL");
     const sourceMap: RawSourceMap = JSON.parse(
-      await readFile(join(fixtureDir, "src", "generated", "test-ui.js.map"), "utf8"));
+      await readFile(join(fixtureDir, "src", "generated", "test-ui.js.map"), "utf8"),
+    );
     const originalPosition = originalPositionFor(sourceMap, Number(frame[1]), Number(frame[2]));
     const errorOffset = configuratorSource.indexOf("new Error");
     const sourceBeforeError = configuratorSource.slice(0, errorOffset);
@@ -252,21 +283,22 @@ describe("generated configurator error reporting", () => {
   it("emits an upload artifact aligned with the executed virtual source", async () => {
     const runtime = await readRuntime(fixtureDir);
     const moduleCode = readConfiguratorModule(runtime);
-    const artifact = await readFile(
-      join(fixtureDir, "src", "generated", "test-ui.js"), "utf8");
+    const artifact = await readFile(join(fixtureDir, "src", "generated", "test-ui.js"), "utf8");
 
     assert.equal(artifact, `\n\n${moduleCode}\n`);
   });
 
   it("uses the shared bounded exception serializer before posting", async () => {
     const runtime = await readRuntime(fixtureDir);
-    const dataModules = [...runtime.matchAll(/base64,([A-Za-z0-9+/=]+)/g)]
-      .map(match => Buffer.from(match[1], "base64").toString("utf8"));
-    const serializerSource = dataModules.find(source => source.includes("serializeException"));
+    const dataModules = [...runtime.matchAll(/base64,([A-Za-z0-9+/=]+)/g)].map((match) =>
+      Buffer.from(match[1], "base64").toString("utf8"),
+    );
+    const serializerSource = dataModules.find((source) => source.includes("serializeException"));
     assert.ok(serializerSource, "generated runtime should embed the shared serializer");
 
     const serializer = await import(
-      `data:text/javascript;base64,${Buffer.from(serializerSource).toString("base64")}`);
+      `data:text/javascript;base64,${Buffer.from(serializerSource).toString("base64")}`
+    );
     const error = new Error("m".repeat(2_000));
     error.name = "n".repeat(300);
     error.stack = "s".repeat(20_000);
@@ -325,7 +357,10 @@ describe("generated configurator error reporting", () => {
 describe("generated configurator option sanitizing", () => {
   it("truncates an overflowing suggestion list but refuses an overflowing grant list", async () => {
     const { sanitizeOptions } = readRuntimeFunctions(
-      await readRuntime(fixtureDir), "optionText", "sanitizeOptions");
+      await readRuntime(fixtureDir),
+      "optionText",
+      "sanitizeOptions",
+    );
     const options = Array.from({ length: 201 }, (_, index) => ({
       value: `tool-${index}`,
       title: `Tool ${index}`,
@@ -337,7 +372,10 @@ describe("generated configurator option sanitizing", () => {
 
   it("keeps every option when the list is within the limit", async () => {
     const { sanitizeOptions } = readRuntimeFunctions(
-      await readRuntime(fixtureDir), "optionText", "sanitizeOptions");
+      await readRuntime(fixtureDir),
+      "optionText",
+      "sanitizeOptions",
+    );
     const options = Array.from({ length: 200 }, (_, index) => ({
       value: `tool-${index}`,
       title: `Tool ${index}`,
@@ -348,32 +386,51 @@ describe("generated configurator option sanitizing", () => {
 
   it("keeps stale selections visible so they can be cleared", async () => {
     const { withUnavailableOptions } = readRuntimeFunctions(
-      await readRuntime(fixtureDir), "splitList", "withUnavailableOptions");
-    assert.deepEqual(withUnavailableOptions(
-      [{ value: "current", title: "Current" }], "current,removed"), [
-      { value: "current", title: "Current" },
-      { value: "removed", title: "removed (unavailable)" },
-    ]);
+      await readRuntime(fixtureDir),
+      "splitList",
+      "withUnavailableOptions",
+    );
+    assert.deepEqual(
+      withUnavailableOptions([{ value: "current", title: "Current" }], "current,removed"),
+      [
+        { value: "current", title: "Current" },
+        { value: "removed", title: "removed (unavailable)" },
+      ],
+    );
   });
 
   it("presents every option as selected when requested", async () => {
     const { checkboxSelection } = readRuntimeFunctions(
-      await readRuntime(fixtureDir), "splitList", "checkboxSelection");
+      await readRuntime(fixtureDir),
+      "splitList",
+      "checkboxSelection",
+    );
     assert.deepEqual(
-        [...checkboxSelection([{ value: "read" }, { value: "write" }], null, true)],
-        ["read", "write"]);
+      [...checkboxSelection([{ value: "read" }, { value: "write" }], null, true)],
+      ["read", "write"],
+    );
   });
 
   it("only blocks failed checkbox lists that are enabled", async () => {
     const { hasBlockingCheckboxFailure } = readRuntimeFunctions(
-      await readRuntime(fixtureDir), "hasBlockingCheckboxFailure");
-    assert.equal(hasBlockingCheckboxFailure({ tools: { status: "failed", disabled: true } }), false);
-    assert.equal(hasBlockingCheckboxFailure({ tools: { status: "failed", disabled: false } }), true);
+      await readRuntime(fixtureDir),
+      "hasBlockingCheckboxFailure",
+    );
+    assert.equal(
+      hasBlockingCheckboxFailure({ tools: { status: "failed", disabled: true } }),
+      false,
+    );
+    assert.equal(
+      hasBlockingCheckboxFailure({ tools: { status: "failed", disabled: false } }),
+      true,
+    );
   });
 
   it("prunes checkbox lists absent from the current render", async () => {
     const { pruneCheckboxEntries } = readRuntimeFunctions(
-      await readRuntime(fixtureDir), "pruneCheckboxEntries");
+      await readRuntime(fixtureDir),
+      "pruneCheckboxEntries",
+    );
     const entries = {
       "tools:old": { status: "failed", disabled: false },
       "tools:new": { status: "ready", disabled: false },
@@ -418,9 +475,11 @@ describe("generated configurator readiness", () => {
   it("reports ready after rendering when the optional readiness predicate is absent", async () => {
     const dom = await runConfiguratorRuntime(checkboxFixtureDir);
     try {
-      const selectionReadyEvents = (dom.window as unknown as {
-        selectionReadyEvents: { ready: boolean; rendered: boolean }[];
-      }).selectionReadyEvents;
+      const selectionReadyEvents = (
+        dom.window as unknown as {
+          selectionReadyEvents: { ready: boolean; rendered: boolean }[];
+        }
+      ).selectionReadyEvents;
       assert.equal(selectionReadyEvents.length, 1);
       assert.equal(selectionReadyEvents[0].ready, true);
       assert.equal(selectionReadyEvents[0].rendered, true);
@@ -432,9 +491,11 @@ describe("generated configurator readiness", () => {
   it("does not report ready when the initial render fails", async () => {
     const dom = await runConfiguratorRuntime(fixtureDir, "render-error");
     try {
-      const selectionReadyEvents = (dom.window as unknown as {
-        selectionReadyEvents: { ready: boolean; rendered: boolean }[];
-      }).selectionReadyEvents;
+      const selectionReadyEvents = (
+        dom.window as unknown as {
+          selectionReadyEvents: { ready: boolean; rendered: boolean }[];
+        }
+      ).selectionReadyEvents;
       assert.equal(selectionReadyEvents.length, 1);
       assert.equal(selectionReadyEvents[0].ready, false);
     } finally {
@@ -447,14 +508,19 @@ describe("generated configurator readiness", () => {
     try {
       const failRender = dom.window.document.querySelector("#fail-render");
       assert.ok(failRender);
-      dom.window.addEventListener("error", (event: Event) => event.preventDefault(), { once: true });
+      dom.window.addEventListener("error", (event: Event) => event.preventDefault(), {
+        once: true,
+      });
       failRender.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
 
       const runtime = dom.window as unknown as {
         selectionReadyEvents: { ready: boolean; rendered: boolean }[];
         configuratorIframe: { collectResourceUrl(): Promise<string> };
       };
-      assert.deepEqual(Array.from(runtime.selectionReadyEvents, event => event.ready), [true, false]);
+      assert.deepEqual(
+        Array.from(runtime.selectionReadyEvents, (event) => event.ready),
+        [true, false],
+      );
       await assert.rejects(
         runtime.configuratorIframe.collectResourceUrl(),
         /failed to render its current state/i,
@@ -464,7 +530,7 @@ describe("generated configurator readiness", () => {
       assert.ok(recoverRender);
       recoverRender.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
       assert.deepEqual(
-        Array.from(runtime.selectionReadyEvents, event => event.ready),
+        Array.from(runtime.selectionReadyEvents, (event) => event.ready),
         [true, false, true],
       );
     } finally {
@@ -482,7 +548,9 @@ describe("generated configurator readiness", () => {
       const resourceUrl = runtime.configuratorIframe.collectResourceUrl();
       const failRender = dom.window.document.querySelector("#fail-render");
       assert.ok(failRender);
-      dom.window.addEventListener("error", (event: Event) => event.preventDefault(), { once: true });
+      dom.window.addEventListener("error", (event: Event) => event.preventDefault(), {
+        once: true,
+      });
       failRender.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
       runtime.resolveResourceUrl("https://example.com/");
 
@@ -524,12 +592,12 @@ describe("generated configurator readiness", () => {
         resolveResourceUrl(url: string): void;
       };
       for (let attempt = 0; attempt < 20 && !runtime.rejectOptions; attempt++) {
-        await new Promise(done => setTimeout(done, 0));
+        await new Promise((done) => setTimeout(done, 0));
       }
       assert.ok(runtime.rejectOptions);
       const resourceUrl = runtime.configuratorIframe.collectResourceUrl();
       runtime.rejectOptions(new Error("options unavailable"));
-      await new Promise(done => setTimeout(done, 0));
+      await new Promise((done) => setTimeout(done, 0));
       runtime.resolveResourceUrl("https://example.com/");
 
       await assert.rejects(resourceUrl, /options did not load/i);
@@ -607,7 +675,8 @@ describe("configurator builder env declarations", () => {
     // Property accesses only (`loadEnv(...).VITE_X`, `process.env.VITE_X`), so a variable merely
     // named in a comment doesn't register as a read.
     const read = new Set(
-      [...builderSource.matchAll(/\.(VITE_[A-Z0-9_]+)/g)].map(match => match[1]));
+      [...builderSource.matchAll(/\.(VITE_[A-Z0-9_]+)/g)].map((match) => match[1]),
+    );
     assert.ok(read.size > 0, "expected the builder to read at least one VITE_ variable");
 
     // `build:configurator`'s own `env`, not the union of every task's. `env` is per-task: vp strips
@@ -624,29 +693,37 @@ describe("configurator builder env declarations", () => {
     // `bin` map rather than being visible in the command string. Resolve it rather than matching the
     // name literally: that way a bin renamed on one side but not the other fails here, and so does a
     // bin quietly re-pointed at a different script.
-    const manifest = JSON.parse(await readFile(resolve("scripts/package.json"), "utf8")) as
-      { bin: Record<string, string> };
+    const manifest = JSON.parse(await readFile(resolve("scripts/package.json"), "utf8")) as {
+      bin: Record<string, string>;
+    };
     const builderBins = Object.entries(manifest.bin)
       .filter(([, target]) => resolve("scripts", target) === builder)
       .map(([name]) => name);
     assert.equal(
-      builderBins.length, 1,
+      builderBins.length,
+      1,
       `expected exactly one bin in scripts/package.json pointing at ${basename(builder)}, ` +
-        `found ${builderBins.length}`);
+        `found ${builderBins.length}`,
+    );
     assert.ok(
       task.includes(builderBins[0]),
       `${configPath}'s \`build:configurator\` no longer runs ${basename(builder)} (via the ` +
         `\`${builderBins[0]}\` bin), so its \`env\` is not what reaches the builder. Point this ` +
-        "assertion at the task that runs it.");
+        "assertion at the task that runs it.",
+    );
 
     const declared = new Set(
-      [...(task.match(/env:\s*\[([^\]]*)\]/)?.[1] ?? "")
-        .matchAll(/["'](VITE_[A-Z0-9_]+)["']/g)].map(match => match[1]));
+      [
+        ...(task.match(/env:\s*\[([^\]]*)\]/)?.[1] ?? "").matchAll(/["'](VITE_[A-Z0-9_]+)["']/g),
+      ].map((match) => match[1]),
+    );
 
     assert.deepEqual(
-      [...read].toSorted(), [...declared].toSorted(),
+      [...read].toSorted(),
+      [...declared].toSorted(),
       `every VITE_ variable the builder reads must be declared in \`env\` on \`build:configurator\` ` +
-        `in ${configPath} (and vice versa -- a stale declaration only adds spurious cache misses)`);
+        `in ${configPath} (and vice versa -- a stale declaration only adds spurious cache misses)`,
+    );
   });
 });
 
@@ -659,9 +736,10 @@ async function configuratorPackages(): Promise<string[]> {
   const names: string[] = [];
   for (const entry of await readdir("packages", { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const sources =
-      await readdir(join("packages", entry.name, "src", "configurator")).catch(() => []);
-    if (sources.some(name => name.endsWith(".tsx"))) names.push(entry.name);
+    const sources = await readdir(join("packages", entry.name, "src", "configurator")).catch(
+      () => [],
+    );
+    if (sources.some((name) => name.endsWith(".tsx"))) names.push(entry.name);
   }
   return names;
 }
@@ -681,9 +759,7 @@ const SHARED_CONFIGURATOR_SPECIFIER = "@gadgets/scripts/gatekeeper-configurator"
  */
 describe("configurator task wiring", () => {
   it("builds Google's configurators before either supported test route", async () => {
-    const manifest = JSON.parse(await readFile(
-      "packages/gatekeeper-google/package.json", "utf8",
-    ));
+    const manifest = JSON.parse(await readFile("packages/gatekeeper-google/package.json", "utf8"));
     assert.equal(
       manifest.scripts["test:run"],
       "vp run -F @gadgets/google-gatekeeper build:configurator && " +
@@ -703,14 +779,16 @@ describe("configurator task wiring", () => {
     assert.ok(names.length > 0, "expected to find packages with configurator UI sources");
 
     for (const name of names) {
-      const config =
-        await readFile(join("packages", name, "vite.config.ts"), "utf8").catch(() => null);
+      const config = await readFile(join("packages", name, "vite.config.ts"), "utf8").catch(
+        () => null,
+      );
       assert.ok(
         config?.includes(SHARED_CONFIGURATOR_SPECIFIER),
         `packages/${name} has configurator UI sources but no vite.config.ts re-exporting ` +
           `${SHARED_CONFIGURATOR_SPECIFIER}, so it declares no \`build:configurator\` task ` +
           "and `pnpm build` would strip VITE_FRONTEND_ERROR_REPORTING from the builder. Re-export " +
-          "the shared config (or declare the task with its own `env` and widen this assertion).");
+          "the shared config (or declare the task with its own `env` and widen this assertion).",
+      );
     }
   });
 
@@ -725,14 +803,19 @@ describe("configurator task wiring", () => {
     assert.ok(
       skeleton.includes(SHARED_CONFIGURATOR_SPECIFIER),
       "SKELETON.md's vite.config.ts block must re-export " +
-        `${SHARED_CONFIGURATOR_SPECIFIER}, the specifier the routing guard looks for.`);
+        `${SHARED_CONFIGURATOR_SPECIFIER}, the specifier the routing guard looks for.`,
+    );
     assert.doesNotMatch(
-      skeleton, /\.\.\/\.\.\/scripts\/gatekeeper-configurator-vite-config/,
-      "SKELETON.md still hands out the pre-@gadgets/scripts relative path to the shared config.");
+      skeleton,
+      /\.\.\/\.\.\/scripts\/gatekeeper-configurator-vite-config/,
+      "SKELETON.md still hands out the pre-@gadgets/scripts relative path to the shared config.",
+    );
     assert.match(
-      skeleton, /"@gadgets\/scripts":\s*"workspace:\*"/,
+      skeleton,
+      /"@gadgets\/scripts":\s*"workspace:\*"/,
       "SKELETON.md must show @gadgets/scripts in the new package's devDependencies: its bins are " +
-        "on PATH from the workspace root, so leaving it undeclared works until it doesn't.");
+        "on PATH from the workspace root, so leaving it undeclared works until it doesn't.",
+    );
   });
 
   // deploy-scripts.test.ts holds the two general deploy invariants. Both pass vacuously on a
@@ -743,10 +826,12 @@ describe("configurator task wiring", () => {
       const manifest = JSON.parse(await readFile(join("packages", name, "package.json"), "utf8"));
       const command = manifest.scripts?.deploy ?? "";
       assert.match(
-        command, /vp run [^&]*build:configurator/,
+        command,
+        /vp run [^&]*build:configurator/,
         `packages/${name} deploys without running \`build:configurator\`: ` +
           `${command || "(no deploy script)"}\nwrangler bundles src/generated/ from disk, so a ` +
-          "deploy that skips the codegen ships whatever the last build happened to leave there.");
+          "deploy that skips the codegen ships whatever the last build happened to leave there.",
+      );
     }
   });
 });

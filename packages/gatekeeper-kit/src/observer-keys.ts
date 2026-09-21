@@ -24,7 +24,10 @@ export const OBSERVER_WITHHOLD_LATCH_KEY = "observer-withhold-latch";
 // Every one of these is scanned by prefix, so a foreign key landing inside one is read as an
 // observer, an admission attempt, or an unsettled withheld read.
 const RESERVED = [
-  OBSERVER_PREFIX, OBSERVER_ATTEMPT_PREFIX, OBSERVER_NONCE_PREFIX, OBSERVER_WITHHOLD_FENCE_PREFIX,
+  OBSERVER_PREFIX,
+  OBSERVER_ATTEMPT_PREFIX,
+  OBSERVER_NONCE_PREFIX,
+  OBSERVER_WITHHOLD_FENCE_PREFIX,
   OBSERVER_WITHHOLD_LATCH_KEY,
 ];
 
@@ -33,6 +36,5 @@ const RESERVED = [
  * @returns The observer prefix it would scan into, or be scanned by; `undefined` when clear.
  */
 export function reservedObserverOverlap(prefix: string): string | undefined {
-  return RESERVED.find(
-    reserved => prefix.startsWith(reserved) || reserved.startsWith(prefix));
+  return RESERVED.find((reserved) => prefix.startsWith(reserved) || reserved.startsWith(prefix));
 }

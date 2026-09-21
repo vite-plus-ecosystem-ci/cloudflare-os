@@ -43,8 +43,10 @@ export const OBSERVATION_REFUSED_CODE = "ObservationRefusedError";
  */
 export function isObservationRefused(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
-  return error.name === OBSERVATION_REFUSED_CODE
-    || ("code" in error && error.code === OBSERVATION_REFUSED_CODE);
+  return (
+    error.name === OBSERVATION_REFUSED_CODE ||
+    ("code" in error && error.code === OBSERVATION_REFUSED_CODE)
+  );
 }
 
 /**
@@ -88,24 +90,25 @@ type ObserverStrategyBase = {
  */
 export type ObserverStrategy =
   | (ObserverStrategyBase & {
-    aclChecks: "per-read";
-    /**
-     * Prepares exclusions for the groupings a read disclosed.
-     * @param collectionIds Provider grouping IDs disclosed by the read.
-     * @returns Prepared observer state.
-     */
-    prepare(collectionIds: readonly string[]): Promise<ObservationCheck>;
-  })
+      aclChecks: "per-read";
+      /**
+       * Prepares exclusions for the groupings a read disclosed.
+       * @param collectionIds Provider grouping IDs disclosed by the read.
+       * @returns Prepared observer state.
+       */
+      prepare(collectionIds: readonly string[]): Promise<ObservationCheck>;
+    })
   | (ObserverStrategyBase & {
-    aclChecks: "no-observers" | "unsupported";
-    prepare?: never;
-  });
+      aclChecks: "no-observers" | "unsupported";
+      prepare?: never;
+    });
 
 // Baseline and public strategies cannot support owner-only reads.
 function cannotWithhold(): never {
   throw new Error(
     "This binding's strategy shares every read with admitted observers; use a baseline scope, " +
-    "or track observed collections to withhold a read.");
+      "or track observed collections to withhold a read.",
+  );
 }
 
 /**
@@ -117,7 +120,9 @@ export function privateObservers(message: string): ObserverStrategy {
   return {
     // Nobody is ever admitted, so a collection scope has no observer to exclude.
     aclChecks: "no-observers",
-    addObserver: async () => { throw new Error(message); },
+    addObserver: async () => {
+      throw new Error(message);
+    },
     removeObserver: async () => {},
     // Owner-only by construction: no observer is ever admitted, so there is nobody to exclude.
     prepareWithheld: () => NOTHING_TO_RESOLVE,
@@ -146,7 +151,7 @@ export function aclObservers<V>(options: {
     addObserver: async (_id, user) => {
       // Only `true` admits, as in C: a malformed answer from a hand-written oracle denies rather
       // than admits, and the two strategies must not disagree on what counts as access.
-      if (await options.hasAccess(asVerifier<V>(user)) !== true) {
+      if ((await options.hasAccess(asVerifier<V>(user))) !== true) {
         throw new Error(options.denyMessage ?? OBSERVER_DENIED);
       }
     },
@@ -160,13 +165,15 @@ export function aclObservers<V>(options: {
  * @param options Observer-tracker storage and ACL policy.
  * @returns A tracked-collection observer strategy.
  */
-export function trackedCollectionObservers<V>(options: ObserverTrackerOptions<V>): ObserverStrategy {
+export function trackedCollectionObservers<V>(
+  options: ObserverTrackerOptions<V>,
+): ObserverStrategy {
   const tracker = new ObserverTracker<V>(options);
   return {
     aclChecks: "per-read",
     addObserver: (id, user) => tracker.addObserver(id, asVerifier<V>(user)),
-    removeObserver: async id => tracker.removeObserver(id),
-    prepare: collectionIds => tracker.prepareObservation(collectionIds),
+    removeObserver: async (id) => tracker.removeObserver(id),
+    prepare: (collectionIds) => tracker.prepareObservation(collectionIds),
     observerIds: () => tracker.observerIds(),
     prepareWithheld: () => tracker.prepareWithheld(),
   };
@@ -301,7 +308,8 @@ export class ObservationGate implements Disposable {
     const exclude = check.excludeObservers;
     try {
       await this.#authorizer.authorizeObservation(
-        exclude?.length ? { ...input, excludeObservers: exclude } : input);
+        exclude?.length ? { ...input, excludeObservers: exclude } : input,
+      );
     } catch (error) {
       // A marked refusal proves nothing was recorded, so prepared state is reclaimed; any other
       // failure leaves the outcome unknown, and durable fences stay.
@@ -327,14 +335,16 @@ export class ObservationGate implements Disposable {
         if (scope.ids.length === 0) {
           throw new Error(
             'An observation scope of kind "collections" needs at least one collection id; use ' +
-            '{ kind: "baseline" } for a read the admission baseline covers.');
+              '{ kind: "baseline" } for a read the admission baseline covers.',
+          );
         }
         // Fail closed, as `prepareWithheld` already does for the mirror-image mismatch. Accepting
         // ids this strategy cannot check would report a per-collection decision nothing made.
         if (this.#strategy.aclChecks === "unsupported") {
           throw new Error(
             "This binding's strategy cannot enforce collection ACLs, so it must not be handed collection ids. " +
-            'Track observed collections to enforce them, or declare the read { kind: "baseline" }.');
+              'Track observed collections to enforce them, or declare the read { kind: "baseline" }.',
+          );
         }
         return (await this.#strategy.prepare?.(scope.ids)) ?? NOTHING_TO_RESOLVE;
     }

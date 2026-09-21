@@ -16,16 +16,24 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return <Section>
-      <Field label="Cloudflare account" description="Queries telemetry across every Worker in this account.">
-        <Autocomplete
-          name="accountId"
-          value={values.accountId}
-          placeholder="Choose an account"
-          loadOptions={query => ui.listAccounts(query)}
-          onChange={accountId => setValues({ accountId })}
-        />
-      </Field>
-    </Section>;
+    return (
+      <Section>
+        <Field
+          label="Cloudflare account"
+          description="Queries telemetry across every Worker in this account."
+        >
+          <Autocomplete
+            name="accountId"
+            value={values.accountId}
+            placeholder="Choose an account"
+            loadOptions={(query) => ui.listAccounts(query)}
+            onChange={(accountId) => setValues({ accountId })}
+          />
+        </Field>
+      </Section>
+    );
   },
-} satisfies ConfiguratorUISpec<CloudflareAccountConfiguratorRpc, CloudflareAccountConfiguratorValues>;
+} satisfies ConfiguratorUISpec<
+  CloudflareAccountConfiguratorRpc,
+  CloudflareAccountConfiguratorValues
+>;

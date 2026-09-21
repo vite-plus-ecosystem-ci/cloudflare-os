@@ -17,7 +17,10 @@ import {
   type VendorDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
 import { connectHandoffPageHtml, htmlResponse } from "@gadgets/gatekeeper-kit/connect-pages";
-import { commitStagedCredentials, stageCredentials } from "@gadgets/gatekeeper-kit/credential-stage";
+import {
+  commitStagedCredentials,
+  stageCredentials,
+} from "@gadgets/gatekeeper-kit/credential-stage";
 import INSTANCE_CONFIGURATOR_HTML from "./generated/instance-configurator-ui.txt";
 import AREA_CONFIGURATOR_HTML from "./generated/area-configurator-ui.txt";
 import LABEL_CONFIGURATOR_HTML from "./generated/label-configurator-ui.txt";
@@ -131,8 +134,7 @@ const HOMEASSISTANT_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox=
 <path d="M489.4 226.7 278.6 16c-12.4-12.4-32.8-12.4-45.2 0L22.6 226.7C10.2 239.1 0 263.7 0 281.3v192c0 17.6 14.4 32 32 32h196.8l-86.7-86.7c-4.5 1.5-9.2 2.4-14.2 2.4-24.1 0-43.7-19.6-43.7-43.7s19.6-43.7 43.7-43.7 43.7 19.6 43.7 43.7c0 5-.9 9.7-2.4 14.2l67.5 67.5V211.8c-14.5-7.1-24.5-22-24.5-39.2 0-24.1 19.6-43.7 43.7-43.7s43.7 19.6 43.7 43.7c0 17.2-10 32.1-24.5 39.2v173.4l67.1-67.1c-1.3-4.2-2-8.6-2-13.2 0-24.1 19.6-43.7 43.7-43.7s43.7 19.6 43.7 43.7-19.6 43.7-43.7 43.7c-5.3 0-10.4-1-15.1-2.8l-93.7 93.7v65.9H480c17.6 0 32-14.4 32-32v-192c0-17.6-10.2-42.2-22.6-54.7" fill="#18bcf2"/>\
 </svg>`;
 
-const HOMEASSISTANT_LOGO_URL =
-  `data:image/svg+xml;utf8,${encodeURIComponent(HOMEASSISTANT_LOGO_SVG)}`;
+const HOMEASSISTANT_LOGO_URL = `data:image/svg+xml;utf8,${encodeURIComponent(HOMEASSISTANT_LOGO_SVG)}`;
 
 const HOMEASSISTANT_ICON: AvatarImage = { url: HOMEASSISTANT_LOGO_URL };
 
@@ -250,7 +252,10 @@ const INVALID_LINK_HTML = `<!DOCTYPE html>
 </html>`;
 
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+  );
 }
 
 function escapeAttr(s: string): string {
@@ -327,10 +332,10 @@ export default {
           });
         }
         if (result.kind === "error") {
-          return new Response(
-            CONNECT_FORM_HTML({ actionUrl: req.url, error: result.message }),
-            { headers: { "Content-Type": "text/html; charset=utf-8" }, status: 400 },
-          );
+          return new Response(CONNECT_FORM_HTML({ actionUrl: req.url, error: result.message }), {
+            headers: { "Content-Type": "text/html; charset=utf-8" },
+            status: 400,
+          });
         }
         return htmlResponse(connectHandoffPageHtml(result.handoff));
       }
@@ -352,9 +357,9 @@ export class GatekeeperVendor extends WorkerEntrypoint<Env> implements Gatekeepe
       logo: HOMEASSISTANT_ICON,
       tagline: "Control your smart home, read sensor state, and edit Lovelace dashboards.",
       description:
-          "Connect your Home Assistant instance so Cloudflare OS can read entity state, call services " +
-          "to control devices, edit dashboards, and render templates. Build agents that automate " +
-          "your home, alert on sensor changes, or generate custom dashboards.",
+        "Connect your Home Assistant instance so Cloudflare OS can read entity state, call services " +
+        "to control devices, edit dashboards, and render templates. Build agents that automate " +
+        "your home, alert on sensor changes, or generate custom dashboards.",
     };
   }
 
@@ -368,7 +373,6 @@ export class GatekeeperVendor extends WorkerEntrypoint<Env> implements Gatekeepe
   async getSupportedResources(): Promise<SupportedResource[]> {
     return SUPPORTED_RESOURCES;
   }
-
 
   async getTypeScriptTypes(): Promise<string> {
     return TYPES_CODE;
@@ -441,8 +445,12 @@ export class UserAccount extends DurableObject<Env> {
     token: string,
   ): Promise<CompleteConnectionResult> {
     const stored = this.ctx.storage.kv.get<StoredNonce>("nonce");
-    if (!stored || stored.connecting || Date.now() >= stored.expiresAt
-        || !constantTimeEqual(stored.value, nonce)) {
+    if (
+      !stored ||
+      stored.connecting ||
+      Date.now() >= stored.expiresAt ||
+      !constantTimeEqual(stored.value, nonce)
+    ) {
       return { kind: "invalid_nonce" };
     }
     // Claim the nonce before the first await. The Durable Object's input gate does not cover the
@@ -457,9 +465,10 @@ export class UserAccount extends DurableObject<Env> {
       await rest.ping();
     } catch (e: any) {
       this.#releaseNonceClaim(nonce);
-      const msg = e instanceof HomeAssistantError
-        ? e.message
-        : `Unable to reach Home Assistant: ${e?.message ?? e}`;
+      const msg =
+        e instanceof HomeAssistantError
+          ? e.message
+          : `Unable to reach Home Assistant: ${e?.message ?? e}`;
       return { kind: "error", message: msg };
     }
 
@@ -478,7 +487,10 @@ export class UserAccount extends DurableObject<Env> {
       // Workshop has confirmed the browser that finished the flow is the owner's (see
       // commitReconnect). Bound gadgets keep reading the current token meanwhile.
       const stageId = stageCredentials<StoredCredentials>(
-          this.ctx.storage.kv, { baseUrl, token }, Date.now());
+        this.ctx.storage.kv,
+        { baseUrl, token },
+        Date.now(),
+      );
       try {
         handoff = await callback.reconnectComplete(stageId);
       } catch (e: any) {
@@ -511,7 +523,11 @@ export class UserAccount extends DurableObject<Env> {
 
   /** Makes the credentials staged under `stageId` live; see GatekeeperUser.commitReconnect. */
   async commitReconnect(stageId: string): Promise<void> {
-    const creds = commitStagedCredentials<StoredCredentials>(this.ctx.storage.kv, Date.now(), stageId);
+    const creds = commitStagedCredentials<StoredCredentials>(
+      this.ctx.storage.kv,
+      Date.now(),
+      stageId,
+    );
     if (!creds) throw new Error("No reconnect is awaiting confirmation. Please try again.");
     this.ctx.storage.kv.put<StoredCredentials>("credentials", creds);
     this.ctx.storage.kv.put("expiredNotified", false);
@@ -716,7 +732,7 @@ export class HomeAssistantUserImpl
     await this.#userAccount().commitReconnect(stageId);
   }
 
-  async ensureResources(_resourceUrlPatterns: string[]): Promise<{url?: string}> {
+  async ensureResources(_resourceUrlPatterns: string[]): Promise<{ url?: string }> {
     return {};
   }
 
@@ -748,10 +764,7 @@ export class HomeAssistantVerifier extends WorkerEntrypoint<Env> implements Gate
 // credentials getter is stored in a WeakMap keyed by the RpcTarget instance, not on the
 // instance itself).
 
-const instanceConfiguratorGetters = new WeakMap<
-  object,
-  () => Promise<HomeAssistantCredentials>
->();
+const instanceConfiguratorGetters = new WeakMap<object, () => Promise<HomeAssistantCredentials>>();
 
 @validateRpc()
 class InstanceConfiguratorUI extends RpcTarget implements HomeAssistantInstanceConfiguratorRpc {
@@ -788,10 +801,7 @@ class InstanceConfiguratorUI extends RpcTarget implements HomeAssistantInstanceC
 // Each is given a credentials-getter closure (stored in a WeakMap so it isn't accessible as an
 // RPC property). They only expose read-only listing methods.
 
-const resourceConfiguratorGetters = new WeakMap<
-  object,
-  () => Promise<HomeAssistantCredentials>
->();
+const resourceConfiguratorGetters = new WeakMap<object, () => Promise<HomeAssistantCredentials>>();
 
 async function getResourceConfiguratorCreds(target: object): Promise<HomeAssistantCredentials> {
   const getter = resourceConfiguratorGetters.get(target);
@@ -929,9 +939,7 @@ class EntityConfiguratorUI extends RpcTarget implements HomeAssistantEntityConfi
   async listEntities(query: string): Promise<HomeAssistantConfiguratorOption[]> {
     const creds = await getResourceConfiguratorCreds(this);
     const snapshot = await fetchRegistrySnapshot(creds);
-    const areaNames = new Map<string, string>(
-      snapshot.areas.map((a: any) => [a.area_id, a.name]),
-    );
+    const areaNames = new Map<string, string>(snapshot.areas.map((a: any) => [a.area_id, a.name]));
     const deviceAreaIds = new Map<string, string | undefined>(
       snapshot.devices.map((d: any) => [d.id, d.area_id]),
     );
@@ -943,8 +951,7 @@ class EntityConfiguratorUI extends RpcTarget implements HomeAssistantEntityConfi
       const entityId: string = reg.entity_id;
       seen.add(entityId);
       const state = snapshot.states.get(entityId);
-      const name =
-        reg.name ?? reg.original_name ?? state?.attributes?.friendly_name ?? entityId;
+      const name = reg.name ?? reg.original_name ?? state?.attributes?.friendly_name ?? entityId;
       const areaId = reg.area_id ?? (reg.device_id && deviceAreaIds.get(reg.device_id));
       const areaName = areaId ? areaNames.get(areaId) : undefined;
       options.push({
@@ -1284,9 +1291,7 @@ export class HomeAssistantGatekeeperImpl
   // ---------------------------------------------------------------------
   // Internal helpers
 
-  async #sessionContext(
-    approvalQueue: RpcStub<ApprovalQueue>,
-  ): Promise<SessionContext> {
+  async #sessionContext(approvalQueue: RpcStub<ApprovalQueue>): Promise<SessionContext> {
     const creds = await this.#getCreds();
     return this.#buildSessionContext(creds, approvalQueue);
   }
@@ -1407,9 +1412,7 @@ export class HomeAssistantGatekeeperImpl
    * `pending:*` rows. */
   #listPendingActions(): HomeAssistantAction[] {
     const rows = [...this.ctx.storage.kv.list<PendingActionRow>({ prefix: "pending:" })];
-    return rows
-      .map(([_, row]) => row.action)
-      .toSorted((a, b) => a.id - b.id);
+    return rows.map(([_, row]) => row.action).toSorted((a, b) => a.id - b.id);
   }
 
   // Action storage (KV layout):
@@ -1759,7 +1762,10 @@ function describeBadArg(value: unknown): string {
   return typeof value;
 }
 
-async function callApi<T>(ctx: SessionContext, fn: (rest: HomeAssistantRest) => Promise<T>): Promise<T> {
+async function callApi<T>(
+  ctx: SessionContext,
+  fn: (rest: HomeAssistantRest) => Promise<T>,
+): Promise<T> {
   const rest = new HomeAssistantRest(ctx.creds);
   try {
     return await fn(rest);
@@ -1771,7 +1777,10 @@ async function callApi<T>(ctx: SessionContext, fn: (rest: HomeAssistantRest) => 
   }
 }
 
-async function callWs<T>(ctx: SessionContext, fn: (ws: HomeAssistantWebSocket) => Promise<T>): Promise<T> {
+async function callWs<T>(
+  ctx: SessionContext,
+  fn: (ws: HomeAssistantWebSocket) => Promise<T>,
+): Promise<T> {
   try {
     return await withWebSocket(ctx.creds, fn);
   } catch (e) {
@@ -1832,7 +1841,9 @@ function normalizeDevice(d: any): DeviceInfo {
 }
 
 function summarizeEntity(
-  snapshot: { entities: any[]; devices: any[]; states: Map<string, any> } | Awaited<ReturnType<typeof fetchRegistrySnapshot>>,
+  snapshot:
+    | { entities: any[]; devices: any[]; states: Map<string, any> }
+    | Awaited<ReturnType<typeof fetchRegistrySnapshot>>,
   entityId: string,
 ): EntitySummary | undefined {
   const registryEntity = (snapshot.entities as any[]).find((e: any) => e.entity_id === entityId);
@@ -1841,16 +1852,17 @@ function summarizeEntity(
   return buildSummary(registryEntity, state, snapshot.devices as any[]);
 }
 
-function buildSummary(registryEntity: any | undefined, state: any | undefined, devices: any[]): EntitySummary {
+function buildSummary(
+  registryEntity: any | undefined,
+  state: any | undefined,
+  devices: any[],
+): EntitySummary {
   const entityId = registryEntity?.entity_id ?? state?.entity_id;
   const domain = String(entityId).split(".")[0];
   const device = registryEntity?.device_id
     ? devices.find((d: any) => d.id === registryEntity.device_id)
     : undefined;
-  const areaId =
-    registryEntity?.area_id ??
-    device?.area_id ??
-    undefined;
+  const areaId = registryEntity?.area_id ?? device?.area_id ?? undefined;
   const name =
     registryEntity?.name ??
     registryEntity?.original_name ??
@@ -1963,10 +1975,7 @@ function normalizeServices(raw: any[]): ServiceInfo[] {
   return out;
 }
 
-function applyEntityFilter(
-  summaries: EntitySummary[],
-  filter?: EntityFilter,
-): EntitySummary[] {
+function applyEntityFilter(summaries: EntitySummary[], filter?: EntityFilter): EntitySummary[] {
   const f = filter ?? {};
   const domains = f.domain == null ? undefined : Array.isArray(f.domain) ? f.domain : [f.domain];
   const search = f.search ? f.search.toLowerCase() : undefined;
@@ -2434,7 +2443,11 @@ class AreaImpl extends RpcTarget implements Area {
     return new DeviceImpl(this.#ctx.fork(), deviceId);
   }
 
-  async callService(domain: string, service: string, data?: Record<string, unknown>): Promise<void> {
+  async callService(
+    domain: string,
+    service: string,
+    data?: Record<string, unknown>,
+  ): Promise<void> {
     await this.#ctx.submitWrite({
       type: "callService",
       domain,
@@ -2547,7 +2560,11 @@ class LabelImpl extends RpcTarget implements Label {
     return new EntityImpl(this.#ctx.fork(), entityId);
   }
 
-  async callService(domain: string, service: string, data?: Record<string, unknown>): Promise<void> {
+  async callService(
+    domain: string,
+    service: string,
+    data?: Record<string, unknown>,
+  ): Promise<void> {
     await this.#ctx.submitWrite({
       type: "callService",
       domain,
@@ -2671,7 +2688,11 @@ class DeviceImpl extends RpcTarget implements Device {
     return new EntityImpl(this.#ctx.fork(), entityId);
   }
 
-  async callService(domain: string, service: string, data?: Record<string, unknown>): Promise<void> {
+  async callService(
+    domain: string,
+    service: string,
+    data?: Record<string, unknown>,
+  ): Promise<void> {
     await this.#ctx.submitWrite({
       type: "callService",
       domain,
@@ -2876,10 +2897,16 @@ class EntityImpl extends RpcTarget implements Entity {
     const mapped = mapLightTurnOnData(data);
     // Pre-validation for light-specific numeric ranges.
     if (mapped) {
-      if (typeof mapped.brightness === "number" && (mapped.brightness < 0 || mapped.brightness > 255)) {
+      if (
+        typeof mapped.brightness === "number" &&
+        (mapped.brightness < 0 || mapped.brightness > 255)
+      ) {
         throw new Error("brightness must be between 0 and 255.");
       }
-      if (typeof mapped.brightness_pct === "number" && (mapped.brightness_pct < 0 || mapped.brightness_pct > 100)) {
+      if (
+        typeof mapped.brightness_pct === "number" &&
+        (mapped.brightness_pct < 0 || mapped.brightness_pct > 100)
+      ) {
         throw new Error("brightnessPct must be between 0 and 100.");
       }
     }
@@ -3044,7 +3071,9 @@ class EntityImpl extends RpcTarget implements Entity {
   }
 }
 
-function mapLightTurnOnData(data?: LightTurnOnData | Record<string, unknown>): Record<string, unknown> | undefined {
+function mapLightTurnOnData(
+  data?: LightTurnOnData | Record<string, unknown>,
+): Record<string, unknown> | undefined {
   if (!data) return undefined;
   // If this looks like a LightTurnOnData (has any of the known keys), map to HA's snake_case
   // naming. Otherwise pass through as-is.

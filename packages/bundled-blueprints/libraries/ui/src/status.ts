@@ -28,7 +28,11 @@ export interface StatusIndicator {
 }
 
 /** Build a {@link StatusIndicator}. */
-export function statusIndicator({ kind = "saved", text = "Saved", title }: StatusOptions = {}): StatusIndicator {
+export function statusIndicator({
+  kind = "saved",
+  text = "Saved",
+  title,
+}: StatusOptions = {}): StatusIndicator {
   const dot = el("span", { class: `dot ${kind}` });
   const label = el("span", {}, [text]);
   const element = el("div", { class: "status", title }, [dot, label]);

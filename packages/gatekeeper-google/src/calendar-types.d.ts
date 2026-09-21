@@ -191,7 +191,10 @@ export interface GoogleCalendarSession {
    * has been committed to Google Calendar it has no real Google event ID, so it cannot yet be
    * targeted by `updateEvent()`.
    */
-  createEvent(event: CalendarEventDraft, opts?: { sendUpdates?: CalendarSendUpdates }): Promise<void>;
+  createEvent(
+    event: CalendarEventDraft,
+    opts?: { sendUpdates?: CalendarSendUpdates },
+  ): Promise<void>;
 
   /**
    * Update an existing event on the selected calendar.

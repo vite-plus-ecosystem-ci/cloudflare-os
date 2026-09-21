@@ -107,7 +107,11 @@ export class FakeProvider {
    * @param perPage Requested page size.
    * @returns One page and the next token.
    */
-  listProjects(grant: PublicGrant, token: string | undefined, perPage: number): {
+  listProjects(
+    grant: PublicGrant,
+    token: string | undefined,
+    perPage: number,
+  ): {
     items: Project[];
     nextToken?: string;
   } {
@@ -131,8 +135,8 @@ export class FakeProvider {
     this.#check(grant);
     const all = [...this.projects.values()];
     return {
-      matches: all.filter(project => project.name.includes(query)),
-      spaces: [...new Set(all.map(project => project.spaceId))],
+      matches: all.filter((project) => project.name.includes(query)),
+      spaces: [...new Set(all.map((project) => project.spaceId))],
     };
   }
 

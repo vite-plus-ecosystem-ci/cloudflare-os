@@ -22,18 +22,24 @@ export function fakeKv(): FakeKv {
   return {
     get: <T>(key: string) => {
       const stored = values.get(key);
-      return stored === undefined ? undefined : structuredClone(stored) as T;
+      return stored === undefined ? undefined : (structuredClone(stored) as T);
     },
     put: (key, value) => {
       writes.push(key);
       values.set(key, structuredClone(value));
     },
     delete: (key: string) => void values.delete(key),
-    list: <T>({ prefix, startAfter, limit }:
-      { prefix: string; startAfter?: string; limit?: number }) => {
+    list: <T>({
+      prefix,
+      startAfter,
+      limit,
+    }: {
+      prefix: string;
+      startAfter?: string;
+      limit?: number;
+    }) => {
       const found = [...values.entries()]
-        .filter(([key]) => key.startsWith(prefix)
-          && (startAfter === undefined || key > startAfter))
+        .filter(([key]) => key.startsWith(prefix) && (startAfter === undefined || key > startAfter))
         .toSorted(byKey)
         .map(([key, value]) => [key, structuredClone(value)] as [string, T]);
       return limit === undefined ? found : found.slice(0, limit);

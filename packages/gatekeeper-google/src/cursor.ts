@@ -81,7 +81,10 @@ export class CursorPager<Item, Entry> implements Pager<Entry> {
     let result = this.#tail.then(() => this.#nextPage());
     // Chain on completion, not on the value: holding the resolved page here would pin a page of
     // results in memory until the next call.
-    this.#tail = result.then(() => undefined, () => undefined);
+    this.#tail = result.then(
+      () => undefined,
+      () => undefined,
+    );
     return result;
   }
 
@@ -114,8 +117,7 @@ export class CursorPager<Item, Entry> implements Pager<Entry> {
 
       if (pageToken === undefined) break;
       if (fetched >= this.#maxEmptyPages) {
-        throw new Error(
-          `${provider} returned ${fetched} pages with no usable results.`);
+        throw new Error(`${provider} returned ${fetched} pages with no usable results.`);
       }
     }
 

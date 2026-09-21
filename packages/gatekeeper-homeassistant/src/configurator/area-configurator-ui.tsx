@@ -16,16 +16,21 @@ export default {
   },
 
   render({ values, setValues, ui }) {
-    return <Section>
-      <Field label="Area" description="Choose a Home Assistant area (room).">
-        <Autocomplete
-          name="areaId"
-          value={values.areaId}
-          placeholder="Search areas..."
-          loadOptions={query => ui.listAreas(query)}
-          onChange={areaId => setValues({ areaId })}
-        />
-      </Field>
-    </Section>;
+    return (
+      <Section>
+        <Field label="Area" description="Choose a Home Assistant area (room).">
+          <Autocomplete
+            name="areaId"
+            value={values.areaId}
+            placeholder="Search areas..."
+            loadOptions={(query) => ui.listAreas(query)}
+            onChange={(areaId) => setValues({ areaId })}
+          />
+        </Field>
+      </Section>
+    );
   },
-} satisfies ConfiguratorUISpec<HomeAssistantAreaConfiguratorRpc, HomeAssistantAreaConfiguratorValues>;
+} satisfies ConfiguratorUISpec<
+  HomeAssistantAreaConfiguratorRpc,
+  HomeAssistantAreaConfiguratorValues
+>;

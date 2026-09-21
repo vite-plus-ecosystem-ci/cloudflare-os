@@ -8,7 +8,6 @@ export type { DocMetadata, GoogleDocReadSession, GoogleDocTab } from "./docs-rea
  * `listTabs()` first and pass the ID of the tab to act on.
  */
 export interface GoogleDocSession extends GoogleDocReadSession {
-
   /**
    * Find `oldMarkdown` in tab `tabId` and replace it with `newMarkdown`.
    * Both parameters are Markdown text.

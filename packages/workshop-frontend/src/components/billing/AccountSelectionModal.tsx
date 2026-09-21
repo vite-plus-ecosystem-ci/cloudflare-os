@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
-import { CloudflareUsageInfo, CloudflareAccountOption } from '@gadgets/workshop-shared/api'
-import { Dialog, Button, Loader, Radio, useKumoToastManager } from '@cloudflare/kumo'
-import { Warning } from '@phosphor-icons/react'
-import { useOptionalAuthenticatedApi } from '../../AuthContext'
-import { useCloudflareLimitsEnabled } from '../../ServerConfigContext'
+import { useCallback, useEffect, useState } from "react";
+import { CloudflareUsageInfo, CloudflareAccountOption } from "@gadgets/workshop-shared/api";
+import { Dialog, Button, Loader, Radio, useKumoToastManager } from "@cloudflare/kumo";
+import { Warning } from "@phosphor-icons/react";
+import { useOptionalAuthenticatedApi } from "../../AuthContext";
+import { useCloudflareLimitsEnabled } from "../../ServerConfigContext";
 
 /**
  * Global, mandatory modal that forces the user to pick which Cloudflare account to bill whenever
@@ -11,60 +11,62 @@ import { useCloudflareLimitsEnabled } from '../../ServerConfigContext'
  * the selection is pending, so it can't be missed after connecting. Mounted once in the app shell.
  */
 export default function AccountSelectionModal() {
-  const limitsEnabled = useCloudflareLimitsEnabled()
-  const auth = useOptionalAuthenticatedApi()
-  const toasts = useKumoToastManager()
-  const [needsSelection, setNeedsSelection] = useState(false)
-  const [accounts, setAccounts] = useState<CloudflareAccountOption[] | null>(null)
-  const [chosen, setChosen] = useState<string | undefined>(undefined)
-  const [saving, setSaving] = useState(false)
+  const limitsEnabled = useCloudflareLimitsEnabled();
+  const auth = useOptionalAuthenticatedApi();
+  const toasts = useKumoToastManager();
+  const [needsSelection, setNeedsSelection] = useState(false);
+  const [accounts, setAccounts] = useState<CloudflareAccountOption[] | null>(null);
+  const [chosen, setChosen] = useState<string | undefined>(undefined);
+  const [saving, setSaving] = useState(false);
 
   const check = useCallback(() => {
-    if (!auth) return
-    auth.authenticatedApi.getCloudflareUsage()
+    if (!auth) return;
+    auth.authenticatedApi
+      .getCloudflareUsage()
       .then((u: CloudflareUsageInfo) => {
-        setNeedsSelection(!!(u.connected && u.needsAccountSelection))
+        setNeedsSelection(!!(u.connected && u.needsAccountSelection));
       })
-      .catch(() => {})
-  }, [auth])
+      .catch(() => {});
+  }, [auth]);
 
   useEffect(() => {
-    if (!limitsEnabled || !auth) return
-    check()
-    const onFocus = () => check()
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [limitsEnabled, auth, check])
+    if (!limitsEnabled || !auth) return;
+    check();
+    const onFocus = () => check();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [limitsEnabled, auth, check]);
 
   // Load the account list once we know a selection is needed; default the choice to the first one.
   useEffect(() => {
     if (needsSelection && accounts === null && auth) {
-      auth.authenticatedApi.listCloudflareAccounts()
+      auth.authenticatedApi
+        .listCloudflareAccounts()
         .then((list: CloudflareAccountOption[]) => {
-          setAccounts(list)
-          setChosen(list[0]?.accountId)
+          setAccounts(list);
+          setChosen(list[0]?.accountId);
         })
-        .catch(() => setAccounts([]))
+        .catch(() => setAccounts([]));
     }
-  }, [needsSelection, accounts, auth])
+  }, [needsSelection, accounts, auth]);
 
-  if (!limitsEnabled || !auth || !needsSelection) return null
+  if (!limitsEnabled || !auth || !needsSelection) return null;
 
   const save = async () => {
-    if (!chosen) return
-    setSaving(true)
+    if (!chosen) return;
+    setSaving(true);
     try {
-      await auth.authenticatedApi.selectCloudflareAccount(chosen)
-      toasts.add({ title: 'Cloudflare account selected', variant: 'success' })
-      setNeedsSelection(false)
-      setAccounts(null)
+      await auth.authenticatedApi.selectCloudflareAccount(chosen);
+      toasts.add({ title: "Cloudflare account selected", variant: "success" });
+      setNeedsSelection(false);
+      setAccounts(null);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to select account'
-      toasts.add({ title: msg, variant: 'error' })
+      const msg = err instanceof Error ? err.message : "Failed to select account";
+      toasts.add({ title: msg, variant: "error" });
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   return (
     // role="alertdialog" + no close affordance: the choice is mandatory, so it isn't dismissible by
@@ -83,7 +85,9 @@ export default function AccountSelectionModal() {
           </p>
 
           {accounts === null ? (
-            <div className="flex justify-center py-6"><Loader size="base" /></div>
+            <div className="flex justify-center py-6">
+              <Loader size="base" />
+            </div>
           ) : accounts.length === 0 ? (
             <p className="text-sm text-kumo-subtle">No accounts available on this connection.</p>
           ) : (
@@ -127,5 +131,5 @@ export default function AccountSelectionModal() {
         </div>
       </Dialog>
     </Dialog.Root>
-  )
+  );
 }

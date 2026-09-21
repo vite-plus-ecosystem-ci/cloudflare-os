@@ -7,7 +7,7 @@
 // canonical empty pack, report-status parsing, and the push driver's body composition.
 
 import type { GitOid, GitPullHints } from "@gadgets/workshop-shared/gatekeeper";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   DELIM_PKT,
   FLUSH_PKT,
@@ -46,8 +46,9 @@ function concatBytes(pieces: Uint8Array[]): Uint8Array {
 
 /** The textual lines of a composed request, in order (flush/delim rendered as markers). */
 function requestLines(request: Uint8Array): string[] {
-  return parsePktItems(request).map(item =>
-    item.kind === "data" ? pktText(item.data) : `<${item.kind}>`);
+  return parsePktItems(request).map((item) =>
+    item.kind === "data" ? pktText(item.data) : `<${item.kind}>`,
+  );
 }
 
 /** A sideband frame within the packfile section. */
@@ -94,10 +95,17 @@ describe("pkt-line framing", () => {
       FLUSH_PKT,
     ]);
     const items = parsePktItems(encoded);
-    expect(items.map(item => item.kind))
-      .toEqual(["data", "delim", "data", "data", "data", "flush"]);
-    expect(items.flatMap(item => (item.kind === "data" ? [pktText(item.data)] : [])))
-      .toEqual(lines);
+    expect(items.map((item) => item.kind)).toEqual([
+      "data",
+      "delim",
+      "data",
+      "data",
+      "data",
+      "flush",
+    ]);
+    expect(items.flatMap((item) => (item.kind === "data" ? [pktText(item.data)] : []))).toEqual(
+      lines,
+    );
   });
 
   it("parses identically across arbitrary chunk boundaries", () => {
@@ -109,17 +117,18 @@ describe("pkt-line framing", () => {
         ...parser.push(encoded.subarray(splitAt)),
       ];
       parser.finish();
-      expect(items.map(item => item.kind)).toEqual(["data", "flush", "data"]);
+      expect(items.map((item) => item.kind)).toEqual(["data", "flush", "data"]);
     }
   });
 
   it("rejects malformed lengths and truncated input", () => {
-    expect(() => parsePktItems(new TextEncoder().encode("00zz")))
-      .toThrow(/malformed pkt-line length/);
-    expect(() => parsePktItems(new TextEncoder().encode("0003")))
-      .toThrow(/malformed pkt-line length/);
-    expect(() => parsePktItems(encodePktLine("hello").subarray(0, 6)))
-      .toThrow(/mid-pkt/);
+    expect(() => parsePktItems(new TextEncoder().encode("00zz"))).toThrow(
+      /malformed pkt-line length/,
+    );
+    expect(() => parsePktItems(new TextEncoder().encode("0003"))).toThrow(
+      /malformed pkt-line length/,
+    );
+    expect(() => parsePktItems(encodePktLine("hello").subarray(0, 6))).toThrow(/mid-pkt/);
   });
 });
 
@@ -128,49 +137,74 @@ describe("buildGitFetchRequest", () => {
   // commitHistory kinds. Used both for per-shape assertions and for the global
   // no-have/single-filter invariants.
   const HINT_MATRIX: { name: string; hints: GitPullHints; filter?: string }[] = [
-    { name: "creation pull (blob:limit)",
+    {
+      name: "creation pull (blob:limit)",
       hints: { type: "commit", commitHistory: DEPTH_1, filterBlobSize: 65536 },
-      filter: "filter blob:limit=65536" },
-    { name: "no blobs at all",
+      filter: "filter blob:limit=65536",
+    },
+    {
+      name: "no blobs at all",
       hints: { type: "commit", commitHistory: DEPTH_1, filterBlobSize: 0 },
-      filter: "filter blob:none" },
-    { name: "exact commit (tree:0)",
+      filter: "filter blob:none",
+    },
+    {
+      name: "exact commit (tree:0)",
       hints: { type: "commit", commitHistory: DEPTH_1, filterTreeDepth: 0 },
-      filter: "filter tree:0" },
-    { name: "exact tree (tree depth 1 -> tree:0; wants always arrive)",
+      filter: "filter tree:0",
+    },
+    {
+      name: "exact tree (tree depth 1 -> tree:0; wants always arrive)",
       hints: { type: "tree", commitHistory: DEPTH_1, filterTreeDepth: 1 },
-      filter: "filter tree:0" },
-    { name: "deep tree hint (inexpressible depth -> blob:none)",
+      filter: "filter tree:0",
+    },
+    {
+      name: "deep tree hint (inexpressible depth -> blob:none)",
       hints: { type: "tree", commitHistory: DEPTH_1, filterTreeDepth: 3 },
-      filter: "filter blob:none" },
-    { name: "both hints, tree depth 0 (tree filter subsumes the blob filter)",
+      filter: "filter blob:none",
+    },
+    {
+      name: "both hints, tree depth 0 (tree filter subsumes the blob filter)",
       hints: { type: "commit", commitHistory: DEPTH_1, filterTreeDepth: 0, filterBlobSize: 100 },
-      filter: "filter tree:0" },
-    { name: "both hints, deep tree (still one filter line)",
+      filter: "filter tree:0",
+    },
+    {
+      name: "both hints, deep tree (still one filter line)",
       hints: { type: "commit", commitHistory: DEPTH_1, filterTreeDepth: 2, filterBlobSize: 100 },
-      filter: "filter blob:none" },
-    { name: "blob fault (no filter: filters do not suppress wants)",
+      filter: "filter blob:none",
+    },
+    {
+      name: "blob fault (no filter: filters do not suppress wants)",
       hints: { type: "blob", commitHistory: DEPTH_1, filterBlobSize: 1048577 },
-      filter: undefined },
-    { name: "no filter hints",
+      filter: undefined,
+    },
+    {
+      name: "no filter hints",
       hints: { type: "commit", commitHistory: DEPTH_1 },
-      filter: undefined },
-    { name: "full history",
+      filter: undefined,
+    },
+    {
+      name: "full history",
       hints: { type: "commit", commitHistory: { kind: "full" } },
-      filter: undefined },
-    { name: "since history",
+      filter: undefined,
+    },
+    {
+      name: "since history",
       hints: { type: "commit", commitHistory: { kind: "since", since: new Date(1330000000500) } },
-      filter: undefined },
+      filter: undefined,
+    },
   ];
 
   it("emits a want per oid (deduplicated) and a done, in a v2 fetch command", () => {
-    const lines = requestLines(buildGitFetchRequest([oid(1), oid(2), oid(1)],
-        { type: "commit", commitHistory: DEPTH_1 }));
+    const lines = requestLines(
+      buildGitFetchRequest([oid(1), oid(2), oid(1)], { type: "commit", commitHistory: DEPTH_1 }),
+    );
     expect(lines[0]).toBe("command=fetch");
     expect(lines).toContain("object-format=sha1");
     expect(lines).toContain("<delim>");
-    expect(lines.filter(line => line.startsWith("want ")))
-      .toEqual([`want ${oid(1)}`, `want ${oid(2)}`]);
+    expect(lines.filter((line) => line.startsWith("want "))).toEqual([
+      `want ${oid(1)}`,
+      `want ${oid(2)}`,
+    ]);
     expect(lines).toContain("ofs-delta");
     expect(lines).toContain("no-progress");
     expect(lines.at(-2)).toBe("done");
@@ -180,26 +214,38 @@ describe("buildGitFetchRequest", () => {
   it("never emits a have line, and at most one filter line, for every hint shape", () => {
     for (const { name, hints, filter } of HINT_MATRIX) {
       const lines = requestLines(buildGitFetchRequest([oid(1), oid(2)], hints));
-      expect(lines.filter(line => line.startsWith("have")), name).toEqual([]);
-      const filters = lines.filter(line => line.startsWith("filter "));
+      expect(
+        lines.filter((line) => line.startsWith("have")),
+        name,
+      ).toEqual([]);
+      const filters = lines.filter((line) => line.startsWith("filter "));
       expect(filters, name).toEqual(filter === undefined ? [] : [filter]);
       expect(lines).toContain("done");
     }
   });
 
   it("maps commitHistory to deepen / deepen-since / nothing", () => {
-    const depth = requestLines(buildGitFetchRequest([oid(1)],
-        { type: "commit", commitHistory: { kind: "depth", depth: 2 } }));
+    const depth = requestLines(
+      buildGitFetchRequest([oid(1)], {
+        type: "commit",
+        commitHistory: { kind: "depth", depth: 2 },
+      }),
+    );
     expect(depth).toContain("deepen 2");
 
-    const since = requestLines(buildGitFetchRequest([oid(1)],
-        { type: "commit", commitHistory: { kind: "since", since: new Date(1330000000500) } }));
+    const since = requestLines(
+      buildGitFetchRequest([oid(1)], {
+        type: "commit",
+        commitHistory: { kind: "since", since: new Date(1330000000500) },
+      }),
+    );
     expect(since).toContain("deepen-since 1330000000");
-    expect(since.filter(line => line.startsWith("deepen "))).toEqual([]);
+    expect(since.filter((line) => line.startsWith("deepen "))).toEqual([]);
 
-    const full = requestLines(buildGitFetchRequest([oid(1)],
-        { type: "commit", commitHistory: { kind: "full" } }));
-    expect(full.filter(line => line.startsWith("deepen"))).toEqual([]);
+    const full = requestLines(
+      buildGitFetchRequest([oid(1)], { type: "commit", commitHistory: { kind: "full" } }),
+    );
+    expect(full.filter((line) => line.startsWith("deepen"))).toEqual([]);
   });
 
   it("rejects malformed oids and empty requests", () => {
@@ -207,28 +253,37 @@ describe("buildGitFetchRequest", () => {
     expect(() => buildGitFetchRequest([], hints)).toThrow(/no objects/);
     expect(() => buildGitFetchRequest(["main"], hints)).toThrow(/invalid git oid/);
     expect(() => buildGitFetchRequest(["A".repeat(40)], hints)).toThrow(/invalid git oid/);
-    expect(() => buildGitFetchRequest([`${oid(1)}\nhave ${oid(2)}`], hints))
-      .toThrow(/invalid git oid/);
+    expect(() => buildGitFetchRequest([`${oid(1)}\nhave ${oid(2)}`], hints)).toThrow(
+      /invalid git oid/,
+    );
   });
 });
 
 describe("filterSpecForHints", () => {
   it("maps blob size 0 to blob:none and positive sizes to blob:limit", () => {
-    expect(filterSpecForHints({ type: "commit", commitHistory: DEPTH_1, filterBlobSize: 0 }))
-      .toBe("blob:none");
-    expect(filterSpecForHints({ type: "tree", commitHistory: DEPTH_1, filterBlobSize: 64 * 1024 }))
-      .toBe("blob:limit=65536");
+    expect(filterSpecForHints({ type: "commit", commitHistory: DEPTH_1, filterBlobSize: 0 })).toBe(
+      "blob:none",
+    );
+    expect(
+      filterSpecForHints({ type: "tree", commitHistory: DEPTH_1, filterBlobSize: 64 * 1024 }),
+    ).toBe("blob:limit=65536");
   });
 
   it("prefers the tree filter when both hints are set", () => {
-    expect(filterSpecForHints(
-        { type: "commit", commitHistory: DEPTH_1, filterTreeDepth: 1, filterBlobSize: 7 }))
-      .toBe("tree:0");
+    expect(
+      filterSpecForHints({
+        type: "commit",
+        commitHistory: DEPTH_1,
+        filterTreeDepth: 1,
+        filterBlobSize: 7,
+      }),
+    ).toBe("tree:0");
   });
 
   it("sends no filter for blob wants", () => {
-    expect(filterSpecForHints({ type: "blob", commitHistory: DEPTH_1, filterBlobSize: 12345 }))
-      .toBeUndefined();
+    expect(
+      filterSpecForHints({ type: "blob", commitHistory: DEPTH_1, filterBlobSize: 12345 }),
+    ).toBeUndefined();
   });
 });
 
@@ -237,14 +292,12 @@ describe("filterSpecForHints", () => {
 // (workshop-backend's) test surface, not this one.
 const PACK_BYTES = new TextEncoder().encode("PACKnonsense-payload-for-framing-tests");
 
-function packfileResponse(options: { withSections?: boolean; progress?: boolean } = {}): Uint8Array[] {
+function packfileResponse(
+  options: { withSections?: boolean; progress?: boolean } = {},
+): Uint8Array[] {
   const pieces: Uint8Array[] = [];
   if (options.withSections) {
-    pieces.push(
-      encodePktLine("shallow-info"),
-      encodePktLine(`shallow ${oid(1)}`),
-      DELIM_PKT,
-    );
+    pieces.push(encodePktLine("shallow-info"), encodePktLine(`shallow ${oid(1)}`), DELIM_PKT);
   }
   pieces.push(encodePktLine("packfile"));
   pieces.push(sidebandPkt(1, PACK_BYTES.subarray(0, 9)));
@@ -259,13 +312,18 @@ function packfileResponse(options: { withSections?: boolean; progress?: boolean 
 describe("demuxGitFetchResponse", () => {
   it("yields exactly the band-1 payload bytes", async () => {
     const pack = await collect(
-        demuxGitFetchResponse(streamOf(packfileResponse()), MAX_GIT_FETCH_BYTES));
+      demuxGitFetchResponse(streamOf(packfileResponse()), MAX_GIT_FETCH_BYTES),
+    );
     expect(pack).toEqual(PACK_BYTES);
   });
 
   it("skips leading sections and progress frames", async () => {
-    const pack = await collect(demuxGitFetchResponse(
-        streamOf(packfileResponse({ withSections: true, progress: true })), MAX_GIT_FETCH_BYTES));
+    const pack = await collect(
+      demuxGitFetchResponse(
+        streamOf(packfileResponse({ withSections: true, progress: true })),
+        MAX_GIT_FETCH_BYTES,
+      ),
+    );
     expect(pack).toEqual(PACK_BYTES);
   });
 
@@ -278,8 +336,9 @@ describe("demuxGitFetchResponse", () => {
 
   it("fails the stream on an ERR pkt with the server's message", async () => {
     const response = [encodePktLine(`ERR upload-pack: not our ref ${oid(3)}`), FLUSH_PKT];
-    await expect(collect(demuxGitFetchResponse(streamOf(response), MAX_GIT_FETCH_BYTES)))
-      .rejects.toThrow(`git fetch failed: upload-pack: not our ref ${oid(3)}`);
+    await expect(
+      collect(demuxGitFetchResponse(streamOf(response), MAX_GIT_FETCH_BYTES)),
+    ).rejects.toThrow(`git fetch failed: upload-pack: not our ref ${oid(3)}`);
   });
 
   it("fails the stream on a band-3 error frame", async () => {
@@ -288,27 +347,31 @@ describe("demuxGitFetchResponse", () => {
       sidebandPkt(1, PACK_BYTES.subarray(0, 4)),
       sidebandPkt(3, new TextEncoder().encode("fatal: the remote end hung up")),
     ];
-    await expect(collect(demuxGitFetchResponse(streamOf(response), MAX_GIT_FETCH_BYTES)))
-      .rejects.toThrow("git fetch failed: fatal: the remote end hung up");
+    await expect(
+      collect(demuxGitFetchResponse(streamOf(response), MAX_GIT_FETCH_BYTES)),
+    ).rejects.toThrow("git fetch failed: fatal: the remote end hung up");
   });
 
   it("rejects a response that ends without a flush", async () => {
     const truncated = packfileResponse().slice(0, -1);
-    await expect(collect(demuxGitFetchResponse(streamOf(truncated), MAX_GIT_FETCH_BYTES)))
-      .rejects.toThrow(/missing final flush/);
+    await expect(
+      collect(demuxGitFetchResponse(streamOf(truncated), MAX_GIT_FETCH_BYTES)),
+    ).rejects.toThrow(/missing final flush/);
   });
 
   it("rejects a response with no packfile section", async () => {
     const response = [encodePktLine("acknowledgments"), encodePktLine("NAK"), FLUSH_PKT];
-    await expect(collect(demuxGitFetchResponse(streamOf(response), MAX_GIT_FETCH_BYTES)))
-      .rejects.toThrow(/no packfile section/);
+    await expect(
+      collect(demuxGitFetchResponse(streamOf(response), MAX_GIT_FETCH_BYTES)),
+    ).rejects.toThrow(/no packfile section/);
   });
 
   it("enforces the transfer-size limit on the raw body", async () => {
     const response = packfileResponse();
     const limit = concatBytes(response).byteLength - 1;
-    await expect(collect(demuxGitFetchResponse(streamOf(response), limit)))
-      .rejects.toThrow(/transfer limit/);
+    await expect(collect(demuxGitFetchResponse(streamOf(response), limit))).rejects.toThrow(
+      /transfer limit/,
+    );
   });
 });
 
@@ -325,8 +388,11 @@ describe("pullGitObjectsIntoCache", () => {
     };
   }
 
-  function fakeFetch(requests: Uint8Array[], pieces: Uint8Array[]): (body: Uint8Array) => Promise<Response> {
-    return async body => {
+  function fakeFetch(
+    requests: Uint8Array[],
+    pieces: Uint8Array[],
+  ): (body: Uint8Array) => Promise<Response> {
+    return async (body) => {
       requests.push(body);
       return new Response(streamOf(pieces) as unknown as BodyInit);
     };
@@ -338,7 +404,11 @@ describe("pullGitObjectsIntoCache", () => {
     const requests: Uint8Array[] = [];
     const cache = fakeCache([oid(1), oid(2), oid(9)]);
     await pullGitObjectsIntoCache(
-        fakeFetch(requests, packfileResponse()), [oid(1), oid(2)], HINTS, cache);
+      fakeFetch(requests, packfileResponse()),
+      [oid(1), oid(2)],
+      HINTS,
+      cache,
+    );
     expect(cache.consumed).toEqual([PACK_BYTES]);
     expect(requests).toHaveLength(1);
     expect(requestLines(requests[0])).toContain(`want ${oid(1)}`);
@@ -346,9 +416,9 @@ describe("pullGitObjectsIntoCache", () => {
 
   it("throws when a requested non-blob object is missing from the stored list", async () => {
     const cache = fakeCache([oid(1)]);
-    await expect(pullGitObjectsIntoCache(
-        fakeFetch([], packfileResponse()), [oid(1), oid(2)], HINTS, cache))
-      .rejects.toThrow(`git fetch did not provide the requested object ${oid(2)}`);
+    await expect(
+      pullGitObjectsIntoCache(fakeFetch([], packfileResponse()), [oid(1), oid(2)], HINTS, cache),
+    ).rejects.toThrow(`git fetch did not provide the requested object ${oid(2)}`);
   });
 
   it("tolerates a missing blob when the request was bounded by filterBlobSize", async () => {
@@ -356,43 +426,84 @@ describe("pullGitObjectsIntoCache", () => {
     // blob (absent from the stored list); the pull reports success without it and the overseer
     // surfaces the too-large read error.
     const cache = fakeCache([]);
-    await expect(pullGitObjectsIntoCache(
-        fakeFetch([], packfileResponse()), [oid(1)],
-        { type: "blob", commitHistory: DEPTH_1, filterBlobSize: 1048577 }, cache))
-      .resolves.toBeUndefined();
+    await expect(
+      pullGitObjectsIntoCache(
+        fakeFetch([], packfileResponse()),
+        [oid(1)],
+        { type: "blob", commitHistory: DEPTH_1, filterBlobSize: 1048577 },
+        cache,
+      ),
+    ).resolves.toBeUndefined();
   });
 
   it("still throws for a missing blob when no blob filter bounded the request", async () => {
     const cache = fakeCache([]);
-    await expect(pullGitObjectsIntoCache(
-        fakeFetch([], packfileResponse()), [oid(1)],
-        { type: "blob", commitHistory: DEPTH_1 }, cache))
-      .rejects.toThrow(/did not provide/);
+    await expect(
+      pullGitObjectsIntoCache(
+        fakeFetch([], packfileResponse()),
+        [oid(1)],
+        { type: "blob", commitHistory: DEPTH_1 },
+        cache,
+      ),
+    ).rejects.toThrow(/did not provide/);
   });
 
   it("fails on a non-OK response", async () => {
     const cache = fakeCache([]);
-    await expect(pullGitObjectsIntoCache(
-        async () => new Response("nope", { status: 502 }), [oid(1)], HINTS, cache))
-      .rejects.toThrow(/HTTP 502/);
+    await expect(
+      pullGitObjectsIntoCache(
+        async () => new Response("nope", { status: 502 }),
+        [oid(1)],
+        HINTS,
+        cache,
+      ),
+    ).rejects.toThrow(/HTTP 502/);
     expect(cache.consumed).toEqual([]);
   });
 });
 
 describe("validateBranchName", () => {
   it("accepts ordinary branch names", () => {
-    for (const name of ["main", "feature/foo-bar", "release/v1.2.3", "user/kenton/wip_2",
-                        "with.dots", "UPPER"]) {
+    for (const name of [
+      "main",
+      "feature/foo-bar",
+      "release/v1.2.3",
+      "user/kenton/wip_2",
+      "with.dots",
+      "UPPER",
+    ]) {
       expect(validateBranchName(name)).toBe(name);
     }
   });
 
   it("rejects names that could escape the ref namespace or corrupt pkt-line framing", () => {
-    for (const name of ["", "has space", "has\ttab", "has\nnewline", "has\0nul", "a..b",
-                        "/leading", "trailing/", "double//slash", "~tilde", "care^t", "colon:",
-                        "quest?", "star*", "brack[et", "back\\slash", "at@{brace", "@",
-                        ".leading-dot", "trailing-dot.", "inner/.dot", "locked.lock",
-                        "locked.lock/sub", "dot./slash", "a".repeat(256)]) {
+    for (const name of [
+      "",
+      "has space",
+      "has\ttab",
+      "has\nnewline",
+      "has\0nul",
+      "a..b",
+      "/leading",
+      "trailing/",
+      "double//slash",
+      "~tilde",
+      "care^t",
+      "colon:",
+      "quest?",
+      "star*",
+      "brack[et",
+      "back\\slash",
+      "at@{brace",
+      "@",
+      ".leading-dot",
+      "trailing-dot.",
+      "inner/.dot",
+      "locked.lock",
+      "locked.lock/sub",
+      "dot./slash",
+      "a".repeat(256),
+    ]) {
       expect(() => validateBranchName(name), JSON.stringify(name)).toThrow(/invalid branch name/);
     }
   });
@@ -402,25 +513,32 @@ describe("buildRefUpdateRequest", () => {
   it("encodes one command pkt with the capability list and a terminating flush", () => {
     const request = buildRefUpdateRequest({ branch: "main", oldSha: oid(1), newSha: oid(2) });
     const items = parsePktItems(request);
-    expect(items.map(item => item.kind)).toEqual(["data", "flush"]);
+    expect(items.map((item) => item.kind)).toEqual(["data", "flush"]);
     const command = pktText((items[0] as { data: Uint8Array }).data);
-    expect(command).toBe(`${oid(1)} ${oid(2)} refs/heads/main\0report-status agent=cloudflare-gadgets`);
+    expect(command).toBe(
+      `${oid(1)} ${oid(2)} refs/heads/main\0report-status agent=cloudflare-gadgets`,
+    );
   });
 
   it("accepts the zero id on either side, but rejects a no-op update", () => {
-    expect(() => buildRefUpdateRequest({ branch: "b", oldSha: ZERO_OID, newSha: oid(1) }))
-      .not.toThrow();
-    expect(() => buildRefUpdateRequest({ branch: "b", oldSha: oid(1), newSha: ZERO_OID }))
-      .not.toThrow();
-    expect(() => buildRefUpdateRequest({ branch: "b", oldSha: oid(1), newSha: oid(1) }))
-      .toThrow(/no-op/);
+    expect(() =>
+      buildRefUpdateRequest({ branch: "b", oldSha: ZERO_OID, newSha: oid(1) }),
+    ).not.toThrow();
+    expect(() =>
+      buildRefUpdateRequest({ branch: "b", oldSha: oid(1), newSha: ZERO_OID }),
+    ).not.toThrow();
+    expect(() => buildRefUpdateRequest({ branch: "b", oldSha: oid(1), newSha: oid(1) })).toThrow(
+      /no-op/,
+    );
   });
 
   it("rejects malformed oids and branch names", () => {
-    expect(() => buildRefUpdateRequest({ branch: "b", oldSha: "nope", newSha: oid(1) }))
-      .toThrow(/invalid git oid/);
-    expect(() => buildRefUpdateRequest({ branch: "bad name", oldSha: ZERO_OID, newSha: oid(1) }))
-      .toThrow(/invalid branch name/);
+    expect(() => buildRefUpdateRequest({ branch: "b", oldSha: "nope", newSha: oid(1) })).toThrow(
+      /invalid git oid/,
+    );
+    expect(() =>
+      buildRefUpdateRequest({ branch: "bad name", oldSha: ZERO_OID, newSha: oid(1) }),
+    ).toThrow(/invalid branch name/);
   });
 });
 
@@ -432,8 +550,9 @@ describe("emptyPackBytes", () => {
     expect(pack.subarray(12)).toEqual(trailer);
     // git's well-known empty-pack checksum, as a cross-check against an independently wrong
     // header and digest agreeing with each other.
-    expect([...pack.subarray(12)].map(b => b.toString(16).padStart(2, "0")).join(""))
-      .toBe("029d08823bd8a8eab510ad6ac75c823cfd3ed31e");
+    expect([...pack.subarray(12)].map((b) => b.toString(16).padStart(2, "0")).join("")).toBe(
+      "029d08823bd8a8eab510ad6ac75c823cfd3ed31e",
+    );
   });
 });
 
@@ -443,15 +562,18 @@ describe("parseReceivePackResponse", () => {
   }
 
   it("returns normally when the update was applied", () => {
-    expect(() => parseReceivePackResponse(
-        report("unpack ok", "ok refs/heads/main"), "refs/heads/main")).not.toThrow();
+    expect(() =>
+      parseReceivePackResponse(report("unpack ok", "ok refs/heads/main"), "refs/heads/main"),
+    ).not.toThrow();
   });
 
   it("throws the distinguished rejection with the server's reason on ng", () => {
     let caught: unknown;
     try {
       parseReceivePackResponse(
-          report("unpack ok", "ng refs/heads/main fetch first"), "refs/heads/main");
+        report("unpack ok", "ng refs/heads/main fetch first"),
+        "refs/heads/main",
+      );
     } catch (error) {
       caught = error;
     }
@@ -460,15 +582,16 @@ describe("parseReceivePackResponse", () => {
   });
 
   it("throws on unpack failure, a missing ref report, and a malformed response", () => {
-    expect(() => parseReceivePackResponse(
+    expect(() =>
+      parseReceivePackResponse(
         report("unpack index-pack abnormal exit", "ng refs/heads/main unpacker error"),
-        "refs/heads/main"))
-      .toThrow(/unpack error: index-pack abnormal exit/);
-    expect(() => parseReceivePackResponse(
-        report("unpack ok", "ok refs/heads/other"), "refs/heads/main"))
-      .toThrow(/did not mention refs\/heads\/main/);
-    expect(() => parseReceivePackResponse(report(), "refs/heads/main"))
-      .toThrow(/no unpack status/);
+        "refs/heads/main",
+      ),
+    ).toThrow(/unpack error: index-pack abnormal exit/);
+    expect(() =>
+      parseReceivePackResponse(report("unpack ok", "ok refs/heads/other"), "refs/heads/main"),
+    ).toThrow(/did not mention refs\/heads\/main/);
+    expect(() => parseReceivePackResponse(report(), "refs/heads/main")).toThrow(/no unpack status/);
   });
 });
 
@@ -488,30 +611,44 @@ describe("pushGitRefUpdate", () => {
     const requests: Uint8Array[] = [];
     const pack = new TextEncoder().encode("PACKBYTES");
     await pushGitRefUpdate(
-        captureFetch(requests, okReport("refs/heads/main")),
-        { branch: "main", oldSha: oid(1), newSha: oid(2) },
-        streamOf([pack]));
+      captureFetch(requests, okReport("refs/heads/main")),
+      { branch: "main", oldSha: oid(1), newSha: oid(2) },
+      streamOf([pack]),
+    );
     expect(requests).toHaveLength(1);
-    const expectedHeader = buildRefUpdateRequest({ branch: "main", oldSha: oid(1), newSha: oid(2) });
+    const expectedHeader = buildRefUpdateRequest({
+      branch: "main",
+      oldSha: oid(1),
+      newSha: oid(2),
+    });
     expect(requests[0]).toEqual(concatBytes([expectedHeader, pack]));
   });
 
   it("sends no pack with a deletion, and requires a pack for anything else", async () => {
     const requests: Uint8Array[] = [];
     await pushGitRefUpdate(
-        captureFetch(requests, okReport("refs/heads/main")),
-        { branch: "main", oldSha: oid(2), newSha: ZERO_OID }, null);
+      captureFetch(requests, okReport("refs/heads/main")),
+      { branch: "main", oldSha: oid(2), newSha: ZERO_OID },
+      null,
+    );
     expect(requests[0]).toEqual(
-        buildRefUpdateRequest({ branch: "main", oldSha: oid(2), newSha: ZERO_OID }));
+      buildRefUpdateRequest({ branch: "main", oldSha: oid(2), newSha: ZERO_OID }),
+    );
 
-    await expect(pushGitRefUpdate(
+    await expect(
+      pushGitRefUpdate(
         captureFetch([], okReport("refs/heads/main")),
-        { branch: "main", oldSha: oid(1), newSha: oid(2) }, null))
-      .rejects.toThrow(/requires a pack/);
-    await expect(pushGitRefUpdate(
+        { branch: "main", oldSha: oid(1), newSha: oid(2) },
+        null,
+      ),
+    ).rejects.toThrow(/requires a pack/);
+    await expect(
+      pushGitRefUpdate(
         captureFetch([], okReport("refs/heads/main")),
-        { branch: "main", oldSha: oid(2), newSha: ZERO_OID }, streamOf([new Uint8Array(1)])))
-      .rejects.toThrow(/must not send a pack/);
+        { branch: "main", oldSha: oid(2), newSha: ZERO_OID },
+        streamOf([new Uint8Array(1)]),
+      ),
+    ).rejects.toThrow(/must not send a pack/);
   });
 
   it("propagates a rejection and fails on a non-OK response", async () => {
@@ -520,14 +657,23 @@ describe("pushGitRefUpdate", () => {
       encodePktLine("ng refs/heads/main non-fast-forward"),
       FLUSH_PKT,
     ]);
-    await expect(pushGitRefUpdate(
+    await expect(
+      pushGitRefUpdate(
         captureFetch([], ngReport),
-        { branch: "main", oldSha: oid(1), newSha: oid(2) }, streamOf([new Uint8Array(1)])))
-      .rejects.toThrow(GitRefUpdateRejectedError);
+        { branch: "main", oldSha: oid(1), newSha: oid(2) },
+        streamOf([new Uint8Array(1)]),
+      ),
+    ).rejects.toThrow(GitRefUpdateRejectedError);
 
-    await expect(pushGitRefUpdate(
-        async body => { await collect(body); return new Response("nope", { status: 502 }); },
-        { branch: "main", oldSha: oid(1), newSha: oid(2) }, streamOf([new Uint8Array(1)])))
-      .rejects.toThrow(/HTTP 502/);
+    await expect(
+      pushGitRefUpdate(
+        async (body) => {
+          await collect(body);
+          return new Response("nope", { status: 502 });
+        },
+        { branch: "main", oldSha: oid(1), newSha: oid(2) },
+        streamOf([new Uint8Array(1)]),
+      ),
+    ).rejects.toThrow(/HTTP 502/);
   });
 });

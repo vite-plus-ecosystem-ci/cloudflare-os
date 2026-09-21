@@ -29,28 +29,31 @@ type InstallEnv = Pick<Cloudflare.Env, "BLUEPRINTS" | "BLUEPRINT_CONTENT">;
  * installed. `contentHash` covers the generated archive, including direct edits to source files.
  */
 export function bundledBlueprintsManifestVersion(): string {
-  return BUNDLED_BLUEPRINTS
-      .map(e => `${e.blueprintId}@${e.revision}+${e.contentHash}+` +
-          fingerprint(JSON.stringify([e.title, e.description, e.author, e.output])))
-      .toSorted()
-      .join(",");
+  return BUNDLED_BLUEPRINTS.map(
+    (e) =>
+      `${e.blueprintId}@${e.revision}+${e.contentHash}+` +
+      fingerprint(JSON.stringify([e.title, e.description, e.author, e.output])),
+  )
+    .toSorted()
+    .join(",");
 }
 
 // Install one bundled blueprint, returning its public info for the featured mirror.
-async function installOne(env: InstallEnv, entry: BundledBlueprint)
-    : Promise<BlueprintPublicInfo> {
+async function installOne(env: InstallEnv, entry: BundledBlueprint): Promise<BlueprintPublicInfo> {
   // Parse through the ordinary archive reader so a corrupt bundled file fails the same way an
   // uploaded one would, rather than producing a half-installed blueprint.
-  let {metadata, contentLength, content} = await parseBlueprintArchive(
-      new Response(Uint8Array.fromBase64(entry.archive) as BufferSource).body!);
+  let { metadata, contentLength, content } = await parseBlueprintArchive(
+    new Response(Uint8Array.fromBase64(entry.archive) as BufferSource).body!,
+  );
 
   // R2 needs a known length, and the archive is already fully in memory (it came out of the
   // Worker bundle), so buffer rather than plumbing a FixedLengthStream through as the upload path
   // does for genuinely streamed uploads.
   let contentBytes = new Uint8Array(await new Response(content).arrayBuffer());
   if (contentBytes.byteLength !== contentLength) {
-    throw new Error(`Archive declares ${contentLength} content bytes but holds ` +
-        `${contentBytes.byteLength}.`);
+    throw new Error(
+      `Archive declares ${contentLength} content bytes but holds ` + `${contentBytes.byteLength}.`,
+    );
   }
 
   // The archive supplies what the blueprint does -- code, bindings, and the dates from the
@@ -69,10 +72,10 @@ async function installOne(env: InstallEnv, entry: BundledBlueprint)
   // content section is already gzip-compressed, which is exactly what R2 holds.
   await env.BLUEPRINT_CONTENT.put(`${entry.blueprintId}/${installed.version}`, contentBytes);
 
-  let kvRecord: BlueprintKvRecord = {metadata: installed};
+  let kvRecord: BlueprintKvRecord = { metadata: installed };
   await env.BLUEPRINTS.put(entry.blueprintId, JSON.stringify(kvRecord));
 
-  return {id: entry.blueprintId, metadata: installed};
+  return { id: entry.blueprintId, metadata: installed };
 }
 
 /**
@@ -85,12 +88,15 @@ export async function installBundledBlueprints(env: InstallEnv): Promise<Bluepri
     try {
       installed.push(await installOne(env, entry));
       logger.info("installed bundled blueprint", {
-        event: "formats.install.ok", blueprintId: entry.blueprintId,
+        event: "formats.install.ok",
+        blueprintId: entry.blueprintId,
       });
     } catch (err) {
       // One bad archive must not deny the deployment the others.
       logger.error("failed to install bundled blueprint", {
-        event: "formats.install.failed", blueprintId: entry.blueprintId, error: err,
+        event: "formats.install.failed",
+        blueprintId: entry.blueprintId,
+        error: err,
       });
     }
   }

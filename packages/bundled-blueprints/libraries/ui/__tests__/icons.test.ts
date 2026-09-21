@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { el, icon } from "../src/dom.ts";
 import { ICONS } from "../src/icons.ts";
@@ -12,13 +12,32 @@ describe("ICONS", () => {
       expect(svg, name).not.toBeNull();
       expect(svg!.children.length, name).toBeGreaterThan(0);
       for (const shape of Array.from(svg!.children)) {
-        expect(["path", "line", "circle", "rect", "polyline"], `${name} draws a ${shape.tagName}`).toContain(shape.tagName.toLowerCase());
+        expect(
+          ["path", "line", "circle", "rect", "polyline"],
+          `${name} draws a ${shape.tagName}`,
+        ).toContain(shape.tagName.toLowerCase());
       }
     }
   });
 
   it("names the toolbar icons the document gadgets share", () => {
-    for (const name of ["undo", "redo", "bold", "italic", "underline", "strike", "link", "ul", "ol", "image", "alignLeft", "alignCenter", "alignRight", "textcolor", "clear"]) {
+    for (const name of [
+      "undo",
+      "redo",
+      "bold",
+      "italic",
+      "underline",
+      "strike",
+      "link",
+      "ul",
+      "ol",
+      "image",
+      "alignLeft",
+      "alignCenter",
+      "alignRight",
+      "textcolor",
+      "clear",
+    ]) {
       expect(ICONS).toHaveProperty(name);
     }
   });

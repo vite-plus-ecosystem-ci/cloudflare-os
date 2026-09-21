@@ -45,7 +45,7 @@ export function isPortalServerHidden(env: Env, serverId: string): boolean {
   if (!serverId) return false;
   return (env.MCP_PORTAL_HIDDEN_SERVER_IDS ?? "")
     .split(",")
-    .some(hiddenId => hiddenId.trim() === serverId);
+    .some((hiddenId) => hiddenId.trim() === serverId);
 }
 
 /**
@@ -117,7 +117,8 @@ export function requirePortalServerScope(
   if (scope.serverId === undefined) {
     throw new Error(
       "A portal grant has to name one of the servers behind the portal. Granting the portal itself " +
-      "would cover every system connected to it, including ones added later.");
+        "would cover every system connected to it, including ones added later.",
+    );
   }
   if (!isValidToolName(scope.serverId)) throw new Error("Invalid portal server id.");
   for (const name of scope.tools ?? []) {
@@ -142,7 +143,7 @@ export function portalCatalogValidationMode(
   reportedServers: readonly Pick<PortalServer, "id">[],
 ): "named-tools" | "reported-server" | "server-evidence" {
   if ((scope.tools?.length ?? 0) > 0) return "named-tools";
-  return reportedServers.some(server => server.id === scope.serverId)
+  return reportedServers.some((server) => server.id === scope.serverId)
     ? "reported-server"
     : "server-evidence";
 }
@@ -158,7 +159,7 @@ export function toolGrantOptions(args: {
   tools: readonly McpTool[];
   trust: ServerTrust;
 }): ConfiguratorUIOption[] {
-  return args.tools.map(tool => {
+  return args.tools.map((tool) => {
     return {
       value: tool.name,
       // Within a chosen server the `{server_id}_` prefix is noise, so it is shown stripped while
@@ -166,9 +167,7 @@ export function toolGrantOptions(args: {
       title: tool.title ?? tool.name.slice(args.serverId.length + 1),
       subtitle: tool.description?.split(/\r?\n/)[0],
       // Surfaced here so the person granting can see, per tool, whether calls will interrupt them.
-      meta: classifyTool(tool, args.trust).mode === "read"
-        ? "read-only"
-        : "needs approval",
+      meta: classifyTool(tool, args.trust).mode === "read" ? "read-only" : "needs approval",
     };
   });
 }
@@ -179,8 +178,7 @@ export function portalResource(config: PortalConfig): SupportedResource {
     // Origin-scoped, so a resource URL for anything else matches nothing this connector offers.
     urlPattern: `${new URL(config.endpoint).origin}/*`,
     title: config.name,
-    description:
-      "Tools from the servers behind this portal. Writes need approval.",
+    description: "Tools from the servers behind this portal. Writes need approval.",
   };
 }
 
@@ -204,7 +202,8 @@ export function portalServer(config: PortalConfig): ConnectedServer {
  * so entering or leaving that mode requires the account to reconnect against current configuration.
  */
 export function portalAuthRequiresReconnect(
-  connected: ServerAuthKind, configured: ServerAuthKind,
+  connected: ServerAuthKind,
+  configured: ServerAuthKind,
 ): boolean {
   return (connected === "token") !== (configured === "token");
 }

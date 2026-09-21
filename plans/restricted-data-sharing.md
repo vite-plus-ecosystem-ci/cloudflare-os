@@ -30,11 +30,11 @@ commits.
   the name. A hard rename means every gatekeeper call site moves in the same commit —
   TypeScript's excess-property check on the object literals passed to
   `authorizeObservation` will not tolerate a staged one.
-- **The durable storage key keeps its old name.** Typed-storage keys *are* property names,
+- **The durable storage key keeps its old name.** Typed-storage keys _are_ property names,
   so renaming the overseer's singleton would silently unlatch every workspace that has
   already observed restricted data. The property is renamed anyway, and declares the old
   key explicitly: `containsRestrictedData: singleton(false, {storageKey:
-  "prohibitAllSharing"})`. `storageKey` is a typed-storage schema option added for this,
+"prohibitAllSharing"})`. `storageKey` is a typed-storage schema option added for this,
   so the exception lives in the schema rather than as a special case at each call site.
 - **Admission is per-collaborator, checked continuously.** Not at grant time: at every
   `open()`, so revocation of a collaborator's underlying resource access is caught
@@ -74,7 +74,7 @@ commits.
   `ObserverRecord` only after all of them succeed. Re-runs on every open. Throws to deny.
 - `SharingManager` (sharing.ts) owns the permission graph: collaborator records, their
   `addedBy` edges, share links and keys, and `computeEffectiveRoles`' fixed-point
-  resolution. The module header states that sharing *policy* deliberately lives outside
+  resolution. The module header states that sharing _policy_ deliberately lives outside
   it.
 - `#inScopeGatekeepers(role)` derives what a collaborator must be verified against.
   `use` scope is live gadget-binding state; `build` scope is broader.
@@ -103,7 +103,7 @@ the TODO at `redeemShareKey`.
 
 ### 3. The unified gate (`authorizeCollaborator`)
 
-Resolves the effective role, denies below `requireRole` *before* verification runs, then
+Resolves the effective role, denies below `requireRole` _before_ verification runs, then
 calls `ensureObserver`. This PR introduces the gate with both non-owner entry points as
 callers: `open()` interactively and `receiveExternalMessage` non-interactively (the
 latter previously checked only the role).
@@ -178,7 +178,7 @@ modal unblock lives in `restricted-data-followups`.
 
 Revocations and role changes take effect within seconds (the revocation restart lands in
 ~100ms), and read-side races inside that envelope are accepted by design: a deferred fix
-stays on this ledger only if its failure mode is *persistent* wrong state that outlives
+stays on this ledger only if its failure mode is _persistent_ wrong state that outlives
 the window. Each item is marked in the code by a matching `TODO` comment; this ledger is
 the follow-up worklist.
 
@@ -214,7 +214,7 @@ the follow-up worklist.
 - **Formerly-bound producers.** Unbinding shrinks `use` scope with no guard, so a
   formerly-bound producer's sensitive reads stop requiring `use` collaborators'
   coverage. Accepted because `use` sessions cannot read chat history or the action log;
-  the data entered gadget storage while the producer *was* bound, when every `use`
+  the data entered gadget storage while the producer _was_ bound, when every `use`
   collaborator was verified against it or could not open the workspace; and re-binding
   restores verifiability at the next open. The residual is `use` grants created after the
   unbind. The chat-history argument does not cover a binding loopback retained across the
@@ -234,7 +234,7 @@ the follow-up worklist.
   verification for `use` collaborators or enforceable provenance that prevents data from an
   unverified producer reaching their gadget-visible state. Both this and the formerly-bound
   residual are documented at `docs/observers.md` edge case 4.
-- **`calculate()`-style aggregates are out of scope here.** This plan governs *who* may
+- **`calculate()`-style aggregates are out of scope here.** This plan governs _who_ may
   see restricted data, not what an aggregate over it discloses.
 - **Verification remains interactive-only.** `receiveExternalMessage` can verify but
   cannot configure, so a caller with unconfigured account choices is told to open the

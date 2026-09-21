@@ -15,10 +15,7 @@ import {
   MessageFormatRef,
   SlashCommandRequest,
 } from "@gadgets/workshop-shared/api";
-import {
-  getStoredSelectedModel,
-  persistSelectedModel,
-} from "../modelSelection";
+import { getStoredSelectedModel, persistSelectedModel } from "../modelSelection";
 import { useDocumentTitle } from "../useDocumentTitle";
 import { homePromptFromSearch } from "../homePrompt";
 import { composerDraftStorageKey } from "../features/chat/composer/draft/composerDraft";
@@ -59,7 +56,8 @@ export function HomePageContent({ prompt }: HomeSearch) {
 
   useEffect(() => {
     let cancelled = false;
-    authenticatedApi.listModels()
+    authenticatedApi
+      .listModels()
       .then((list) => {
         if (cancelled) return;
         setModels(list);
@@ -113,7 +111,7 @@ export function HomePageContent({ prompt }: HomeSearch) {
         ensureProvisionalGadget();
         const overseer = provisionalOverseerRef.current!.stub;
         // Pipeline both independent calls in one batch, but settle both before releasing the stub.
-        const [chat, {id}] = await Promise.all([
+        const [chat, { id }] = await Promise.all([
           overseer.newChat(message, modelId, capsules, attachments, formats),
           overseer.getMetadata(),
         ]);
@@ -122,8 +120,9 @@ export function HomePageContent({ prompt }: HomeSearch) {
         // Open the conversation we just started.
         navigate({ to: "/workspace/$id", params: { id }, search: { chat } });
       } catch (err) {
-        const transient = logRpcFailure("Failed to create gadget:", err,
-            { reportSite: "workspace.create" });
+        const transient = logRpcFailure("Failed to create gadget:", err, {
+          reportSite: "workspace.create",
+        });
         // A retry reuses the provisional gadget while the draft contains gadget-scoped references.
         if (!attachments?.length && !capsules?.length) {
           provisionalOverseerRef.current?.stub[Symbol.dispose]();
@@ -195,9 +194,9 @@ export function HomePageContent({ prompt }: HomeSearch) {
           minRows={3}
           seedText={seed?.text}
           seedNonce={seed?.nonce}
-          draftStorageKey={currentUser
-            ? composerDraftStorageKey(currentUser.id, "home")
-            : undefined}
+          draftStorageKey={
+            currentUser ? composerDraftStorageKey(currentUser.id, "home") : undefined
+          }
         />
 
         {/* A few example work tasks to spark ideas. Picking one seeds the composer above. */}

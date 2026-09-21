@@ -17,7 +17,7 @@ Read `packages/workshop-shared/src/gatekeeper.ts` for the canonical interfaces a
 
 1. **Auth management** — Manage authorization to the external service via OAuth (or similar), on behalf of the human end user. This means managing "connected accounts" — token storage, refresh, and revocation in a `UserAccount` Durable Object.
 
-2. **API design** — Provide a TypeScript API wrapper around the service's API, compatible with Cap'n Web RPC. The interface should be designed around capability-based security: object-oriented, with separate interfaces representing logical resources. For example, the Google Docs gatekeeper provides an interface to a *specific* document, rather than a coarse-grained interface where you pass the doc ID to every method. **IMPORTANT:** When writing a new gatekeeper, design a proposed API and then STOP to let the operator review and make changes before proceeding with the rest of the implementation. Getting the API right is the most important and delicate part of creating a new gatekeeper.
+2. **API design** — Provide a TypeScript API wrapper around the service's API, compatible with Cap'n Web RPC. The interface should be designed around capability-based security: object-oriented, with separate interfaces representing logical resources. For example, the Google Docs gatekeeper provides an interface to a _specific_ document, rather than a coarse-grained interface where you pass the doc ID to every method. **IMPORTANT:** When writing a new gatekeeper, design a proposed API and then STOP to let the operator review and make changes before proceeding with the rest of the implementation. Getting the API right is the most important and delicate part of creating a new gatekeeper.
 
 3. **Fine-grained resource granting** — Enable the end user to grant access to agents at fine granularities, in addition to coarse-grained access. For example, a user may want to give an agent access to a specific Google Doc or GitHub repo, rather than granting broad access to everything they can do. This should be straightforward given a capability-based API. That said, broad access should also be allowed when it makes sense. Consider carefully which granularities are meaningful — a Jira gatekeeper might support "whole service", "project", and "issue" granularities, but it would be silly to support granting access to a single field of an issue separately.
 
@@ -27,7 +27,7 @@ Read `packages/workshop-shared/src/gatekeeper.ts` for the canonical interfaces a
 
 6. **Simulation** — Actions submitted but not yet applied should be simulated as if they already occurred, to the maximum extent reasonable. If the caller reads back data, it should observe the data as if pending actions had been applied, even though they haven't yet. This allows the agent to continue working without waiting for each approval, and allows the end user to batch-approve a lot of work at once. Simulation may leverage caching (updating the cache on submit, clearing or repopulating it on reject), or it may work by storing pending actions separately and adjusting read results at query time — the latter is arguably cleaner but trickier to implement correctly. See Phase 2 for implementation guidance.
 
-7. **Observer verification** — When a Gadget is shared, collaborators may "observe" data the Gadget previously read through the gatekeeper. The gatekeeper must ensure each collaborator could access that data themselves, via `getVerifier()` / `addObserver()` / `removeObserver()`. The interface methods are mandatory — a gatekeeper won't type-check without them — so include at least minimal versions in Phase 1; but *choosing and implementing the right strategy* is a Phase 2 security concern, like logging/approvals. See [Observer verification](#observer-verification).
+7. **Observer verification** — When a Gadget is shared, collaborators may "observe" data the Gadget previously read through the gatekeeper. The gatekeeper must ensure each collaborator could access that data themselves, via `getVerifier()` / `addObserver()` / `removeObserver()`. The interface methods are mandatory — a gatekeeper won't type-check without them — so include at least minimal versions in Phase 1; but _choosing and implementing the right strategy_ is a Phase 2 security concern, like logging/approvals. See [Observer verification](#observer-verification).
 
 ## Phase 1: Core implementation
 
@@ -36,6 +36,7 @@ In the first phase, focus only on responsibilities 1 - 3, though keeping in mind
 ### Step 1: Understand the external service
 
 Study the service's API docs. Identify:
+
 - Auth model (OAuth 2.0, API keys, etc.)
 - Resources to expose and what access granularities make sense
 - Which operations are observations (read-only) vs. actions (side effects)
@@ -47,6 +48,7 @@ Create `src/types.d.ts` defining the Session interface (and Hook interface if th
 Before designing, read `packages/workshop-shared/node_modules/capnweb/README.md` to understand what Cap'n Web RPC supports — this determines what types and patterns are expressible in the Session interface.
 
 Design principles:
+
 - One interface per logical resource type, not a god-object
 - Methods return structured data, not raw API responses
 - Use capability-based design principles: make it easy to limit authority in useful ways by simply limiting access to specific objects or allowing/blocking specific methods
@@ -73,6 +75,7 @@ Also confirm the JSDoc follows [Documenting the API](#documenting-the-api-typesd
 See [SKELETON.md](SKELETON.md) for a complete implementation template.
 
 Package structure:
+
 ```
 packages/gatekeeper-<name>/
 ├── src/
@@ -89,11 +92,12 @@ packages/gatekeeper-<name>/
 ### Step 5: Configure and register
 
 Add a service binding to `packages/workshop-backend/wrangler.jsonc`:
+
 ```jsonc
 {
   "binding": "GATEKEEPER_<NAME>",
   "service": "gatekeeper-<name>",
-  "entrypoint": "GatekeeperVendor"
+  "entrypoint": "GatekeeperVendor",
 }
 ```
 
@@ -198,7 +202,7 @@ This is responsibility 7. When a Gadget is shared, each non-owner collaborator b
 
 Three methods implement this (full JSDoc in `gatekeeper.ts`):
 
-- `GatekeeperUser.getVerifier()` — mints a `GatekeeperUserVerifier` (a persistent service stub) representing *this* user's account. The overseer mints one per open and **only ever passes it back to a gatekeeper of the same vendor**, so the gatekeeper may trust whatever it learns from it.
+- `GatekeeperUser.getVerifier()` — mints a `GatekeeperUserVerifier` (a persistent service stub) representing _this_ user's account. The overseer mints one per open and **only ever passes it back to a gatekeeper of the same vendor**, so the gatekeeper may trust whatever it learns from it.
 - `Gatekeeper.addObserver(id, verifier)` — must **throw** if the user represented by `verifier` is not allowed to observe everything read through this gatekeeper so far. The overseer calls it on **every open by every authorized observer** (re-verification, so revoked access is caught at the next open); cache as needed if the check is expensive. `id` is an opaque, stable per-(user,gadget) string.
 - `Gatekeeper.removeObserver(id)` — idempotent; drop a tracked observer.
 
@@ -248,7 +252,7 @@ Strategy is chosen **per `Gatekeeper` DO class / binding**, not per package — 
 - **C — Data-set tracking.** The binding spans sub-resources with **distinct ACLs**, and there is a **per-observer access oracle** for each. The DO logs the data sets actually observed and the current observers; `addObserver()` verifies the observer against **every** logged set (plus a coarse membership baseline) and **stores their verifier**; each later observation that first touches a **new** set re-checks all stored observers and sets `excludeObservers` for any who fail. Use for workspace / organization / dataset-spanning bindings.
 - **D — Low-stakes.** `addObserver()` / `removeObserver()` are no-ops; `getVerifier()` returns a trivial verifier with a no-op public method such as `verify(): void {}` (an empty `WorkerEntrypoint` is not registered in `ctx.exports`). Use when any collaborator may observe (personal, low-stakes services).
 
-The **B-vs-C decision** (the "broad binding" lens): use C only when **both** (1) the binding spans sub-resources with distinct ACLs *and* (2) there's a per-observer oracle to check each against. If one ACL covers everything → B. If there's no oracle → A or D.
+The **B-vs-C decision** (the "broad binding" lens): use C only when **both** (1) the binding spans sub-resources with distinct ACLs _and_ (2) there's a per-observer oracle to check each against. If one ACL covers everything → B. If there's no oracle → A or D.
 
 #### Implementing strategy C
 
@@ -287,7 +291,7 @@ Key points for C:
 
 - **Use two durable states: pending and observed.** Mark unknown sets pending before the first await, recheck pending sets on every retry, and promote them only after `authorizeObservation()` succeeds. A failed authorization leaves them pending. `addObserver()` must check both states and loop until no unchecked sets remain before synchronously storing the verifier; this also closes admission races in either request ordering.
 - **The session impls must route through this helper**, not `approvalQueue.authorizeObservation()`. If sessions hold the raw queue (not the DO), thread a small prepare hook/callback into each session and any sub-sessions it spawns, and expose a completion step that promotes its pending sets after authorization. For a single broad binding the hook is active; for the narrow (B) sibling binding it is absent (passthrough). See Linear/Notion for the shared-session-impl case and Supabase for the context-object case.
-- **One observation may reveal several sets** (e.g. a workspace-wide list whose rows belong to different sub-resources). Pass all of them; union the exclusions over the newly-seen ones. Reads that reveal *no* set (workspace name, member directory, a bare "open") pass an empty list and rely on the membership baseline.
+- **One observation may reveal several sets** (e.g. a workspace-wide list whose rows belong to different sub-resources). Pass all of them; union the exclusions over the newly-seen ones. Reads that reveal _no_ set (workspace name, member directory, a bare "open") pass an empty list and rely on the membership baseline.
 - **`addObserver` baseline:** verify the coarse membership (e.g. same org/workspace) that gates the set-independent reads, then verify each already-observed set, then store the verifier. Fail closed if a needed identity is unknown (e.g. an account connected before you began persisting the workspace id → force a reconnect).
 
 #### `excludeObservers` semantics (why conservative is safe)
@@ -302,14 +306,14 @@ Some services can push events to the Gadget (inbound email, webhooks, chat messa
 
 ### The pieces
 
-- **Hook interface** (in `types.d.ts`): the methods the Gadget implements to receive events, e.g. `EmailHook.receiveEmail(email)`. It is implemented by the Gadget as an **`RpcTarget`** (or a plain function), *not* a `WorkerEntrypoint`. Reference it from `describe()` via `hookTsType`.
+- **Hook interface** (in `types.d.ts`): the methods the Gadget implements to receive events, e.g. `EmailHook.receiveEmail(email)`. It is implemented by the Gadget as an **`RpcTarget`** (or a plain function), _not_ a `WorkerEntrypoint`. Reference it from `describe()` via `hookTsType`.
 - **Session method**: a method like `subscribe(callback)` that the Gadget (or, more commonly, an agent in a one-off `executeCode` call) uses to register interest. The `callback` is a **persistent stub** (created by the Gadget with `ctx.restore()`), so it can be stored and re-invoked long after the session ends.
 - **`HookController`** (a `WorkerEntrypoint` you implement): lets the overseer `enable()` / `disable()` the hook. All the state it needs must live in its `props`, so it is constructed via `this.ctx.exports.MyHookControllerImpl({props})` **at bind time**, immediately before calling `bindHook()` — see below.
 - **`HookInitiator`** (provided to you by the overseer): you call `startHook()` on it when an event arrives.
 
 ### Lifecycle
 
-1. **Register.** The Gadget calls your Session method (e.g. `subscribe(callback, filter)`). Inside it, construct a `HookController` whose `props` capture the specifics of *this* registration, then call `approvalQueue.bindHook(controller, callback, description)`. The overseer stores the callback and records the hook (initially **disabled**). Do **not** store the callback yourself — it is bound to the current session and would be revoked when the session ends.
+1. **Register.** The Gadget calls your Session method (e.g. `subscribe(callback, filter)`). Inside it, construct a `HookController` whose `props` capture the specifics of _this_ registration, then call `approvalQueue.bindHook(controller, callback, description)`. The overseer stores the callback and records the hook (initially **disabled**). Do **not** store the callback yourself — it is bound to the current session and would be revoked when the session ends.
 2. **Enable.** When the user approves the hook in the Workshop UI, the overseer calls `controller.enable(initiator, target)`. Store the `initiator` Fetcher somewhere it can be reached when events arrive (e.g. an event-source DO). `target` identifies where the hook delivers (workspace, plus gadget when the hook is pinned to one); persist it alongside the initiator if you display or link to the target — the IDs are fixed when the hook is bound, so there is nothing to refresh. A gatekeeper that doesn't need it still has to declare the parameter, since RPC argument validation rejects arguments the receiver doesn't declare. Avoid storing any other state until enabled; everything else should already be in the controller's `props`.
 3. **Deliver.** When the event occurs, call `initiator.startHook()`. This returns `{callback, approvalQueue}` bound to a fresh session. Call `authorizeObservation()` (a hook event is almost always an observation; register actions too if the callback's return value triggers side effects), then invoke the `callback` to deliver the event to the Gadget.
 4. **Disable / delete.** The overseer calls `controller.disable()`. Forget the stored `initiator` and clean up all related state — `disable()` may never be called again, though the overseer may later call `enable()` afresh.
@@ -318,7 +322,7 @@ Because the callback is a persistent stub tied to a session, the gatekeeper neve
 
 ### Documentation
 
-When defining a session interface with hooks, it's important to include comments that clearly state when a method expects to be passed a *persistent* stub created with `ctx.restore()`, as opposed to a regular RpcStub. The caller needs to do extra work to make sure the stub they provide you is persistent.
+When defining a session interface with hooks, it's important to include comments that clearly state when a method expects to be passed a _persistent_ stub created with `ctx.restore()`, as opposed to a regular RpcStub. The caller needs to do extra work to make sure the stub they provide you is persistent.
 
 ## Tips
 
@@ -330,7 +334,7 @@ When defining a session interface with hooks, it's important to include comments
 - If the gatekeeper implements multiple unrelated resource types with disjoint APIs, each may have its own `.d.ts` file, so that the `getTypeScriptTypes()` method of the specific `Gatekeeper` implementation only returns the types that matter for it. The `getTypeScriptTypes()` method on the top-level `GatekeeperVendor` should return the concatenation of all of these.
 - All DO classes must appear in `wrangler.jsonc` under `migrations[].new_sqlite_classes`.
 - Set a self-destruct alarm in `UserAccount.setCallback()` in case the OAuth flow is never completed.
-- `authorizeObservation()` may be called *after* fetching data (so the description can include details about what was fetched) but must be awaited *before* returning anything to the caller.
+- `authorizeObservation()` may be called _after_ fetching data (so the description can include details about what was fetched) but must be awaited _before_ returning anything to the caller.
 - `getVerifier()` / `addObserver()` / `removeObserver()` are **mandatory** — the gatekeeper won't type-check without them. Even a read-only or push-only gatekeeper needs them (sharing is independent of whether the gatekeeper has actions). Pick a strategy per [Observers](#observer-verification): a low-stakes one can be A or D; otherwise B/C.
 
 ## Reference implementations

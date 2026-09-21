@@ -39,10 +39,7 @@ export const useComposerEditorLayout = ({
       return;
     }
     const wrapperBottom = wrapper.getBoundingClientRect().bottom;
-    setUrlLineOffset(Math.max(
-      CAPSULE_OVERLAY_GAP,
-      wrapperBottom - textTop + CAPSULE_OVERLAY_GAP,
-    ));
+    setUrlLineOffset(Math.max(CAPSULE_OVERLAY_GAP, wrapperBottom - textTop + CAPSULE_OVERLAY_GAP));
   };
   measureUrlLineOffsetRef.current = measureUrlLineOffset;
 
@@ -59,8 +56,7 @@ export const useComposerEditorLayout = ({
     const verticalBorder = parseFloat(styles.borderTopWidth) + parseFloat(styles.borderBottomWidth);
     const minimumHeight = lineHeight * minRows + verticalPadding + verticalBorder;
     const maximumHeight = lineHeight * maxRows + verticalPadding + verticalBorder;
-    textarea.style.height =
-      `${Math.min(Math.max(textarea.scrollHeight, minimumHeight), maximumHeight)}px`;
+    textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, minimumHeight), maximumHeight)}px`;
     textarea.style.overflow = textarea.scrollHeight > maximumHeight ? "auto" : "hidden";
     mirrorRef.current?.syncLayout(textarea);
     measureUrlLineOffsetRef.current();

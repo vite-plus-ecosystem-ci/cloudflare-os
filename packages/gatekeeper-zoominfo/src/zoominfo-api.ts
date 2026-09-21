@@ -143,7 +143,11 @@ async function tokenRequest(
     id_token?: string;
   };
   if (!result.access_token) {
-    throw new ZoomInfoApiError(400, "ZoomInfo token exchange did not return an access token.", parsed);
+    throw new ZoomInfoApiError(
+      400,
+      "ZoomInfo token exchange did not return an access token.",
+      parsed,
+    );
   }
 
   return {
@@ -294,7 +298,7 @@ function formatApiError(response: Response, parsed: unknown): string {
       errors?: { detail?: string; title?: string }[];
     };
     const fromErrors = doc.errors
-      ?.map(e => e.detail || e.title)
+      ?.map((e) => e.detail || e.title)
       .filter(Boolean)
       .join("; ");
     const message = fromErrors || doc.detail || doc.title;

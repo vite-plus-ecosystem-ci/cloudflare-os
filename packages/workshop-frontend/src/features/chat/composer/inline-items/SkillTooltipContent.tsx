@@ -32,7 +32,9 @@ const SkillTooltipContent = ({
       <span className="min-w-0 truncate font-medium">{providerLabel}</span>
       {resourceLabel && (
         <>
-          <span className="shrink-0 text-kumo-inactive" aria-hidden="true">{"\u00b7"}</span>
+          <span className="shrink-0 text-kumo-inactive" aria-hidden="true">
+            {"\u00b7"}
+          </span>
           <span className="min-w-0 truncate text-kumo-inactive">{resourceLabel}</span>
         </>
       )}

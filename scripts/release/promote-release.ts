@@ -111,8 +111,9 @@ async function main() {
 
   const candidate = await client.fetch(keyUrl(candidateKey), { method: "GET" });
   if (candidate.status === 404) {
-    throw new Error(`candidate not found: ${candidateKey} — was the release uploaded ` +
-      "with --candidate?");
+    throw new Error(
+      `candidate not found: ${candidateKey} — was the release uploaded ` + "with --candidate?",
+    );
   }
   if (!candidate.ok) {
     throw new Error(`GET ${candidateKey}: ${candidate.status} ${await candidate.text()}`);
@@ -121,9 +122,11 @@ async function main() {
 
   const superseder = supersededBy(args.releaseId, await listPublishedReleaseIds(client, keyUrl));
   if (superseder) {
-    console.warn(`WARNING: not promoting ${args.releaseId} — a newer release ` +
-      `(${superseder}) is already published; promoting now would roll the deploy ` +
-      "service back to this older candidate.");
+    console.warn(
+      `WARNING: not promoting ${args.releaseId} — a newer release ` +
+        `(${superseder}) is already published; promoting now would roll the deploy ` +
+        "service back to this older candidate.",
+    );
     return;
   }
 

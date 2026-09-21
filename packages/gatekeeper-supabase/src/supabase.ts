@@ -16,7 +16,10 @@ import {
   type VendorDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
 import { connectHandoffPageHtml, htmlResponse } from "@gadgets/gatekeeper-kit/connect-pages";
-import { commitStagedCredentials, stageCredentials } from "@gadgets/gatekeeper-kit/credential-stage";
+import {
+  commitStagedCredentials,
+  stageCredentials,
+} from "@gadgets/gatekeeper-kit/credential-stage";
 import {
   SupabaseApi,
   SupabaseApiError,
@@ -57,7 +60,8 @@ import { obsContext } from "./observability.js";
 const VENDOR_ID = "supabase";
 
 const logger = obsContext.createLogger({
-  component: "gatekeeper.supabase", vendorId: VENDOR_ID,
+  component: "gatekeeper.supabase",
+  vendorId: VENDOR_ID,
 });
 
 type Env = Cloudflare.Env & {
@@ -150,7 +154,7 @@ const PROJECT_RESOURCE: SupportedResource = {
   urlPattern: "https://supabase.com/dashboard/project/:ref",
   title: "Supabase Project",
   description:
-      "Query and manage a project's Postgres database, and inspect its edge functions and storage.",
+    "Query and manage a project's Postgres database, and inspect its edge functions and storage.",
   icon: { url: SUPABASE_LOGO_URL },
 };
 
@@ -186,7 +190,7 @@ const NOT_CONFIGURED_HTML = `<!DOCTYPE html>
 </html>`;
 
 function hexEncode(bytes: Uint8Array): string {
-  return [...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("");
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function generateNonce(): string {
@@ -221,7 +225,7 @@ function organizationUrl(slug: string): string {
 // Builds a cache key from parts, encoding each so that identifiers containing the ":" delimiter
 // (legal in Postgres) can't collide across different (schema, name) combinations.
 function cacheKey(...parts: (string | number | boolean)[]): string {
-  return parts.map(part => encodeURIComponent(String(part))).join(":");
+  return parts.map((part) => encodeURIComponent(String(part))).join(":");
 }
 
 // Defense-in-depth for query(): the read-only endpoint already runs in a read-only transaction as
@@ -249,16 +253,28 @@ function assertReadOnlyQuerySafe(sql: string): void {
     if (pattern.test(sql)) {
       throw new Error(
         `query() is read-only and rejected a reference to ${name}, which can cause side effects. ` +
-        `Use execute() for any statement with external effects.`,
+          `Use execute() for any statement with external effects.`,
       );
     }
   }
 }
 
 const PROJECT_STATUSES: ReadonlySet<SupabaseProjectStatus> = new Set([
-  "INACTIVE", "ACTIVE_HEALTHY", "ACTIVE_UNHEALTHY", "COMING_UP", "GOING_DOWN", "INIT_FAILED",
-  "REMOVED", "RESTORING", "UPGRADING", "PAUSING", "RESTARTING", "PAUSE_FAILED", "RESTORE_FAILED",
-  "RESIZING", "UNKNOWN",
+  "INACTIVE",
+  "ACTIVE_HEALTHY",
+  "ACTIVE_UNHEALTHY",
+  "COMING_UP",
+  "GOING_DOWN",
+  "INIT_FAILED",
+  "REMOVED",
+  "RESTORING",
+  "UPGRADING",
+  "PAUSING",
+  "RESTARTING",
+  "PAUSE_FAILED",
+  "RESTORE_FAILED",
+  "RESIZING",
+  "UNKNOWN",
 ]);
 
 // The Management API status is an open string; map unrecognized values to "UNKNOWN" rather than
@@ -297,7 +313,9 @@ export default {
 
     if (path.length === 2 && path[0].length === 64 && path[1].length === NONCE_BYTES * 2) {
       if (!env.CLIENT_ID || !env.CLIENT_SECRET) {
-        return new Response(NOT_CONFIGURED_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+        return new Response(NOT_CONFIGURED_HTML, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
       }
 
       const doId = path[0];
@@ -305,7 +323,9 @@ export default {
       const stub = ctx.exports.UserAccount.get(ctx.exports.UserAccount.idFromString(doId));
       const oauthNonce = await stub.beginOAuthFlow(initiationNonce);
       if (oauthNonce === null) {
-        return new Response(INVALID_LINK_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+        return new Response(INVALID_LINK_HTML, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
       }
 
       const redirectUrl = new URL("https://api.supabase.com/v1/oauth/authorize");
@@ -319,14 +339,20 @@ export default {
     if (relPath === "/oauth") {
       const error = url.searchParams.get("error");
       if (error) {
-        return new Response("Supabase authorization failed. Please restart the connection flow from Cloudflare OS.", {
-          status: 400,
-          headers: { "Content-Type": "text/plain; charset=utf-8" },
-        });
+        return new Response(
+          "Supabase authorization failed. Please restart the connection flow from Cloudflare OS.",
+          {
+            status: 400,
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          },
+        );
       }
 
       const badRequest = (message: string) =>
-        new Response(message, { status: 400, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+        new Response(message, {
+          status: 400,
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
 
       const state = url.searchParams.get("state");
       if (!state) return badRequest("Error: no 'state' provided");
@@ -343,7 +369,9 @@ export default {
       );
       const handoff = await stub.acceptAuthCode(code, oauthNonce);
       if (!handoff) {
-        return new Response(INVALID_LINK_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+        return new Response(INVALID_LINK_HTML, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
       }
 
       return htmlResponse(connectHandoffPageHtml(handoff));
@@ -366,8 +394,8 @@ export class GatekeeperVendor extends WorkerEntrypoint<Env> implements Gatekeepe
       color: "#f0fdf4",
       tagline: "Query Postgres, inspect schema, and manage projects",
       description:
-          "Connect your Supabase account so Cloudflare OS can run SQL against your project databases, " +
-          "explore schema, and inspect edge functions and storage for the projects you choose.",
+        "Connect your Supabase account so Cloudflare OS can run SQL against your project databases, " +
+        "explore schema, and inspect edge functions and storage for the projects you choose.",
     };
   }
 
@@ -397,7 +425,10 @@ export class UserAccount extends DurableObject<Env> {
   // coalesce overlapping refreshes onto a single in-flight promise.
   #refreshInFlight?: Promise<StoredToken>;
 
-  async setCallback(callback: Fetcher<GatekeeperConnectCallback>, initiationNonce: string): Promise<void> {
+  async setCallback(
+    callback: Fetcher<GatekeeperConnectCallback>,
+    initiationNonce: string,
+  ): Promise<void> {
     if (!this.ctx.storage.kv.get<string>("refreshToken")) {
       await this.ctx.storage.setAlarm(Date.now() + CONNECT_TIMEOUT_MS);
     }
@@ -422,8 +453,12 @@ export class UserAccount extends DurableObject<Env> {
   /** Verify the initiation nonce and mint a one-time OAuth `state` nonce. Returns null if invalid. */
   async beginOAuthFlow(initiationNonce: string): Promise<string | null> {
     const stored = this.ctx.storage.kv.get<StoredNonce>("nonce");
-    if (!stored || stored.stage !== "initiation" || Date.now() >= stored.expiresAt
-        || !constantTimeEqual(stored.value, initiationNonce)) {
+    if (
+      !stored ||
+      stored.stage !== "initiation" ||
+      Date.now() >= stored.expiresAt ||
+      !constantTimeEqual(stored.value, initiationNonce)
+    ) {
       return null;
     }
 
@@ -443,8 +478,12 @@ export class UserAccount extends DurableObject<Env> {
    */
   async acceptAuthCode(code: string, oauthNonce: string): Promise<ConnectHandoff | null> {
     const stored = this.ctx.storage.kv.get<StoredNonce>("nonce");
-    if (!stored || stored.stage !== "oauth" || Date.now() >= stored.expiresAt
-        || !constantTimeEqual(stored.value, oauthNonce)) {
+    if (
+      !stored ||
+      stored.stage !== "oauth" ||
+      Date.now() >= stored.expiresAt ||
+      !constantTimeEqual(stored.value, oauthNonce)
+    ) {
       return null;
     }
     this.ctx.storage.kv.delete("nonce");
@@ -539,7 +578,9 @@ export class UserAccount extends DurableObject<Env> {
 
     try {
       const grant = toStoredGrant(
-        await refreshAccessToken(refreshToken, clientId, clientSecret), Date.now());
+        await refreshAccessToken(refreshToken, clientId, clientSecret),
+        Date.now(),
+      );
       this.#storeGrant(grant);
       return { token: grant.accessToken, expiresAt: grant.accessTokenExpiresAt };
     } catch (error) {
@@ -574,7 +615,8 @@ export class UserAccount extends DurableObject<Env> {
         await revokeRefreshToken(refreshToken, this.env.CLIENT_ID, this.env.CLIENT_SECRET);
       } catch (error) {
         logger.error("failed to revoke Supabase OAuth grant", {
-          event: "oauth.grant.revoke.failed", error,
+          event: "oauth.grant.revoke.failed",
+          error,
         });
       }
     }
@@ -587,10 +629,14 @@ export class UserAccount extends DurableObject<Env> {
 // GatekeeperUserImpl — maps resource URLs to gatekeeper DO classes.
 
 @validateRpc()
-export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImplProps> implements GatekeeperUser {
+export class GatekeeperUserImpl
+  extends WorkerEntrypoint<Env, GatekeeperUserImplProps>
+  implements GatekeeperUser
+{
   #userAccount() {
     return this.ctx.exports.UserAccount.get(
-      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
+      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
+    );
   }
 
   #getToken = async (): Promise<string> => {
@@ -605,7 +651,10 @@ export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImpl
       if (error instanceof SupabaseApiError) {
         if (error.isAuthError) {
           await this.#userAccount().noteCredentialsExpired();
-          throw new Error("Supabase credentials have expired or been revoked. Please reconnect the account.", { cause: error });
+          throw new Error(
+            "Supabase credentials have expired or been revoked. Please reconnect the account.",
+            { cause: error },
+          );
         }
         throw new Error(error.message, { cause: error });
       }
@@ -614,7 +663,7 @@ export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImpl
   }
 
   async describe(): Promise<AccountDescription> {
-    return await this.#withApi(async api => {
+    return await this.#withApi(async (api) => {
       const organizations = await api.listOrganizations();
       const primary = organizations[0];
       return {
@@ -629,7 +678,7 @@ export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImpl
     return null;
   }
 
-  async ensureResources(_resourceUrlPatterns: string[]): Promise<{url?: string}> {
+  async ensureResources(_resourceUrlPatterns: string[]): Promise<{ url?: string }> {
     return {};
   }
 
@@ -657,7 +706,10 @@ export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImpl
         resourceKind: "project",
         ref: segments[2],
       };
-      return { class: this.ctx.exports.SupabaseGatekeeperImpl({ props }), resource: PROJECT_RESOURCE };
+      return {
+        class: this.ctx.exports.SupabaseGatekeeperImpl({ props }),
+        resource: PROJECT_RESOURCE,
+      };
     }
 
     if (segments[1] === "org") {
@@ -666,7 +718,10 @@ export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImpl
         resourceKind: "organization",
         slug: segments[2],
       };
-      return { class: this.ctx.exports.SupabaseGatekeeperImpl({ props }), resource: ORGANIZATION_RESOURCE };
+      return {
+        class: this.ctx.exports.SupabaseGatekeeperImpl({ props }),
+        resource: ORGANIZATION_RESOURCE,
+      };
     }
 
     throw new Error(`Unsupported Supabase URL: ${url}`);
@@ -749,11 +804,14 @@ type ProjectObservationCheck = {
 type ObservedProjectState = true | "pending" | "observed";
 
 @validateRpc()
-export class SupabaseVerifier extends WorkerEntrypoint<Env, SupabaseVerifierProps>
-    implements SupabaseVerifierApi {
+export class SupabaseVerifier
+  extends WorkerEntrypoint<Env, SupabaseVerifierProps>
+  implements SupabaseVerifierApi
+{
   #api(): SupabaseApi {
     const account = this.ctx.exports.UserAccount.get(
-      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
+      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
+    );
     return new SupabaseApi(async () => (await account.getAccessToken()).token);
   }
 
@@ -761,8 +819,8 @@ export class SupabaseVerifier extends WorkerEntrypoint<Env, SupabaseVerifierProp
     if (refs.length === 0) return [];
     try {
       const projects = await this.#api().listProjects();
-      const accessibleRefs = new Set(projects.map(project => project.ref));
-      return refs.map(ref => accessibleRefs.has(ref));
+      const accessibleRefs = new Set(projects.map((project) => project.ref));
+      return refs.map((ref) => accessibleRefs.has(ref));
     } catch (error) {
       // A broken/expired observer token cannot demonstrate access; treat as "no access" rather than
       // failing the whole open. The observer will be re-checked on their next open.
@@ -774,7 +832,7 @@ export class SupabaseVerifier extends WorkerEntrypoint<Env, SupabaseVerifierProp
   async hasOrgAccess(slug: string): Promise<boolean> {
     try {
       const orgs = await this.#api().listOrganizations();
-      return orgs.some(org => org.slug === slug);
+      return orgs.some((org) => org.slug === slug);
     } catch (error) {
       if (error instanceof SupabaseApiError && error.isAuthError) return false;
       throw error;
@@ -897,9 +955,10 @@ class SupabaseSessionContext {
   ): Promise<void> {
     const check = this.#projectObservationHook
       ? await this.#projectObservationHook(ref)
-      : {pendingProjects: [], commit() {}};
+      : { pendingProjects: [], commit() {} };
     await this.approvalQueue.authorizeObservation({
-      ...description, excludeObservers: check.excludeObservers,
+      ...description,
+      excludeObservers: check.excludeObservers,
     });
     check.commit();
   }
@@ -911,7 +970,10 @@ class SupabaseSessionContext {
       if (error instanceof SupabaseApiError) {
         if (error.isAuthError) {
           await this.#noteExpired();
-          throw new Error("Supabase credentials have expired or been revoked. Please reconnect the account.", { cause: error });
+          throw new Error(
+            "Supabase credentials have expired or been revoked. Please reconnect the account.",
+            { cause: error },
+          );
         }
         // Re-throw as a plain Error so the gadget sees a clean message without the internal
         // "SupabaseApiError:" class-name prefix. The message (including any Postgres detail) is kept.
@@ -922,7 +984,11 @@ class SupabaseSessionContext {
   }
 
   // Returns a cached value if fresh, otherwise loads it (with auth handling) and caches it.
-  async cached<T>(key: string, ttlMs: number, loader: (api: SupabaseApi) => Promise<T>): Promise<T> {
+  async cached<T>(
+    key: string,
+    ttlMs: number,
+    loader: (api: SupabaseApi) => Promise<T>,
+  ): Promise<T> {
     const hit = this.#cache.get<T>(key, ttlMs);
     if (hit !== undefined) return hit;
     const value = await this.run(loader);
@@ -940,9 +1006,11 @@ class SupabaseSessionContext {
       await this.approvalQueue.submitAction(actionId, {
         title: "Run SQL on Supabase",
         description:
-            `Execute a mutating SQL statement against Supabase project \`${ref}\`.\n\n` +
-            "```sql\n" + sql + "\n```" +
-            (params && params.length > 0 ? `\n\nParameters: \`${JSON.stringify(params)}\`` : ""),
+          `Execute a mutating SQL statement against Supabase project \`${ref}\`.\n\n` +
+          "```sql\n" +
+          sql +
+          "\n```" +
+          (params && params.length > 0 ? `\n\nParameters: \`${JSON.stringify(params)}\`` : ""),
         // Arbitrary SQL cannot be automatically reverted.
         implementsRevert: false,
         // This gatekeeper doesn't simulate writes, so the agent shouldn't continue (and read back
@@ -960,9 +1028,10 @@ class SupabaseSessionContext {
 // GatekeeperImpl DO — per-resource instance, runs as a facet of the Overseer.
 
 @validateRpc()
-export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeeperImplProps>
-    implements Gatekeeper<SupabaseProject | SupabaseOrganization> {
-
+export class SupabaseGatekeeperImpl
+  extends DurableObject<Env, SupabaseGatekeeperImplProps>
+  implements Gatekeeper<SupabaseProject | SupabaseOrganization>
+{
   // Cache of the access token on this DO instance (shared across the resource's sessions/requests),
   // so repeated API calls — including the parallel queries inside describeTable — don't each make a
   // round-trip to the UserAccount DO. #tokenFetch coalesces concurrent fetches.
@@ -971,7 +1040,8 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
 
   #userAccount() {
     return this.ctx.exports.UserAccount.get(
-      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
+      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
+    );
   }
 
   #getAccessToken = async (): Promise<string> => {
@@ -1002,15 +1072,18 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
     // Organization bindings track which projects' data has actually been observed and exclude
     // observers who lack access to them; project bindings are a single ACL unit with nothing to
     // exclude, so they get no hook.
-    const projectObservationHook = this.ctx.props.resourceKind === "organization"
-      ? (ref: string) => this.#prepareProjectObservation(ref)
-      : undefined;
+    const projectObservationHook =
+      this.ctx.props.resourceKind === "organization"
+        ? (ref: string) => this.#prepareProjectObservation(ref)
+        : undefined;
     return new SupabaseSessionContext(
       this.#makeApi(),
       approvalQueue.dup(),
       new SupabaseCache(this.ctx.storage.kv),
       new PendingActionStore(this.ctx.storage.kv),
-      async () => { await this.#userAccount().noteCredentialsExpired(); },
+      async () => {
+        await this.#userAccount().noteCredentialsExpired();
+      },
       projectObservationHook,
     );
   }
@@ -1018,8 +1091,12 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
   // -------------------------------------------------------------------------
   // Observer tracking (see addObserver/removeObserver).
 
-  #observerKey(id: string): string { return `observer:${id}`; }
-  #observedProjectKey(ref: string): string { return `observedProject:${ref}`; }
+  #observerKey(id: string): string {
+    return `observer:${id}`;
+  }
+  #observedProjectKey(ref: string): string {
+    return `observedProject:${ref}`;
+  }
 
   #isProjectObserved(ref: string): boolean {
     const state = this.ctx.storage.kv.get<ObservedProjectState>(this.#observedProjectKey(ref));
@@ -1028,13 +1105,16 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
 
   #listTrackedProjects(): string[] {
     const prefix = "observedProject:";
-    return [...this.ctx.storage.kv.list<ObservedProjectState>({ prefix })]
-      .map(([key]) => key.slice(prefix.length));
+    return [...this.ctx.storage.kv.list<ObservedProjectState>({ prefix })].map(([key]) =>
+      key.slice(prefix.length),
+    );
   }
 
   *#listObservers(): IterableIterator<[string, Fetcher<SupabaseVerifierApi>]> {
     const prefix = "observer:";
-    for (const [key, verifier] of this.ctx.storage.kv.list<Fetcher<SupabaseVerifierApi>>({ prefix })) {
+    for (const [key, verifier] of this.ctx.storage.kv.list<Fetcher<SupabaseVerifierApi>>({
+      prefix,
+    })) {
       yield [key.slice(prefix.length), verifier];
     }
   }
@@ -1042,7 +1122,7 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
   // Organization bindings only. Marks the project pending and returns current observers who cannot
   // access it. Authorization promotes it; failed attempts remain pending and are rechecked.
   async #prepareProjectObservation(ref: string): Promise<ProjectObservationCheck> {
-    if (this.#isProjectObserved(ref)) return {pendingProjects: [], commit() {}};
+    if (this.#isProjectObserved(ref)) return { pendingProjects: [], commit() {} };
     const key = this.#observedProjectKey(ref);
     if (this.ctx.storage.kv.get<ObservedProjectState>(key) === undefined) {
       this.ctx.storage.kv.put(key, "pending");
@@ -1051,9 +1131,7 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
     const access = await Promise.all(
       observers.map(([, verifier]) => verifier.hasProjectAccess([ref])),
     );
-    const excluded = observers
-      .filter((_, index) => !access[index][0])
-      .map(([id]) => id);
+    const excluded = observers.filter((_, index) => !access[index][0]).map(([id]) => id);
     return {
       excludeObservers: excluded.length > 0 ? excluded : undefined,
       pendingProjects: [ref],
@@ -1089,7 +1167,9 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
   async describe(): Promise<ResourceDescription> {
     if (this.ctx.props.resourceKind === "project") {
       const ref = this.#requireRef();
-      const project = await this.#cachedMetadata(cacheKey("describe-project", ref), api => api.getProject(ref));
+      const project = await this.#cachedMetadata(cacheKey("describe-project", ref), (api) =>
+        api.getProject(ref),
+      );
       return {
         url: projectUrl(ref),
         title: project.name,
@@ -1100,8 +1180,10 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
     }
 
     const slug = this.#requireSlug();
-    const organizations = await this.#cachedMetadata(cacheKey("describe-orgs"), api => api.listOrganizations());
-    const org = organizations.find(o => o.slug === slug);
+    const organizations = await this.#cachedMetadata(cacheKey("describe-orgs"), (api) =>
+      api.listOrganizations(),
+    );
+    const org = organizations.find((o) => o.slug === slug);
     return {
       url: organizationUrl(slug),
       title: org ? org.name : slug,
@@ -1119,7 +1201,9 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
     return [];
   }
 
-  async startSession(approvalQueue: RpcStub<ApprovalQueue>): Promise<SupabaseProject | SupabaseOrganization> {
+  async startSession(
+    approvalQueue: RpcStub<ApprovalQueue>,
+  ): Promise<SupabaseProject | SupabaseOrganization> {
     const context = this.#makeContext(approvalQueue);
     if (this.ctx.props.resourceKind === "project") {
       return new SupabaseProjectImpl(context, this.#requireRef());
@@ -1144,7 +1228,10 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
       // The action stays queued (we don't remove it) so it can be retried after reconnecting.
       if (error instanceof SupabaseApiError && error.isAuthError) {
         await this.#userAccount().noteCredentialsExpired();
-        throw new Error("Supabase credentials have expired or been revoked. Reconnect the account, then retry.", { cause: error });
+        throw new Error(
+          "Supabase credentials have expired or been revoked. Reconnect the account, then retry.",
+          { cause: error },
+        );
       }
       throw error;
     }
@@ -1164,8 +1251,8 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
   async revertAction(_action: number): Promise<void | { message?: string; canRetry?: boolean }> {
     return {
       message:
-          "This SQL change can't be reverted automatically. To undo it, run a compensating " +
-          "statement (e.g. a corresponding `DELETE`, `UPDATE`, or `DROP`).",
+        "This SQL change can't be reverted automatically. To undo it, run a compensating " +
+        "statement (e.g. a corresponding `DELETE`, `UPDATE`, or `DROP`).",
     };
   }
 
@@ -1196,7 +1283,8 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
       if (!hasAccess) {
         throw new Error(
           `This collaborator does not have access to the Supabase project ${ref}, so they cannot ` +
-          `be allowed to observe data this workspace read from it.`);
+            `be allowed to observe data this workspace read from it.`,
+        );
       }
       return;
     }
@@ -1205,11 +1293,12 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
     if (!(await verifier.hasOrgAccess(slug))) {
       throw new Error(
         `This collaborator is not a member of the Supabase organization ${slug}, so they cannot ` +
-        `be allowed to observe it.`);
+          `be allowed to observe it.`,
+      );
     }
     const checked = new Set<string>();
     while (true) {
-      const refs = this.#listTrackedProjects().filter(ref => !checked.has(ref));
+      const refs = this.#listTrackedProjects().filter((ref) => !checked.has(ref));
       if (refs.length === 0) {
         this.ctx.storage.kv.put(this.#observerKey(id), verifier);
         return;
@@ -1219,7 +1308,8 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
         if (!projectAccess[index]) {
           throw new Error(
             `This collaborator does not have access to the Supabase project ${ref}, whose data the ` +
-            `workspace has read, so they cannot be allowed to observe it.`);
+              `workspace has read, so they cannot be allowed to observe it.`,
+          );
         }
         checked.add(ref);
       }
@@ -1236,8 +1326,11 @@ export class SupabaseGatekeeperImpl extends DurableObject<Env, SupabaseGatekeepe
 
 // Fetches (and caches) full project info. Shared so SupabaseOrganization.getProject() and
 // SupabaseProject.getInfo() hit the same cache entry instead of fetching the project twice.
-async function fetchProjectInfo(ctx: SupabaseSessionContext, ref: string): Promise<SupabaseProjectInfo> {
-  return await ctx.cached(cacheKey("project-info", ref), METADATA_CACHE_TTL_MS, async api => {
+async function fetchProjectInfo(
+  ctx: SupabaseSessionContext,
+  ref: string,
+): Promise<SupabaseProjectInfo> {
+  return await ctx.cached(cacheKey("project-info", ref), METADATA_CACHE_TTL_MS, async (api) => {
     const project = await api.getProject(ref);
     return {
       ...projectSummary(project),
@@ -1261,14 +1354,20 @@ class SupabaseOrganizationImpl extends RpcTarget implements SupabaseOrganization
   }
 
   async getInfo(): Promise<SupabaseOrganizationInfo> {
-    const info = await this.#ctx.cached(cacheKey("org", this.#slug), METADATA_CACHE_TTL_MS, async api => {
-      const organizations = await api.listOrganizations();
-      const org = organizations.find(o => o.slug === this.#slug);
-      if (!org) {
-        throw new Error(`Organization ${this.#slug} is not accessible with the connected account.`);
-      }
-      return { slug: org.slug, name: org.name, url: organizationUrl(org.slug) };
-    });
+    const info = await this.#ctx.cached(
+      cacheKey("org", this.#slug),
+      METADATA_CACHE_TTL_MS,
+      async (api) => {
+        const organizations = await api.listOrganizations();
+        const org = organizations.find((o) => o.slug === this.#slug);
+        if (!org) {
+          throw new Error(
+            `Organization ${this.#slug} is not accessible with the connected account.`,
+          );
+        }
+        return { slug: org.slug, name: org.name, url: organizationUrl(org.slug) };
+      },
+    );
 
     await this.#ctx.approvalQueue.authorizeObservation({
       title: "Read Supabase organization",
@@ -1278,15 +1377,20 @@ class SupabaseOrganizationImpl extends RpcTarget implements SupabaseOrganization
   }
 
   async listProjects(): Promise<SupabaseProjectSummary[]> {
-    const projects = await this.#ctx.cached(cacheKey("org-projects", this.#slug), METADATA_CACHE_TTL_MS, async api => {
-      const all = await api.listProjects();
-      return all.filter(project => project.organization_slug === this.#slug).map(projectSummary);
-    });
+    const projects = await this.#ctx.cached(
+      cacheKey("org-projects", this.#slug),
+      METADATA_CACHE_TTL_MS,
+      async (api) => {
+        const all = await api.listProjects();
+        return all
+          .filter((project) => project.organization_slug === this.#slug)
+          .map(projectSummary);
+      },
+    );
 
     await this.#ctx.approvalQueue.authorizeObservation({
       title: "List Supabase projects",
-      description:
-          `List the ${projects.length} project(s) in the Supabase organization \`${this.#slug}\`.`,
+      description: `List the ${projects.length} project(s) in the Supabase organization \`${this.#slug}\`.`,
     });
     return projects;
   }
@@ -1334,11 +1438,14 @@ class SupabaseProjectImpl extends RpcTarget implements SupabaseProject {
     return new SupabaseDatabaseImpl(this.#ctx, this.#ref);
   }
 
-
   async checkHealth(): Promise<SupabaseServiceHealth[]> {
     // Not cached: health is a liveness probe where staleness defeats the purpose.
-    const health = await this.#ctx.run(api => api.getServicesHealth(this.#ref, HEALTH_SERVICES));
-    const result = health.map(item => ({ service: item.name, status: item.status, error: item.error }));
+    const health = await this.#ctx.run((api) => api.getServicesHealth(this.#ref, HEALTH_SERVICES));
+    const result = health.map((item) => ({
+      service: item.name,
+      status: item.status,
+      error: item.error,
+    }));
 
     await this.#ctx.authorizeProjectObservation(this.#ref, {
       title: "Check Supabase project health",
@@ -1348,18 +1455,22 @@ class SupabaseProjectImpl extends RpcTarget implements SupabaseProject {
   }
 
   async listEdgeFunctions(): Promise<SupabaseEdgeFunction[]> {
-    const functions = await this.#ctx.cached(cacheKey("functions", this.#ref), METADATA_CACHE_TTL_MS, async api => {
-      const list = await api.listFunctions(this.#ref);
-      return list.map(fn => ({
-        slug: fn.slug,
-        name: fn.name,
-        status: fn.status,
-        version: fn.version,
-        verifyJwt: fn.verify_jwt ?? false,
-        createdAt: new Date(fn.created_at),
-        updatedAt: new Date(fn.updated_at),
-      }));
-    });
+    const functions = await this.#ctx.cached(
+      cacheKey("functions", this.#ref),
+      METADATA_CACHE_TTL_MS,
+      async (api) => {
+        const list = await api.listFunctions(this.#ref);
+        return list.map((fn) => ({
+          slug: fn.slug,
+          name: fn.name,
+          status: fn.status,
+          version: fn.version,
+          verifyJwt: fn.verify_jwt ?? false,
+          createdAt: new Date(fn.created_at),
+          updatedAt: new Date(fn.updated_at),
+        }));
+      },
+    );
 
     await this.#ctx.authorizeProjectObservation(this.#ref, {
       title: "List Supabase edge functions",
@@ -1372,7 +1483,7 @@ class SupabaseProjectImpl extends RpcTarget implements SupabaseProject {
     const source = await this.#ctx.cached(
       cacheKey("function-source", this.#ref, slug),
       METADATA_CACHE_TTL_MS,
-      api => api.getFunctionBody(this.#ref, slug),
+      (api) => api.getFunctionBody(this.#ref, slug),
     );
 
     await this.#ctx.authorizeProjectObservation(this.#ref, {
@@ -1383,16 +1494,20 @@ class SupabaseProjectImpl extends RpcTarget implements SupabaseProject {
   }
 
   async listStorageBuckets(): Promise<SupabaseStorageBucket[]> {
-    const buckets = await this.#ctx.cached(cacheKey("buckets", this.#ref), METADATA_CACHE_TTL_MS, async api => {
-      const list = await api.listStorageBuckets(this.#ref);
-      return list.map(bucket => ({
-        id: bucket.id,
-        name: bucket.name,
-        public: bucket.public,
-        createdAt: new Date(bucket.created_at),
-        updatedAt: new Date(bucket.updated_at),
-      }));
-    });
+    const buckets = await this.#ctx.cached(
+      cacheKey("buckets", this.#ref),
+      METADATA_CACHE_TTL_MS,
+      async (api) => {
+        const list = await api.listStorageBuckets(this.#ref);
+        return list.map((bucket) => ({
+          id: bucket.id,
+          name: bucket.name,
+          public: bucket.public,
+          createdAt: new Date(bucket.created_at),
+          updatedAt: new Date(bucket.updated_at),
+        }));
+      },
+    );
 
     await this.#ctx.authorizeProjectObservation(this.#ref, {
       title: "List Supabase storage buckets",
@@ -1417,13 +1532,15 @@ class SupabaseDatabaseImpl extends RpcTarget implements SupabaseDatabase {
     assertReadOnlyQuerySafe(sql);
     // Read-only queries are not cached (the SQL and parameters are arbitrary and dynamic). The
     // result size is bounded inside runReadOnlyQuery (it throws before returning an oversized body).
-    const rows = await this.#ctx.run(api => api.runReadOnlyQuery(this.#ref, sql, params));
+    const rows = await this.#ctx.run((api) => api.runReadOnlyQuery(this.#ref, sql, params));
 
     await this.#ctx.authorizeProjectObservation(this.#ref, {
       title: "Run read-only SQL on Supabase",
       description:
-          `Run a read-only query against Supabase project \`${this.#ref}\`.\n\n` +
-          "```sql\n" + sql + "\n```",
+        `Run a read-only query against Supabase project \`${this.#ref}\`.\n\n` +
+        "```sql\n" +
+        sql +
+        "\n```",
     });
     return { rows: rows as SupabaseQueryResult["rows"], rowCount: rows.length };
   }
@@ -1443,7 +1560,7 @@ class SupabaseDatabaseImpl extends RpcTarget implements SupabaseDatabase {
     const schemas = await this.#ctx.cached(
       cacheKey("schemas", this.#ref),
       SCHEMA_CACHE_TTL_MS,
-      api => listSchemas(api, this.#ref),
+      (api) => listSchemas(api, this.#ref),
     );
 
     await this.#ctx.authorizeProjectObservation(this.#ref, {
@@ -1461,13 +1578,12 @@ class SupabaseDatabaseImpl extends RpcTarget implements SupabaseDatabase {
     const tables = await this.#ctx.cached(
       cacheKey("tables", this.#ref, schema, includeViews),
       SCHEMA_CACHE_TTL_MS,
-      api => listTables(api, this.#ref, { schema, includeViews }),
+      (api) => listTables(api, this.#ref, { schema, includeViews }),
     );
 
     await this.#ctx.authorizeProjectObservation(this.#ref, {
       title: "List Supabase tables",
-      description:
-          `List the ${tables.length} table(s)/view(s) in schema \`${schema}\` of project \`${this.#ref}\`.`,
+      description: `List the ${tables.length} table(s)/view(s) in schema \`${schema}\` of project \`${this.#ref}\`.`,
     });
     return tables;
   }
@@ -1476,7 +1592,7 @@ class SupabaseDatabaseImpl extends RpcTarget implements SupabaseDatabase {
     const details = await this.#ctx.cached(
       cacheKey("table", this.#ref, schema, name),
       SCHEMA_CACHE_TTL_MS,
-      api => describeTable(api, this.#ref, schema, name),
+      (api) => describeTable(api, this.#ref, schema, name),
     );
 
     await this.#ctx.authorizeProjectObservation(this.#ref, {

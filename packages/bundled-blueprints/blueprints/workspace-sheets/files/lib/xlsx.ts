@@ -17,7 +17,15 @@ const MAX_CELL_FORMATS = 65490;
 const MAX_FORMULA_CHARACTERS = 8192;
 const TEXT_CHUNK_SIZE = 64 * 1024;
 const FUTURE_FUNCTIONS = new Set([
-  "CONCAT", "DAYS", "IFNA", "IFS", "SWITCH", "TEXTJOIN", "UNICHAR", "UNICODE", "XOR",
+  "CONCAT",
+  "DAYS",
+  "IFNA",
+  "IFS",
+  "SWITCH",
+  "TEXTJOIN",
+  "UNICHAR",
+  "UNICODE",
+  "XOR",
 ]);
 
 /** A worksheet as it is assembled: `sourceSheets` reads it out of the document, `assignSheetNames`
@@ -109,8 +117,12 @@ function spreadsheetXml(value: unknown, attribute = false): string {
       clean += "_xFFFD_";
     } else if (code === 13) {
       clean += "_x000D_";
-    } else if (code === 9 || code === 10 ||
-        (code >= 0x20 && code <= 0xd7ff) || (code >= 0xe000 && code <= 0xfffd)) {
+    } else if (
+      code === 9 ||
+      code === 10 ||
+      (code >= 0x20 && code <= 0xd7ff) ||
+      (code >= 0xe000 && code <= 0xfffd)
+    ) {
       clean += input[i];
     } else {
       clean += `_x${code.toString(16).toUpperCase().padStart(4, "0")}_`;
@@ -132,46 +144,61 @@ function formulaXml(value: string): string {
       else clean += String.fromCharCode(0xfffd);
     } else if (code >= 0xdc00 && code <= 0xdfff) {
       clean += String.fromCharCode(0xfffd);
-    } else if (code === 9 || code === 10 || code === 13 ||
-        (code >= 0x20 && code <= 0xd7ff) || (code >= 0xe000 && code <= 0xfffd)) {
+    } else if (
+      code === 9 ||
+      code === 10 ||
+      code === 13 ||
+      (code >= 0x20 && code <= 0xd7ff) ||
+      (code >= 0xe000 && code <= 0xfffd)
+    ) {
       clean += input[i];
     } else {
       clean += String.fromCharCode(0xfffd);
     }
   }
-  return clean.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  return clean
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
     .replace(/\r/g, "&#13;");
 }
 
 function xmlAttribute(value: string): string {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 // Encodes a string generator into ~64 KiB byte chunks. Cell-sized chunks would make the ZIP's
 // CompressionStream the bottleneck. `highWaterMark: 0` keeps generation lazy until the archive
 // reaches this part.
 function textStream(generator: Generator<string, void, unknown>): ReadableStream<Uint8Array> {
-  return new ReadableStream<Uint8Array>({
-    pull(controller) {
-      const parts: string[] = [];
-      let length = 0;
-      while (length < TEXT_CHUNK_SIZE) {
-        const result = generator.next();
-        if (result.done) {
-          if (parts.length) controller.enqueue(encoder.encode(parts.join("")));
-          controller.close();
-          return;
+  return new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        const parts: string[] = [];
+        let length = 0;
+        while (length < TEXT_CHUNK_SIZE) {
+          const result = generator.next();
+          if (result.done) {
+            if (parts.length) controller.enqueue(encoder.encode(parts.join("")));
+            controller.close();
+            return;
+          }
+          parts.push(result.value);
+          length += result.value.length;
         }
-        parts.push(result.value);
-        length += result.value.length;
-      }
-      controller.enqueue(encoder.encode(parts.join("")));
+        controller.enqueue(encoder.encode(parts.join("")));
+      },
+      cancel(reason) {
+        generator.return(reason);
+      },
     },
-    cancel(reason) {
-      generator.return(reason);
-    },
-  }, {highWaterMark: 0});
+    { highWaterMark: 0 },
+  );
 }
 
 function count(value: unknown, fallback: number, maximum: number): number {
@@ -207,7 +234,9 @@ function truncateSheetName(value: string, length: number): string {
 }
 
 function safeSheetName(value: unknown): string {
-  let name = String(value ?? "").replace(/[:\\/?*\[\]]/g, "_").trim();
+  let name = String(value ?? "")
+    .replace(/[:\\/?*\[\]]/g, "_")
+    .trim();
   name = truncateSheetName(name, 31);
   if (name.startsWith("'")) name = "_" + name.slice(1);
   if (name.endsWith("'")) name = name.slice(0, -1) + "_";
@@ -251,13 +280,13 @@ function parseCellReference(reference: string): { row: number; column: number } 
   }
   const row = Number(match[2]);
   if (!Number.isSafeInteger(row) || row > MAX_ROWS) return null;
-  return {row, column};
+  return { row, column };
 }
 
 function columnName(column: number): string {
   let name = "";
   for (let value = column; value > 0; value = Math.floor((value - 1) / 26)) {
-    name = String.fromCharCode(65 + (value - 1) % 26) + name;
+    name = String.fromCharCode(65 + ((value - 1) % 26)) + name;
   }
   return name;
 }
@@ -275,7 +304,11 @@ function columnWidth(pixels: number): string {
   return String(Math.min(255, Math.round(Math.max(0, (pixels - 5) / 7) * 256) / 256));
 }
 
-function dimensions(source: Dims | undefined, maximum: number, convert: (pixels: number) => string): Dimension[] {
+function dimensions(
+  source: Dims | undefined,
+  maximum: number,
+  convert: (pixels: number) => string,
+): Dimension[] {
   const result: Dimension[] = [];
   if (!source || typeof source !== "object") return result;
   for (const [key, value] of Object.entries(source)) {
@@ -283,7 +316,7 @@ function dimensions(source: Dims | undefined, maximum: number, convert: (pixels:
     const index = Number(key);
     const pixels = pixelDimension(value);
     if (!Number.isSafeInteger(index) || index < 0 || index >= maximum || pixels == null) continue;
-    result.push({index, value: convert(pixels)});
+    result.push({ index, value: convert(pixels) });
   }
   result.sort((a, b) => a.index - b.index);
   return result;
@@ -292,10 +325,17 @@ function dimensions(source: Dims | undefined, maximum: number, convert: (pixels:
 function xlsxColor(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const hex = value.slice(1);
-  if (!value.startsWith("#") || ![3, 4, 6, 8].includes(hex.length) || !/^[0-9a-f]+$/i.test(hex)) return null;
-  if (hex.length === 3) return "FF" + Array.from(hex, character => character + character).join("").toUpperCase();
+  if (!value.startsWith("#") || ![3, 4, 6, 8].includes(hex.length) || !/^[0-9a-f]+$/i.test(hex))
+    return null;
+  if (hex.length === 3)
+    return (
+      "FF" +
+      Array.from(hex, (character) => character + character)
+        .join("")
+        .toUpperCase()
+    );
   if (hex.length === 4) {
-    const [r, g, b, a] = Array.from(hex, character => character + character);
+    const [r, g, b, a] = Array.from(hex, (character) => character + character);
     return (a + r + g + b).toUpperCase();
   }
   if (hex.length === 6) return "FF" + hex.toUpperCase();
@@ -325,15 +365,15 @@ class Styles {
   declare cellFormatIds: Map<string, number>;
 
   constructor() {
-    this.fonts = [{size: 11}];
+    this.fonts = [{ size: 11 }];
     this.fontIds = new Map();
-    this.fills = [null, {gray125: true}];
+    this.fills = [null, { gray125: true }];
     this.fillIds = new Map();
     this.numberFormats = [];
     this.numberFormatIds = new Map();
     this.alignments = [null];
     this.alignmentIds = new Map();
-    this.cellFormats = [{fontId: 0, fillId: 0, numberFormatId: 0, alignmentId: 0}];
+    this.cellFormats = [{ fontId: 0, fillId: 0, numberFormatId: 0, alignmentId: 0 }];
     this.cellFormatIds = new Map();
   }
 
@@ -343,14 +383,20 @@ class Styles {
     // The grid renders `fs` in CSS pixels; Excel font sizes are points.
     const size = Number.isFinite(pixels) && pixels >= 6 && pixels <= 96 ? pixels * 0.75 : null;
     const font: Font = {
-      bold: Boolean(fmt?.b), italic: Boolean(fmt?.i), underline: Boolean(fmt?.u),
-      strike: Boolean(fmt?.s), color, size,
+      bold: Boolean(fmt?.b),
+      italic: Boolean(fmt?.i),
+      underline: Boolean(fmt?.u),
+      strike: Boolean(fmt?.s),
+      color,
+      size,
     };
-    if (!font.bold && !font.italic && !font.underline && !font.strike && !font.color && !font.size) return 0;
+    if (!font.bold && !font.italic && !font.underline && !font.strike && !font.color && !font.size)
+      return 0;
     const key = JSON.stringify(font);
     let id = this.fontIds.get(key);
     if (id == null) {
-      if (this.fonts.length >= MAX_FONTS) throw new Error("XLSX font count exceeds Excel's limit of 512.");
+      if (this.fonts.length >= MAX_FONTS)
+        throw new Error("XLSX font count exceeds Excel's limit of 512.");
       id = this.fonts.length;
       this.fontIds.set(key, id);
       this.fonts.push(font);
@@ -363,10 +409,11 @@ class Styles {
     if (!color) return 0;
     let id = this.fillIds.get(color);
     if (id == null) {
-      if (this.fills.length >= MAX_FILLS) throw new Error("XLSX fill count exceeds Excel's limit of 256.");
+      if (this.fills.length >= MAX_FILLS)
+        throw new Error("XLSX fill count exceeds Excel's limit of 256.");
       id = this.fills.length;
       this.fillIds.set(color, id);
-      this.fills.push({color});
+      this.fills.push({ color });
     }
     return id;
   }
@@ -379,7 +426,7 @@ class Styles {
       }
       id = 164 + this.numberFormats.length;
       this.numberFormatIds.set(code, id);
-      this.numberFormats.push({id, code});
+      this.numberFormats.push({ id, code });
     }
     return id;
   }
@@ -394,8 +441,10 @@ class Styles {
       const pattern = '"$"#,##0' + decimalPattern(places ?? 2);
       return this.customNumberFormat(pattern + ";-" + pattern);
     }
-    if (name === "percent") return this.customNumberFormat("#,##0" + decimalPattern(places ?? 2) + "%");
-    if (name === "scientific") return this.customNumberFormat("0" + decimalPattern(places ?? 2) + "E+00");
+    if (name === "percent")
+      return this.customNumberFormat("#,##0" + decimalPattern(places ?? 2) + "%");
+    if (name === "scientific")
+      return this.customNumberFormat("0" + decimalPattern(places ?? 2) + "E+00");
     if (name === "date") return this.customNumberFormat("mm/dd/yyyy");
     if (name === "time") return this.customNumberFormat("h:mm:ss AM/PM");
     if (name === "datetime") return this.customNumberFormat("mm/dd/yyyy h:mm:ss AM/PM");
@@ -404,7 +453,8 @@ class Styles {
   }
 
   alignment(fmt: CellFmt): number {
-    const horizontal = fmt?.a === "l" ? "left" : fmt?.a === "c" ? "center" : fmt?.a === "r" ? "right" : null;
+    const horizontal =
+      fmt?.a === "l" ? "left" : fmt?.a === "c" ? "center" : fmt?.a === "r" ? "right" : null;
     const wrap = Boolean(fmt?.wrap);
     if (!horizontal && !wrap) return 0;
     const key = `${horizontal || ""}|${wrap}`;
@@ -412,7 +462,7 @@ class Styles {
     if (id == null) {
       id = this.alignments.length;
       this.alignmentIds.set(key, id);
-      this.alignments.push({horizontal, wrap});
+      this.alignments.push({ horizontal, wrap });
     }
     return id;
   }
@@ -420,10 +470,18 @@ class Styles {
   style(fmt: CellFmt | null | undefined): number {
     if (!fmt || typeof fmt !== "object") return 0;
     const cellFormat: CellFormat = {
-      fontId: this.font(fmt), fillId: this.fill(fmt), numberFormatId: this.numberFormat(fmt),
+      fontId: this.font(fmt),
+      fillId: this.fill(fmt),
+      numberFormatId: this.numberFormat(fmt),
       alignmentId: this.alignment(fmt),
     };
-    if (!cellFormat.fontId && !cellFormat.fillId && !cellFormat.numberFormatId && !cellFormat.alignmentId) return 0;
+    if (
+      !cellFormat.fontId &&
+      !cellFormat.fillId &&
+      !cellFormat.numberFormatId &&
+      !cellFormat.alignmentId
+    )
+      return 0;
     const key = `${cellFormat.fontId}|${cellFormat.fillId}|${cellFormat.numberFormatId}|${cellFormat.alignmentId}`;
     let id = this.cellFormatIds.get(key);
     if (id == null) {
@@ -442,8 +500,10 @@ function sourceSheets(document: SheetsDocument): NamedSheet[] {
   const result: SheetDraft[] = [];
   const seen = new Set<string>();
   const order: string[] = Array.isArray(document?.sheetOrder) ? document.sheetOrder : [];
-  const sheetMap: Record<string, SheetMeta> = document?.sheets && typeof document.sheets === "object" ? document.sheets : {};
-  const cellMap: Record<string, CellMap> = document?.cells && typeof document.cells === "object" ? document.cells : {};
+  const sheetMap: Record<string, SheetMeta> =
+    document?.sheets && typeof document.sheets === "object" ? document.sheets : {};
+  const cellMap: Record<string, CellMap> =
+    document?.cells && typeof document.cells === "object" ? document.cells : {};
   for (const rawId of order) {
     const id = String(rawId);
     if (seen.has(id)) continue;
@@ -457,12 +517,16 @@ function sourceSheets(document: SheetsDocument): NamedSheet[] {
       sourceCells: cellMap[id] && typeof cellMap[id] === "object" ? cellMap[id] : {},
     });
   }
-  if (!result.length) result.push({id: "", sourceName: "Sheet", metadata: {}, sourceCells: {}});
+  if (!result.length) result.push({ id: "", sourceName: "Sheet", metadata: {}, sourceCells: {} });
   assignSheetNames(result);
   return result;
 }
 
-function prepareWorkbook(document: SheetsDocument): { sheets: PreparedSheet[]; styles: Styles; formulaNames: Map<string, string> } {
+function prepareWorkbook(document: SheetsDocument): {
+  sheets: PreparedSheet[];
+  styles: Styles;
+  formulaNames: Map<string, string>;
+} {
   const sheets = sourceSheets(document);
   const formulaNames = new Map<string, string>();
   for (const sheet of sheets) {
@@ -484,26 +548,31 @@ function prepareWorkbook(document: SheetsDocument): { sheets: PreparedSheet[]; s
       const style = styles.style(sourceCell.fmt);
       const value = sourceCell.value == null ? "" : String(sourceCell.value);
       if (value === "" && !style) continue;
-      sheet.cells.push({reference, ...position, value, style});
+      sheet.cells.push({ reference, ...position, value, style });
     }
     delete sheet.sourceCells;
     sheet.cells.sort((a, b) => a.row - b.row || a.column - b.column);
   }
   // The loop above set every remaining field of every sheet.
-  return {sheets: sheets as PreparedSheet[], styles, formulaNames};
+  return { sheets: sheets as PreparedSheet[], styles, formulaNames };
 }
 
 function formulaReferenceAt(formula: string, offset: number): boolean {
   const match = /^\$?([A-Za-z]{1,3})\$?([1-9]\d*)/.exec(formula.slice(offset));
   if (!match) return false;
   let column = 0;
-  for (const character of match[1].toUpperCase()) column = column * 26 + character.charCodeAt(0) - 64;
+  for (const character of match[1].toUpperCase())
+    column = column * 26 + character.charCodeAt(0) - 64;
   if (column > MAX_COLUMNS || Number(match[2]) > MAX_ROWS) return false;
   const next = formula[offset + match[0].length];
   return !next || !/[A-Za-z0-9_$]/.test(next);
 }
 
-function quotedSheetReference(formula: string, offset: number, names: Map<string, string>): FormulaRewrite | null {
+function quotedSheetReference(
+  formula: string,
+  offset: number,
+  names: Map<string, string>,
+): FormulaRewrite | null {
   const nameParts: string[] = [];
   for (let i = offset + 1; i < formula.length; ++i) {
     if (formula[i] !== "'") {
@@ -523,19 +592,31 @@ function quotedSheetReference(formula: string, offset: number, names: Map<string
     const normalized = names.get(name.toLowerCase());
     const malformed = offset > 0 && /[A-Za-z0-9_.$]/.test(formula[offset - 1]);
     const external = formula[offset - 1] === "]" || (!normalized && /\[[^\]]*\]/.test(name));
-    if (!hasBang || !formulaReferenceAt(formula, end) || malformed || external ||
-        isThreeDimensionalReference(formula, offset)) return {end, text};
-    return normalized
-      ? {end, text: `'${normalized.replace(/'/g, "''")}'!`}
-      : {end, text};
+    if (
+      !hasBang ||
+      !formulaReferenceAt(formula, end) ||
+      malformed ||
+      external ||
+      isThreeDimensionalReference(formula, offset)
+    )
+      return { end, text };
+    return normalized ? { end, text: `'${normalized.replace(/'/g, "''")}'!` } : { end, text };
   }
   return null;
 }
 
-function unquotedSheetReference(formula: string, offset: number, names: Map<string, string>): FormulaRewrite | null {
-  if (!/[A-Za-z_$]/.test(formula[offset]) ||
-      (offset > 0 && /[A-Za-z0-9_.$]/.test(formula[offset - 1])) ||
-      formula[offset - 1] === "]" || isThreeDimensionalReference(formula, offset)) return null;
+function unquotedSheetReference(
+  formula: string,
+  offset: number,
+  names: Map<string, string>,
+): FormulaRewrite | null {
+  if (
+    !/[A-Za-z_$]/.test(formula[offset]) ||
+    (offset > 0 && /[A-Za-z0-9_.$]/.test(formula[offset - 1])) ||
+    formula[offset - 1] === "]" ||
+    isThreeDimensionalReference(formula, offset)
+  )
+    return null;
   let end = offset + 1;
   while (end < formula.length && /[A-Za-z0-9_.$]/.test(formula[end])) ++end;
   if (formula[end] !== "!" || !formulaReferenceAt(formula, end + 1)) return null;
@@ -543,9 +624,9 @@ function unquotedSheetReference(formula: string, offset: number, names: Map<stri
   const normalized = names.get(name.toLowerCase());
   if (!normalized) return null;
   if (normalized.toLowerCase() === name.toLowerCase()) {
-    return {end: end + 1, text: formula.slice(offset, end + 1)};
+    return { end: end + 1, text: formula.slice(offset, end + 1) };
   }
-  return {end: end + 1, text: `'${normalized.replace(/'/g, "''")}'!`};
+  return { end: end + 1, text: `'${normalized.replace(/'/g, "''")}'!` };
 }
 
 function isThreeDimensionalReference(formula: string, offset: number): boolean {
@@ -559,17 +640,20 @@ function isThreeDimensionalReference(formula: string, offset: number): boolean {
 // Recognizes a function call at `offset`. The grid's tokenizer discards whitespace, so it accepts
 // `SUM (1)`; in Excel that space is the intersection operator, so the gap is dropped here.
 function formulaFunctionAt(formula: string, offset: number): FormulaRewrite | null {
-  if (!/[A-Za-z_]/.test(formula[offset]) ||
-      (offset > 0 && /[A-Za-z0-9_.$!]/.test(formula[offset - 1]))) return null;
+  if (
+    !/[A-Za-z_]/.test(formula[offset]) ||
+    (offset > 0 && /[A-Za-z0-9_.$!]/.test(formula[offset - 1]))
+  )
+    return null;
   let end = offset + 1;
   while (end < formula.length && /[A-Za-z0-9_.]/.test(formula[end])) ++end;
   let parenthesis = end;
   while (parenthesis < formula.length && /\s/.test(formula[parenthesis])) ++parenthesis;
   if (formula[parenthesis] !== "(") return null;
   const name = formula.slice(offset, end).toUpperCase();
-  if (FUTURE_FUNCTIONS.has(name)) return {end: parenthesis, text: "_xlfn." + name};
-  if (name === "ERRORTYPE") return {end: parenthesis, text: "ERROR.TYPE"};
-  return parenthesis > end ? {end: parenthesis, text: formula.slice(offset, end)} : null;
+  if (FUTURE_FUNCTIONS.has(name)) return { end: parenthesis, text: "_xlfn." + name };
+  if (name === "ERRORTYPE") return { end: parenthesis, text: "ERROR.TYPE" };
+  return parenthesis > end ? { end: parenthesis, text: formula.slice(offset, end) } : null;
 }
 
 // Rewrites sheet and function names for Excel. Returns null when the formula is unbalanced
@@ -604,9 +688,10 @@ function rewriteFormula(formula: string, names: Map<string, string>): string | n
       if (!structuredReferenceDepth) {
         if (character === "(") ++parentheses;
         else if (character === ")" && --parentheses < 0) return null;
-        const reference = character === "'"
-          ? quotedSheetReference(formula, i, names)
-          : formulaFunctionAt(formula, i) || unquotedSheetReference(formula, i, names);
+        const reference =
+          character === "'"
+            ? quotedSheetReference(formula, i, names)
+            : formulaFunctionAt(formula, i) || unquotedSheetReference(formula, i, names);
         if (character === "'" && !reference) return null;
         if (reference) {
           result.push(reference.text);
@@ -622,27 +707,27 @@ function rewriteFormula(formula: string, names: Map<string, string>): string | n
 }
 
 function parsedCellValue(value: string, formulaNames: Map<string, string>): ParsedCellValue {
-  if (value[0] === "'") return {type: "text", value: value.slice(1)};
+  if (value[0] === "'") return { type: "text", value: value.slice(1) };
   if (value[0] === "=") {
     const formula = rewriteFormula(value.slice(1), formulaNames);
     // Excel also rejects empty formulas and those over its length limit; keep the stored text.
     return formula && formula.trim() && formula.length < MAX_FORMULA_CHARACTERS
-      ? {type: "formula", value: formula}
-      : {type: "text", value};
+      ? { type: "formula", value: formula }
+      : { type: "text", value };
   }
   const trimmed = value.trim();
-  if (trimmed === "") return {type: "blank", value: ""};
-  if (/^(TRUE|FALSE)$/i.test(trimmed)) return {type: "boolean", value: /^true$/i.test(trimmed)};
+  if (trimmed === "") return { type: "blank", value: "" };
+  if (/^(TRUE|FALSE)$/i.test(trimmed)) return { type: "boolean", value: /^true$/i.test(trimmed) };
   if (/^[-+]?\$?[\d,]*\.?\d+%?$/.test(trimmed) && /\d/.test(trimmed)) {
     const negative = trimmed.startsWith("-");
     const cleaned = trimmed.replace(/[$,+%-]/g, "");
     let number = Number(cleaned);
     if (Number.isFinite(number)) {
       if (trimmed.endsWith("%")) number /= 100;
-      return {type: "number", value: negative ? -number : number};
+      return { type: "number", value: negative ? -number : number };
     }
   }
-  return {type: "text", value};
+  return { type: "text", value };
 }
 
 function cellXml(cell: PreparedCell, formulaNames: Map<string, string>): string {
@@ -650,9 +735,12 @@ function cellXml(cell: PreparedCell, formulaNames: Map<string, string>): string 
   if (cell.value === "") return `<c r="${cell.reference}"${style}/>`;
   const parsed = parsedCellValue(cell.value, formulaNames);
   if (parsed.type === "blank") return `<c r="${cell.reference}"${style}/>`;
-  if (parsed.type === "formula") return `<c r="${cell.reference}"${style}><f>${formulaXml(parsed.value)}</f></c>`;
-  if (parsed.type === "boolean") return `<c r="${cell.reference}"${style} t="b"><v>${parsed.value ? 1 : 0}</v></c>`;
-  if (parsed.type === "number") return `<c r="${cell.reference}"${style}><v>${String(parsed.value)}</v></c>`;
+  if (parsed.type === "formula")
+    return `<c r="${cell.reference}"${style}><f>${formulaXml(parsed.value)}</f></c>`;
+  if (parsed.type === "boolean")
+    return `<c r="${cell.reference}"${style} t="b"><v>${parsed.value ? 1 : 0}</v></c>`;
+  if (parsed.type === "number")
+    return `<c r="${cell.reference}"${style}><v>${String(parsed.value)}</v></c>`;
   return `<c r="${cell.reference}"${style} t="inlineStr"><is><t xml:space="preserve">${spreadsheetXml(parsed.value)}</t></is></c>`;
 }
 
@@ -664,14 +752,19 @@ function frozenPane(sheet: PreparedSheet): string {
   if (columns) attributes.push(`xSplit="${columns}"`);
   if (rows) attributes.push(`ySplit="${rows}"`);
   attributes.push(`topLeftCell="${columnName(columns + 1)}${rows + 1}"`);
-  attributes.push(`activePane="${rows && columns ? "bottomRight" : rows ? "bottomLeft" : "topRight"}"`);
+  attributes.push(
+    `activePane="${rows && columns ? "bottomRight" : rows ? "bottomLeft" : "topRight"}"`,
+  );
   attributes.push('state="frozen"');
   return `<pane ${attributes.join(" ")}/>`;
 }
 
 function worksheetDimension(cells: PreparedCell[]): string {
   if (!cells.length) return "A1";
-  let minRow = MAX_ROWS, minColumn = MAX_COLUMNS, maxRow = 1, maxColumn = 1;
+  let minRow = MAX_ROWS,
+    minColumn = MAX_COLUMNS,
+    maxRow = 1,
+    maxColumn = 1;
   for (const cell of cells) {
     minRow = Math.min(minRow, cell.row);
     minColumn = Math.min(minColumn, cell.column);
@@ -683,7 +776,10 @@ function worksheetDimension(cells: PreparedCell[]): string {
   return first === last ? first : first + ":" + last;
 }
 
-function* worksheetXml(sheet: PreparedSheet, formulaNames: Map<string, string>): Generator<string, void, unknown> {
+function* worksheetXml(
+  sheet: PreparedSheet,
+  formulaNames: Map<string, string>,
+): Generator<string, void, unknown> {
   yield `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${MAIN_NS}">`;
   yield `<dimension ref="${worksheetDimension(sheet.cells)}"/>`;
   yield `<sheetViews><sheetView workbookViewId="0">${frozenPane(sheet)}</sheetView></sheetViews>`;
@@ -704,7 +800,8 @@ function* worksheetXml(sheet: PreparedSheet, formulaNames: Map<string, string>):
     const row = Math.min(cellRow, heightRow);
     const height = heightRow === row ? sheet.rowHeights[heightIndex++] : null;
     yield `<row r="${row}"${height ? ` ht="${height.value}" customHeight="1"` : ""}>`;
-    while (sheet.cells[cellIndex]?.row === row) yield cellXml(sheet.cells[cellIndex++], formulaNames);
+    while (sheet.cells[cellIndex]?.row === row)
+      yield cellXml(sheet.cells[cellIndex++], formulaNames);
     yield "</row>";
   }
   yield "</sheetData></worksheet>";
@@ -714,7 +811,8 @@ function* stylesXml(styles: Styles): Generator<string, void, unknown> {
   yield `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${MAIN_NS}">`;
   if (styles.numberFormats.length) {
     yield `<numFmts count="${styles.numberFormats.length}">`;
-    for (const format of styles.numberFormats) yield `<numFmt numFmtId="${format.id}" formatCode="${xmlAttribute(format.code)}"/>`;
+    for (const format of styles.numberFormats)
+      yield `<numFmt numFmtId="${format.id}" formatCode="${xmlAttribute(format.code)}"/>`;
     yield "</numFmts>";
   }
   yield `<fonts count="${styles.fonts.length}">`;
@@ -758,10 +856,13 @@ function* stylesXml(styles: Styles): Generator<string, void, unknown> {
 function contentTypes(sheetCount: number): string {
   let xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   xml += '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">';
-  xml += '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>';
+  xml +=
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>';
   xml += '<Default Extension="xml" ContentType="application/xml"/>';
-  xml += '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>';
-  xml += '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
+  xml +=
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>';
+  xml +=
+    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
   for (let i = 1; i <= sheetCount; ++i) {
     xml += `<Override PartName="/xl/worksheets/sheet${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`;
   }
@@ -783,18 +884,24 @@ function workbookRelationships(sheetCount: number): string {
   for (let i = 1; i <= sheetCount; ++i) {
     xml += `<Relationship Id="rId${i}" Type="${REL_NS}/worksheet" Target="worksheets/sheet${i}.xml"/>`;
   }
-  return xml + `<Relationship Id="rId${sheetCount + 1}" Type="${REL_NS}/styles" Target="styles.xml"/></Relationships>`;
+  return (
+    xml +
+    `<Relationship Id="rId${sheetCount + 1}" Type="${REL_NS}/styles" Target="styles.xml"/></Relationships>`
+  );
 }
 
 /** Streams `document` (a complete `Gadget.getDocument()` snapshot) as an XLSX workbook. */
 export function workbookToXlsx(document: SheetsDocument): ReadableStream<Uint8Array> {
-  const {sheets, styles, formulaNames} = prepareWorkbook(document);
+  const { sheets, styles, formulaNames } = prepareWorkbook(document);
   const entries: ZipEntry[] = [
-    {name: "[Content_Types].xml", data: contentTypes(sheets.length)},
-    {name: "_rels/.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${PACKAGE_REL_NS}"><Relationship Id="rId1" Type="${REL_NS}/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
-    {name: "xl/workbook.xml", data: workbookXml(sheets)},
-    {name: "xl/_rels/workbook.xml.rels", data: workbookRelationships(sheets.length)},
-    {name: "xl/styles.xml", data: textStream(stylesXml(styles))},
+    { name: "[Content_Types].xml", data: contentTypes(sheets.length) },
+    {
+      name: "_rels/.rels",
+      data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${PACKAGE_REL_NS}"><Relationship Id="rId1" Type="${REL_NS}/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+    },
+    { name: "xl/workbook.xml", data: workbookXml(sheets) },
+    { name: "xl/_rels/workbook.xml.rels", data: workbookRelationships(sheets.length) },
+    { name: "xl/styles.xml", data: textStream(stylesXml(styles)) },
     ...sheets.map((sheet, i) => ({
       name: `xl/worksheets/sheet${i + 1}.xml`,
       data: textStream(worksheetXml(sheet, formulaNames)),

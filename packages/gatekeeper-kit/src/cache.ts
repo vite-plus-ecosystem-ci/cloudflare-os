@@ -104,11 +104,7 @@ export class KvTtlCache {
    * port's existing shared layout.
    * @returns A cache partitioned by the source's live connection generation.
    */
-  static partitionedBy(
-    kv: CacheKv,
-    source: AuthoritySource,
-    options: CacheNamespace,
-  ): KvTtlCache {
+  static partitionedBy(kv: CacheKv, source: AuthoritySource, options: CacheNamespace): KvTtlCache {
     return new KvTtlCache(kv, () => source.cacheAuthority(), options);
   }
 
@@ -127,8 +123,11 @@ export class KvTtlCache {
     const entryKey = `${this.#prefix}entry:${key}`;
     const generation = this.#generation();
     const entry = this.#kv.get<CacheEntry<T>>(entryKey);
-    if (entry?.authority === authority && entry.generation === generation
-      && Date.now() - entry.fetchedAt < ttlMs) {
+    if (
+      entry?.authority === authority &&
+      entry.generation === generation &&
+      Date.now() - entry.fetchedAt < ttlMs
+    ) {
       return entry.value;
     }
 

@@ -33,7 +33,12 @@ import {
   collaboratorFor,
   createSubscriber,
 } from "@gadgets/bundled-blueprints/libraries/sync/client";
-import type { CustomSelect, CustomSelectOptions, PreparedImage, PromptOptions } from "@gadgets/bundled-blueprints/libraries/ui/client";
+import type {
+  CustomSelect,
+  CustomSelectOptions,
+  PreparedImage,
+  PromptOptions,
+} from "@gadgets/bundled-blueprints/libraries/ui/client";
 import type {
   BlockContent,
   DocCursor,
@@ -68,7 +73,9 @@ function isText(node: Node | null | undefined): node is Text {
 }
 
 const clientId = Math.random().toString(36).slice(2);
-const isDocumentExport = ["html", "pdf"].includes((globalThis as { gadgetExportFormatId?: string }).gadgetExportFormatId ?? "");
+const isDocumentExport = ["html", "pdf"].includes(
+  (globalThis as { gadgetExportFormatId?: string }).gadgetExportFormatId ?? "",
+);
 
 // --- Styles ----------------------------------------------------------------
 const style = document.createElement("style");
@@ -418,9 +425,12 @@ document.head.appendChild(style);
 const ICONS = {
   ...UI_ICONS,
   highlight: '<path d="M9 11l-4 4v3h3l4-4"/><path d="M13 7l4 4"/><path d="M11 9l5-5 4 4-5 5z"/>',
-  alignJustify: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>',
-  outdent: '<line x1="20" y1="6" x2="4" y2="6"/><line x1="20" y1="18" x2="4" y2="18"/><line x1="20" y1="12" x2="11" y2="12"/><polyline points="7 9 4 12 7 15"/>',
-  indent: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/><line x1="13" y1="12" x2="20" y2="12"/><polyline points="6 9 9 12 6 15"/>',
+  alignJustify:
+    '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>',
+  outdent:
+    '<line x1="20" y1="6" x2="4" y2="6"/><line x1="20" y1="18" x2="4" y2="18"/><line x1="20" y1="12" x2="11" y2="12"/><polyline points="7 9 4 12 7 15"/>',
+  indent:
+    '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/><line x1="13" y1="12" x2="20" y2="12"/><polyline points="6 9 9 12 6 15"/>',
   hr: '<line x1="4" y1="12" x2="20" y2="12"/>',
 };
 type IconName = keyof typeof ICONS;
@@ -428,7 +438,11 @@ type IconName = keyof typeof ICONS;
 // --- Build UI --------------------------------------------------------------
 const editor = el("div", { class: "doc-page", contenteditable: "true", spellcheck: "true" });
 
-const titleInput = el("input", { class: "title-input", value: "Untitled document", "aria-label": "Document title" });
+const titleInput = el("input", {
+  class: "title-input",
+  value: "Untitled document",
+  "aria-label": "Document title",
+});
 const saveStatus = statusIndicator({ title: "Save status" });
 
 const topbar = el("div", { class: "topbar" }, [
@@ -442,13 +456,17 @@ const topbar = el("div", { class: "topbar" }, [
 // had is what the chosen command applies to.
 function toolbarSelect(options: CustomSelectOptions): CustomSelect {
   const select = customSelect(options);
-  select.el.addEventListener("mousedown", (e) => { e.preventDefault(); savedRange = getRange(); });
+  select.el.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    savedRange = getRange();
+  });
   return select;
 }
 
 // Style selector
 const styleSel = toolbarSelect({
-  className: "style-sel", title: "Paragraph style",
+  className: "style-sel",
+  title: "Paragraph style",
   options: [
     { value: "P", label: "Normal text" },
     { value: "TITLE", label: "Title" },
@@ -477,7 +495,8 @@ const styleSel = toolbarSelect({
 
 // Font family
 const fontSel = toolbarSelect({
-  className: "font-sel", title: "Font",
+  className: "font-sel",
+  title: "Font",
   options: [
     ["Sans serif", "ui-sans-serif, system-ui, Inter, sans-serif"],
     ["Serif", "Georgia, 'Times New Roman', serif"],
@@ -497,8 +516,12 @@ const fontSel = toolbarSelect({
 
 // Font size
 const sizeSel = toolbarSelect({
-  className: "size-sel", title: "Font size",
-  options: [11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 40, 48].map((s) => ({ value: s, label: String(s) })),
+  className: "size-sel",
+  title: "Font size",
+  options: [11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 40, 48].map((s) => ({
+    value: s,
+    label: String(s),
+  })),
   value: 16,
   onChange: (value) => {
     restoreRange();
@@ -540,7 +563,9 @@ function commandColorBtn(name: IconName, title: string, command: string, default
     editor.focus();
     scheduleSave();
   });
-  btn.addEventListener("mousedown", () => { savedRange = getRange(); });
+  btn.addEventListener("mousedown", () => {
+    savedRange = getRange();
+  });
   return btn;
 }
 const textColorBtn = commandColorBtn("textcolor", "Text color", "foreColor", "#1d1d20");
@@ -561,7 +586,12 @@ alignBtns.left = alignBtn("alignLeft", "Align left", "justifyLeft");
 alignBtns.center = alignBtn("alignCenter", "Align center", "justifyCenter");
 alignBtns.right = alignBtn("alignRight", "Align right", "justifyRight");
 alignBtns.justify = alignBtn("alignJustify", "Justify", "justifyFull");
-const alignSegment = el("div", { class: "segment" }, [alignBtns.left, alignBtns.center, alignBtns.right, alignBtns.justify]);
+const alignSegment = el("div", { class: "segment" }, [
+  alignBtns.left,
+  alignBtns.center,
+  alignBtns.right,
+  alignBtns.justify,
+]);
 
 const ulBtn = cmdBtn("ul", "Bulleted list", "insertUnorderedList");
 const olBtn = cmdBtn("ol", "Numbered list", "insertOrderedList");
@@ -569,7 +599,11 @@ const outdentBtn = cmdBtn("outdent", "Decrease indent", "outdent");
 const indentBtn = cmdBtn("indent", "Increase indent", "indent");
 
 const linkBtn = iconBtn(ICONS.link, "Insert link", () => insertLink());
-const imageInput = el("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif", multiple: "true" });
+const imageInput = el("input", {
+  type: "file",
+  accept: "image/png,image/jpeg,image/webp,image/gif",
+  multiple: "true",
+});
 imageInput.style.display = "none";
 document.body.appendChild(imageInput);
 const imageBtn = iconBtn(ICONS.image, "Insert image", () => {
@@ -589,12 +623,20 @@ const clearBtn = iconBtn(ICONS.clear, "Clear formatting", () => {
   scheduleSave();
 });
 
-const undoBtn = iconBtn(ICONS.undo, "Undo (Ctrl+Z)", () => { document.execCommand("undo"); editor.focus(); scheduleSave(); });
-const redoBtn = iconBtn(ICONS.redo, "Redo (Ctrl+Y)", () => { document.execCommand("redo"); editor.focus(); scheduleSave(); });
+const undoBtn = iconBtn(ICONS.undo, "Undo (Ctrl+Z)", () => {
+  document.execCommand("undo");
+  editor.focus();
+  scheduleSave();
+});
+const redoBtn = iconBtn(ICONS.redo, "Redo (Ctrl+Y)", () => {
+  document.execCommand("redo");
+  editor.focus();
+  scheduleSave();
+});
 
 const toolbar = el("div", { class: "toolbar" }, [
-  group(null, [undoBtn, redoBtn], true),     // always
-  group(null, [styleSel.el]),                 // always
+  group(null, [undoBtn, redoBtn], true), // always
+  group(null, [styleSel.el]), // always
   group("p2", [fontSel.el, sizeSel.el]),
   group(null, [boldBtn, italicBtn, underlineBtn, strikeBtn]), // always
   group("p2", [textColorBtn, highlightBtn]),
@@ -613,7 +655,8 @@ document.body.appendChild(app);
 let savedRange: Range | null = null;
 function getRange(): Range | null {
   const sel = window.getSelection();
-  if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) return sel.getRangeAt(0).cloneRange();
+  if (sel && sel.rangeCount && editor.contains(sel.anchorNode))
+    return sel.getRangeAt(0).cloneRange();
   return null;
 }
 function restoreRange() {
@@ -627,7 +670,8 @@ function currentBlock(): Element | null {
   if (!sel || !sel.rangeCount) return null;
   let node = sel.anchorNode;
   while (node && node !== editor) {
-    if (isElement(node) && /^(P|H1|H2|H3|H4|BLOCKQUOTE|PRE|LI|DIV)$/.test(node.tagName)) return node;
+    if (isElement(node) && /^(P|H1|H2|H3|H4|BLOCKQUOTE|PRE|LI|DIV)$/.test(node.tagName))
+      return node;
     node = node.parentNode;
   }
   return null;
@@ -660,7 +704,10 @@ function normalizeHref(url: string): string {
 }
 
 function escapeAttr(s: string): string {
-  return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
 }
 
 // --- Images ---------------------------------------------------------------
@@ -727,7 +774,9 @@ function setCaretFromPoint(x: number, y: number) {
 let selectedImage: HTMLImageElement | null = null;
 let resizingImage = false;
 let draggedImage: HTMLImageElement | null = null;
-const imageControls = el("div", { class: "image-controls" }, [el("div", { class: "resize-handle" })]);
+const imageControls = el("div", { class: "image-controls" }, [
+  el("div", { class: "resize-handle" }),
+]);
 document.body.appendChild(imageControls);
 const resizeHandle = imageControls.querySelector<HTMLDivElement>(".resize-handle")!;
 
@@ -804,7 +853,9 @@ editor.addEventListener("dragstart", (e) => {
     // defaults expose the image as HTML and our drop sanitizer inserts a copy.
     e.dataTransfer.setData("application/x-doc-image-move", "1");
     e.dataTransfer.setData("text/plain", "");
-    try { e.dataTransfer.setDragImage(img, Math.min(20, img.width / 2), Math.min(20, img.height / 2)); } catch (err) {}
+    try {
+      e.dataTransfer.setDragImage(img, Math.min(20, img.width / 2), Math.min(20, img.height / 2));
+    } catch (err) {}
   }
 });
 
@@ -816,7 +867,13 @@ editor.addEventListener("dragend", () => {
 
 editor.addEventListener("dragover", (e) => {
   const types = Array.from((e.dataTransfer && e.dataTransfer.types) || []);
-  if (draggedImage || imageFilesFrom(e.dataTransfer).length || types.includes("Files") || types.includes("text/html") || types.includes("text/plain")) {
+  if (
+    draggedImage ||
+    imageFilesFrom(e.dataTransfer).length ||
+    types.includes("Files") ||
+    types.includes("text/html") ||
+    types.includes("text/plain")
+  ) {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = draggedImage ? "move" : "copy";
     editor.classList.add("drop-target");
@@ -871,8 +928,16 @@ editor.addEventListener("drop", (e) => {
   }
 });
 
-window.addEventListener("scroll", () => { if (selectedImage) positionImageControls(); }, true);
-window.addEventListener("resize", () => { if (selectedImage) positionImageControls(); });
+window.addEventListener(
+  "scroll",
+  () => {
+    if (selectedImage) positionImageControls();
+  },
+  true,
+);
+window.addEventListener("resize", () => {
+  if (selectedImage) positionImageControls();
+});
 
 function sanitizeImageElement(srcImg: Element): HTMLImageElement | null {
   const src = srcImg.getAttribute("src") || "";
@@ -938,20 +1003,30 @@ const linkPopUrl = el("a", { class: "lp-url", target: "_blank", rel: "noopener n
 const linkPopEdit = el("button", { class: "lp-btn" }, "Edit");
 const linkPopRemove = el("button", { class: "lp-btn lp-danger" }, "Remove link");
 const linkPop = el("div", { class: "link-pop" }, [
-  linkPopUrl, el("span", { class: "lp-div" }), linkPopEdit, linkPopRemove,
+  linkPopUrl,
+  el("span", { class: "lp-div" }),
+  linkPopEdit,
+  linkPopRemove,
 ]);
 linkPop.style.display = "none";
 // Don't let clicks inside the popover collapse the editor selection.
-linkPop.addEventListener("mousedown", (e) => { if (e.target !== linkPopUrl) e.preventDefault(); });
-linkPopEdit.addEventListener("click", () => { if (activeLink) editLink(activeLink); });
-linkPopRemove.addEventListener("click", () => { if (activeLink) removeLink(activeLink); });
+linkPop.addEventListener("mousedown", (e) => {
+  if (e.target !== linkPopUrl) e.preventDefault();
+});
+linkPopEdit.addEventListener("click", () => {
+  if (activeLink) editLink(activeLink);
+});
+linkPopRemove.addEventListener("click", () => {
+  if (activeLink) removeLink(activeLink);
+});
 document.body.appendChild(linkPop);
 
 function positionLinkPopover(anchor: Element) {
   const r = anchor.getBoundingClientRect();
   linkPop.style.visibility = "hidden";
   linkPop.style.display = "flex";
-  const pw = linkPop.offsetWidth, ph = linkPop.offsetHeight;
+  const pw = linkPop.offsetWidth,
+    ph = linkPop.offsetHeight;
   let left = Math.round(r.left);
   left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
   let top = Math.round(r.bottom + 6);
@@ -980,8 +1055,16 @@ function updateLinkPopover() {
   else hideLinkPopover();
 }
 
-window.addEventListener("scroll", () => { if (activeLink) positionLinkPopover(activeLink); }, true);
-window.addEventListener("resize", () => { if (activeLink) positionLinkPopover(activeLink); });
+window.addEventListener(
+  "scroll",
+  () => {
+    if (activeLink) positionLinkPopover(activeLink);
+  },
+  true,
+);
+window.addEventListener("resize", () => {
+  if (activeLink) positionLinkPopover(activeLink);
+});
 
 // --- Paste sanitizer -------------------------------------------------------
 // Pasted content (especially from Google Docs / Word) carries formatting in
@@ -990,7 +1073,11 @@ window.addEventListener("resize", () => { if (activeLink) positionLinkPopover(ac
 // rebuild pasted HTML into clean semantic markup so it behaves like text the
 // editor created itself.
 const INLINE_ONLY = ["code", "s", "u", "i", "b"];
-function wrapEl(tag: string, child: Node): HTMLElement { const e = document.createElement(tag); e.appendChild(child); return e; }
+function wrapEl(tag: string, child: Node): HTMLElement {
+  const e = document.createElement(tag);
+  e.appendChild(child);
+  return e;
+}
 
 /** The inline formatting in force where the sanitizer stands in the pasted tree. */
 interface InlineFormat {
@@ -1041,7 +1128,21 @@ function wrapInline(text: string, ctx: InlineFormat): Node {
   return node;
 }
 
-const BLOCK_TAGS = ["P", "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE", "PRE", "UL", "OL", "LI", "DIV"];
+const BLOCK_TAGS = [
+  "P",
+  "H1",
+  "H2",
+  "H3",
+  "H4",
+  "H5",
+  "H6",
+  "BLOCKQUOTE",
+  "PRE",
+  "UL",
+  "OL",
+  "LI",
+  "DIV",
+];
 
 function sanitizePastedHtml(html: string): string {
   const parsed = new DOMParser().parseFromString(html, "text/html");
@@ -1057,8 +1158,7 @@ function sanitizePastedHtml(html: string): string {
         else if (tag === "IMG") {
           const img = sanitizeImageElement(child);
           if (img) target.appendChild(img);
-        }
-        else if (tag === "HR" || tag === "STYLE" || tag === "SCRIPT") return;
+        } else if (tag === "HR" || tag === "STYLE" || tag === "SCRIPT") return;
         else appendInline(child, target, fmtOf(child, ctx));
       }
     });
@@ -1073,8 +1173,9 @@ function sanitizePastedHtml(html: string): string {
         const nested: Element[] = [];
         child.childNodes.forEach((g) => {
           if (isElement(g) && (g.tagName === "UL" || g.tagName === "OL")) nested.push(g);
-          else if (isText(g)) { if (g.textContent) li.appendChild(wrapInline(g.textContent, ctx)); }
-          else if (isElement(g)) appendInline(g, li, fmtOf(g, ctx));
+          else if (isText(g)) {
+            if (g.textContent) li.appendChild(wrapInline(g.textContent, ctx));
+          } else if (isElement(g)) appendInline(g, li, fmtOf(g, ctx));
         });
         nested.forEach((n) => li.appendChild(processList(n, ctx)));
         list.appendChild(li);
@@ -1098,7 +1199,10 @@ function sanitizePastedHtml(html: string): string {
       if (!isElement(node)) return;
       const tag = node.tagName;
       if (tag === "STYLE" || tag === "SCRIPT" || tag === "META" || tag === "BR") return;
-      if (tag === "HR") { result.appendChild(document.createElement("hr")); return; }
+      if (tag === "HR") {
+        result.appendChild(document.createElement("hr"));
+        return;
+      }
       if (tag === "IMG") {
         const img = sanitizeImageElement(node);
         if (img) {
@@ -1108,7 +1212,10 @@ function sanitizePastedHtml(html: string): string {
         }
         return;
       }
-      if (tag === "UL" || tag === "OL") { result.appendChild(processList(node, ctx)); return; }
+      if (tag === "UL" || tag === "OL") {
+        result.appendChild(processList(node, ctx));
+        return;
+      }
       if (["P", "H1", "H2", "H3", "H4", "H5", "H6", "BLOCKQUOTE", "PRE"].includes(tag)) {
         let out = tag.toLowerCase();
         if (out === "h4" || out === "h5" || out === "h6") out = "h3";
@@ -1121,7 +1228,8 @@ function sanitizePastedHtml(html: string): string {
       // otherwise treat its inline content as a paragraph.
       const newCtx = fmtOf(node, ctx);
       const hasBlockChild = Array.from(node.childNodes).some(
-        (c) => isElement(c) && BLOCK_TAGS.includes(c.tagName));
+        (c) => isElement(c) && BLOCK_TAGS.includes(c.tagName),
+      );
       if (hasBlockChild) {
         processNodes(Array.from(node.childNodes), newCtx);
       } else {
@@ -1139,7 +1247,6 @@ function sanitizePastedHtml(html: string): string {
 function escapeText(t: string): string {
   return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-
 
 editor.addEventListener("paste", (e) => {
   const cb = e.clipboardData;
@@ -1184,7 +1291,9 @@ function refreshToolbarState() {
     let tag = block.tagName;
     if (tag === "LI" || tag === "DIV") tag = "P";
     if (tag === "H1" && block.classList.contains("doc-title")) tag = "TITLE";
-    styleSel.setValue(["P", "TITLE", "H1", "H2", "H3", "BLOCKQUOTE", "PRE"].includes(tag) ? tag : "P");
+    styleSel.setValue(
+      ["P", "TITLE", "H1", "H2", "H3", "BLOCKQUOTE", "PRE"].includes(tag) ? tag : "P",
+    );
   }
 }
 
@@ -1242,7 +1351,9 @@ function newBlockId() {
   return "b_" + Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-function blockId(node: Node | null | undefined): string | null { return isElement(node) ? node.getAttribute("data-block-id") : null; }
+function blockId(node: Node | null | undefined): string | null {
+  return isElement(node) ? node.getAttribute("data-block-id") : null;
+}
 function findBlock(id: string): Element | null {
   return Array.from(editor.children).find((node) => blockId(node) === id) || null;
 }
@@ -1281,8 +1392,12 @@ function normalizeBlocks() {
   if (selectionBlock && !activeBlockId()) {
     const node = findBlock(selectionBlock);
     if (node) {
-      const range = document.createRange(); range.selectNodeContents(node); range.collapse(false);
-      const sel = window.getSelection()!; sel.removeAllRanges(); sel.addRange(range);
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      range.collapse(false);
+      const sel = window.getSelection()!;
+      sel.removeAllRanges();
+      sel.addRange(range);
     }
   }
 }
@@ -1294,15 +1409,21 @@ function canonicalBlockHtml(node: Element): string {
   clone.classList.remove("remote-editing");
   clone.style.removeProperty("--remote-color");
   clone.querySelectorAll<HTMLElement>(".remote-editing").forEach((child) => {
-    child.classList.remove("remote-editing"); child.style.removeProperty("--remote-color");
+    child.classList.remove("remote-editing");
+    child.style.removeProperty("--remote-color");
   });
-  clone.querySelectorAll(".image-selected").forEach((image) => image.classList.remove("image-selected"));
+  clone
+    .querySelectorAll(".image-selected")
+    .forEach((image) => image.classList.remove("image-selected"));
   return clone.outerHTML;
 }
 function serializeBlocks(): BlockContent[] {
   normalizeBlocks();
   // normalizeBlocks() has just given every block an id.
-  return Array.from(editor.children).map((node) => ({ id: blockId(node)!, html: canonicalBlockHtml(node) }));
+  return Array.from(editor.children).map((node) => ({
+    id: blockId(node)!,
+    html: canonicalBlockHtml(node),
+  }));
 }
 function parseBlock(block: BlockContent): Element {
   const tpl = document.createElement("template");
@@ -1327,9 +1448,11 @@ function currentTitle(): string {
 
 function isDirty(): boolean {
   const blocks = serializeBlocks();
-  return blocks.some((block) => acknowledged.get(block.id)?.html !== block.html) ||
+  return (
+    blocks.some((block) => acknowledged.get(block.id)?.html !== block.html) ||
     blocks.length !== acknowledged.size ||
-    currentTitle() !== acknowledgedTitle;
+    currentTitle() !== acknowledgedTitle
+  );
 }
 
 async function sendChanges(): Promise<SaveOutcome> {
@@ -1345,18 +1468,24 @@ async function sendChanges(): Promise<SaveOutcome> {
   if (!upserts.length && !deletes.length && title === acknowledgedTitle) return "saved";
 
   const result = await gadget.applyOperation({
-    senderId: clientId, baseRevision: revision, upserts, deletes,
-    order: blocks.map((b) => b.id), title,
+    senderId: clientId,
+    baseRevision: revision,
+    upserts,
+    deletes,
+    order: blocks.map((b) => b.id),
+    title,
   });
   revision = Math.max(revision, result.revision || 0);
-  for (const block of result.upserts || []) acknowledged.set(block.id, { html: block.html, version: block.version });
+  for (const block of result.upserts || [])
+    acknowledged.set(block.id, { html: block.html, version: block.version });
   for (const id of result.deletedIds || []) acknowledged.delete(id);
   acknowledgedTitle = result.title || title;
   if (!result.conflicts?.length) return "saved";
 
   // Keep the local draft visible, but rebase its next operation on the latest
   // authoritative block version. The next save intentionally preserves mine.
-  for (const block of result.conflicts) acknowledged.set(block.id, { html: block.html, version: block.version });
+  for (const block of result.conflicts)
+    acknowledged.set(block.id, { html: block.html, version: block.version });
   return "conflict";
 }
 
@@ -1368,8 +1497,12 @@ editor.addEventListener("input", () => {
 });
 titleInput.addEventListener("input", () => scheduleSave());
 
-try { document.execCommand("styleWithCSS", false, true); } catch (e) {}
-try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) {}
+try {
+  document.execCommand("styleWithCSS", false, true);
+} catch (e) {}
+try {
+  document.execCommand("defaultParagraphSeparator", false, "p");
+} catch (e) {}
 
 function applyOrder(order: string[] | undefined) {
   // Move only nodes that are actually out of place. Re-appending every block
@@ -1398,7 +1531,8 @@ function applyRemoteOperation(event: OperationEvent) {
     }
     const old = findBlock(block.id);
     const next = parseBlock(block);
-    if (old) old.replaceWith(next); else editor.appendChild(next);
+    if (old) old.replaceWith(next);
+    else editor.appendChild(next);
   }
   for (const id of event.deletedIds || []) {
     acknowledged.delete(id);
@@ -1409,13 +1543,19 @@ function applyRemoteOperation(event: OperationEvent) {
   if (document.activeElement !== titleInput) titleInput.value = event.title || acknowledgedTitle;
   acknowledgedTitle = event.title || acknowledgedTitle;
   applyingRemote = false;
-  setStatus("synced", activeId && pendingByBlock.has(activeId) ? "Concurrent edit pending" : "Live update");
-  setTimeout(() => { if (!saver.busy) setStatus("saved", "Saved"); }, 900);
+  setStatus(
+    "synced",
+    activeId && pendingByBlock.has(activeId) ? "Concurrent edit pending" : "Live update",
+  );
+  setTimeout(() => {
+    if (!saver.busy) setStatus("saved", "Saved");
+  }, 900);
 }
 
 function applySnapshot(doc: StoredDocument) {
   applyingRemote = true;
-  hideLinkPopover(); hideImageControls();
+  hideLinkPopover();
+  hideImageControls();
   revision = doc.revision || 0;
   acknowledged.clear();
   // Server snapshots store IDs alongside HTML; imported/generated HTML is not
@@ -1425,7 +1565,10 @@ function applySnapshot(doc: StoredDocument) {
   normalizeBlocks();
   for (const block of doc.blocks || []) {
     const node = findBlock(block.id);
-    acknowledged.set(block.id, { html: node ? canonicalBlockHtml(node) : block.html, version: block.version });
+    acknowledged.set(block.id, {
+      html: node ? canonicalBlockHtml(node) : block.html,
+      version: block.version,
+    });
   }
   titleInput.value = doc.title || "Untitled document";
   acknowledgedTitle = titleInput.value;
@@ -1442,12 +1585,16 @@ function settlePendingBlock(id: string) {
   const local = findBlock(id);
   const base = acknowledged.get(id);
   const dirty = local && (!base || canonicalBlockHtml(local) !== base.html);
-  if (dirty) { scheduleSave(20); return; }
+  if (dirty) {
+    scheduleSave(20);
+    return;
+  }
   applyingRemote = true;
   if (pending.type === "delete") local?.remove();
   else if (pending.block.version >= (base?.version || 0)) {
     const next = parseBlock(pending.block);
-    if (local) local.replaceWith(next); else editor.appendChild(next);
+    if (local) local.replaceWith(next);
+    else editor.appendChild(next);
   }
   applyingRemote = false;
 }
@@ -1471,14 +1618,20 @@ function containingBlock(node: Node | null | undefined): Node | null {
   while (node && node.parentElement !== editor) node = node.parentElement;
   return node?.parentElement === editor ? node : null;
 }
-function textOffsetForPoint(block: Node | null, node: Node | null | undefined, offset: number): number {
+function textOffsetForPoint(
+  block: Node | null,
+  node: Node | null | undefined,
+  offset: number,
+): number {
   if (!block || !node) return 0;
   try {
     const range = document.createRange();
     range.selectNodeContents(block);
     range.setEnd(node, offset);
     return range.toString().length;
-  } catch (e) { return 0; }
+  } catch (e) {
+    return 0;
+  }
 }
 // Anchor and focus endpoints let everyone draw both a caret and a selection,
 // including one spanning several top-level blocks.
@@ -1487,7 +1640,9 @@ function currentPresence(): PresenceUpdate {
   const anchorBlock = containingBlock(sel?.anchorNode);
   const focusBlock = containingBlock(sel?.focusNode);
   return {
-    clientId, name: me.name, color: me.color,
+    clientId,
+    name: me.name,
+    color: me.color,
     anchorBlockId: blockId(anchorBlock),
     anchorOffset: textOffsetForPoint(anchorBlock, sel?.anchorNode, sel?.anchorOffset || 0),
     focusBlockId: blockId(focusBlock),
@@ -1502,7 +1657,9 @@ interface DomPoint {
 }
 function domPointAtTextOffset(block: Element, requestedOffset: number): DomPoint {
   const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-  let remaining = Math.max(0, requestedOffset || 0), text: Text | null = null, last: Text | null = null;
+  let remaining = Math.max(0, requestedOffset || 0),
+    text: Text | null = null,
+    last: Text | null = null;
   // The walker shows text nodes only.
   while ((text = walker.nextNode() as Text | null)) {
     last = text;
@@ -1512,10 +1669,14 @@ function domPointAtTextOffset(block: Element, requestedOffset: number): DomPoint
   if (last) return { node: last, offset: last.data.length };
   return { node: block, offset: 0 };
 }
-function caretRectAtPoint(block: Element, point: DomPoint): Pick<DOMRect, "left" | "top" | "height"> {
+function caretRectAtPoint(
+  block: Element,
+  point: DomPoint,
+): Pick<DOMRect, "left" | "top" | "height"> {
   try {
     const range = document.createRange();
-    range.setStart(point.node, point.offset); range.collapse(true);
+    range.setStart(point.node, point.offset);
+    range.collapse(true);
     const rect = range.getClientRects()[0];
     if (rect) return rect;
   } catch (e) {}
@@ -1529,13 +1690,18 @@ function orderedSelectionRange(cursor: DocCursor) {
   const anchor = domPointAtTextOffset(anchorBlock, cursor.anchorOffset);
   const focus = domPointAtTextOffset(focusBlock, cursor.focusOffset);
   const blockOrder = Array.from(editor.children);
-  const ai = blockOrder.indexOf(anchorBlock), fi = blockOrder.indexOf(focusBlock);
+  const ai = blockOrder.indexOf(anchorBlock),
+    fi = blockOrder.indexOf(focusBlock);
   const anchorFirst = ai < fi || (ai === fi && cursor.anchorOffset <= cursor.focusOffset);
   const start = anchorFirst ? anchor : focus;
   const end = anchorFirst ? focus : anchor;
   const range = document.createRange();
-  try { range.setStart(start.node, start.offset); range.setEnd(end.node, end.offset); }
-  catch (e) { return null; }
+  try {
+    range.setStart(start.node, start.offset);
+    range.setEnd(end.node, end.offset);
+  } catch (e) {
+    return null;
+  }
   return { range, focusBlock, focus };
 }
 function renderPresence() {
@@ -1570,13 +1736,23 @@ function applyPresence(event: DocPresenceEvent) {
 document.addEventListener("selectionchange", () => {
   if (editor.contains(window.getSelection()?.anchorNode ?? null)) presence.schedule();
 });
-window.addEventListener("scroll", () => { if (roster.entries().length) renderPresence(); }, true);
-window.addEventListener("resize", () => { if (roster.entries().length) renderPresence(); });
+window.addEventListener(
+  "scroll",
+  () => {
+    if (roster.entries().length) renderPresence();
+  },
+  true,
+);
+window.addEventListener("resize", () => {
+  if (roster.entries().length) renderPresence();
+});
 
 // onRpcBroken and unload delivery can both be delayed by the browser. A small
 // heartbeat makes stationary cursors live, while stale collaborators disappear
 // predictably even when a tab/process is killed without a clean disconnect.
-presence.startHeartbeat(() => { if (roster.expire()) renderPresence(); });
+presence.startHeartbeat(() => {
+  if (roster.expire()) renderPresence();
+});
 
 window.addEventListener("pagehide", () => {
   // This is best-effort only; stale expiry above is the guaranteed fallback.
@@ -1589,7 +1765,9 @@ const subscriber = createSubscriber<SubscriberCallbacks>(RpcTarget, {
     if (event.type === "snapshot") applySnapshot(event.document);
     else applyRemoteOperation(event);
   },
-  presence(event) { applyPresence(event); },
+  presence(event) {
+    applyPresence(event);
+  },
 });
 
 if (isDocumentExport) {
@@ -1601,21 +1779,23 @@ if (isDocumentExport) {
 
 // --- Init ------------------------------------------------------------------
 
-  try {
-    let doc = await gadget.subscribe(subscriber, { clientId, name: me.name, color: me.color });
-    if (!doc.blocks) {
-      // One-time, backwards-compatible conversion of the former HTML snapshot.
-      editor.innerHTML = doc.legacyContent || "";
-      normalizeBlocks();
-      doc = await gadget.initializeBlocks({
-        blocks: serializeBlocks(), title: doc.title, senderId: clientId,
-      });
-    }
-    applySnapshot(doc);
-    setStatus("saved", "Saved");
-    presence.sendNow();
-  } catch (e) {
-    console.error(e);
-    setStatus("bad", "Offline");
+try {
+  let doc = await gadget.subscribe(subscriber, { clientId, name: me.name, color: me.color });
+  if (!doc.blocks) {
+    // One-time, backwards-compatible conversion of the former HTML snapshot.
+    editor.innerHTML = doc.legacyContent || "";
+    normalizeBlocks();
+    doc = await gadget.initializeBlocks({
+      blocks: serializeBlocks(),
+      title: doc.title,
+      senderId: clientId,
+    });
   }
-  refreshToolbarState();
+  applySnapshot(doc);
+  setStatus("saved", "Saved");
+  presence.sendNow();
+} catch (e) {
+  console.error(e);
+  setStatus("bad", "Offline");
+}
+refreshToolbarState();

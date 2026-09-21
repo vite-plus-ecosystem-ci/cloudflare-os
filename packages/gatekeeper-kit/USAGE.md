@@ -4,10 +4,7 @@ The kit exposes independent modules through package subpaths. Import only the pi
 needs:
 
 ```ts
-import {
-  CredentialCoordinator,
-  CredentialSource,
-} from "@gadgets/gatekeeper-kit/credentials";
+import { CredentialCoordinator, CredentialSource } from "@gadgets/gatekeeper-kit/credentials";
 ```
 
 The exported symbols carry their exact contracts in JSDoc. This guide covers the choices and
@@ -28,8 +25,9 @@ account's connection generation so a disconnect or newer connect cannot be overw
 exchange:
 
 ```ts
-const state = advanceToOAuth(kv, linkNonce, Date.now(),
-  { startedUnder: this.#creds.connectionGeneration() });
+const state = advanceToOAuth(kv, linkNonce, Date.now(), {
+  startedUnder: this.#creds.connectionGeneration(),
+});
 if (state === null) throw new Error("This connect link has expired. Start again.");
 
 const claim = claimOAuth<{ startedUnder: string }>(kv, oauthNonce, Date.now());
@@ -100,11 +98,7 @@ return htmlResponse(connectHandoffPageHtml(handoff));
 Workshop then calls the account's `commitReconnect(stageId)`:
 
 ```ts
-const staged = commitStagedCredentials<ReconnectStage>(
-  this.ctx.storage.kv,
-  Date.now(),
-  stageId,
-);
+const staged = commitStagedCredentials<ReconnectStage>(this.ctx.storage.kv, Date.now(), stageId);
 if (staged === null) throw new Error("This reconnect stage is no longer available.");
 const retired = this.#creds.stored();
 try {
@@ -250,13 +244,13 @@ Project credentials before returning them. Refresh material must not cross the a
 boundary.
 
 `refreshAtProvider` owns a classification the kit cannot make: throw `CredentialsExpiredError` only
-when the provider proves the *grant* is dead — `invalid_grant` from the token endpoint, a revoked
+when the provider proves the _grant_ is dead — `invalid_grant` from the token endpoint, a revoked
 refresh token, or provider-specific evidence of the same. Let transport, malformed-response, and
 5xx failures travel unchanged, and never read a bare `invalid_token` as that proof: it is RFC 6750
 for the presented access token, which a refresh recovers. Treating either an outage or a recoverable
 token rejection as grant death destroys healthy authority and prompts an unnecessary reconnect.
 
-It also owes the *complete* canonical record, not the provider's response. Providers routinely omit
+It also owes the _complete_ canonical record, not the provider's response. Providers routinely omit
 values that did not change — an unchanged rotating refresh token, granted scopes, provider metadata
 — and the coordinator replaces the stored record wholesale, so anything absent is lost and the next
 refresh fails after the first successful rotation:
@@ -556,12 +550,12 @@ of the individual rows.
 Each strategy declares, as `aclChecks`, how thoroughly it verifies observer access to them, and the
 gate refuses a `collections` scope a strategy cannot honour:
 
-| Strategy | `aclChecks` | A `collections` scope |
-| --- | --- | --- |
-| `trackedCollectionObservers` | `per-read` | checked for every observer, on every read |
-| `privateObservers` | `no-observers` | accepted; nobody is admitted to exclude |
-| `aclObservers` | `unsupported` | **refused** |
-| `openObservers` | `unsupported` | **refused** |
+| Strategy                     | `aclChecks`    | A `collections` scope                     |
+| ---------------------------- | -------------- | ----------------------------------------- |
+| `trackedCollectionObservers` | `per-read`     | checked for every observer, on every read |
+| `privateObservers`           | `no-observers` | accepted; nobody is admitted to exclude   |
+| `aclObservers`               | `unsupported`  | **refused**                               |
+| `openObservers`              | `unsupported`  | **refused**                               |
 
 A resource whose children carry their own ACLs needs `trackedCollectionObservers`. Under the other two,
 collection ids would name a check nothing performs, so declare those reads `{ kind: "baseline" }` — and if
@@ -585,18 +579,21 @@ return new TokenCursor<Project>({
   pageSize: 50,
   dispose: () => walk[Symbol.dispose](),
   fetchPage: (token, perPage) => this.#api.listProjects({ cursor: token, limit: perPage }),
-  authorizePage: (projects, { terminal }) => projects.length === 0
-    ? walk.authorize(
-      {
-        title: "Projects",
-        description: terminal
-          ? "Listed the projects; there were none."
-          : "Scanned a window of projects; none were visible.",
-      },
-      { kind: "baseline" })
-    : walk.authorize(
-      { title: "Projects", description: `Read ${projects.length} projects.` },
-      { kind: "collections", ids: projects.map(project => project.id) }),
+  authorizePage: (projects, { terminal }) =>
+    projects.length === 0
+      ? walk.authorize(
+          {
+            title: "Projects",
+            description: terminal
+              ? "Listed the projects; there were none."
+              : "Scanned a window of projects; none were visible.",
+          },
+          { kind: "baseline" },
+        )
+      : walk.authorize(
+          { title: "Projects", description: `Read ${projects.length} projects.` },
+          { kind: "collections", ids: projects.map((project) => project.id) },
+        ),
 });
 ```
 
@@ -633,7 +630,7 @@ connection the walk opened under, not the current one:
 ```ts
 const opened = await this.#creds.read();
 return new TokenCursor<Project>({
-  authorizePage: async projects => {
+  authorizePage: async (projects) => {
     if ((await this.#creds.read()).generation !== opened.generation) {
       throw new Error("This walk was started under a connection that has since been replaced.");
     }
@@ -667,12 +664,12 @@ instead of allowing a bound to disable itself.
 
 The kit supplies defaults where they apply across consumers:
 
-| Option | Default |
-| --- | ---: |
-| `maxPending` | 50 |
-| `maxTrackedCollections` | 1000 |
-| `maxObservers` | 10 |
-| `remotePageSize` | 100 |
+| Option                  | Default |
+| ----------------------- | ------: |
+| `maxPending`            |      50 |
+| `maxTrackedCollections` |    1000 |
+| `maxObservers`          |      10 |
+| `remotePageSize`        |     100 |
 
 The kit requires values where no general default is safe:
 
@@ -680,7 +677,7 @@ The kit requires values where no general default is safe:
 - `ActionFileStore`'s `maxFileBytes` and `maxTotalBytes`.
 
 Size limits from the provider and the disclosure shape. `maxTrackedCollections` is a cumulative budget: it
-bounds the distinct collections this binding has *ever* disclosed, including markers a fail-closed read
+bounds the distinct collections this binding has _ever_ disclosed, including markers a fail-closed read
 left behind, so size it from the whole resource rather than one page — a per-page value starts
 refusing valid reads once later pages reveal new collections. `maxObservers` must account for the Workers
 subrequest ceiling because every observer costs a verifier call on each read. `remotePageSize`

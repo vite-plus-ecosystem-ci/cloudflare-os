@@ -2,51 +2,79 @@ import { basename } from "node:path";
 import { z } from "zod";
 import type { JsonValue } from "vitest-evals";
 
-const AssertionSchema = z.object({
-  status: z.enum(["passed", "failed"]),
-  duration: z.number().nonnegative(),
-  meta: z.object({
-    harness: z.object({
-      run: z.object({
-        session: z.object({
-          metadata: z.object({
-            taskId: z.string().min(1),
-            taskVersion: z.string().min(1),
-            gitCommit: z.string().min(1),
-          }).loose(),
-        }).loose(),
-        usage: z.object({
-          model: z.string().min(1),
-          metadata: z.object({
-            observedCumulativeChatCostUsd: z.number().nonnegative().optional(),
-          }).loose(),
-        }).loose(),
-        output: z.object({
-          metrics: z.object({
-            modelTurns: z.number().int().nonnegative(),
-            toolCalls: z.number().int().nonnegative(),
-            toolErrors: z.number().int().nonnegative(),
-          }),
-          turns: z.array(z.object({
-            outcome: z.object({ status: z.string() }).loose(),
-          }).loose()),
-        }).loose(),
-        errors: z.array(z.object({
-          name: z.string(),
-          message: z.string(),
-        }).loose()),
-      }).loose(),
-    }).loose(),
-  }).loose(),
-}).loose();
+const AssertionSchema = z
+  .object({
+    status: z.enum(["passed", "failed"]),
+    duration: z.number().nonnegative(),
+    meta: z
+      .object({
+        harness: z
+          .object({
+            run: z
+              .object({
+                session: z
+                  .object({
+                    metadata: z
+                      .object({
+                        taskId: z.string().min(1),
+                        taskVersion: z.string().min(1),
+                        gitCommit: z.string().min(1),
+                      })
+                      .loose(),
+                  })
+                  .loose(),
+                usage: z
+                  .object({
+                    model: z.string().min(1),
+                    metadata: z
+                      .object({
+                        observedCumulativeChatCostUsd: z.number().nonnegative().optional(),
+                      })
+                      .loose(),
+                  })
+                  .loose(),
+                output: z
+                  .object({
+                    metrics: z.object({
+                      modelTurns: z.number().int().nonnegative(),
+                      toolCalls: z.number().int().nonnegative(),
+                      toolErrors: z.number().int().nonnegative(),
+                    }),
+                    turns: z.array(
+                      z
+                        .object({
+                          outcome: z.object({ status: z.string() }).loose(),
+                        })
+                        .loose(),
+                    ),
+                  })
+                  .loose(),
+                errors: z.array(
+                  z
+                    .object({
+                      name: z.string(),
+                      message: z.string(),
+                    })
+                    .loose(),
+                ),
+              })
+              .loose(),
+          })
+          .loose(),
+      })
+      .loose(),
+  })
+  .loose();
 
 // One entry per eval file. A file that fails before its first trial (a collection error) is still
 // listed, with no assertions and the error in `message`.
-const FileSchema = z.object({
-  name: z.string(),
-  message: z.string().optional(),
-  assertionResults: z.array(AssertionSchema),
-}).loose();
+const FileSchema = z
+  .object({
+    name: z.string(),
+    message: z.string().optional(),
+    assertionResults: z.array(AssertionSchema),
+  })
+  .loose();
 
 const ResultsSchema = z.object({ testResults: z.array(FileSchema) }).loose();
 
@@ -101,7 +129,7 @@ function parseResults(name: string, text: string): EvalFile[] {
 }
 
 function trials(files: EvalFile[]): Assertion[] {
-  return files.flatMap(file => file.assertionResults);
+  return files.flatMap((file) => file.assertionResults);
 }
 
 function cohortKey(taskId: string, model: string): string {
@@ -129,8 +157,9 @@ function group(assertions: Assertion[]): Map<string, Cohort> {
 }
 
 function singleCommit(name: string, assertions: Assertion[]): string {
-  const commits = new Set(assertions.map(
-      assertion => assertion.meta.harness.run.session.metadata.gitCommit));
+  const commits = new Set(
+    assertions.map((assertion) => assertion.meta.harness.run.session.metadata.gitCommit),
+  );
   if (commits.size !== 1) throw new Error(`${name} results have inconsistent commits`);
   const commit = commits.values().next().value;
   if (commit === undefined) throw new Error(`${name} results have no commit`);
@@ -142,27 +171,31 @@ function mean(values: number[]): number {
 }
 
 function stats({ assertions }: Cohort): EvalStats {
-  const costs = assertions.flatMap(assertion => {
+  const costs = assertions.flatMap((assertion) => {
     const cost = assertion.meta.harness.run.usage.metadata.observedCumulativeChatCostUsd;
     return cost === undefined ? [] : [cost];
   });
-  const metrics = assertions.map(assertion => assertion.meta.harness.run.output.metrics);
+  const metrics = assertions.map((assertion) => assertion.meta.harness.run.output.metrics);
   return {
     trials: assertions.length,
-    passed: assertions.filter(assertion => assertion.status === "passed").length,
-    meanDurationMs: mean(assertions.map(assertion => assertion.duration)),
-    meanModelTurns: mean(metrics.map(value => value.modelTurns)),
-    meanToolCalls: mean(metrics.map(value => value.toolCalls)),
-    meanToolErrors: mean(metrics.map(value => value.toolErrors)),
+    passed: assertions.filter((assertion) => assertion.status === "passed").length,
+    meanDurationMs: mean(assertions.map((assertion) => assertion.duration)),
+    meanModelTurns: mean(metrics.map((value) => value.modelTurns)),
+    meanToolCalls: mean(metrics.map((value) => value.toolCalls)),
+    meanToolErrors: mean(metrics.map((value) => value.toolErrors)),
     meanCostUsd: costs.length === assertions.length ? mean(costs) : null,
   };
 }
 
 function hasInfrastructureFailure(assertion: Assertion): boolean {
   const run = assertion.meta.harness.run;
-  if (run.output.turns.some(turn =>
-    turn.outcome.status === "error" || turn.outcome.status === "cancelled")) return true;
-  const names = new Set(run.errors.map(error => error.name));
+  if (
+    run.output.turns.some(
+      (turn) => turn.outcome.status === "error" || turn.outcome.status === "cancelled",
+    )
+  )
+    return true;
+  const names = new Set(run.errors.map((error) => error.name));
   if (names.has("EvalCleanupError")) return true;
   const hasAgentOutcome = names.has("AgentError") || names.has("AgentTimeout");
   return names.has("EvalRunError") && !hasAgentOutcome;
@@ -177,7 +210,9 @@ export function validateEvalResults(text: string, expectedTrials: number): void 
   const files = parseResults("baseline", text);
   for (const file of files) {
     if (file.assertionResults.length === 0) {
-      throw new Error(`${basename(file.name)} ran no trials${file.message ? `: ${file.message}` : ""}`);
+      throw new Error(
+        `${basename(file.name)} ran no trials${file.message ? `: ${file.message}` : ""}`,
+      );
     }
   }
   const assertions = trials(files);
@@ -186,7 +221,8 @@ export function validateEvalResults(text: string, expectedTrials: number): void 
     if (cohort.assertions.length !== expectedTrials) {
       throw new Error(
         `${cohort.taskId} on ${cohort.model} has ${cohort.assertions.length} trials, ` +
-        `expected ${expectedTrials}`);
+          `expected ${expectedTrials}`,
+      );
     }
     if (cohort.assertions.some(hasInfrastructureFailure)) {
       throw new Error(`${cohort.taskId} on ${cohort.model} has infrastructure failures`);
@@ -200,8 +236,9 @@ export function validateEvalResults(text: string, expectedTrials: number): void 
  * does, no cohort is comparable.
  */
 export function compareEvalResults(
-    baselineText: string, candidateText: string,
-    definitionsChanged: (baselineSha: string, candidateSha: string) => boolean = () => false,
+  baselineText: string,
+  candidateText: string,
+  definitionsChanged: (baselineSha: string, candidateSha: string) => boolean = () => false,
 ): EvalComparison {
   const baselineAssertions = trials(parseResults("baseline", baselineText));
   const candidateAssertions = trials(parseResults("candidate", candidateText));
@@ -211,25 +248,39 @@ export function compareEvalResults(
   const baseline = group(baselineAssertions);
   const candidate = group(candidateAssertions);
   // Either side's cohort carries the identity; both do when the key is shared.
-  const rows = [...new Map([...baseline, ...candidate])].map(([key, cohort]): EvalComparisonRow => {
-    const identity = { taskId: cohort.taskId, model: cohort.model };
-    const base = baseline.get(key);
-    const next = candidate.get(key);
-    if (base === undefined) {
-      return { ...identity, reason: "missing baseline", baseline: null, candidate: stats(cohort) };
-    }
-    if (next === undefined) {
-      return { ...identity, reason: "missing candidate", baseline: stats(base), candidate: null };
-    }
-    const reason = changed ? "eval definition changed"
-      : base.taskVersion !== next.taskVersion ? "task version changed"
-      : base.assertions.length !== next.assertions.length ? "trial counts differ"
-      : base.assertions.some(hasInfrastructureFailure) ? "baseline run errors"
-      : next.assertions.some(hasInfrastructureFailure) ? "candidate run errors"
-      : null;
-    return { ...identity, reason, baseline: stats(base), candidate: stats(next) };
-  }).toSorted((left, right) =>
-    left.taskId.localeCompare(right.taskId) || left.model.localeCompare(right.model));
+  const rows = [...new Map([...baseline, ...candidate])]
+    .map(([key, cohort]): EvalComparisonRow => {
+      const identity = { taskId: cohort.taskId, model: cohort.model };
+      const base = baseline.get(key);
+      const next = candidate.get(key);
+      if (base === undefined) {
+        return {
+          ...identity,
+          reason: "missing baseline",
+          baseline: null,
+          candidate: stats(cohort),
+        };
+      }
+      if (next === undefined) {
+        return { ...identity, reason: "missing candidate", baseline: stats(base), candidate: null };
+      }
+      const reason = changed
+        ? "eval definition changed"
+        : base.taskVersion !== next.taskVersion
+          ? "task version changed"
+          : base.assertions.length !== next.assertions.length
+            ? "trial counts differ"
+            : base.assertions.some(hasInfrastructureFailure)
+              ? "baseline run errors"
+              : next.assertions.some(hasInfrastructureFailure)
+                ? "candidate run errors"
+                : null;
+      return { ...identity, reason, baseline: stats(base), candidate: stats(next) };
+    })
+    .toSorted(
+      (left, right) =>
+        left.taskId.localeCompare(right.taskId) || left.model.localeCompare(right.model),
+    );
   return { baselineSha, candidateSha, rows };
 }
 
@@ -263,15 +314,18 @@ export function renderEvalComparison(comparison: EvalComparison): string {
       cells.push(row.reason, "—", "—", "—");
     } else {
       const { baseline, candidate } = row;
-      const costDelta = baseline.meanCostUsd === null || candidate.meanCostUsd === null
-        ? "—"
-        : `${candidate.meanCostUsd >= baseline.meanCostUsd ? "+" : "-"}$${
-          Math.abs(candidate.meanCostUsd - baseline.meanCostUsd).toFixed(4)}`;
+      const costDelta =
+        baseline.meanCostUsd === null || candidate.meanCostUsd === null
+          ? "—"
+          : `${candidate.meanCostUsd >= baseline.meanCostUsd ? "+" : "-"}$${Math.abs(
+              candidate.meanCostUsd - baseline.meanCostUsd,
+            ).toFixed(4)}`;
       cells.push(
         signed((passRate(candidate) - passRate(baseline)) * 100, " pp"),
         signed(candidate.meanDurationMs - baseline.meanDurationMs, " ms"),
         signed(candidate.meanToolErrors - baseline.meanToolErrors, ""),
-        costDelta);
+        costDelta,
+      );
     }
     lines.push(`| ${cells.join(" | ")} |`);
   }

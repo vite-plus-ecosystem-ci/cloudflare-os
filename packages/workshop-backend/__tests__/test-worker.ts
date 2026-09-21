@@ -20,7 +20,9 @@ export { default } from "../src/server.js";
  */
 const restoreTargets = new WeakMap<DurableObjectState, DurableObject>();
 function bridgedRestore(this: DurableObject, params: unknown): unknown {
-  const target = restoreTargets.get(this.ctx) as { [restore]?: (params: unknown) => unknown } | undefined;
+  const target = restoreTargets.get(this.ctx) as
+    | { [restore]?: (params: unknown) => unknown }
+    | undefined;
   if (target?.[restore] === undefined || target[restore] === bridgedRestore) {
     throw new TypeError("This Durable Object does not implement a [restore]() method.");
   }
@@ -59,8 +61,10 @@ const accountCalls = new Map<string, string[]>();
  * Records calls by `props.name` so a test can ask any instance what happened (`calls()`); with
  * `failRevoke` / `failDescribe`, that method rejects after being recorded.
  */
-export class FakeGatekeeperAccount
-    extends WorkerEntrypoint<unknown, { name: string; failRevoke?: boolean; failDescribe?: boolean }> {
+export class FakeGatekeeperAccount extends WorkerEntrypoint<
+  unknown,
+  { name: string; failRevoke?: boolean; failDescribe?: boolean }
+> {
   #record(call: string) {
     const calls = accountCalls.get(this.ctx.props.name) ?? [];
     calls.push(call);

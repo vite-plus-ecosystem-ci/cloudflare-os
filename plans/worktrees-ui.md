@@ -21,7 +21,7 @@ Three things move together:
   `subscribeToWorkpieces`, the reads implemented over the existing lazy git cache, the
   client-delivery stripping the first plan installed **deleted**, and `getCodeAtCommit`
   deleted.
-- **Frontend (workshop-frontend):** `ChatOtClient` becomes sparse for *all* pins (no
+- **Frontend (workshop-frontend):** `ChatOtClient` becomes sparse for _all_ pins (no
   whole-tree fetch anywhere), a per-commit file store sits under the editor,
   `FileSidebar` becomes a changes-list + tree browser, and `GadgetCodeInterface` is
   generalized to both workpiece types.
@@ -41,7 +41,7 @@ Frontend:
   (`changeApplied` rows; `"changes"` messages composed by `computeChatEpochChanges`,
   `ChatInterface.tsx:2313`).
 - `otClient.ts` (`ChatOtClient`): `#applied` = **full** pin base trees + epoch change +
-  rows. A row touching an id without content fetches the *whole* pin base (`#applyRow`,
+  rows. A row touching an id without content fetches the _whole_ pin base (`#applyRow`,
   `:417-445`); `#rebuild` prefetches every pin's tree (`:644-652`);
   `#trySwitchGeneration` carries touched ids across an epoch reset (`:558-632`);
   `ensureGadgetEditable` (`:709`) seeds an unpinned gadget from head and declares the pin
@@ -52,7 +52,7 @@ Frontend:
   `rightTabs(output)` (`:173`). `WorkpiecePicker.tsx` is the output rail. The
   "Pending changes" banner/badge derive from `AiChatMetadata.proposedChangeWorkpieces`
   (`chatHasProposedChanges`, `ChatInterface.tsx:2432`); Discard = `revertChanges(chatId,
-  0)` (`:4147-4176`); Accept = `mergeChanges` (`:4073`).
+0)` (`:4147-4176`); Accept = `mergeChanges` (`:4073`).
 - Edit previews (`editPreviewStart/Delta/Clear`, `api.ts:3481-3529`) carry no base text:
   the client locates `textToReplace` in its own copy of the file, synchronously.
 - No virtualized list/tree component exists; Kumo has `Collapsible` and `List`, no tree.
@@ -60,7 +60,7 @@ Frontend:
 Backend:
 
 - `WorktreeRecord` (`overseer.ts:406-463`): `{type:"worktree", id, title, chatId,
-  sourceGatekeeperId?, baseCommit, headCommit, pinBase, pending?}`. `pinBase` advances
+sourceGatekeeperId?, baseCommit, headCommit, pinBase, pending?}`. `pinBase` advances
   only at epoch resets (`:4600-4606`); `headCommit` only by explicit `commit()`
   (`:8433-8450`) and revert rollback (`:4773-4790`, to the earliest reverted
   advancement's `previousHead`).
@@ -104,22 +104,22 @@ Backend:
     pinned — the mainline commit whose content has been merged into the chat — else the
     accepted commit. Diff `original` and Changes statuses are computed against it, and
     never against head alone.
-  The diff must show exactly what clicking Accept would apply, and accepting never reverts
-  mainline. A chat not updated from mainline has `mergedCommit === baseCommit`, so it
-  diffs against its own pin and mainline's later commits never appear (accept is blocked
-  by the stale dialog until they are merged in). Once `updateChatFromMainline` has
-  imported them as ordinary OT rows, `mergedCommit` has advanced past `baseCommit` and
-  those rows compare equal and vanish, instead of being listed as this chat's changes —
-  which diffing against the pin's `baseCommit` would do. Accept requires `mergedCommit ===
-  head`, so wherever it is enabled this equals the head comparison. For a worktree the
-  bases coincide by construction (no mainline; `pin.baseCommit === pin.mergedCommit ===
-  record.pinBase` within an epoch), which yields the review the user wants: an agent that
-  edits and immediately commits still shows its work, and a user driving many small
-  changes toward one eventual commit accepts them incrementally — `headCommit` plays no
-  role in review. No server-side tree diff is needed: the candidate set is the overlay,
-  since every path where the review base differs from the content base was touched by the
-  rows that imported the difference. Choosing another review base (from a commit log) is
-  future work.
+    The diff must show exactly what clicking Accept would apply, and accepting never reverts
+    mainline. A chat not updated from mainline has `mergedCommit === baseCommit`, so it
+    diffs against its own pin and mainline's later commits never appear (accept is blocked
+    by the stale dialog until they are merged in). Once `updateChatFromMainline` has
+    imported them as ordinary OT rows, `mergedCommit` has advanced past `baseCommit` and
+    those rows compare equal and vanish, instead of being listed as this chat's changes —
+    which diffing against the pin's `baseCommit` would do. Accept requires `mergedCommit ===
+head`, so wherever it is enabled this equals the head comparison. For a worktree the
+    bases coincide by construction (no mainline; `pin.baseCommit === pin.mergedCommit ===
+record.pinBase` within an epoch), which yields the review the user wants: an agent that
+    edits and immediately commits still shows its work, and a user driving many small
+    changes toward one eventual commit accepts them incrementally — `headCommit` plays no
+    role in review. No server-side tree diff is needed: the candidate set is the overlay,
+    since every path where the review base differs from the content base was touched by the
+    rows that imported the difference. Choosing another review base (from a commit log) is
+    future work.
 - **Rejecting changes rejects their commits.** Already true: a revert rolls `headCommit`
   back to the earliest reverted advancement's `previousHead`, and Discard reverts the
   whole epoch, so the worktree returns to its last accepted state, head included. This
@@ -140,12 +140,12 @@ Backend:
   message like any gadget pin; client: a declaration the server accepts iff its
   `baseCommit` equals `record.pinBase`); accept does what it does today — auto-commit the
   dirty worktree, `record.pinBase := auto-commit`, `headCommit` untouched — and then
-  simply does *not* re-create the chat pin, since the new epoch has no rows. Nothing is
+  simply does _not_ re-create the chat pin, since the new epoch has no rows. Nothing is
   lost at that boundary: changes not committed to head are the accepted commit's tree,
   as now. The invariant "a chat pin, when present, has `baseCommit === record.pinBase`"
   holds as it does today; the entry is merely absent when it would be vacuous. No birth
   pin, no re-pin of clean worktrees, no new `worktreePins` written (the field stays in
-  the API and is still *honored* by every reader, since existing chat logs contain it).
+  the API and is still _honored_ by every reader, since existing chat logs contain it).
   **Legacy live pins are not migrated.** A chat that already holds a born/re-created
   worktree pin in its stored `codeBase` keeps it, and once the exclusion is removed that
   pin reads as "pending changes" — a spurious banner on an idle chat. Accepted: few such
@@ -164,7 +164,7 @@ Backend:
   else; the Changes list's candidate set is "the pinned overlay" by construction; and
   the UI's content base is the chat pin's `baseCommit` when present and
   `WorktreeSummary.pinBase` (the accepted commit) when not — the same `chatFiles ??
-  headFiles` shape it uses for gadgets — while the review base is the pin's
+headFiles` shape it uses for gadgets — while the review base is the pin's
   `mergedCommit` when present and the accepted commit when not (see the review-base
   decision).
   (Alternative considered: keep born-pinned and add
@@ -175,7 +175,7 @@ Backend:
   re-pinning refactor too costly.)
 - **The "Pending changes" banner covers worktrees — once modified.** With
   pins-on-modification it does so through the existing derivation: pinned worktrees. A
-  worktree record merely *pending* in the chat (created, never written to or committed) does
+  worktree record merely _pending_ in the chat (created, never written to or committed) does
   **not** propose anything, unlike a pending gadget: a worktree stays private to its chat
   whether or not it is accepted, so an agent that checks a repository out only to read it
   would otherwise raise a banner over a chat with nothing to accept. For the same reason the
@@ -199,7 +199,7 @@ Backend:
   With a lazy client there is no reason for two delivery shapes: the strip helpers,
   `isEverWorktree`, `deadWorktreeIds` and all call sites go. Soundness is unchanged in
   this direction (per-workpiece transform). Ordering: the lazy-capable frontend deploys
-  *before* the stripping is removed (commit sequence), so no intermediate release pairs an
+  _before_ the stripping is removed (commit sequence), so no intermediate release pairs an
   old client with un-stripped deliveries; tabs left open across the final deploy may show
   an error view in the Code tab until reload, which is accepted.
 - **One code-fetching machinery for every workpiece type: sparse pins, content by path.**
@@ -220,7 +220,7 @@ Backend:
   fault-pull through a gatekeeper on the client's behalf, reaching only commits the
   workspace's gatekeepers advertised or proved — nothing an agent couldn't already
   trigger (gadget commits are always local and never pull). Build role only. A
-  `WorktreeClient` capability is deferred until UI *operations* (commit, push, log) need
+  `WorktreeClient` capability is deferred until UI _operations_ (commit, push, log) need
   one.
 - **One file browser, one code interface, one content model, for gadgets and worktrees.**
   The only type-specific code left is the summary field the accepted commit comes from
@@ -246,7 +246,7 @@ Every export doc-commented to the kernel bar.
 
 - `WorkpieceSummary` becomes a discriminated union; the existing shape is the `"gadget"`
   member. Add `{ id, type: "worktree", title, chatId: number, pinBase: string,
-  headCommit: string, baseCommit: string }`. `pinBase` is the review base while the
+headCommit: string, baseCommit: string }`. `pinBase` is the review base while the
   worktree is unpinned (the analog of `commitId`) and is re-delivered when an accept
   advances it; `headCommit` (header display; re-delivered on `commit()`) and `baseCommit`
   (informational) are cheap and may be trimmed in review.
@@ -259,14 +259,14 @@ Every export doc-commented to the kernel bar.
 - New `Overseer` methods (build role; use role throws, as `getCodeAtCommit` did):
   - `listTree(commitId: string): Promise<TreeNode[]>` — the commit's root directory as a
     nested tree: `TreeNode = { name: string; kind: "file" | "executable" | "symlink" |
-    "submodule" } | { name: string; kind: "dir"; children: TreeNode[] }`, each
+"submodule" } | { name: string; kind: "dir"; children: TreeNode[] }`, each
     directory's entries in git tree order (which is byte order of names, with a
     directory sorted as if its name had a trailing `/`). Names are single path segments;
     the client joins them. Trees fault in eagerly; blobs are never touched; no sizes, no
     oids. Response size is proportional to entry count with each name carried once.
   - `readFilesAtCommit(commitId: string, paths: string[]): Promise<[path: string,
-    FileAtCommit][]>`, `FileAtCommit = { kind: "text"; text: string } | { kind: "absent" } |
-    { kind: "unreadable"; message: string }`. `absent` covers a missing path and a directory
+FileAtCommit][]>`, `FileAtCommit = { kind: "text"; text: string } | { kind: "absent" } |
+{ kind: "unreadable"; message: string }`. `absent` covers a missing path and a directory
     path; `unreadable` carries
     the descriptive message for symlink / submodule / binary / oversized content. One
     batched blob pull for all missing blobs. Pull/provenance failures throw the whole call
@@ -307,7 +307,7 @@ Every export doc-commented to the kernel bar.
   bridge must pin a bridged worktree row at the new `record.pinBase` (verify; it derives
   gadget pins from the boundary commits today).
 - `submitCodeChange`: accept a worktree pin declaration iff `baseCommit ===
-  record.pinBase` (replacing the rejection at `:4041-4047`); the tree-entry-mode checks
+record.pinBase` (replacing the rejection at `:4041-4047`); the tree-entry-mode checks
   and other-chat rejection stay.
 - `proposedChangeWorkpieceIds`: drop the `isWorktree` exclusion; let the pending-record
   loop include worktrees (`pending?.chatId === chatId`; they have no bindings). Update
@@ -316,7 +316,7 @@ Every export doc-commented to the kernel bar.
   `agent-compaction.ts:437-442`); nothing writes it.
 - Tests (adapting `worktrees.test.ts` / `worktree-session.test.ts`): unpinned read from
   `pinBase`; first write pins at `pinBase` and the pin lands in the step's message;
-  `commit()` on an unpinned worktree pins; `commit()` on a *pinned* worktree advances
+  `commit()` on an unpinned worktree pins; `commit()` on a _pinned_ worktree advances
   `headCommit` only — the chat pin's `baseCommit`/`mergedCommit` and `record.pinBase` are
   untouched (this is what keeps an agent's own commit out of the review base; see the
   review-base decision); client declaration accepted at `pinBase`,
@@ -362,7 +362,7 @@ Same class, same three input paths, same submission machinery; the whole-tree fe
 disappears and a tombstone side-table appears. Nothing is type-specific.
 
 - **Delegate**: `fetchCommitFiles(commitId)` is replaced by `fetchFilesAtCommit(commitId,
-  paths): Promise<ReadonlyMap<string, string | null>>` (`null` = absent; an `unreadable`
+paths): Promise<ReadonlyMap<string, string | null>>` (`null` = absent; an `unreadable`
   base under an `edit` row is a server-invariant violation → `onFatalError`, like a
   failed tree fetch today).
 - **`#applyRow`** (`:417`): for a pin the content doesn't cover, fetch only the row's
@@ -373,7 +373,7 @@ disappears and a tombstone side-table appears. Nothing is type-specific.
 - **`#rebuild`** (`:644`): batch-fetch the `edit` paths of `durable.epochChange` per pin
   (one call per base commit), then `applyCodeChange` as today.
 - **Tombstones follow the applied/display split.** `#removed: Map<WorkpieceId,
-  Set<string>>` tracks the **acknowledged** state only, updated exactly where `#applied`
+Set<string>>` tracks the **acknowledged** state only, updated exactly where `#applied`
   is (rows, rebuild, switch): `remove` adds, `set`/`edit` deletes. **Displayed**
   tombstones are never stored; `getRemovedPaths(id)` derives them on demand by folding
   the local buffers over the acknowledged set in the same order `#recomputeDisplay` folds
@@ -391,7 +391,7 @@ disappears and a tombstone side-table appears. Nothing is type-specific.
   declaration. Tombstones reset except locally removed paths.
 - **`ensureFileEditable(id, baseCommit, path, baseText)`** replaces `ensureGadgetEditable`:
   if the id has no content and no seed → a sparse `#localSeeds` entry `{baseCommit,
-  files: {path: baseText}}`, declared as the pin on the next submission exactly as today
+files: {path: baseText}}`, declared as the pin on the next submission exactly as today
   (`baseCommit` = the gadget's `commitId` or the worktree's `pinBase`; pending creations
   need no seed, as now); if the id is already pinned/seeded but the path is unloaded →
   seed the path into `#applied`/`#display` (server-acked base content).
@@ -401,18 +401,18 @@ disappears and a tombstone side-table appears. Nothing is type-specific.
   across `remove`→`set`; **local delete in flight + remote edit of the same path keeps
   the displayed tombstone** (and the reverse: remote `remove` + pending local `set`
   shows the file); first local edit on an unpinned workpiece declares `{gadgetId,
-  baseCommit}` with a sparse seed; a later local edit on another path seeds only that path
+baseCommit}` with a sparse seed; a later local edit on another path seeds only that path
   and declares nothing; remote row transforms a pending local edit on a sparse entry;
   switch carries only locally touched paths; unreadable base under an edit → fatal; a pin
   whose base differs from a local seed still discards and rebuilds; deliveries with
-  worktree content *stripped* (old backend) are inert.
+  worktree content _stripped_ (old backend) are inert.
 
 ### 4. Frontend: the per-commit file store
 
 New module replacing `commitFilesCache`, module-scoped like it:
 
 - `listTree(commit) → Promise<TreeNode[]>`, `readFiles(commit, paths) → Promise<Map<path,
-  FileAtCommit>>`, memoized by oid (immutable), with in-flight dedupe and microtask
+FileAtCommit>>`, memoized by oid (immutable), with in-flight dedupe and microtask
   coalescing of `readFiles` into one RPC per commit (chunked at
   `MAX_READ_FILES_PER_CALL`; re-requests paths the server omitted under the byte budget).
 - The OT delegate reads from the store, so a base an editor already opened is never
@@ -422,22 +422,22 @@ New module replacing `commitFilesCache`, module-scoped like it:
 
 - **`WorkpieceCodeModel`** (per selected workpiece; fed by the OT client, the store, the
   summary) answers:
-  - *Two bases* (the locked decision): `acceptedCommit = summary.type === "worktree" ?
-    summary.pinBase : summary.commitId` — the single type-specific line in the model;
+  - _Two bases_ (the locked decision): `acceptedCommit = summary.type === "worktree" ?
+summary.pinBase : summary.commitId` — the single type-specific line in the model;
     `contentBase = pin?.baseCommit ?? acceptedCommit` is what content is built on, and
     `reviewBase = pin?.mergedCommit ?? acceptedCommit` is the **review base**. Both
     `undefined` for a pending (chat-created) gadget, whose tree is the overlay alone.
     They are equal except for a gadget chat updated from mainline.
-  - *The tree*: `store.listTree(contentBase)` overlaid with the client's display for the
+  - _The tree_: `store.listTree(contentBase)` overlaid with the client's display for the
     id — displayed tombstones removed, overlay paths absent from the base inserted with
     virtual ancestor directories, directories first then files. A base directory whose
     files are all tombstoned is hidden (the full tree makes that computable).
-  - *Changes*: touched paths (display keys ∪ displayed tombstones) with status from
+  - _Changes_: touched paths (display keys ∪ displayed tombstones) with status from
     `store.readFiles(reviewBase, paths)`: `absent` → added; tombstone → deleted if
     present at the review base, else dropped; equal text → unchanged (hidden); else
     modified. `unreadable` review-base content under a `set` → modified, no diff view.
     This replaces today's `headFiles` vs `displayFiles` loop for gadgets.
-  - *A file*: `text` = display (touched) or `readFiles(contentBase, [P])`; `original` =
+  - _A file_: `text` = display (touched) or `readFiles(contentBase, [P])`; `original` =
     `readFiles(reviewBase, [P])` in a chat; the seed passed to `ensureFileEditable`
     is the `contentBase` text (the OT base), not `original`; `unreadable` → placeholder;
     `symlink`/`submodule` → not openable; `text.length > MAX_FILE_TEXT_LENGTH` →
@@ -450,7 +450,7 @@ New module replacing `commitFilesCache`, module-scoped like it:
   the per-row menu (download / rename / delete) and the create dialog carry over.
   Rename/delete/create disabled on symlink/submodule entries and non-file paths;
   **rename is also disabled for `executable` entries**: a rename is `remove(old)` +
-  `set(new, text)`, and the tree writer takes a mode only from the *destination's* base
+  `set(new, text)`, and the tree writer takes a mode only from the _destination's_ base
   entry, so a renamed script would silently drop `100755` at the next accept or commit —
   `CodeChange` has no way to say "same mode at a new path" (a representation change,
   future work; the agent's `Worktree` API has the same gap). "Download all" hidden for
@@ -461,7 +461,7 @@ New module replacing `commitFilesCache`, module-scoped like it:
   `EditSession` calls `ensureFileEditable(id, contentBase, path, contentBaseText)` on a
   file's first `applyLocal`. Edit previews (landed in commit 4): on `editPreviewStart`
   for a path not in the display, `store.readFiles(contentBase, [path])` first, buffering
-  deltas, then overlay as today; a preview that *finishes* (the next call's start) before
+  deltas, then overlay as today; a preview that _finishes_ (the next call's start) before
   that read lands is deferred, not dropped — it joins its file's pending chain when the
   read arrives, in call order, and a row or clear arriving first resolves it like a chain
   entry. Short edits followed by the next tool call routinely fit inside one read's RTT,
@@ -502,14 +502,14 @@ New module replacing `commitFilesCache`, module-scoped like it:
 - **Gadget open cost**: `listTree(head)` + `readFiles(head, [activeFile])` instead of one
   `getCodeAtCommit`; both are small and issued together when the active file is known.
   If an eager whole-tree path is ever wanted back for gadgets, it is a `readFiles(commit,
-  allPaths)` call into the same store — not a second implementation.
+allPaths)` call into the same store — not a second implementation.
 - **`edit` row whose base read fails**: pull failure → `onFatalError` → the
   existing retry UI; `unreadable` → fatal. Never skip a row (gapless revisions).
 - **`remove` of an absent base path**: valid no-op server-side; the Changes list drops it
   when `readFiles(reviewBase, [path])` says `absent`.
 - **Gadget pinned at an older head, then updated from mainline**: `mergedCommit` is the
   new head; imported rows are touched paths whose text equals it → hidden; the chat's own
-  edits show their diff against it. Gadget pinned at an older head and *not* updated:
+  edits show their diff against it. Gadget pinned at an older head and _not_ updated:
   `mergedCommit === baseCommit`, so every file — touched or not — diffs against the pin
   and mainline's later changes never appear (nothing here reverts them; the stale dialog
   gates accept until they are merged in). Tests: both scenarios against the model.
@@ -517,7 +517,7 @@ New module replacing `commitFilesCache`, module-scoped like it:
   is `pinBase` whether or not the chat pin is present (`pin.mergedCommit === pinBase` for
   a worktree pin's whole life — only `updateChatFromMainline` ever advances a
   `mergedCommit`, and it skips worktrees), so the diff original and statuses come from the
-  last *accepted* commit and never from a commit the agent made. `headCommit` is header
+  last _accepted_ commit and never from a commit the agent made. `headCommit` is header
   display only. Test: against the model, a worktree whose summary has `headCommit` ahead
   of `pinBase`, pinned and unpinned, with `original` read from `pinBase`.
 - **Legacy live worktree pins** show a pending banner on an idle upgraded chat until one
@@ -577,7 +577,7 @@ can't yet show.
    `WorkpieceSummary` union itself landed in 5), deletion of the strip helpers / `deadWorktreeIds` / call sites,
    deletion of `getCodeAtCommit`, `proposedChangeWorkpieceIds` exclusion removed, preview
    throw removed, doc updates. Tests: invert the first plan's leak test (a client
-   subscription *does* receive worktree rows, pins, messages, gapless revisions); summary
+   subscription _does_ receive worktree rows, pins, messages, gapless revisions); summary
    delivery and re-delivery on `pinBase`/`headCommit` advance; use-role exclusion; preview
    events for worktree targets; `proposedChangeWorkpieces` with worktrees.
 8. **frontend: polish.** Transcript "open worktree" card, header details, expanded-state

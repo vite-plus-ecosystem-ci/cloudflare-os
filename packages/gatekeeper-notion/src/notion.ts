@@ -32,7 +32,10 @@ import {
   type VendorDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
 import { connectHandoffPageHtml, htmlResponse } from "@gadgets/gatekeeper-kit/connect-pages";
-import { commitStagedCredentials, stageCredentials } from "@gadgets/gatekeeper-kit/credential-stage";
+import {
+  commitStagedCredentials,
+  stageCredentials,
+} from "@gadgets/gatekeeper-kit/credential-stage";
 import {
   NotionApi,
   NotionApiError,
@@ -141,7 +144,7 @@ function getBasePath(env: Env): string {
 }
 
 function hexEncode(bytes: Uint8Array): string {
-  return [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 function generateNonce(): string {
@@ -296,9 +299,9 @@ export class GatekeeperVendor extends WorkerEntrypoint<Env> implements Gatekeepe
       color: "#f7f6f3",
       tagline: "Read and write your Notion pages and databases",
       description:
-          "Connect your Notion workspace to let Cloudflare OS search, read, and edit the pages and " +
-          "databases you share. Build agents that draft documents, organize notes, or manage " +
-          "database records.",
+        "Connect your Notion workspace to let Cloudflare OS search, read, and edit the pages and " +
+        "databases you share. Build agents that draft documents, organize notes, or manage " +
+        "database records.",
     };
   }
 
@@ -350,8 +353,12 @@ export class UserAccount extends DurableObject<Env> {
   /** Verify & consume the initiation nonce, returning a fresh OAuth nonce. Returns null if invalid. */
   async beginOAuthFlow(initiationNonce: string): Promise<{ oauthNonce: string } | null> {
     const stored = this.ctx.storage.kv.get<StoredNonce>("nonce");
-    if (!stored || stored.stage !== "initiation" ||
-        Date.now() >= stored.expiresAt || !constantTimeEqual(stored.value, initiationNonce)) {
+    if (
+      !stored ||
+      stored.stage !== "initiation" ||
+      Date.now() >= stored.expiresAt ||
+      !constantTimeEqual(stored.value, initiationNonce)
+    ) {
       return null;
     }
     const oauthNonce = generateNonce();
@@ -370,8 +377,12 @@ export class UserAccount extends DurableObject<Env> {
    */
   async acceptAuthCode(code: string, oauthNonce: string): Promise<ConnectHandoff | null> {
     const stored = this.ctx.storage.kv.get<StoredNonce>("nonce");
-    if (!stored || stored.stage !== "oauth" ||
-        Date.now() >= stored.expiresAt || !constantTimeEqual(stored.value, oauthNonce)) {
+    if (
+      !stored ||
+      stored.stage !== "oauth" ||
+      Date.now() >= stored.expiresAt ||
+      !constantTimeEqual(stored.value, oauthNonce)
+    ) {
       return null;
     }
     this.ctx.storage.kv.delete("nonce");
@@ -386,7 +397,11 @@ export class UserAccount extends DurableObject<Env> {
     }
 
     const grant = await exchangeAuthCode(
-        code, this.env.CLIENT_ID, this.env.CLIENT_SECRET, getBaseUrl(this.env) + "/oauth");
+      code,
+      this.env.CLIENT_ID,
+      this.env.CLIENT_SECRET,
+      getBaseUrl(this.env) + "/oauth",
+    );
 
     let handoff: ConnectHandoff;
     if (stored.reconnect) {
@@ -411,7 +426,11 @@ export class UserAccount extends DurableObject<Env> {
 
   /** Makes the grant staged under `stageId` live; see GatekeeperUser.commitReconnect. */
   async commitReconnect(stageId: string): Promise<void> {
-    const grant = commitStagedCredentials<NotionOAuthGrant>(this.ctx.storage.kv, Date.now(), stageId);
+    const grant = commitStagedCredentials<NotionOAuthGrant>(
+      this.ctx.storage.kv,
+      Date.now(),
+      stageId,
+    );
     if (!grant) throw new Error("No reconnect is awaiting confirmation. Please try again.");
     this.#storeGrant(grant);
   }
@@ -455,7 +474,11 @@ export class UserAccount extends DurableObject<Env> {
       throw new NotionApiError(401, "Notion credentials are no longer valid. Please reconnect.");
     }
     try {
-      const grant = await refreshAccessToken(refreshToken, this.env.CLIENT_ID, this.env.CLIENT_SECRET);
+      const grant = await refreshAccessToken(
+        refreshToken,
+        this.env.CLIENT_ID,
+        this.env.CLIENT_SECRET,
+      );
       this.#storeGrant(grant);
       const callback = this.ctx.storage.kv.get<Fetcher<GatekeeperConnectCallback>>("callback");
       callback?.credentialsRestored().catch(() => {});
@@ -498,8 +521,10 @@ type GatekeeperUserImplProps = {
 };
 
 @validateRpc()
-export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImplProps>
-                                implements GatekeeperUser {
+export class GatekeeperUserImpl
+  extends WorkerEntrypoint<Env, GatekeeperUserImplProps>
+  implements GatekeeperUser
+{
   #userAccount() {
     const id = this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId);
     return this.ctx.exports.UserAccount.get(id);
@@ -523,7 +548,7 @@ export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImpl
     return null;
   }
 
-  async ensureResources(_resourceUrlPatterns: string[]): Promise<{url?: string}> {
+  async ensureResources(_resourceUrlPatterns: string[]): Promise<{ url?: string }> {
     return {};
   }
 
@@ -541,7 +566,10 @@ export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImpl
         userObjectId: this.ctx.props.userObjectId,
         itemId: id,
       };
-      return { class: this.ctx.exports.NotionItemGatekeeperImpl({ props }), resource: ITEM_RESOURCE };
+      return {
+        class: this.ctx.exports.NotionItemGatekeeperImpl({ props }),
+        resource: ITEM_RESOURCE,
+      };
     }
     const props: NotionWorkspaceGatekeeperImplProps = {
       userObjectId: this.ctx.props.userObjectId,
@@ -627,11 +655,14 @@ export interface NotionVerifierApi extends GatekeeperUserVerifier {
 }
 
 @validateRpc()
-export class NotionVerifier extends WorkerEntrypoint<Env, NotionVerifierProps>
-    implements NotionVerifierApi {
+export class NotionVerifier
+  extends WorkerEntrypoint<Env, NotionVerifierProps>
+  implements NotionVerifierApi
+{
   #account() {
     return this.ctx.exports.UserAccount.get(
-      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId));
+      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
+    );
   }
 
   #api(): NotionApi {
@@ -654,9 +685,14 @@ export class NotionVerifier extends WorkerEntrypoint<Env, NotionVerifierProps>
       await this.#api().detectKind(itemId);
       return true;
     } catch (error) {
-      if (error instanceof NotionApiError &&
-          (error.status === 404 || error.status === 403 || error.status === 400 ||
-           error.isAuthError || error.code === "restricted_resource")) {
+      if (
+        error instanceof NotionApiError &&
+        (error.status === 404 ||
+          error.status === 403 ||
+          error.status === 400 ||
+          error.isAuthError ||
+          error.code === "restricted_resource")
+      ) {
         return false;
       }
       throw error;
@@ -693,9 +729,8 @@ async function authorizeItemObservation(
   itemIds: string[],
   description: ObservationDescription,
 ): Promise<void> {
-  const check = observe && itemIds.length > 0
-    ? await observe(itemIds)
-    : {pendingItems: [], commit() {}};
+  const check =
+    observe && itemIds.length > 0 ? await observe(itemIds) : { pendingItems: [], commit() {} };
   await queue.authorizeObservation({ ...description, excludeObservers: check.excludeObservers });
   check.commit();
 }
@@ -709,8 +744,10 @@ type NotionItemGatekeeperImplProps = {
 };
 
 @validateRpc()
-export class NotionItemGatekeeperImpl extends DurableObject<Env, NotionItemGatekeeperImplProps>
-    implements Gatekeeper<NotionPageSession | NotionDatabaseSession> {
+export class NotionItemGatekeeperImpl
+  extends DurableObject<Env, NotionItemGatekeeperImplProps>
+  implements Gatekeeper<NotionPageSession | NotionDatabaseSession>
+{
   #api(): NotionApi {
     const userObjectId = this.ctx.props.userObjectId;
     const account = () =>
@@ -789,7 +826,8 @@ export class NotionItemGatekeeperImpl extends DurableObject<Env, NotionItemGatek
     if (!(await verifier.hasItemAccess(this.ctx.props.itemId))) {
       throw new Error(
         "This collaborator does not have access to the bound Notion page/database, so they cannot " +
-        "be allowed to observe data this workspace read from it.");
+          "be allowed to observe data this workspace read from it.",
+      );
     }
   }
 
@@ -814,8 +852,9 @@ type NotionWorkspaceGatekeeperImplProps = {
 
 @validateRpc()
 export class NotionWorkspaceGatekeeperImpl
-    extends DurableObject<Env, NotionWorkspaceGatekeeperImplProps>
-    implements Gatekeeper<NotionWorkspaceSession> {
+  extends DurableObject<Env, NotionWorkspaceGatekeeperImplProps>
+  implements Gatekeeper<NotionWorkspaceSession>
+{
   #api(): NotionApi {
     const userObjectId = this.ctx.props.userObjectId;
     const account = () =>
@@ -831,9 +870,9 @@ export class NotionWorkspaceGatekeeperImpl
   }
 
   async describe(): Promise<ResourceDescription> {
-    const info = await this.ctx.exports.UserAccount
-        .get(this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId))
-        .getAccountInfo();
+    const info = await this.ctx.exports.UserAccount.get(
+      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
+    ).getAccountInfo();
     return {
       url: "https://www.notion.so/",
       title: info.workspaceName ? `${info.workspaceName} (Notion)` : "Notion workspace",
@@ -852,15 +891,18 @@ export class NotionWorkspaceGatekeeperImpl
   }
 
   async startSession(approvalQueue: RpcStub<ApprovalQueue>): Promise<NotionWorkspaceSession> {
-    const info = await this.ctx.exports.UserAccount
-        .get(this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId))
-        .getAccountInfo();
+    const info = await this.ctx.exports.UserAccount.get(
+      this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
+    ).getAccountInfo();
     const authorizedBy: NotionUser | null = info.ownerId
       ? { id: info.ownerId, name: info.ownerName, avatarUrl: info.ownerAvatar, type: "person" }
       : null;
     return new NotionWorkspaceSessionImpl(
-      this.#store(), approvalQueue.dup(), authorizedBy,
-      itemIds => this.#prepareItemObservation(itemIds));
+      this.#store(),
+      approvalQueue.dup(),
+      authorizedBy,
+      (itemIds) => this.#prepareItemObservation(itemIds),
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -873,8 +915,12 @@ export class NotionWorkspaceGatekeeperImpl
   // (their verifier stored) so that forward-exclusion re-check can run. The overseer re-runs
   // addObserver on every open, catching loss of access promptly.
 
-  #observerKey(id: string): string { return `observer:${id}`; }
-  #observedItemKey(itemId: string): string { return `observedItem:${normalizeId(itemId)}`; }
+  #observerKey(id: string): string {
+    return `observer:${id}`;
+  }
+  #observedItemKey(itemId: string): string {
+    return `observedItem:${normalizeId(itemId)}`;
+  }
 
   #isItemObserved(itemId: string): boolean {
     const state = this.ctx.storage.kv.get<ObservedItemState>(this.#observedItemKey(itemId));
@@ -883,13 +929,16 @@ export class NotionWorkspaceGatekeeperImpl
 
   #listTrackedItems(): string[] {
     const prefix = "observedItem:";
-    return [...this.ctx.storage.kv.list<ObservedItemState>({ prefix })]
-      .map(([key]) => key.slice(prefix.length));
+    return [...this.ctx.storage.kv.list<ObservedItemState>({ prefix })].map(([key]) =>
+      key.slice(prefix.length),
+    );
   }
 
   *#listObservers(): IterableIterator<[string, Fetcher<NotionVerifierApi>]> {
     const prefix = "observer:";
-    for (const [key, verifier] of this.ctx.storage.kv.list<Fetcher<NotionVerifierApi>>({ prefix })) {
+    for (const [key, verifier] of this.ctx.storage.kv.list<Fetcher<NotionVerifierApi>>({
+      prefix,
+    })) {
       yield [key.slice(prefix.length), verifier];
     }
   }
@@ -897,18 +946,22 @@ export class NotionWorkspaceGatekeeperImpl
   // Marks unknown items pending and returns current observers who cannot access any pending item in
   // this attempt. Authorization promotes them; failed attempts remain pending and are rechecked.
   async #prepareItemObservation(itemIds: string[]): Promise<ItemObservationCheck> {
-    const pendingItems = [...new Set(itemIds)].filter(id => !this.#isItemObserved(id));
-    if (pendingItems.length === 0) return {pendingItems, commit() {}};
+    const pendingItems = [...new Set(itemIds)].filter((id) => !this.#isItemObserved(id));
+    if (pendingItems.length === 0) return { pendingItems, commit() {} };
     for (const itemId of pendingItems) {
       const key = this.#observedItemKey(itemId);
       if (this.ctx.storage.kv.get<ObservedItemState>(key) === undefined) {
         this.ctx.storage.kv.put(key, "pending");
       }
     }
-    const observerAccess = await Promise.all([...this.#listObservers()].map(async ([id, verifier]) => {
-      const access = await Promise.all(pendingItems.map(itemId => verifier.hasItemAccess(itemId)));
-      return [id, access.every(hasAccess => hasAccess)] as const;
-    }));
+    const observerAccess = await Promise.all(
+      [...this.#listObservers()].map(async ([id, verifier]) => {
+        const access = await Promise.all(
+          pendingItems.map((itemId) => verifier.hasItemAccess(itemId)),
+        );
+        return [id, access.every((hasAccess) => hasAccess)] as const;
+      }),
+    );
     const excluded = observerAccess.filter(([, hasAccess]) => !hasAccess).map(([id]) => id);
     return {
       excludeObservers: excluded.length > 0 ? excluded : undefined,
@@ -923,31 +976,36 @@ export class NotionWorkspaceGatekeeperImpl
 
   async addObserver(id: string, user: Fetcher<GatekeeperUserVerifier>): Promise<void> {
     const verifier = user as unknown as Fetcher<NotionVerifierApi>;
-    const workspaceId = (await this.ctx.exports.UserAccount
-        .get(this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId))
-        .getAccountInfo()).workspaceId;
+    const workspaceId = (
+      await this.ctx.exports.UserAccount.get(
+        this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId),
+      ).getAccountInfo()
+    ).workspaceId;
     if (!workspaceId) {
       throw new Error(
         "This Notion connection predates workspace-id tracking; please disconnect and reconnect " +
-        "the owning Notion account before sharing this workspace.");
+          "the owning Notion account before sharing this workspace.",
+      );
     }
     if (!(await verifier.hasWorkspaceAccess(workspaceId))) {
       throw new Error(
         "This collaborator is not a member of this Notion workspace, so they cannot be allowed to " +
-        "observe it.");
+          "observe it.",
+      );
     }
     const checked = new Set<string>();
     while (true) {
-      const itemIds = this.#listTrackedItems().filter(itemId => !checked.has(itemId));
+      const itemIds = this.#listTrackedItems().filter((itemId) => !checked.has(itemId));
       if (itemIds.length === 0) {
         this.ctx.storage.kv.put(this.#observerKey(id), verifier);
         return;
       }
-      const itemAccess = await Promise.all(itemIds.map(itemId => verifier.hasItemAccess(itemId)));
-      if (itemAccess.some(hasAccess => !hasAccess)) {
+      const itemAccess = await Promise.all(itemIds.map((itemId) => verifier.hasItemAccess(itemId)));
+      if (itemAccess.some((hasAccess) => !hasAccess)) {
         throw new Error(
           "This collaborator does not have access to a Notion page/database whose data this workspace " +
-          "has read, so they cannot be allowed to observe it.");
+            "has read, so they cannot be allowed to observe it.",
+        );
       }
       for (const itemId of itemIds) checked.add(itemId);
     }
@@ -975,15 +1033,19 @@ export class NotionWorkspaceGatekeeperImpl
 
 @validateRpc()
 class PagedCursor<T> extends RpcTarget implements Cursor<T> {
-  #fetchPage: (cursor: string | undefined, firstPage: boolean) =>
-    Promise<{ items: T[]; nextCursor: string | undefined }>;
+  #fetchPage: (
+    cursor: string | undefined,
+    firstPage: boolean,
+  ) => Promise<{ items: T[]; nextCursor: string | undefined }>;
   #cursor: string | undefined = undefined;
   #first = true;
   #done = false;
 
   constructor(
-    fetchPage: (cursor: string | undefined, firstPage: boolean) =>
-      Promise<{ items: T[]; nextCursor: string | undefined }>,
+    fetchPage: (
+      cursor: string | undefined,
+      firstPage: boolean,
+    ) => Promise<{ items: T[]; nextCursor: string | undefined }>,
   ) {
     super();
     this.#fetchPage = fetchPage;
@@ -1046,7 +1108,10 @@ class NotionPageSessionImpl extends RpcTarget implements NotionPageSession {
   #observe?: ObserveHook;
 
   constructor(
-    store: NotionStore, approvalQueue: RpcStub<ApprovalQueue>, pageId: string, observe?: ObserveHook,
+    store: NotionStore,
+    approvalQueue: RpcStub<ApprovalQueue>,
+    pageId: string,
+    observe?: ObserveHook,
   ) {
     super();
     this.#store = store;
@@ -1105,8 +1170,15 @@ class NotionPageSessionImpl extends RpcTarget implements NotionPageSession {
     const meta = simulatePageMetadata(await this.#baseMetadata(), this.#pageId, records);
     meta.createdBy = await this.#resolveUser(meta.createdBy);
     meta.lastEditedBy = await this.#resolveUser(meta.lastEditedBy);
-    await authorizeItemObservation(this.#approvalQueue, this.#observe, this.#itemIds(),
-      observation("Read Notion page", `Read metadata for Notion page “${meta.title || "Untitled"}”.`));
+    await authorizeItemObservation(
+      this.#approvalQueue,
+      this.#observe,
+      this.#itemIds(),
+      observation(
+        "Read Notion page",
+        `Read metadata for Notion page “${meta.title || "Untitled"}”.`,
+      ),
+    );
     return meta;
   }
 
@@ -1120,18 +1192,32 @@ class NotionPageSessionImpl extends RpcTarget implements NotionPageSession {
       if (dbId) seed = defaultPropertiesFromSchema(await this.#store.getDatabaseSchema(dbId));
     }
     const props = simulatePageProperties(await this.#baseProperties(), records, seed);
-    const titleVal = Object.values(props).find(v => v.type === "title");
+    const titleVal = Object.values(props).find((v) => v.type === "title");
     const label = titleVal?.type === "title" && titleVal.text ? `“${titleVal.text}”` : this.#ref();
-    await authorizeItemObservation(this.#approvalQueue, this.#observe, this.#itemIds(),
-      observation("Read Notion page properties", `Read the property values of Notion page ${label}.`));
+    await authorizeItemObservation(
+      this.#approvalQueue,
+      this.#observe,
+      this.#itemIds(),
+      observation(
+        "Read Notion page properties",
+        `Read the property values of Notion page ${label}.`,
+      ),
+    );
     return props;
   }
 
   async getContent(): Promise<string> {
     const base = this.#isProvisional() ? null : await this.#store.getPageContent(this.#pageId);
     const content = simulatePageContent(base, this.#store.pendingForPage(this.#pageId));
-    await authorizeItemObservation(this.#approvalQueue, this.#observe, this.#itemIds(),
-      observation("Read Notion page content", `Read the body content of Notion page ${this.#ref()}.`));
+    await authorizeItemObservation(
+      this.#approvalQueue,
+      this.#observe,
+      this.#itemIds(),
+      observation(
+        "Read Notion page content",
+        `Read the body content of Notion page ${this.#ref()}.`,
+      ),
+    );
     return content;
   }
 
@@ -1157,12 +1243,21 @@ class NotionPageSessionImpl extends RpcTarget implements NotionPageSession {
         all = overlayChildPages(collected, pageId, store, true);
         // The listing reveals each (real) child item's existence/title, so attribute it to the parent
         // page plus the child pages/databases themselves.
-        const itemIds = provisional ? [] : [
-          store.resolveId(pageId),
-          ...all.filter(c => !NotionStore.isProvisional(c.id)).map(c => c.id),
-        ];
-        await authorizeItemObservation(approvalQueue, observe, itemIds,
-          observation("List Notion child pages", `List the sub-pages of Notion page ${store.resolveId(pageId)}.`));
+        const itemIds = provisional
+          ? []
+          : [
+              store.resolveId(pageId),
+              ...all.filter((c) => !NotionStore.isProvisional(c.id)).map((c) => c.id),
+            ];
+        await authorizeItemObservation(
+          approvalQueue,
+          observe,
+          itemIds,
+          observation(
+            "List Notion child pages",
+            `List the sub-pages of Notion page ${store.resolveId(pageId)}.`,
+          ),
+        );
       }
       const slice = all.slice(offset, offset + pageSize);
       offset += slice.length;
@@ -1176,7 +1271,11 @@ class NotionPageSessionImpl extends RpcTarget implements NotionPageSession {
 
   async setTitle(title: string): Promise<void> {
     const records = this.#store.pendingForPage(this.#pageId);
-    const previousTitle = simulatePageMetadata(await this.#baseMetadata(), this.#pageId, records).title;
+    const previousTitle = simulatePageMetadata(
+      await this.#baseMetadata(),
+      this.#pageId,
+      records,
+    ).title;
     await this.#stage({ type: "setTitle", pageId: this.#pageId, title, previousTitle });
   }
 
@@ -1185,7 +1284,9 @@ class NotionPageSessionImpl extends RpcTarget implements NotionPageSession {
   // the page doesn't exist on the server yet.
   async #parentDatabaseId(): Promise<string | null | undefined> {
     if (this.#isProvisional()) {
-      const create = this.#store.pendingForPage(this.#pageId).find(r => r.action.type === "createPage");
+      const create = this.#store
+        .pendingForPage(this.#pageId)
+        .find((r) => r.action.type === "createPage");
       const action = create?.action;
       if (action?.type !== "createPage") return undefined; // unknown — skip validation
       return action.parent.kind === "database" ? action.parent.databaseId : null;
@@ -1206,7 +1307,8 @@ class NotionPageSessionImpl extends RpcTarget implements NotionPageSession {
       throw new NotionApiError(
         400,
         "This page is not a database row, so it has no editable properties. Use setTitle() to " +
-        "change its title.");
+          "change its title.",
+      );
     }
     const records = this.#store.pendingForPage(this.#pageId);
     const current = simulatePageProperties(await this.#baseProperties(), records);
@@ -1215,7 +1317,12 @@ class NotionPageSessionImpl extends RpcTarget implements NotionPageSession {
       const prev = current[name] ? propertyValueToInput(current[name]) : null;
       if (prev) previousProperties[name] = prev;
     }
-    await this.#stage({ type: "setProperties", pageId: this.#pageId, properties, previousProperties });
+    await this.#stage({
+      type: "setProperties",
+      pageId: this.#pageId,
+      properties,
+      previousProperties,
+    });
   }
 
   async setIcon(icon: NotionIconInput | null): Promise<void> {
@@ -1242,7 +1349,12 @@ class NotionPageSessionImpl extends RpcTarget implements NotionPageSession {
       icon: options.icon,
     };
     await this.#stage(action);
-    return new NotionPageSessionImpl(this.#store, this.#approvalQueue.dup(), provisionalId, this.#observe);
+    return new NotionPageSessionImpl(
+      this.#store,
+      this.#approvalQueue.dup(),
+      provisionalId,
+      this.#observe,
+    );
   }
 
   async archive(): Promise<void> {
@@ -1269,22 +1381,33 @@ class NotionPageSessionImpl extends RpcTarget implements NotionPageSession {
         try {
           result = await store.api.listComments(store.resolveId(pageId), cursor, pageSize);
         } catch (err) {
-          if (err instanceof NotionApiError && (err.status === 403 || err.code === "restricted_resource")) {
+          if (
+            err instanceof NotionApiError &&
+            (err.status === 403 || err.code === "restricted_resource")
+          ) {
             throw new NotionApiError(
               403,
-              "Reading comments isn't available: this Notion connection lacks the \"Read comments\" " +
-              "capability. Enable it in the integration's settings, then reconnect.",
-              err.code);
+              'Reading comments isn\'t available: this Notion connection lacks the "Read comments" ' +
+                "capability. Enable it in the integration's settings, then reconnect.",
+              err.code,
+            );
           }
           throw err;
         }
         items = result.results.map(commentToNotion);
-        nextCursor = result.has_more ? result.next_cursor ?? undefined : undefined;
+        nextCursor = result.has_more ? (result.next_cursor ?? undefined) : undefined;
       }
       // Pending comments are only surfaced on the first batch to avoid duplication.
       if (firstPage) items = simulateComments(items, store.pendingForPage(pageId));
-      await authorizeItemObservation(approvalQueue, observe, itemIds,
-        observation("Read Notion page comments", `Read the comment thread on Notion page ${store.resolveId(pageId)}.`));
+      await authorizeItemObservation(
+        approvalQueue,
+        observe,
+        itemIds,
+        observation(
+          "Read Notion page comments",
+          `Read the comment thread on Notion page ${store.resolveId(pageId)}.`,
+        ),
+      );
       return { items, nextCursor };
     });
   }
@@ -1304,7 +1427,10 @@ class NotionDatabaseSessionImpl extends RpcTarget implements NotionDatabaseSessi
   #observe?: ObserveHook;
 
   constructor(
-    store: NotionStore, approvalQueue: RpcStub<ApprovalQueue>, databaseId: string, observe?: ObserveHook,
+    store: NotionStore,
+    approvalQueue: RpcStub<ApprovalQueue>,
+    databaseId: string,
+    observe?: ObserveHook,
   ) {
     super();
     this.#store = store;
@@ -1327,18 +1453,28 @@ class NotionDatabaseSessionImpl extends RpcTarget implements NotionDatabaseSessi
       createdAt: summary.createdAt,
       lastEditedAt: summary.lastEditedAt,
     };
-    const description = (db.description ?? []).map(r => r.plain_text ?? r.text?.content ?? "").join("");
+    const description = (db.description ?? [])
+      .map((r) => r.plain_text ?? r.text?.content ?? "")
+      .join("");
     if (description) metadata.description = description;
     if (summary.icon) metadata.icon = summary.icon;
-    await authorizeItemObservation(this.#approvalQueue, this.#observe, [this.#databaseId],
-      observation("Read Notion database", `Read metadata for Notion database “${metadata.title}”.`));
+    await authorizeItemObservation(
+      this.#approvalQueue,
+      this.#observe,
+      [this.#databaseId],
+      observation("Read Notion database", `Read metadata for Notion database “${metadata.title}”.`),
+    );
     return metadata;
   }
 
   async getSchema(): Promise<NotionDatabaseSchema> {
     const schema = await this.#store.getDatabaseSchema(this.#databaseId);
-    await authorizeItemObservation(this.#approvalQueue, this.#observe, [this.#databaseId],
-      observation("Read Notion database schema", "Read the property schema of a Notion database."));
+    await authorizeItemObservation(
+      this.#approvalQueue,
+      this.#observe,
+      [this.#databaseId],
+      observation("Read Notion database schema", "Read the property schema of a Notion database."),
+    );
     return schema;
   }
 
@@ -1364,12 +1500,28 @@ class NotionDatabaseSessionImpl extends RpcTarget implements NotionDatabaseSessi
         start_cursor: cursor,
         page_size: pageSize,
       });
-      const rows = overlayDatabaseRows(result.results.map(pageToSummary), databaseId, store, firstPage, seed);
+      const rows = overlayDatabaseRows(
+        result.results.map(pageToSummary),
+        databaseId,
+        store,
+        firstPage,
+        seed,
+      );
       // A query reveals row data, which is gated by access to the database (rows inherit it), so the
       // database is the data set.
-      await authorizeItemObservation(approvalQueue, observe, [databaseId],
-        observation("Query Notion database", `Query rows from Notion database ${store.resolveId(databaseId)}.`));
-      return { items: rows, nextCursor: result.has_more ? result.next_cursor ?? undefined : undefined };
+      await authorizeItemObservation(
+        approvalQueue,
+        observe,
+        [databaseId],
+        observation(
+          "Query Notion database",
+          `Query rows from Notion database ${store.resolveId(databaseId)}.`,
+        ),
+      );
+      return {
+        items: rows,
+        nextCursor: result.has_more ? (result.next_cursor ?? undefined) : undefined,
+      };
     });
   }
 
@@ -1377,18 +1529,31 @@ class NotionDatabaseSessionImpl extends RpcTarget implements NotionDatabaseSessi
     // Authorize before touching Notion so this can't be used as an existence oracle for pages
     // outside this database's grant. This "open" reveals no row data itself (that is read through the
     // returned session, which tracks the row), so it carries no item attribution.
-    await authorizeItemObservation(this.#approvalQueue, this.#observe, [],
-      observation("Open Notion database row", "Open a page (row) in a Notion database."));
+    await authorizeItemObservation(
+      this.#approvalQueue,
+      this.#observe,
+      [],
+      observation("Open Notion database row", "Open a page (row) in a Notion database."),
+    );
 
     // A provisional handle (row created earlier in this session, not yet approved): rehydrate it if
     // its queued creation targets this database.
     if (NotionStore.isProvisional(idOrUrl)) {
       const action = this.#store.createActionFor(idOrUrl)?.action;
-      if (!action || action.type !== "createPage" || action.parent.kind !== "database" ||
-          normalizeId(action.parent.databaseId) !== normalizeId(this.#databaseId)) {
+      if (
+        !action ||
+        action.type !== "createPage" ||
+        action.parent.kind !== "database" ||
+        normalizeId(action.parent.databaseId) !== normalizeId(this.#databaseId)
+      ) {
         throw new NotionApiError(404, "No such page (row) in this database.");
       }
-      return new NotionPageSessionImpl(this.#store, this.#approvalQueue.dup(), idOrUrl, this.#observe);
+      return new NotionPageSessionImpl(
+        this.#store,
+        this.#approvalQueue.dup(),
+        idOrUrl,
+        this.#observe,
+      );
     }
 
     const id = parseNotionId(idOrUrl);
@@ -1401,8 +1566,11 @@ class NotionDatabaseSessionImpl extends RpcTarget implements NotionDatabaseSessi
       throw new NotionApiError(404, "No such page (row) in this database.");
     }
     const parent = page.parent;
-    if (!parent || parent.type !== "database_id" ||
-        normalizeId(parent.database_id) !== normalizeId(this.#databaseId)) {
+    if (
+      !parent ||
+      parent.type !== "database_id" ||
+      normalizeId(parent.database_id) !== normalizeId(this.#databaseId)
+    ) {
       throw new NotionApiError(404, "No such page (row) in this database.");
     }
     return new NotionPageSessionImpl(this.#store, this.#approvalQueue.dup(), id, this.#observe);
@@ -1426,7 +1594,12 @@ class NotionDatabaseSessionImpl extends RpcTarget implements NotionDatabaseSessi
       titlePropertyName: titlePropertyNameOf(schema),
     };
     await stageAction(this.#store, this.#approvalQueue, action);
-    return new NotionPageSessionImpl(this.#store, this.#approvalQueue.dup(), provisionalId, this.#observe);
+    return new NotionPageSessionImpl(
+      this.#store,
+      this.#approvalQueue.dup(),
+      provisionalId,
+      this.#observe,
+    );
   }
 }
 
@@ -1446,7 +1619,9 @@ class NotionWorkspaceSessionImpl extends RpcTarget implements NotionWorkspaceSes
   #observe: ObserveHook;
 
   constructor(
-    store: NotionStore, approvalQueue: RpcStub<ApprovalQueue>, authorizedBy: NotionUser | null,
+    store: NotionStore,
+    approvalQueue: RpcStub<ApprovalQueue>,
+    authorizedBy: NotionUser | null,
     observe: ObserveHook,
   ) {
     super();
@@ -1466,8 +1641,12 @@ class NotionWorkspaceSessionImpl extends RpcTarget implements NotionWorkspaceSes
     if (bot.workspaceName) metadata.name = bot.workspaceName;
     // The workspace's name is visible to any workspace member, so no item attribution is needed (the
     // baseline workspace-membership check in addObserver covers it).
-    await authorizeItemObservation(this.#approvalQueue, this.#observe, [],
-      observation("Read Notion workspace info", "Read the connected Notion workspace's name."));
+    await authorizeItemObservation(
+      this.#approvalQueue,
+      this.#observe,
+      [],
+      observation("Read Notion workspace info", "Read the connected Notion workspace's name."),
+    );
     return metadata;
   }
 
@@ -1479,7 +1658,8 @@ class NotionWorkspaceSessionImpl extends RpcTarget implements NotionWorkspaceSes
     const sort = options?.sort
       ? {
           direction: (options.sort === "lastEditedAscending" ? "ascending" : "descending") as
-            "ascending" | "descending",
+            | "ascending"
+            | "descending",
           timestamp: "last_edited_time" as const,
         }
       : undefined;
@@ -1495,29 +1675,46 @@ class NotionWorkspaceSessionImpl extends RpcTarget implements NotionWorkspaceSes
         page_size: pageSize,
       });
       const items = overlaySearch(
-        result.results.map(itemResponseToSummary), store, firstPage, options?.filter);
+        result.results.map(itemResponseToSummary),
+        store,
+        firstPage,
+        options?.filter,
+      );
       // Search reveals each matching item's existence/title, so attribute to every (real) result item
       // and exclude observers who lack access to any of them.
       const itemIds = result.results
-        .map(r => r.id)
-        .filter(id => !NotionStore.isProvisional(id));
-      await authorizeItemObservation(approvalQueue, observe, itemIds,
-        observation("Search Notion", `Search Notion for “${options?.query ?? ""}”.`));
-      return { items, nextCursor: result.has_more ? result.next_cursor ?? undefined : undefined };
+        .map((r) => r.id)
+        .filter((id) => !NotionStore.isProvisional(id));
+      await authorizeItemObservation(
+        approvalQueue,
+        observe,
+        itemIds,
+        observation("Search Notion", `Search Notion for “${options?.query ?? ""}”.`),
+      );
+      return { items, nextCursor: result.has_more ? (result.next_cursor ?? undefined) : undefined };
     });
   }
 
   async getPage(idOrUrl: string): Promise<NotionPageSession> {
     // This "open" reveals no page data itself (that is read through the returned session, which
     // tracks the page), so it carries no item attribution.
-    await authorizeItemObservation(this.#approvalQueue, this.#observe, [],
-      observation("Open Notion page", "Open a Notion page by ID or URL."));
+    await authorizeItemObservation(
+      this.#approvalQueue,
+      this.#observe,
+      [],
+      observation("Open Notion page", "Open a Notion page by ID or URL."),
+    );
     // Accept a provisional handle for a page created earlier in this session.
     if (NotionStore.isProvisional(idOrUrl)) {
       if (!this.#store.knowsProvisional(idOrUrl)) {
         throw new NotionApiError(404, "No such page.");
       }
-      return new NotionPageSessionImpl(this.#store, this.#approvalQueue.dup(), idOrUrl, this.#observe);
+      return new NotionPageSessionImpl(
+        this.#store,
+        this.#approvalQueue.dup(),
+        idOrUrl,
+        this.#observe,
+      );
     }
     const id = parseNotionId(idOrUrl);
     await this.#store.getPageResponse(id);
@@ -1526,8 +1723,12 @@ class NotionWorkspaceSessionImpl extends RpcTarget implements NotionWorkspaceSes
 
   async getDatabase(idOrUrl: string): Promise<NotionDatabaseSession> {
     // As with getPage, opening reveals no database data itself; the returned session tracks it.
-    await authorizeItemObservation(this.#approvalQueue, this.#observe, [],
-      observation("Open Notion database", "Open a Notion database by ID or URL."));
+    await authorizeItemObservation(
+      this.#approvalQueue,
+      this.#observe,
+      [],
+      observation("Open Notion database", "Open a Notion database by ID or URL."),
+    );
     // Databases are never provisional (this gatekeeper doesn't create databases).
     if (NotionStore.isProvisional(idOrUrl)) {
       throw new NotionApiError(404, "No such database.");
@@ -1549,7 +1750,12 @@ class NotionWorkspaceSessionImpl extends RpcTarget implements NotionWorkspaceSes
       icon: options.icon,
     };
     await stageAction(this.#store, this.#approvalQueue, action);
-    return new NotionPageSessionImpl(this.#store, this.#approvalQueue.dup(), provisionalId, this.#observe);
+    return new NotionPageSessionImpl(
+      this.#store,
+      this.#approvalQueue.dup(),
+      provisionalId,
+      this.#observe,
+    );
   }
 
   async listUsers(options?: NotionPageOptions): Promise<Cursor<NotionUser>> {
@@ -1557,15 +1763,19 @@ class NotionWorkspaceSessionImpl extends RpcTarget implements NotionWorkspaceSes
     const store = this.#store;
     const approvalQueue = this.#approvalQueue;
     const observe = this.#observe;
-    return new PagedCursor<NotionUser>(async cursor => {
+    return new PagedCursor<NotionUser>(async (cursor) => {
       const result = await store.api.listUsers(cursor, pageSize);
       // The member directory is visible to any workspace member, so no item attribution (the baseline
       // workspace-membership check in addObserver covers it).
-      await authorizeItemObservation(approvalQueue, observe, [],
-        observation("List Notion users", "List the members of the Notion workspace."));
+      await authorizeItemObservation(
+        approvalQueue,
+        observe,
+        [],
+        observation("List Notion users", "List the members of the Notion workspace."),
+      );
       return {
         items: result.results.map(userResponseToUser),
-        nextCursor: result.has_more ? result.next_cursor ?? undefined : undefined,
+        nextCursor: result.has_more ? (result.next_cursor ?? undefined) : undefined,
       };
     });
   }
@@ -1591,7 +1801,10 @@ function assertValidIcon(icon: NotionIconInput): void {
   // A Notion emoji icon is a single emoji (possibly a ZWJ/modifier sequence). Reject anything with
   // ASCII letters/digits or lacking an emoji pictographic — e.g. "not-an-emoji".
   if (!emoji || /[A-Za-z0-9]/.test(emoji) || !/\p{Extended_Pictographic}/u.test(emoji)) {
-    throw new NotionApiError(400, `"${icon.emoji}" is not a valid emoji. Use a single emoji character, or { imageUrl }.`);
+    throw new NotionApiError(
+      400,
+      `"${icon.emoji}" is not a valid emoji. Use a single emoji character, or { imageUrl }.`,
+    );
   }
 }
 
@@ -1609,7 +1822,9 @@ function validateProperties(
     }
     if (prop.type !== input.type) {
       throw new NotionApiError(
-        400, `Property "${name}" is of type ${prop.type}; cannot set it with a ${input.type} value.`);
+        400,
+        `Property "${name}" is of type ${prop.type}; cannot set it with a ${input.type} value.`,
+      );
     }
   }
 }
@@ -1629,10 +1844,12 @@ function filterToNotion(
 ): unknown {
   if (depth > MAX_FILTER_DEPTH) {
     throw new NotionApiError(
-      400, `Database filter is nested too deeply (max ${MAX_FILTER_DEPTH} levels).`);
+      400,
+      `Database filter is nested too deeply (max ${MAX_FILTER_DEPTH} levels).`,
+    );
   }
-  if ("and" in filter) return { and: filter.and.map(f => filterToNotion(f, typeOf, depth + 1)) };
-  if ("or" in filter) return { or: filter.or.map(f => filterToNotion(f, typeOf, depth + 1)) };
+  if ("and" in filter) return { and: filter.and.map((f) => filterToNotion(f, typeOf, depth + 1)) };
+  if ("or" in filter) return { or: filter.or.map((f) => filterToNotion(f, typeOf, depth + 1)) };
 
   const propType = typeOf(filter.property);
   if (!propType) {
@@ -1641,36 +1858,84 @@ function filterToNotion(
   const container = filterContainerForType(propType);
   if (!container) {
     throw new NotionApiError(
-      400, `Property "${filter.property}" (type ${propType}) cannot be used in a filter.`);
+      400,
+      `Property "${filter.property}" (type ${propType}) cannot be used in a filter.`,
+    );
   }
   const valid = FILTER_CONDITIONS[container];
   if (valid && !valid.has(filter.condition)) {
     throw new NotionApiError(
       400,
       `Unknown filter condition "${filter.condition}" for property "${filter.property}" ` +
-      `(type ${propType}). Valid conditions: ${[...valid].join(", ")}.`);
+        `(type ${propType}). Valid conditions: ${[...valid].join(", ")}.`,
+    );
   }
   // When no `value` is given, the operand shape depends on the condition: relative-date frames
   // (this_week, past_week, …) take an empty object `{}`, whereas existence checks (is_empty,
   // is_not_empty) take the boolean `true`. Sending `true` for a date frame makes Notion reject it.
-  const operand = filter.value !== undefined ? filter.value
-    : RELATIVE_DATE_CONDITIONS.has(filter.condition) ? {}
-    : true;
+  const operand =
+    filter.value !== undefined
+      ? filter.value
+      : RELATIVE_DATE_CONDITIONS.has(filter.condition)
+        ? {}
+        : true;
   return { property: filter.property, [container]: { [filter.condition]: operand } };
 }
 
 // Date filter conditions whose operand is an empty object rather than a value/boolean.
 const RELATIVE_DATE_CONDITIONS = new Set([
-  "this_week", "past_week", "past_month", "past_year", "next_week", "next_month", "next_year",
+  "this_week",
+  "past_week",
+  "past_month",
+  "past_year",
+  "next_week",
+  "next_month",
+  "next_year",
 ]);
 
 // Valid filter conditions per filter container (from Notion's "Filter database entries" reference),
 // so we return a clean error rather than leaking Notion's multi-line validation dump.
 const FILTER_CONDITIONS: Record<string, Set<string>> = {
-  rich_text: new Set(["equals", "does_not_equal", "contains", "does_not_contain", "starts_with", "ends_with", "is_empty", "is_not_empty"]),
-  phone_number: new Set(["equals", "does_not_equal", "contains", "does_not_contain", "starts_with", "ends_with", "is_empty", "is_not_empty"]),
-  number: new Set(["equals", "does_not_equal", "greater_than", "less_than", "greater_than_or_equal_to", "less_than_or_equal_to", "is_empty", "is_not_empty"]),
-  unique_id: new Set(["equals", "does_not_equal", "greater_than", "less_than", "greater_than_or_equal_to", "less_than_or_equal_to", "is_empty", "is_not_empty"]),
+  rich_text: new Set([
+    "equals",
+    "does_not_equal",
+    "contains",
+    "does_not_contain",
+    "starts_with",
+    "ends_with",
+    "is_empty",
+    "is_not_empty",
+  ]),
+  phone_number: new Set([
+    "equals",
+    "does_not_equal",
+    "contains",
+    "does_not_contain",
+    "starts_with",
+    "ends_with",
+    "is_empty",
+    "is_not_empty",
+  ]),
+  number: new Set([
+    "equals",
+    "does_not_equal",
+    "greater_than",
+    "less_than",
+    "greater_than_or_equal_to",
+    "less_than_or_equal_to",
+    "is_empty",
+    "is_not_empty",
+  ]),
+  unique_id: new Set([
+    "equals",
+    "does_not_equal",
+    "greater_than",
+    "less_than",
+    "greater_than_or_equal_to",
+    "less_than_or_equal_to",
+    "is_empty",
+    "is_not_empty",
+  ]),
   checkbox: new Set(["equals", "does_not_equal"]),
   select: new Set(["equals", "does_not_equal", "is_empty", "is_not_empty"]),
   status: new Set(["equals", "does_not_equal", "is_empty", "is_not_empty"]),
@@ -1678,7 +1943,22 @@ const FILTER_CONDITIONS: Record<string, Set<string>> = {
   people: new Set(["contains", "does_not_contain", "is_empty", "is_not_empty"]),
   relation: new Set(["contains", "does_not_contain", "is_empty", "is_not_empty"]),
   files: new Set(["is_empty", "is_not_empty"]),
-  date: new Set(["equals", "before", "after", "on_or_before", "on_or_after", "is_empty", "is_not_empty", "this_week", "past_week", "past_month", "past_year", "next_week", "next_month", "next_year"]),
+  date: new Set([
+    "equals",
+    "before",
+    "after",
+    "on_or_before",
+    "on_or_after",
+    "is_empty",
+    "is_not_empty",
+    "this_week",
+    "past_week",
+    "past_month",
+    "past_year",
+    "next_week",
+    "next_month",
+    "next_year",
+  ]),
 };
 
 // Maps a property type to the filter-object key Notion expects. Notion only accepts a fixed set of

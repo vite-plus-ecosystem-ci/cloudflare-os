@@ -1,6 +1,10 @@
 import { DurableObject, RpcStub, RpcTarget } from "cloudflare:workers";
 import type {
-  ActionDescription, ApprovalQueue, GitCache, HookController, HookDescription,
+  ActionDescription,
+  ApprovalQueue,
+  GitCache,
+  HookController,
+  HookDescription,
   ObservationDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
 import { TestGitCache } from "./test-git-cache";
@@ -74,9 +78,9 @@ export class TestHooks extends DurableObject<Env> {
   ): Promise<T> {
     let queue = new TestApprovalQueue();
     using approvalQueue = new RpcStub<ApprovalQueue>(queue);
-    using session = await this.#gatekeeper(facetName).startSession(
+    using session = (await this.#gatekeeper(facetName).startSession(
       approvalQueue as unknown as ApprovalQueue,
-    ) as GoogleDocSession & Disposable;
+    )) as GoogleDocSession & Disposable;
     try {
       // Awaited inside the scope: `return body(...)` would dispose both stubs mid-call.
       return await body(session, queue);
@@ -99,29 +103,34 @@ export class TestHooks extends DurableObject<Env> {
   }
 
   async submitAppend(facetName: string, markdown: string, tabId?: string): Promise<number> {
-    return this.#submit(facetName, session => session.appendText(markdown, tabId));
+    return this.#submit(facetName, (session) => session.appendText(markdown, tabId));
   }
 
   async submitReplace(
-    facetName: string, oldMarkdown: string, newMarkdown: string, tabId?: string,
+    facetName: string,
+    oldMarkdown: string,
+    newMarkdown: string,
+    tabId?: string,
   ): Promise<number> {
-    return this.#submit(
-      facetName, session => session.replaceText(oldMarkdown, newMarkdown, tabId));
+    return this.#submit(facetName, (session) =>
+      session.replaceText(oldMarkdown, newMarkdown, tabId),
+    );
   }
 
   /** The `lastModified` a metadata read reports, as epoch milliseconds. */
   async readMetadata(facetName: string): Promise<number> {
-    return this.#withSession(
-      facetName, async session => (await session.getMetadata()).lastModified.valueOf());
+    return this.#withSession(facetName, async (session) =>
+      (await session.getMetadata()).lastModified.valueOf(),
+    );
   }
 
   /** The simulated content of one tab. */
   async readContent(facetName: string, tabId?: string): Promise<string> {
-    return this.#withSession(facetName, session => session.getContent(tabId));
+    return this.#withSession(facetName, (session) => session.getContent(tabId));
   }
 
   async listTabs(facetName: string): Promise<GoogleDocTab[]> {
-    return this.#withSession(facetName, session => session.listTabs());
+    return this.#withSession(facetName, (session) => session.listTabs());
   }
 
   async applyAction(facetName: string, actionId: number): Promise<string | null> {

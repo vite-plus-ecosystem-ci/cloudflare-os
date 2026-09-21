@@ -5,11 +5,11 @@ export type ConfiguratorOption = {
   title: string;
   subtitle?: string;
   meta?: string;
-}
+};
 
 export type LinearTeamConfiguratorValues = {
   teamKey?: string | null;
-}
+};
 
 export interface LinearTeamConfiguratorRpc extends LinearWorkspaceConfiguratorRpc {
   listTeams(query: string): Promise<ConfiguratorOption[]>;

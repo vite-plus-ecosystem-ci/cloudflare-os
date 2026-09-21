@@ -390,11 +390,7 @@ export interface HomeAssistantSession extends RpcTarget {
    *   undefined,                                   // up to now
    *   "binary_sensor.front_door",                  // single entity
    * ); */
-  getLogbook(
-    start: string | Date,
-    end?: string | Date,
-    entityId?: string,
-  ): Promise<LogbookEntry[]>;
+  getLogbook(start: string | Date, end?: string | Date, entityId?: string): Promise<LogbookEntry[]>;
 
   // ---- Dashboards ---------------------------------------------------------
 
@@ -459,11 +455,7 @@ export interface Area extends RpcTarget {
   getDevice(deviceId: string): Promise<Device>;
   /** Call a service targeted at every entity in this area. Positional arguments only.
    * @example await area.callService("light", "turn_off"); */
-  callService(
-    domain: string,
-    service: string,
-    data?: Record<string, unknown>,
-  ): Promise<void>;
+  callService(domain: string, service: string, data?: Record<string, unknown>): Promise<void>;
   /** Get historical states for all entities in this area. */
   getHistory(start: string | Date, end?: string | Date): Promise<EntityHistory[]>;
 }
@@ -478,11 +470,7 @@ export interface Label extends RpcTarget {
   getEntity(entityId: string): Promise<Entity>;
   /** Call a service targeted at every entity carrying this label. Positional arguments only.
    * @example await label.callService("light", "turn_off"); */
-  callService(
-    domain: string,
-    service: string,
-    data?: Record<string, unknown>,
-  ): Promise<void>;
+  callService(domain: string, service: string, data?: Record<string, unknown>): Promise<void>;
   /** Get historical states for entities carrying this label. */
   getHistory(start: string | Date, end?: string | Date): Promise<EntityHistory[]>;
 }
@@ -499,11 +487,7 @@ export interface Device extends RpcTarget {
   getEntity(entityId: string): Promise<Entity>;
   /** Call a service targeted at every entity provided by this device. Positional arguments only.
    * @example await device.callService("switch", "turn_off"); */
-  callService(
-    domain: string,
-    service: string,
-    data?: Record<string, unknown>,
-  ): Promise<void>;
+  callService(domain: string, service: string, data?: Record<string, unknown>): Promise<void>;
   /** Get historical states for all entities provided by this device. */
   getHistory(start: string | Date, end?: string | Date): Promise<EntityHistory[]>;
 }

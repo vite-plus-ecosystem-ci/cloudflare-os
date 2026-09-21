@@ -8,7 +8,7 @@
  */
 
 import { env } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { RpcStub } from "cloudflare:workers";
 import type { ConformanceAccount, ConformanceResource } from "./conformance/gatekeeper";
 import {
@@ -90,11 +90,13 @@ describe("credentials and connect", () => {
       creds: { accessToken: original.creds.accessToken },
       generation: original.generation,
     });
-    expect((await resource.searchProjects("Alpha")).map(project => project.id))
-      .toEqual(["project-a"]);
+    expect((await resource.searchProjects("Alpha")).map((project) => project.id)).toEqual([
+      "project-a",
+    ]);
 
-    await expect(async () => { await account.commitReconnect("wrong-stage"); })
-      .rejects.toThrow(/stage is no longer available/);
+    await expect(async () => {
+      await account.commitReconnect("wrong-stage");
+    }).rejects.toThrow(/stage is no longer available/);
     expect(await account.getCredentials()).toMatchObject({
       creds: { accessToken: original.creds.accessToken },
       generation: original.generation,
@@ -139,8 +141,9 @@ describe("credentials and connect", () => {
     await connect(account);
     const winner = await account.getCredentials();
 
-    await expect(async () => { await account.commitReconnect(stageId); })
-      .rejects.toThrow(/connection changed while reconnecting/);
+    await expect(async () => {
+      await account.commitReconnect(stageId);
+    }).rejects.toThrow(/connection changed while reconnecting/);
     expect(await account.getCredentials()).toEqual(winner);
     expect([...provider.revoked]).toEqual([expect.stringMatching(/^user-b-refresh-/)]);
   });
@@ -161,8 +164,9 @@ describe("credentials and connect", () => {
       expect.stringMatching(/^user-b-refresh-/),
       expect.stringMatching(/^user-c-refresh-/),
     ]);
-    await expect(async () => { await account.commitReconnect(expired); })
-      .rejects.toThrow(/stage is no longer available/);
+    await expect(async () => {
+      await account.commitReconnect(expired);
+    }).rejects.toThrow(/stage is no longer available/);
     await account.commitReconnect(current);
     expect((await account.getCredentials()).creds.accessToken).toMatch(/^user-d-access-/);
   });
@@ -175,8 +179,9 @@ describe("credentials and connect", () => {
 
     await account.disconnect();
 
-    await expect(async () => { await account.commitReconnect(stageId); })
-      .rejects.toThrow(/stage is no longer available/);
+    await expect(async () => {
+      await account.commitReconnect(stageId);
+    }).rejects.toThrow(/stage is no longer available/);
     expect(await account.isConnected()).toBe(false);
     expect([...provider.revoked]).toEqual([
       expect.stringMatching(/^user-b-refresh-/),
@@ -237,8 +242,9 @@ describe("credentials and connect", () => {
     provider.controls.grantDead = true;
     provider.controls.rejectCredentials = true;
 
-    await expect(async () => { await resource.searchProjects("Alpha"); })
-      .rejects.toThrow(/Reconnect the conformance account/);
+    await expect(async () => {
+      await resource.searchProjects("Alpha");
+    }).rejects.toThrow(/Reconnect the conformance account/);
   });
 
   it("refuses a completion whose connection was replaced while it exchanged", async () => {
@@ -291,8 +297,9 @@ describe("observations", () => {
 
     // Only the space-1 project matches, but the search read space-2 as well: the miss there is
     // disclosure too, so naming only the matched space would leak it.
-    expect((await resource.searchProjects("Alpha")).map(project => project.id))
-      .toEqual(["project-a"]);
+    expect((await resource.searchProjects("Alpha")).map((project) => project.id)).toEqual([
+      "project-a",
+    ]);
     expect(observations[0]?.excludeObservers).toEqual(["limited"]);
   });
 
@@ -317,22 +324,26 @@ describe("observations", () => {
     using cursor = await resource.listProjects();
     expect(await cursor.next()).toBeNull();
 
-    expect(observations.map(sent => sent.description))
-      .toEqual(["Listed projects; there were none."]);
+    expect(observations.map((sent) => sent.description)).toEqual([
+      "Listed projects; there were none.",
+    ]);
   });
 
   it("authorizes every page of a walk, including one served from the buffer", async () => {
     const { account, resource } = bind();
     for (const index of [1, 2, 3, 4, 5]) {
-      provider.projects.set(`extra-${index}`,
-        { id: `extra-${index}`, name: `Extra ${index}`, spaceId: "space-1" });
+      provider.projects.set(`extra-${index}`, {
+        id: `extra-${index}`,
+        name: `Extra ${index}`,
+        spaceId: "space-1",
+      });
     }
     await connect(account);
     await bindResource(resource, account);
 
     using cursor = await resource.listProjects();
     let pages = 0;
-    while (await cursor.next() !== null) pages += 1;
+    while ((await cursor.next()) !== null) pages += 1;
 
     // One observation per returned page, and fewer provider fetches than pages — so at least one
     // authorized page was served from the buffer with no fetch behind it.
@@ -346,8 +357,11 @@ describe("observations", () => {
     // connection would page through the new principal's projects from the old one's offset.
     const { account, resource } = bind();
     for (const index of [1, 2, 3, 4, 5]) {
-      provider.projects.set(`extra-${index}`,
-        { id: `extra-${index}`, name: `Extra ${index}`, spaceId: "space-1" });
+      provider.projects.set(`extra-${index}`, {
+        id: `extra-${index}`,
+        name: `Extra ${index}`,
+        spaceId: "space-1",
+      });
     }
     await connect(account);
     await bindResource(resource, account);
@@ -357,8 +371,9 @@ describe("observations", () => {
     await account.disconnect();
     await connect(account);
 
-    await expect(async () => { await cursor.next(); })
-      .rejects.toThrow(/walk was started under a connection/);
+    await expect(async () => {
+      await cursor.next();
+    }).rejects.toThrow(/walk was started under a connection/);
   });
 
   it("refuses a held page whose connection was replaced before the retry", async () => {
@@ -371,13 +386,16 @@ describe("observations", () => {
 
     using cursor = await resource.listProjects();
     overseer.refuseNext = true;
-    await expect(async () => { await cursor.next(); }).rejects.toThrow(/overseer refused/);
+    await expect(async () => {
+      await cursor.next();
+    }).rejects.toThrow(/overseer refused/);
 
     await account.disconnect();
     await connect(account);
 
-    await expect(async () => { await cursor.next(); })
-      .rejects.toThrow(/walk was started under a connection/);
+    await expect(async () => {
+      await cursor.next();
+    }).rejects.toThrow(/walk was started under a connection/);
   });
 });
 
@@ -387,17 +405,23 @@ describe("actions", () => {
     await connect(account);
     await bindResource(resource, account);
 
-    const create = await resource.submit("createProject",
-      { ref: "~new", name: "Gamma", spaceId: "space-1" });
-    const rename = await resource.submit("renameProject",
-      { target: "~new", name: "Gamma Renamed" });
+    const create = await resource.submit("createProject", {
+      ref: "~new",
+      name: "Gamma",
+      spaceId: "space-1",
+    });
+    const rename = await resource.submit("renameProject", {
+      target: "~new",
+      name: "Gamma Renamed",
+    });
 
     await resource.apply(create);
     await resource.apply(rename);
 
     // The provisional reference resolved to whatever the provider minted.
-    expect([...provider.projects.values()].map(project => project.name))
-      .toContain("Gamma Renamed");
+    expect([...provider.projects.values()].map((project) => project.name)).toContain(
+      "Gamma Renamed",
+    );
   });
 
   it("puts every staged action through the approval queue with its rendered description", async () => {
@@ -407,16 +431,24 @@ describe("actions", () => {
     await connect(account);
     await bindResource(resource, account);
 
-    const id = await resource.submit("createProject",
-      { ref: "~queued", name: "Iota", spaceId: "space-1" });
+    const id = await resource.submit("createProject", {
+      ref: "~queued",
+      name: "Iota",
+      spaceId: "space-1",
+    });
 
-    expect(submissions).toEqual([[id, {
-      title: 'Create project "Iota"',
-      description: "Creates **Iota** in space space-1.",
-      implementsRevert: false,
-      autoApprovable: false,
-      actionKind: { tag: "create-project", label: "Create a project" },
-    }]]);
+    expect(submissions).toEqual([
+      [
+        id,
+        {
+          title: 'Create project "Iota"',
+          description: "Creates **Iota** in space space-1.",
+          implementsRevert: false,
+          autoApprovable: false,
+          actionKind: { tag: "create-project", label: "Create a project" },
+        },
+      ],
+    ]);
   });
 
   it("refuses to dispatch a dependent whose reference is still provisional", async () => {
@@ -424,13 +456,16 @@ describe("actions", () => {
     await connect(account);
     await bindResource(resource, account);
 
-    await resource.submit("createProject",
-      { ref: "~later", name: "Delta", spaceId: "space-1" });
-    const rename = await resource.submit("renameProject",
-      { target: "~later", name: "Delta Renamed" });
+    await resource.submit("createProject", { ref: "~later", name: "Delta", spaceId: "space-1" });
+    const rename = await resource.submit("renameProject", {
+      target: "~later",
+      name: "Delta Renamed",
+    });
 
     // Passing "~later" to the provider is what must not happen.
-    await expect(async () => { await resource.apply(rename); }).rejects.toThrow(/not applied yet/);
+    await expect(async () => {
+      await resource.apply(rename);
+    }).rejects.toThrow(/not applied yet/);
   });
 
   it("records an ambiguous provider outcome without claiming the effect did not land", async () => {
@@ -440,19 +475,27 @@ describe("actions", () => {
     await connect(account);
     await bindResource(resource, account);
     provider.controls.timeoutAfterCreate = true;
-    const create = await resource.submit("createProject",
-      { ref: "~ghost", name: "Epsilon", spaceId: "space-1" });
+    const create = await resource.submit("createProject", {
+      ref: "~ghost",
+      name: "Epsilon",
+      spaceId: "space-1",
+    });
 
-    await expect(async () => { await resource.apply(create); }).rejects.toThrow(/timed out/);
+    await expect(async () => {
+      await resource.apply(create);
+    }).rejects.toThrow(/timed out/);
 
     expect(await resource.record(create)).toMatchObject({ state: "failed", outcome: "unknown" });
 
     // Terminal: a second approval is refused before the provider is reached, so the effect that
     // did land stays a single one.
     provider.controls.timeoutAfterCreate = false;
-    await expect(async () => { await resource.apply(create); }).rejects.toThrow(/timed out/);
-    expect([...provider.projects.values()].filter(project => project.name === "Epsilon"))
-      .toHaveLength(1);
+    await expect(async () => {
+      await resource.apply(create);
+    }).rejects.toThrow(/timed out/);
+    expect(
+      [...provider.projects.values()].filter((project) => project.name === "Epsilon"),
+    ).toHaveLength(1);
   });
 
   it("keeps a dependent decidable when its provider's outcome is unknown", async () => {
@@ -460,12 +503,19 @@ describe("actions", () => {
     await connect(account);
     await bindResource(resource, account);
     provider.controls.timeoutAfterCreate = true;
-    const create = await resource.submit("createProject",
-      { ref: "~maybe", name: "Zeta", spaceId: "space-1" });
-    const rename = await resource.submit("renameProject",
-      { target: "~maybe", name: "Zeta Renamed" });
+    const create = await resource.submit("createProject", {
+      ref: "~maybe",
+      name: "Zeta",
+      spaceId: "space-1",
+    });
+    const rename = await resource.submit("renameProject", {
+      target: "~maybe",
+      name: "Zeta Renamed",
+    });
 
-    await expect(async () => { await resource.apply(create); }).rejects.toThrow(/timed out/);
+    await expect(async () => {
+      await resource.apply(create);
+    }).rejects.toThrow(/timed out/);
 
     // The project may exist, so retiring the rename would destroy viable work.
     expect((await resource.record(rename))?.state).toBe("pending");
@@ -487,8 +537,9 @@ describe("assembly", () => {
     const { account, resource } = bind();
     await connect(account);
     await bindResource(resource, account);
-    expect((await resource.searchProjects("Alpha")).map(project => project.id))
-      .toEqual(["project-a"]);
+    expect((await resource.searchProjects("Alpha")).map((project) => project.id)).toEqual([
+      "project-a",
+    ]);
 
     // The provider now answers as someone else, and the account reconnects to them. A cache keyed
     // on a last-seen fence would keep serving the previous principal's hit for the whole TTL.
@@ -497,8 +548,10 @@ describe("assembly", () => {
     await account.disconnect();
     await connect(account);
 
-    expect((await resource.searchProjects("Alpha")).map(project => project.id))
-      .toEqual(["project-a", "project-c"]);
+    expect((await resource.searchProjects("Alpha")).map((project) => project.id)).toEqual([
+      "project-a",
+      "project-c",
+    ]);
   });
 
   it("stops a warm facet reading a grant another facet's rejection buried", async () => {
@@ -509,31 +562,40 @@ describe("assembly", () => {
     await bindResource(other, account);
 
     // The second facet vouches for the grant and warms its cache under it.
-    expect((await other.searchProjects("Alpha")).map(project => project.id)).toEqual(["project-a"]);
+    expect((await other.searchProjects("Alpha")).map((project) => project.id)).toEqual([
+      "project-a",
+    ]);
 
     provider.controls.grantDead = true;
     provider.controls.rejectCredentials = true;
-    await expect(async () => { await resource.searchProjects("Alpha"); })
-      .rejects.toThrow(/Reconnect the conformance account/);
+    await expect(async () => {
+      await resource.searchProjects("Alpha");
+    }).rejects.toThrow(/Reconnect the conformance account/);
 
     // The account recorded the death, so the warm facet must refuse rather than serve its hit --
     // nothing about the grant's own hour-long expiry says it is dead.
-    await expect(async () => { await other.searchProjects("Alpha"); })
-      .rejects.toThrow(/credentials have expired/);
+    await expect(async () => {
+      await other.searchProjects("Alpha");
+    }).rejects.toThrow(/credentials have expired/);
 
     provider.controls.grantDead = false;
     provider.controls.rejectCredentials = false;
     await account.disconnect();
     await connect(account);
 
-    expect((await other.searchProjects("Alpha")).map(project => project.id)).toEqual(["project-a"]);
+    expect((await other.searchProjects("Alpha")).map((project) => project.id)).toEqual([
+      "project-a",
+    ]);
   });
 
   it("keeps a cursor's lease walking after its resource rebinds", async () => {
     const { account, resource } = bind();
     for (const index of [1, 2, 3]) {
-      provider.projects.set(`extra-${index}`,
-        { id: `extra-${index}`, name: `Extra ${index}`, spaceId: "space-1" });
+      provider.projects.set(`extra-${index}`, {
+        id: `extra-${index}`,
+        name: `Extra ${index}`,
+        spaceId: "space-1",
+      });
     }
     await connect(account);
     await bindResource(resource, account);
@@ -557,8 +619,9 @@ describe("assembly", () => {
 
     provider.activeAccessTokens.delete((await account.getCredentials()).creds.accessToken);
 
-    expect((await resource.searchProjects("Alpha")).map(project => project.id))
-      .toEqual(["project-a"]);
+    expect((await resource.searchProjects("Alpha")).map((project) => project.id)).toEqual([
+      "project-a",
+    ]);
     // The rotating refresh revokes the token it replaced, so this proves the read went through a
     // refresh rather than being served by a token the provider should have rejected.
     expect(provider.revoked.size).toBe(1);
@@ -568,14 +631,18 @@ describe("assembly", () => {
     const { account, resource } = bind();
     await connect(account);
     await bindResource(resource, account);
-    const staged = await resource.submit("createProject",
-      { ref: "~fenced", name: "Fenced", spaceId: "space-1" });
+    const staged = await resource.submit("createProject", {
+      ref: "~fenced",
+      name: "Fenced",
+      spaceId: "space-1",
+    });
 
     await account.disconnect();
     await connect(account);
 
-    await expect(async () => { await resource.apply(staged); })
-      .rejects.toThrow(/has since been replaced/);
+    await expect(async () => {
+      await resource.apply(staged);
+    }).rejects.toThrow(/has since been replaced/);
     expect((await resource.record(staged))?.state).toBe("failed");
   });
 
@@ -585,14 +652,18 @@ describe("assembly", () => {
     const { account, resource } = bind();
     await connect(account);
     await bindResource(resource, account);
-    const staged = await resource.submit("createProject",
-      { ref: "~raced", name: "Raced", spaceId: "space-1" });
+    const staged = await resource.submit("createProject", {
+      ref: "~raced",
+      name: "Raced",
+      spaceId: "space-1",
+    });
 
-    await expect(async () => { await resource.apply(staged, true); })
-      .rejects.toThrow(/has since been replaced/);
+    await expect(async () => {
+      await resource.apply(staged, true);
+    }).rejects.toThrow(/has since been replaced/);
     // The provider was never called, so no project was created under the new connection — and the
     // record is terminal, not restored to pending under a fence that can never match again.
-    expect([...provider.projects.values()].map(project => project.name)).not.toContain("Raced");
+    expect([...provider.projects.values()].map((project) => project.name)).not.toContain("Raced");
     expect((await resource.record(staged))?.state).toBe("failed");
   });
 

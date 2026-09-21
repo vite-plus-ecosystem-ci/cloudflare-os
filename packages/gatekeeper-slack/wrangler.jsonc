@@ -3,13 +3,11 @@
   "main": ".wrangler/validate/src/slack.ts",
   "build": {
     "command": "pnpm exec capnweb-validate build --out .wrangler/validate",
-    "watch_dir": "src"
+    "watch_dir": "src",
   },
   "compatibility_date": "2026-09-04",
   "compatibility_flags": ["allow_irrevocable_stub_storage"],
-  "rules": [
-    { "type": "Text", "globs": ["**/*.txt", "**/*.svg"], "fallthrough": false }
-  ],
+  "rules": [{ "type": "Text", "globs": ["**/*.txt", "**/*.svg"], "fallthrough": false }],
   "migrations": [
     {
       "tag": "v0",
@@ -17,8 +15,8 @@
         "UserAccount",
         "SlackWorkspaceGatekeeperImpl",
         "SlackConversationGatekeeperImpl",
-        "SlackThreadGatekeeperImpl"
-      ]
-    }
-  ]
+        "SlackThreadGatekeeperImpl",
+      ],
+    },
+  ],
 }

@@ -45,7 +45,5 @@ export type KvScannable = KvMutable & {
    * @param options Prefix and optional storage-level page bounds.
    * @returns Matching key-value pairs.
    */
-  list<T>(
-    options: { prefix: string; startAfter?: string; limit?: number },
-  ): Iterable<[string, T]>;
+  list<T>(options: { prefix: string; startAfter?: string; limit?: number }): Iterable<[string, T]>;
 };

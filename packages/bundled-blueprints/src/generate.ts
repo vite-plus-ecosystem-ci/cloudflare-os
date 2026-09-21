@@ -23,8 +23,11 @@ import type { BundledBlueprintManifest, BundledBlueprintPresentation } from "./m
 import { parseBundledBlueprintManifest, parseBundledBlueprintPresentation } from "./manifest.ts";
 
 /** The blueprints this repository ships: `blueprints/` beside this module's `src/`. */
-export const BUNDLED_BLUEPRINTS_DIR: string =
-  resolve(dirname(fileURLToPath(import.meta.url)), "..", "blueprints");
+export const BUNDLED_BLUEPRINTS_DIR: string = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "blueprints",
+);
 
 /** What the caller wants the generated module's header to say it was built from. */
 export type GenerateOptions = {
@@ -58,11 +61,11 @@ export async function generateBundledBlueprintsModule(
   sourceDir: string,
   { builtFrom }: GenerateOptions,
 ): Promise<GeneratedModule> {
-  let allContents = await readdir(sourceDir, {withFileTypes: true});
-  let contents = allContents.filter(entry => !entry.name.startsWith("."));
-  let directoryPaths = new Map(contents
-      .filter(entry => entry.isDirectory())
-      .map(entry => [entry.name, entry.name]));
+  let allContents = await readdir(sourceDir, { withFileTypes: true });
+  let contents = allContents.filter((entry) => !entry.name.startsWith("."));
+  let directoryPaths = new Map(
+    contents.filter((entry) => entry.isDirectory()).map((entry) => [entry.name, entry.name]),
+  );
   for (const [name, backup] of findInterruptedImportBackups(allContents, sourceDir)) {
     directoryPaths.set(name, backup);
   }
@@ -72,17 +75,20 @@ export async function generateBundledBlueprintsModule(
   for (let entry of allContents) {
     let name = /^\.(.+)\.backup-\d+$/su.exec(entry.name)?.[1];
     if (entry.isDirectory() && name !== undefined && directoryPaths.get(name) === name) {
-      console.warn(`${entry.name} is left over from an interrupted import beside ${name}/ and ` +
-          `is ignored; delete it, or import ${name} again.`);
+      console.warn(
+        `${entry.name} is left over from an interrupted import beside ${name}/ and ` +
+          `is ignored; delete it, or import ${name} again.`,
+      );
     }
   }
   let directories = [...directoryPaths.keys()].toSorted();
   let directorySet = new Set(directories);
-  let files = contents.filter(entry => entry.isFile()).map(entry => entry.name);
-  let legacyNames = files.filter(file => file.endsWith(".gadget"))
-      .map(file => basename(file, ".gadget"))
-      .filter(name => !directorySet.has(name))
-      .toSorted();
+  let files = contents.filter((entry) => entry.isFile()).map((entry) => entry.name);
+  let legacyNames = files
+    .filter((file) => file.endsWith(".gadget"))
+    .map((file) => basename(file, ".gadget"))
+    .filter((name) => !directorySet.has(name))
+    .toSorted();
   let expectedFiles = new Set(["README.md"]);
   for (let name of legacyNames) {
     expectedFiles.add(`${name}.gadget`);
@@ -97,30 +103,39 @@ export async function generateBundledBlueprintsModule(
     expectedFiles.add(`${name}.json`);
   }
   let unexpected = contents
-      .filter(entry => !entry.isDirectory() && !expectedFiles.has(entry.name))
-      .map(entry => entry.name);
+    .filter((entry) => !entry.isDirectory() && !expectedFiles.has(entry.name))
+    .map((entry) => entry.name);
   if (unexpected.length > 0) {
     throw new Error(`Unexpected files in ${sourceDir}: ${unexpected.join(", ")}`);
   }
   if (directories.length === 0 && legacyNames.length === 0) {
-    console.warn(`No blueprint directories in ${sourceDir}; the deployment will bundle no formats.`);
+    console.warn(
+      `No blueprint directories in ${sourceDir}; the deployment will bundle no formats.`,
+    );
   }
 
-  let entries: Array<Omit<BundledBlueprintManifest,
-      "created" | "version" | "lastUpdated" | "bindings"> & {
-        contentHash: string;
-        archive: string;
-      }> = [];
+  let entries: Array<
+    Omit<BundledBlueprintManifest, "created" | "version" | "lastUpdated" | "bindings"> & {
+      contentHash: string;
+      archive: string;
+    }
+  > = [];
   let totalBytes = 0;
   let seen = new Map<string, string>();
   let sources = [
-    ...directories.map(name => ({name, directory: directoryPaths.get(name)!,
-      kind: "extracted" as const})),
-    ...legacyNames.map(name => ({name, kind: "legacy" as const})),
-  ].toSorted((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-  validatePortablePaths(sources.map(source => source.name), sourceDir);
+    ...directories.map((name) => ({
+      name,
+      directory: directoryPaths.get(name)!,
+      kind: "extracted" as const,
+    })),
+    ...legacyNames.map((name) => ({ name, kind: "legacy" as const })),
+  ].toSorted((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  validatePortablePaths(
+    sources.map((source) => source.name),
+    sourceDir,
+  );
   for (let source of sources) {
-    let {name} = source;
+    let { name } = source;
     let raw: string;
     let entry: BundledBlueprintPresentation;
     let bytes: Uint8Array;
@@ -133,7 +148,7 @@ export async function generateBundledBlueprintsModule(
         throw new Error(`${name}/ has no blueprint.json describing it.`, { cause: err });
       }
       let manifest = parseBundledBlueprintManifest(name, raw);
-      let {created, version, lastUpdated, bindings, ...presentation} = manifest;
+      let { created, version, lastUpdated, bindings, ...presentation } = manifest;
       entry = presentation;
       let sourceFiles = await readSourceFiles(join(sourceDir, directory, "files"), `${name}/files`);
       let metadata = {

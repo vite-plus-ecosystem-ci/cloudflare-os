@@ -47,13 +47,15 @@ const BUILT = ["dist", "node_modules"];
  * (`vitest run`) never consults these exports.
  */
 const externalBlueprintsDir: WorkerInput[] = process.env.BUNDLED_BLUEPRINTS_DIR
-  ? [{
-    kind: "dir",
-    path: relative(
-      WORKSPACE_DIR,
-      resolve(WORKSPACE_DIR, "packages/workshop-backend", process.env.BUNDLED_BLUEPRINTS_DIR),
-    ).replaceAll("\\", "/"),
-  }]
+  ? [
+      {
+        kind: "dir",
+        path: relative(
+          WORKSPACE_DIR,
+          resolve(WORKSPACE_DIR, "packages/workshop-backend", process.env.BUNDLED_BLUEPRINTS_DIR),
+        ).replaceAll("\\", "/"),
+      },
+    ]
   : [];
 
 const WORKER_INPUTS: WorkerInput[] = [
@@ -87,7 +89,7 @@ const WORKER_INPUTS: WorkerInput[] = [
 ];
 
 /** Literal roots for `server.watcher.add`. Vite registers paths; the globs below filter events. */
-export const WATCH_PATHS: string[] = WORKER_INPUTS.map(entry => absolute(entry.path));
+export const WATCH_PATHS: string[] = WORKER_INPUTS.map((entry) => absolute(entry.path));
 
 /**
  * `forceRerunTriggers` globs covering the same set.
@@ -96,7 +98,7 @@ export const WATCH_PATHS: string[] = WORKER_INPUTS.map(entry => absolute(entry.p
  * OR-matches the array with `picomatch.isMatch`, so a standalone `!...` entry is just another
  * pattern that matches nearly every path. The exclusion has to live *inside* a pattern.
  */
-export const FORCE_RERUN_TRIGGERS: string[] = WORKER_INPUTS.flatMap(entry => {
+export const FORCE_RERUN_TRIGGERS: string[] = WORKER_INPUTS.flatMap((entry) => {
   if (entry.kind === "file") return [absolute(entry.path)];
   const root = absolute(entry.path);
   if (!entry.excludeDirs?.length) return [`${root}/**`];
@@ -112,7 +114,7 @@ export const FORCE_RERUN_TRIGGERS: string[] = WORKER_INPUTS.flatMap(entry => {
  */
 export function isWorkerInput(absolutePath: string): boolean {
   const path = resolve(absolutePath).replaceAll("\\", "/");
-  return WORKER_INPUTS.some(entry => {
+  return WORKER_INPUTS.some((entry) => {
     const root = absolute(entry.path);
     if (entry.kind === "file") return path === root;
     if (!path.startsWith(`${root}/`)) return false;

@@ -33,7 +33,11 @@ export class UserDirectoryDurableObject extends DurableObject<Cloudflare.Env> {
        ON CONFLICT (id) DO UPDATE SET name = excluded.name, search_text = excluded.search_text,
          rev = excluded.rev
        WHERE excluded.rev > users.rev`,
-      record.id, record.name, `${record.id}\n${record.name}`.toLowerCase(), rev);
+      record.id,
+      record.name,
+      `${record.id}\n${record.name}`.toLowerCase(),
+      rev,
+    );
   }
 
   /**
@@ -47,7 +51,8 @@ export class UserDirectoryDurableObject extends DurableObject<Cloudflare.Env> {
     // across the two fields.
     if (query.length > MAX_QUERY_LENGTH || /[\r\n]/.test(query)) {
       throw new Error(
-        `Search query must be at most ${MAX_QUERY_LENGTH} characters with no line breaks.`);
+        `Search query must be at most ${MAX_QUERY_LENGTH} characters with no line breaks.`,
+      );
     }
     const excluded = [...new Set(excludeIds)];
     if (excluded.length > MAX_EXCLUDE_IDS) {
@@ -55,12 +60,16 @@ export class UserDirectoryDurableObject extends DurableObject<Cloudflare.Env> {
     }
     const needle = query.trim().toLowerCase();
     if (needle === "") return [];
-    return this.ctx.storage.sql.exec<UserDirectoryRecord>(
-      `SELECT id, name FROM users
+    return this.ctx.storage.sql
+      .exec<UserDirectoryRecord>(
+        `SELECT id, name FROM users
        WHERE id NOT IN (SELECT value FROM json_each(?)) AND instr(search_text, ?) > 0
        ORDER BY instr(search_text, ?), id, name COLLATE NOCASE
        LIMIT ${SEARCH_RESULT_LIMIT}`,
-      JSON.stringify(excluded), needle, needle,
-    ).toArray();
+        JSON.stringify(excluded),
+        needle,
+        needle,
+      )
+      .toArray();
   }
 }

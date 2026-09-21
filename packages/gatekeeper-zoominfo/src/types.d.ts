@@ -175,10 +175,7 @@ export interface ZoomInfoSession extends RpcTarget {
    *
    * Cost: one credit for the company; each returned signal counts as a record.
    */
-  enrichIntent(
-    criteria: IntentEnrichCriteria,
-    page?: PageRequest,
-  ): Promise<EnrichmentTicket>;
+  enrichIntent(criteria: IntentEnrichCriteria, page?: PageRequest): Promise<EnrichmentTicket>;
 
   // -------------------------------------------------------------------------
   // Scoops
@@ -190,10 +187,7 @@ export interface ZoomInfoSession extends RpcTarget {
    * Resolve topic/type/department values via `lookup("scoop-topics" | "scoop-types" |
    * "scoop-departments")`.
    */
-  searchScoops(
-    criteria: ScoopSearchCriteria,
-    page?: PageRequest,
-  ): Promise<SearchPage<Scoop>>;
+  searchScoops(criteria: ScoopSearchCriteria, page?: PageRequest): Promise<SearchPage<Scoop>>;
 
   /**
    * Retrieve Scoops for a single company. Returns a ticket; fetch the scoops with
@@ -201,10 +195,7 @@ export interface ZoomInfoSession extends RpcTarget {
    *
    * Cost: one credit for the company; each returned scoop counts as a record.
    */
-  enrichScoops(
-    criteria: ScoopEnrichCriteria,
-    page?: PageRequest,
-  ): Promise<EnrichmentTicket>;
+  enrichScoops(criteria: ScoopEnrichCriteria, page?: PageRequest): Promise<EnrichmentTicket>;
 
   // -------------------------------------------------------------------------
   // News
@@ -214,10 +205,7 @@ export interface ZoomInfoSession extends RpcTarget {
    * Search ZoomInfo-curated news articles by category, URL, and publish-date range. Free (each
    * article counts as a record). Resolve categories via `lookup("news-categories")`.
    */
-  searchNews(
-    criteria: NewsSearchCriteria,
-    page?: PageRequest,
-  ): Promise<SearchPage<NewsArticle>>;
+  searchNews(criteria: NewsSearchCriteria, page?: PageRequest): Promise<SearchPage<NewsArticle>>;
 
   /**
    * Retrieve news articles for a single company. Returns a ticket; fetch the articles with
@@ -225,10 +213,7 @@ export interface ZoomInfoSession extends RpcTarget {
    *
    * Cost: one credit for the company; each returned article counts as a record.
    */
-  enrichNews(
-    criteria: NewsEnrichCriteria,
-    page?: PageRequest,
-  ): Promise<EnrichmentTicket>;
+  enrichNews(criteria: NewsEnrichCriteria, page?: PageRequest): Promise<EnrichmentTicket>;
 
   // -------------------------------------------------------------------------
   // Enrichment results
@@ -582,7 +567,10 @@ export type CompanyOnlyFilters = {
  * specific company". To pull intent or scoops for a company you already know, use `enrichIntent` /
  * `enrichScoops`, which take a company identifier.
  */
-export type SignalCompanyFilters = Omit<CompanyFilters, "companyId" | "companyName" | "companyWebsite">;
+export type SignalCompanyFilters = Omit<
+  CompanyFilters,
+  "companyId" | "companyName" | "companyWebsite"
+>;
 
 /**
  * Person-level contact filters, shared (nested under `contact`) by contact and scoop search. All
@@ -773,21 +761,66 @@ export type CompanyHashtag = {
 
 /** Selectable output fields for `enrichCompanies`. */
 export type CompanyOutputField =
-  | "id" | "name" | "website" | "domainList" | "ticker" | "type" | "description"
-  | "phone" | "fax" | "street" | "city" | "state" | "zipCode" | "country" | "continent"
-  | "metroArea" | "logo" | "alternateLogos" | "socialMediaUrls"
-  | "primaryIndustry" | "primaryIndustryCode" | "primarySubIndustryCode" | "industries"
-  | "industryCodes" | "sicCodes" | "naicsCodes"
-  | "employeeCount" | "employeeRange" | "employeeGrowth" | "employeeCountByDepartment"
-  | "revenue" | "revenueRange" | "numberOfContactsInZoomInfo"
-  | "companyStatus" | "companyStatusDate" | "isDefunct"
-  | "competitors" | "products" | "businessModel" | "foundedYear"
-  | "parentId" | "parentName" | "subUnitType" | "subUnitIndustries"
-  | "ultimateParentId" | "ultimateParentName" | "ultimateParentRevenue" | "ultimateParentEmployees"
-  | "locationCount" | "locationMatch"
-  | "lastUpdatedDate" | "createdDate" | "certificationDate" | "certified"
-  | "companyFunding" | "recentFundingAmount" | "recentFundingDate" | "totalFundingAmount"
-  | "departmentBudgets" | "engagements";
+  | "id"
+  | "name"
+  | "website"
+  | "domainList"
+  | "ticker"
+  | "type"
+  | "description"
+  | "phone"
+  | "fax"
+  | "street"
+  | "city"
+  | "state"
+  | "zipCode"
+  | "country"
+  | "continent"
+  | "metroArea"
+  | "logo"
+  | "alternateLogos"
+  | "socialMediaUrls"
+  | "primaryIndustry"
+  | "primaryIndustryCode"
+  | "primarySubIndustryCode"
+  | "industries"
+  | "industryCodes"
+  | "sicCodes"
+  | "naicsCodes"
+  | "employeeCount"
+  | "employeeRange"
+  | "employeeGrowth"
+  | "employeeCountByDepartment"
+  | "revenue"
+  | "revenueRange"
+  | "numberOfContactsInZoomInfo"
+  | "companyStatus"
+  | "companyStatusDate"
+  | "isDefunct"
+  | "competitors"
+  | "products"
+  | "businessModel"
+  | "foundedYear"
+  | "parentId"
+  | "parentName"
+  | "subUnitType"
+  | "subUnitIndustries"
+  | "ultimateParentId"
+  | "ultimateParentName"
+  | "ultimateParentRevenue"
+  | "ultimateParentEmployees"
+  | "locationCount"
+  | "locationMatch"
+  | "lastUpdatedDate"
+  | "createdDate"
+  | "certificationDate"
+  | "certified"
+  | "companyFunding"
+  | "recentFundingAmount"
+  | "recentFundingDate"
+  | "totalFundingAmount"
+  | "departmentBudgets"
+  | "engagements";
 
 // ===========================================================================
 // Contact search / enrich
@@ -870,26 +903,83 @@ export type ContactRecord = {
 
 /** Selectable output fields for `enrichContacts` (person + employing-company fields). */
 export type ContactOutputField =
-  | "id" | "firstName" | "middleName" | "lastName" | "salutation" | "suffix"
-  | "email" | "emailAlt" | "hasCanadianEmail" | "hashedEmails"
-  | "phone" | "directPhoneAlt" | "directPhoneDoNotCall"
-  | "mobilePhone" | "mobilePhoneAlt" | "mobilePhoneDoNotCall"
-  | "jobTitle" | "jobFunction" | "managementLevel" | "contactAccuracyScore"
-  | "street" | "city" | "region" | "metroArea" | "zipCode" | "state" | "country" | "continent"
-  | "personHasMoved" | "withinEu" | "withinCalifornia" | "withinCanada"
-  | "validDate" | "lastUpdatedDate" | "noticeProvidedDate"
-  | "education" | "picture" | "techSkills" | "externalUrls"
-  | "employmentHistory" | "locationCompanyId" | "positionStartDate" | "yearsOfExperience"
-  | "engagements" | "isDefunct"
-  | "companyId" | "companyName" | "companyWebsite" | "companyDescription" | "companyPhone"
-  | "companyFax" | "companyStreet" | "companyCity" | "companyState" | "companyZipCode"
-  | "companyCountry" | "companyContinent" | "companyLogo" | "companyAlternateLogos"
-  | "companySocialMediaUrls" | "companyRevenue" | "companyRevenueNumeric" | "companyRevenueRange"
-  | "companyEmployeeCount" | "companyEmployeeRange" | "companyEmployeeGrowth"
-  | "companyType" | "companyTicker" | "companyRanking" | "companyDivision"
-  | "companyIndustries" | "companyIndustryCodes" | "companyPrimaryIndustry"
-  | "companyPrimaryIndustryCode" | "companyPrimarySubIndustryCode"
-  | "companySicCodes" | "companyNaicsCodes";
+  | "id"
+  | "firstName"
+  | "middleName"
+  | "lastName"
+  | "salutation"
+  | "suffix"
+  | "email"
+  | "emailAlt"
+  | "hasCanadianEmail"
+  | "hashedEmails"
+  | "phone"
+  | "directPhoneAlt"
+  | "directPhoneDoNotCall"
+  | "mobilePhone"
+  | "mobilePhoneAlt"
+  | "mobilePhoneDoNotCall"
+  | "jobTitle"
+  | "jobFunction"
+  | "managementLevel"
+  | "contactAccuracyScore"
+  | "street"
+  | "city"
+  | "region"
+  | "metroArea"
+  | "zipCode"
+  | "state"
+  | "country"
+  | "continent"
+  | "personHasMoved"
+  | "withinEu"
+  | "withinCalifornia"
+  | "withinCanada"
+  | "validDate"
+  | "lastUpdatedDate"
+  | "noticeProvidedDate"
+  | "education"
+  | "picture"
+  | "techSkills"
+  | "externalUrls"
+  | "employmentHistory"
+  | "locationCompanyId"
+  | "positionStartDate"
+  | "yearsOfExperience"
+  | "engagements"
+  | "isDefunct"
+  | "companyId"
+  | "companyName"
+  | "companyWebsite"
+  | "companyDescription"
+  | "companyPhone"
+  | "companyFax"
+  | "companyStreet"
+  | "companyCity"
+  | "companyState"
+  | "companyZipCode"
+  | "companyCountry"
+  | "companyContinent"
+  | "companyLogo"
+  | "companyAlternateLogos"
+  | "companySocialMediaUrls"
+  | "companyRevenue"
+  | "companyRevenueNumeric"
+  | "companyRevenueRange"
+  | "companyEmployeeCount"
+  | "companyEmployeeRange"
+  | "companyEmployeeGrowth"
+  | "companyType"
+  | "companyTicker"
+  | "companyRanking"
+  | "companyDivision"
+  | "companyIndustries"
+  | "companyIndustryCodes"
+  | "companyPrimaryIndustry"
+  | "companyPrimaryIndustryCode"
+  | "companyPrimarySubIndustryCode"
+  | "companySicCodes"
+  | "companyNaicsCodes";
 
 // ===========================================================================
 // Enrichment tickets & outcomes
@@ -1360,15 +1450,42 @@ export type CompanyInsightsCriteria = {
 
 /** Insight signal types (see ZoomInfo Signals Glossary). */
 export type InsightSignalType =
-  | "zi.funding" | "zi.cxochange" | "zi.scoop" | "zi.websights"
-  | "zi.buyingcommitteechange" | "zi.account-level-intent.spike" | "zi.intent.competitor.spike"
-  | "zi.mpocchange" | "zi.g2" | "zi.trustradius" | "zi.anomaloushiring" | "zi.formcomplete"
-  | "zi.podcastmentions" | "zi.marketingcampaigns" | "zi.technology" | "zi.seniorjobpostings"
-  | "zi.personwebsights" | "zi.personbasednews" | "zi.wondeal"
-  | "zi.newcontactpreviouslyworkedforcustomer" | "zi.personchange" | "zi.upcomingmeeting"
-  | "zi.lowactivecontacts" | "zi.nodecisionmaker" | "zi.nopostmeetingfollowup"
-  | "zi.upcomingrenewal" | "zi.m&a" | "zi.productlaunch" | "zi.earnings" | "zi.partnership"
-  | "zi.layoffs" | "zi.painpoint" | "zi.divestiture" | "zi.ipo" | "zi.award" | "zi.project";
+  | "zi.funding"
+  | "zi.cxochange"
+  | "zi.scoop"
+  | "zi.websights"
+  | "zi.buyingcommitteechange"
+  | "zi.account-level-intent.spike"
+  | "zi.intent.competitor.spike"
+  | "zi.mpocchange"
+  | "zi.g2"
+  | "zi.trustradius"
+  | "zi.anomaloushiring"
+  | "zi.formcomplete"
+  | "zi.podcastmentions"
+  | "zi.marketingcampaigns"
+  | "zi.technology"
+  | "zi.seniorjobpostings"
+  | "zi.personwebsights"
+  | "zi.personbasednews"
+  | "zi.wondeal"
+  | "zi.newcontactpreviouslyworkedforcustomer"
+  | "zi.personchange"
+  | "zi.upcomingmeeting"
+  | "zi.lowactivecontacts"
+  | "zi.nodecisionmaker"
+  | "zi.nopostmeetingfollowup"
+  | "zi.upcomingrenewal"
+  | "zi.m&a"
+  | "zi.productlaunch"
+  | "zi.earnings"
+  | "zi.partnership"
+  | "zi.layoffs"
+  | "zi.painpoint"
+  | "zi.divestiture"
+  | "zi.ipo"
+  | "zi.award"
+  | "zi.project";
 
 /** The insights for one company. */
 export type CompanyInsights = {

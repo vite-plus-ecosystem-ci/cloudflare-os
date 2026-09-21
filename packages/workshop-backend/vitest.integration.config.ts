@@ -1,11 +1,8 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
-const EXPECTED_OPEN_ERROR_CODES = new Set([
-  "WORKSPACE_NOT_FOUND",
-  "WORKSPACE_ACCESS_DENIED",
-]);
+const EXPECTED_OPEN_ERROR_CODES = new Set(["WORKSPACE_NOT_FOUND", "WORKSPACE_ACCESS_DENIED"]);
 
 export default defineConfig({
   esbuild: {
@@ -22,6 +19,11 @@ export default defineConfig({
     }),
   ],
   test: {
+    // Vitest v4 compatibility: preserve mock call history.
+    // Remove after tests no longer rely on calls from setup or earlier tests.
+    // https://rfc-vitest-v5-upgrade-viteplus-dev.voidzero-docs.workers.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
+    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+    clearMocks: false,
     include: ["__integration__/*.test.ts"],
     // Asserts the pool actually started, rather than trusting a green run to mean workerd.
     setupFiles: ["@gadgets/scripts/assert-workerd"],

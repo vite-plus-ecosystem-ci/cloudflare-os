@@ -1,18 +1,29 @@
-import { clone, fetch, listFiles as listGitFiles, listServerRefs, readBlob, resolveRef } from "isomorphic-git";
+import {
+  clone,
+  fetch,
+  listFiles as listGitFiles,
+  listServerRefs,
+  readBlob,
+  resolveRef,
+} from "isomorphic-git";
 import { request as baseHttpRequest } from "isomorphic-git/http/web";
 import type { GitHttpResponse, HttpClient } from "isomorphic-git/http/web";
 import * as fs from "node:fs";
 import { promises as fsp } from "node:fs";
 import { posix as posixPath } from "node:path";
 import {
-  MAX_DOCUMENT_BODY_BYTES, contentTypeFromPath, isTextContentType, VENDOR_ID,
+  MAX_DOCUMENT_BODY_BYTES,
+  contentTypeFromPath,
+  isTextContentType,
+  VENDOR_ID,
 } from "./context-types.js";
 import { truncateContextDescription } from "./context-storage.js";
 import { extractDescription } from "./description-extractors.js";
 import { obsContext } from "./observability.js";
 
 const logger = obsContext.createLogger({
-  component: "gatekeeper.context", vendorId: VENDOR_ID,
+  component: "gatekeeper.context",
+  vendorId: VENDOR_ID,
 });
 
 // Maximum packed git repository size that can be loaded into memory
@@ -32,7 +43,10 @@ class GitTransferTooLargeError extends Error {
   }
 }
 
-async function* limitBody(body: AsyncIterableIterator<Uint8Array>, maxBytes: number): AsyncIterableIterator<Uint8Array> {
+async function* limitBody(
+  body: AsyncIterableIterator<Uint8Array>,
+  maxBytes: number,
+): AsyncIterableIterator<Uint8Array> {
   let seenBytes = 0;
   for await (let chunk of body) {
     seenBytes += chunk.byteLength;
@@ -47,9 +61,7 @@ function makeHttp(maxBytes: number): HttpClient {
   return {
     async request(request): Promise<GitHttpResponse> {
       let response = await baseHttpRequest(request);
-      return response.body
-        ? { ...response, body: limitBody(response.body, maxBytes) }
-        : response;
+      return response.body ? { ...response, body: limitBody(response.body, maxBytes) } : response;
     },
   };
 }
@@ -65,17 +77,23 @@ async function dirSizeBytes(dir: string): Promise<number> {
     if (entry.isDirectory()) {
       size += await dirSizeBytes(path);
     } else if (entry.isFile()) {
-      size += await fsp.stat(path).then(stat => stat.size, (err) => {
-        if (isEnoent(err)) return 0;
-        throw err;
-      });
+      size += await fsp.stat(path).then(
+        (stat) => stat.size,
+        (err) => {
+          if (isEnoent(err)) return 0;
+          throw err;
+        },
+      );
     }
   }
   return size;
 }
 
 async function gitdirStats(dir: string): Promise<{ exists: boolean; sizeBytes: number }> {
-  let exists = await fsp.stat(`${dir}/.git`).then(stat => stat.isDirectory(), () => false);
+  let exists = await fsp.stat(`${dir}/.git`).then(
+    (stat) => stat.isDirectory(),
+    () => false,
+  );
   return {
     exists,
     sizeBytes: exists ? await dirSizeBytes(dir) : 0,
@@ -113,7 +131,7 @@ export function artifactContextDocument(path: string, blob: Uint8Array): Artifac
     path,
     name: posixPath.basename(path),
     description: truncateContextDescription(
-      body === undefined ? "" : extractDescription(contentType, body) ?? "",
+      body === undefined ? "" : (extractDescription(contentType, body) ?? ""),
     ),
     contentType,
     body: blob,
@@ -125,7 +143,12 @@ export type ArtifactRepoReadResult =
   | { commit: string; changed: true; documents: ArtifactContextDocument[] }
   | { commit: string; changed: false };
 
-async function cloneRepo(dir: string, url: string, branch: string, onAuth: () => { username: string; password: string }): Promise<void> {
+async function cloneRepo(
+  dir: string,
+  url: string,
+  branch: string,
+  onAuth: () => { username: string; password: string },
+): Promise<void> {
   try {
     await fsp.mkdir(dir, { recursive: true });
     await clone({
@@ -151,13 +174,24 @@ async function cloneRepo(dir: string, url: string, branch: string, onAuth: () =>
   }
 }
 
-async function recloneRepo(dir: string, url: string, branch: string, onAuth: () => { username: string; password: string }): Promise<string> {
+async function recloneRepo(
+  dir: string,
+  url: string,
+  branch: string,
+  onAuth: () => { username: string; password: string },
+): Promise<string> {
   await deleteCachedRepo(dir);
   await cloneRepo(dir, url, branch, onAuth);
   return resolveRef({ fs, dir, ref: "HEAD" });
 }
 
-async function fetchRepo(dir: string, url: string, branch: string, onAuth: () => { username: string; password: string }, maxBytes: number): Promise<string> {
+async function fetchRepo(
+  dir: string,
+  url: string,
+  branch: string,
+  onAuth: () => { username: string; password: string },
+  maxBytes: number,
+): Promise<string> {
   let result = await fetch({
     fs,
     http: makeHttp(maxBytes),
@@ -173,7 +207,12 @@ async function fetchRepo(dir: string, url: string, branch: string, onAuth: () =>
   return result.fetchHead;
 }
 
-async function fetchOrRecloneRepo(dir: string, url: string, branch: string, onAuth: () => { username: string; password: string }): Promise<string> {
+async function fetchOrRecloneRepo(
+  dir: string,
+  url: string,
+  branch: string,
+  onAuth: () => { username: string; password: string },
+): Promise<string> {
   let { sizeBytes } = await gitdirStats(dir);
   let remainingBytes = MAX_GIT_DIR_BYTES - sizeBytes;
   if (remainingBytes <= 0) {
@@ -206,10 +245,16 @@ export function readArtifactRepoDocuments(
   currentCommit?: string,
 ): Promise<ArtifactRepoReadResult> {
   const dir = `/tmp/artifacts/${repoName}`;
-  return obsContext.with({
-    operation: "artifacts.repo.read", repoName, branch, dir,
-  }, () => readArtifactRepoDocumentsWithContext(
-      artifacts, repoName, url, branch, dir, currentCommit));
+  return obsContext.with(
+    {
+      operation: "artifacts.repo.read",
+      repoName,
+      branch,
+      dir,
+    },
+    () =>
+      readArtifactRepoDocumentsWithContext(artifacts, repoName, url, branch, dir, currentCommit),
+  );
 }
 
 async function readArtifactRepoDocumentsWithContext(
@@ -227,8 +272,13 @@ async function readArtifactRepoDocumentsWithContext(
   try {
     let onAuth = () => ({ username: "x-access-token", password: token.plaintext });
     let branchRefName = `refs/heads/${branch}`;
-    let refs = await listServerRefs({ http: makeHttp(MAX_GIT_DIR_BYTES), url, prefix: branchRefName, onAuth });
-    let branchRef = refs.find(ref => ref.ref === branchRefName);
+    let refs = await listServerRefs({
+      http: makeHttp(MAX_GIT_DIR_BYTES),
+      url,
+      prefix: branchRefName,
+      onAuth,
+    });
+    let branchRef = refs.find((ref) => ref.ref === branchRefName);
     if (!branchRef) {
       return currentCommit === ""
         ? { commit: "", changed: false }

@@ -56,7 +56,10 @@ function parseScopes(scope: string | string[] | undefined): string[] {
   if (!scope) return [];
   if (Array.isArray(scope)) return scope;
   // New apps return a space- or comma-separated string.
-  return scope.split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+  return scope
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function grantFromTokenResponse(result: TokenResponse): LinearOAuthGrant {
@@ -362,7 +365,11 @@ export class LinearApi {
     if (json.errors && json.errors.length > 0) {
       const first = json.errors[0];
       const code = first.extensions?.code ?? "";
-      const status = /AUTHENTICATION|FORBIDDEN/i.test(code) ? 401 : (response.ok ? 400 : response.status);
+      const status = /AUTHENTICATION|FORBIDDEN/i.test(code)
+        ? 401
+        : response.ok
+          ? 400
+          : response.status;
       throw new LinearApiError(status, first.message, json.errors);
     }
 
@@ -392,7 +399,11 @@ export class LinearApi {
     return data.organization;
   }
 
-  async listTeams(options: { first: number; after?: string; includeArchived?: boolean }): Promise<RawConnection<RawTeam>> {
+  async listTeams(options: {
+    first: number;
+    after?: string;
+    includeArchived?: boolean;
+  }): Promise<RawConnection<RawTeam>> {
     const data = await this.graphql<{ teams: RawConnection<RawTeam> }>(
       `query($first: Int!, $after: String, $includeArchived: Boolean) {
         teams(first: $first, after: $after, includeArchived: $includeArchived) {
@@ -400,7 +411,11 @@ export class LinearApi {
           pageInfo { hasNextPage endCursor }
         }
       }`,
-      { first: options.first, after: options.after, includeArchived: options.includeArchived ?? false },
+      {
+        first: options.first,
+        after: options.after,
+        includeArchived: options.includeArchived ?? false,
+      },
     );
     return data.teams;
   }
@@ -477,7 +492,12 @@ export class LinearApi {
             }
           }
         }`,
-        { id: scope.teamId, first: options.first, after: options.after, includeArchived: options.includeArchived ?? false },
+        {
+          id: scope.teamId,
+          first: options.first,
+          after: options.after,
+          includeArchived: options.includeArchived ?? false,
+        },
       );
       return data.team.projects;
     }
@@ -487,24 +507,34 @@ export class LinearApi {
           nodes { ${PROJECT_LIST_FIELDS} } pageInfo { hasNextPage endCursor }
         }
       }`,
-      { first: options.first, after: options.after, includeArchived: options.includeArchived ?? false },
+      {
+        first: options.first,
+        after: options.after,
+        includeArchived: options.includeArchived ?? false,
+      },
     );
-    await Promise.all(data.projects.nodes.map(async project => {
-      const teams = project.teams;
-      if (!teams) return;
+    await Promise.all(
+      data.projects.nodes.map(async (project) => {
+        const teams = project.teams;
+        if (!teams) return;
 
-      while (teams.pageInfo.hasNextPage) {
-        const after = teams.pageInfo.endCursor;
-        if (!after) throw new LinearApiError(500, "Linear returned an invalid project teams cursor.");
-        const page = await this.#listProjectTeams(project.id, after);
-        teams.nodes.push(...page.nodes);
-        teams.pageInfo = page.pageInfo;
-      }
-    }));
+        while (teams.pageInfo.hasNextPage) {
+          const after = teams.pageInfo.endCursor;
+          if (!after)
+            throw new LinearApiError(500, "Linear returned an invalid project teams cursor.");
+          const page = await this.#listProjectTeams(project.id, after);
+          teams.nodes.push(...page.nodes);
+          teams.pageInfo = page.pageInfo;
+        }
+      }),
+    );
     return data.projects;
   }
 
-  async #listProjectTeams(projectId: string, after: string): Promise<RawConnection<{ id: string }>> {
+  async #listProjectTeams(
+    projectId: string,
+    after: string,
+  ): Promise<RawConnection<{ id: string }>> {
     const data = await this.graphql<{ project: { teams: RawConnection<{ id: string }> } }>(
       `query($id: String!, $after: String!) {
         project(id: $id) {
@@ -519,7 +549,10 @@ export class LinearApi {
     return data.project.teams;
   }
 
-  async listCycles(teamId: string, options: { first: number; after?: string }): Promise<RawConnection<RawCycle>> {
+  async listCycles(
+    teamId: string,
+    options: { first: number; after?: string },
+  ): Promise<RawConnection<RawCycle>> {
     const data = await this.graphql<{ team: { cycles: RawConnection<RawCycle> } }>(
       `query($id: String!, $first: Int!, $after: String) {
         team(id: $id) {
@@ -593,7 +626,10 @@ export class LinearApi {
     return data.issue;
   }
 
-  async listComments(issueId: string, options: { first: number; after?: string }): Promise<RawConnection<RawComment>> {
+  async listComments(
+    issueId: string,
+    options: { first: number; after?: string },
+  ): Promise<RawConnection<RawComment>> {
     const data = await this.graphql<{ issue: { comments: RawConnection<RawComment> } }>(
       `query($id: String!, $first: Int!, $after: String) {
         issue(id: $id) {
@@ -622,7 +658,8 @@ export class LinearApi {
       }`,
       { input },
     );
-    if (!data.issueCreate.success) throw new LinearApiError(400, "Linear refused to create the issue.");
+    if (!data.issueCreate.success)
+      throw new LinearApiError(400, "Linear refused to create the issue.");
     return data.issueCreate.issue;
   }
 
@@ -631,7 +668,8 @@ export class LinearApi {
       `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`,
       { id: issueId, input },
     );
-    if (!data.issueUpdate.success) throw new LinearApiError(400, "Linear refused to update the issue.");
+    if (!data.issueUpdate.success)
+      throw new LinearApiError(400, "Linear refused to update the issue.");
   }
 
   async setIssueArchived(issueId: string, archived: boolean): Promise<void> {
@@ -641,7 +679,10 @@ export class LinearApi {
       { id: issueId },
     );
     if (!data[mutation].success) {
-      throw new LinearApiError(400, `Linear refused to ${archived ? "archive" : "unarchive"} the issue.`);
+      throw new LinearApiError(
+        400,
+        `Linear refused to ${archived ? "archive" : "unarchive"} the issue.`,
+      );
     }
   }
 
@@ -652,7 +693,8 @@ export class LinearApi {
       }`,
       { input: { issueId, body } },
     );
-    if (!data.commentCreate.success) throw new LinearApiError(400, "Linear refused to create the comment.");
+    if (!data.commentCreate.success)
+      throw new LinearApiError(400, "Linear refused to create the comment.");
     return data.commentCreate.comment;
   }
 
@@ -663,14 +705,22 @@ export class LinearApi {
     );
   }
 
-  async createLabel(input: { teamId: string; name: string; color?: string; description?: string }): Promise<RawLabel> {
-    const data = await this.graphql<{ issueLabelCreate: { success: boolean; issueLabel: RawLabel } }>(
+  async createLabel(input: {
+    teamId: string;
+    name: string;
+    color?: string;
+    description?: string;
+  }): Promise<RawLabel> {
+    const data = await this.graphql<{
+      issueLabelCreate: { success: boolean; issueLabel: RawLabel };
+    }>(
       `mutation($input: IssueLabelCreateInput!) {
         issueLabelCreate(input: $input) { success issueLabel { ${LABEL_FIELDS} } }
       }`,
       { input },
     );
-    if (!data.issueLabelCreate.success) throw new LinearApiError(400, "Linear refused to create the label.");
+    if (!data.issueLabelCreate.success)
+      throw new LinearApiError(400, "Linear refused to create the label.");
     return data.issueLabelCreate.issueLabel;
   }
 

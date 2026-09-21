@@ -97,7 +97,9 @@ export interface Deck {
 }
 
 /** A partial update to a slide: `background` is merged key by key, anything else replaces the field. */
-export type SlidePatch = Partial<Omit<Slide, "id" | "background">> & { background?: Partial<SlideBackground> };
+export type SlidePatch = Partial<Omit<Slide, "id" | "background">> & {
+  background?: Partial<SlideBackground>;
+};
 
 /** A partial update to a block: `props` is merged key by key, anything else replaces the field. */
 export type BlockPatch = Partial<Omit<Block, "id" | "props">> & { props?: Partial<BlockProps> };

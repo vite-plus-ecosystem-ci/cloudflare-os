@@ -14,7 +14,12 @@
  * and is tested in Node.
  */
 
-export { type Collaborator, collaboratorFor, DEFAULT_COLOR, DEFAULT_NAME } from "./src/collaborator.ts";
+export {
+  type Collaborator,
+  collaboratorFor,
+  DEFAULT_COLOR,
+  DEFAULT_NAME,
+} from "./src/collaborator.ts";
 export {
   HEARTBEAT_MS,
   type PresenceEvent,

@@ -32,13 +32,25 @@ export interface ModuleScan {
 
 /** Whether `node` declares a value binding named `require` (see {@link ModuleScan.rebindsRequire}). */
 function bindsRequire(node: ts.Node): boolean {
-  const declaration = ts.isVariableDeclaration(node) || ts.isParameter(node) ||
-      ts.isBindingElement(node) || ts.isFunctionDeclaration(node) ||
-      ts.isFunctionExpression(node) || ts.isClassDeclaration(node) || ts.isClassExpression(node) ||
-      ts.isEnumDeclaration(node) || ts.isImportClause(node) || ts.isImportSpecifier(node) ||
-      ts.isNamespaceImport(node) || ts.isImportEqualsDeclaration(node);
-  return declaration && node.name !== undefined && ts.isIdentifier(node.name) &&
-      node.name.text === "require";
+  const declaration =
+    ts.isVariableDeclaration(node) ||
+    ts.isParameter(node) ||
+    ts.isBindingElement(node) ||
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isClassDeclaration(node) ||
+    ts.isClassExpression(node) ||
+    ts.isEnumDeclaration(node) ||
+    ts.isImportClause(node) ||
+    ts.isImportSpecifier(node) ||
+    ts.isNamespaceImport(node) ||
+    ts.isImportEqualsDeclaration(node);
+  return (
+    declaration &&
+    node.name !== undefined &&
+    ts.isIdentifier(node.name) &&
+    node.name.text === "require"
+  );
 }
 
 /**
@@ -49,9 +61,13 @@ function bindsRequire(node: ts.Node): boolean {
  * require call either, leaving it to the `__require` shim the output check catches.
  */
 function unwrap(expression: ts.Expression): ts.Expression {
-  while (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression) ||
-      ts.isSatisfiesExpression(expression) || ts.isNonNullExpression(expression) ||
-      ts.isTypeAssertionExpression(expression)) {
+  while (
+    ts.isParenthesizedExpression(expression) ||
+    ts.isAsExpression(expression) ||
+    ts.isSatisfiesExpression(expression) ||
+    ts.isNonNullExpression(expression) ||
+    ts.isTypeAssertionExpression(expression)
+  ) {
     expression = expression.expression;
   }
   return expression;
@@ -82,9 +98,12 @@ export function scanModule(path: string, source: string): ModuleScan {
       // A bare `require` only: `foo.require(...)` is a method of that name, not the keyword. A
       // local binding of the name is refused above rather than resolved here.
       const callee = unwrap(node.expression);
-      const keyword = callee.kind === ts.SyntaxKind.ImportKeyword ? "import"
-          : ts.isIdentifier(callee) && callee.text === "require" ? "require"
-          : undefined;
+      const keyword =
+        callee.kind === ts.SyntaxKind.ImportKeyword
+          ? "import"
+          : ts.isIdentifier(callee) && callee.text === "require"
+            ? "require"
+            : undefined;
       if (keyword !== undefined) {
         // The first argument names the module; `import("./x", { with: ... })` is a literal import.
         const [operand] = node.arguments;

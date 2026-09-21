@@ -1,17 +1,37 @@
 import { WorkerEntrypoint, DurableObject, RpcStub } from "cloudflare:workers";
 import { skipRpcValidation, validateRpc } from "capnweb-validate";
 import {
-  GatekeeperVendor as GatekeeperVendorIface, Gatekeeper, GatekeeperUserVerifier, VendorDescription,
-  GatekeeperConnectCallback, GatekeeperConnectOptions, AccountDescription,
-  SupportedResource, ResourceConfiguratorFrame, ResourceDescription, ApprovalQueue, ActionKind,
-  GitCache, stripTrailingSlashes, type ConnectHandoff,
+  GatekeeperVendor as GatekeeperVendorIface,
+  Gatekeeper,
+  GatekeeperUserVerifier,
+  VendorDescription,
+  GatekeeperConnectCallback,
+  GatekeeperConnectOptions,
+  AccountDescription,
+  SupportedResource,
+  ResourceConfiguratorFrame,
+  ResourceDescription,
+  ApprovalQueue,
+  ActionKind,
+  GitCache,
+  stripTrailingSlashes,
+  type ConnectHandoff,
 } from "@gadgets/workshop-shared/gatekeeper";
 import { connectHandoffPageHtml, htmlResponse } from "@gadgets/gatekeeper-kit/connect-pages";
-import { commitStagedCredentials, stageCredentials } from "@gadgets/gatekeeper-kit/credential-stage";
+import {
+  commitStagedCredentials,
+  stageCredentials,
+} from "@gadgets/gatekeeper-kit/credential-stage";
 import { CloudflareGatekeeperUser } from "@gadgets/workshop-shared/cloudflare-gatekeeper";
 import {
-  getOAuthConfig, buildAuthorizeUrl, generatePkce, exchangeCode, refreshTokens,
-  AUTH_SCOPES, BILLING_SCOPES, persistentScopesForResources,
+  getOAuthConfig,
+  buildAuthorizeUrl,
+  generatePkce,
+  exchangeCode,
+  refreshTokens,
+  AUTH_SCOPES,
+  BILLING_SCOPES,
+  persistentScopesForResources,
 } from "./oauth";
 import { fetchIdentity } from "./cloudflare-api";
 import {
@@ -37,7 +57,8 @@ import TYPES_CODE from "./types.txt";
 import { obsContext } from "./observability.js";
 
 const logger = obsContext.createLogger({
-  component: "gatekeeper.cloudflare", vendorId: VENDOR_ID,
+  component: "gatekeeper.cloudflare",
+  vendorId: VENDOR_ID,
 });
 
 // A nonce stored in UserAccount KV to protect the OAuth flow. Only one is active at a time; `stage`
@@ -59,7 +80,11 @@ type StoredNonce = {
 // A cached access token plus its absolute expiry (unix ms).
 type StoredAccessToken = { token: string; expires: number };
 /** The live keys a completed OAuth exchange writes, as one value so a reconnect can stage it. */
-type StoredGrant = { refreshToken: string; accessToken: StoredAccessToken; grantedScopes: string[] };
+type StoredGrant = {
+  refreshToken: string;
+  accessToken: StoredAccessToken;
+  grantedScopes: string[];
+};
 
 const NONCE_BYTES = 32;
 const INITIATION_NONCE_LIFETIME_MS = 10 * 60 * 1000;
@@ -68,15 +93,17 @@ const ACCESS_TOKEN_EXPIRY_SAFETY_MS = 60 * 1000;
 
 // Official Cloudflare logomark (orange cloud on a transparent background), as a data URI so it can
 // be rendered directly as the vendor/account avatar.
-const CLOUDFLARE_LOGO_URL = "data:image/svg+xml," + encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 209.51 94.74">` +
-  `<path fill="#f4801f" d="M143.05,93.42l1.07-3.71c1.27-4.41.8-8.48-1.34-11.48-2-2.76-5.26-4.38-9.25-4.57L58,72.7a1.47,1.47,0,0,1-1.35-2,2,2,0,0,1,1.75-1.34l76.26-1c9-.41,18.84-7.75,22.27-16.71l4.34-11.36a2.68,2.68,0,0,0,.18-1,3.31,3.31,0,0,0-.06-.54,49.67,49.67,0,0,0-95.49-5.14,22.35,22.35,0,0,0-35,23.42A31.73,31.73,0,0,0,.34,93.45a1.47,1.47,0,0,0,1.45,1.27l139.49,0h0A1.83,1.83,0,0,0,143.05,93.42Z"/>` +
-  `<path fill="#f9ab41" d="M168.22,41.15q-1,0-2.1.06a.88.88,0,0,0-.32.07,1.17,1.17,0,0,0-.76.8l-3,10.26c-1.28,4.41-.81,8.48,1.34,11.48a11.65,11.65,0,0,0,9.24,4.57l16.11,1a1.44,1.44,0,0,1,1.14.62,1.5,1.5,0,0,1,.17,1.37,2,2,0,0,1-1.75,1.34l-16.73,1c-9.09.42-18.88,7.75-22.31,16.7l-1.21,3.16a.9.9,0,0,0,.79,1.22h57.63A1.55,1.55,0,0,0,208,93.63a41.34,41.34,0,0,0-39.76-52.48Z"/>` +
-  `</svg>`,
-);
+const CLOUDFLARE_LOGO_URL =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 209.51 94.74">` +
+      `<path fill="#f4801f" d="M143.05,93.42l1.07-3.71c1.27-4.41.8-8.48-1.34-11.48-2-2.76-5.26-4.38-9.25-4.57L58,72.7a1.47,1.47,0,0,1-1.35-2,2,2,0,0,1,1.75-1.34l76.26-1c9-.41,18.84-7.75,22.27-16.71l4.34-11.36a2.68,2.68,0,0,0,.18-1,3.31,3.31,0,0,0-.06-.54,49.67,49.67,0,0,0-95.49-5.14,22.35,22.35,0,0,0-35,23.42A31.73,31.73,0,0,0,.34,93.45a1.47,1.47,0,0,0,1.45,1.27l139.49,0h0A1.83,1.83,0,0,0,143.05,93.42Z"/>` +
+      `<path fill="#f9ab41" d="M168.22,41.15q-1,0-2.1.06a.88.88,0,0,0-.32.07,1.17,1.17,0,0,0-.76.8l-3,10.26c-1.28,4.41-.81,8.48,1.34,11.48a11.65,11.65,0,0,0,9.24,4.57l16.11,1a1.44,1.44,0,0,1,1.14.62,1.5,1.5,0,0,1,.17,1.37,2,2,0,0,1-1.75,1.34l-16.73,1c-9.09.42-18.88,7.75-22.31,16.7l-1.21,3.16a.9.9,0,0,0,.79,1.22h57.63A1.55,1.55,0,0,0,208,93.63a41.34,41.34,0,0,0-39.76-52.48Z"/>` +
+      `</svg>`,
+  );
 
 function hexEncode(bytes: Uint8Array): string {
-  return [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 function generateNonce(): string {
@@ -134,17 +161,26 @@ export default {
 
     if (path.length === 2 && path[0].length === 64 && path[1].length === NONCE_BYTES * 2) {
       if (!env.CLIENT_ID || !env.CLIENT_SECRET) {
-        return new Response(NOT_CONFIGURED_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+        return new Response(NOT_CONFIGURED_HTML, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
       }
       const doId = path[0];
       const initiationNonce = path[1];
       const stub = ctx.exports.UserAccount.get(ctx.exports.UserAccount.idFromString(doId));
       const begun = await stub.beginOAuthFlow(initiationNonce);
       if (begun === null) {
-        return new Response(INVALID_LINK_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+        return new Response(INVALID_LINK_HTML, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
       }
       const config = getOAuthConfig(env.CLIENT_ID, env.CLIENT_SECRET, getBaseUrl(env))!;
-      const authUrl = buildAuthorizeUrl(config, `${doId}:${begun.oauthNonce}`, begun.challenge, begun.scopes);
+      const authUrl = buildAuthorizeUrl(
+        config,
+        `${doId}:${begun.oauthNonce}`,
+        begun.challenge,
+        begun.scopes,
+      );
       return Response.redirect(authUrl, 302);
     } else if (relPath === "/oauth") {
       const error = url.searchParams.get("error");
@@ -163,7 +199,9 @@ export default {
       const stub = ctx.exports.UserAccount.get(ctx.exports.UserAccount.idFromString(doId));
       const handoff = await stub.acceptAuthCode(code, oauthNonce);
       if (!handoff) {
-        return new Response(INVALID_LINK_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+        return new Response(INVALID_LINK_HTML, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
       }
       return htmlResponse(connectHandoffPageHtml(handoff));
     }
@@ -183,23 +221,29 @@ export class GatekeeperVendor extends WorkerEntrypoint<Env> implements Gatekeepe
       color: "#fbece0",
       tagline: "Sign in, use AI Gateway, and inspect Workers Observability",
       description:
-          "Sign in with your Cloudflare account and use your own Cloudflare AI Gateway credits for " +
-          "usage beyond the free tier. You can also connect Workers Observability to inspect logs, " +
-          "invocations, traces, and aggregate metrics.",
+        "Sign in with your Cloudflare account and use your own Cloudflare AI Gateway credits for " +
+        "usage beyond the free tier. You can also connect Workers Observability to inspect logs, " +
+        "invocations, traces, and aggregate metrics.",
       providesAuth: true,
     };
   }
 
-  async connectAccount(callback: Fetcher<GatekeeperConnectCallback>,
-                       options?: GatekeeperConnectOptions): Promise<{ url: string }> {
+  async connectAccount(
+    callback: Fetcher<GatekeeperConnectCallback>,
+    options?: GatekeeperConnectOptions,
+  ): Promise<{ url: string }> {
     const userObjectId = this.ctx.exports.UserAccount.newUniqueId();
     const initiationNonce = generateNonce();
     const authOnly = options?.scopes === "auth";
     const scopes = authOnly
       ? AUTH_SCOPES
       : persistentScopesForResources(options?.resourceUrlPatterns);
-    await this.ctx.exports.UserAccount.get(userObjectId)
-        .setCallback(callback, initiationNonce, scopes, authOnly);
+    await this.ctx.exports.UserAccount.get(userObjectId).setCallback(
+      callback,
+      initiationNonce,
+      scopes,
+      authOnly,
+    );
     return { url: `${getBaseUrl(this.env)}/${userObjectId.toString()}/${initiationNonce}` };
   }
 
@@ -219,8 +263,12 @@ export class UserAccount extends DurableObject<Env> {
     return config;
   }
 
-  async setCallback(callback: Fetcher<GatekeeperConnectCallback>, initiationNonce: string,
-                    scopes: string[], ephemeral?: boolean) {
+  async setCallback(
+    callback: Fetcher<GatekeeperConnectCallback>,
+    initiationNonce: string,
+    scopes: string[],
+    ephemeral?: boolean,
+  ) {
     if (!this.ctx.storage.kv.get<string>("refreshToken")) {
       this.ctx.storage.setAlarm(Date.now() + 3600 * 1000);
     }
@@ -255,10 +303,16 @@ export class UserAccount extends DurableObject<Env> {
    * Verify+consume the initiation nonce; mint a fresh OAuth nonce + PKCE pair. Returns the OAuth
    * nonce (for the `state`) and the PKCE challenge (for the authorize URL), or null if invalid.
    */
-  async beginOAuthFlow(initiationNonce: string): Promise<{ oauthNonce: string; challenge: string; scopes: string[] } | null> {
+  async beginOAuthFlow(
+    initiationNonce: string,
+  ): Promise<{ oauthNonce: string; challenge: string; scopes: string[] } | null> {
     const stored = this.ctx.storage.kv.get<StoredNonce>("nonce");
-    if (!stored || stored.stage !== "initiation" ||
-        Date.now() >= stored.expiresAt || !constantTimeEqual(stored.value, initiationNonce)) {
+    if (
+      !stored ||
+      stored.stage !== "initiation" ||
+      Date.now() >= stored.expiresAt ||
+      !constantTimeEqual(stored.value, initiationNonce)
+    ) {
       return null;
     }
     const oauthNonce = generateNonce();
@@ -282,8 +336,13 @@ export class UserAccount extends DurableObject<Env> {
    */
   async acceptAuthCode(code: string, oauthNonce: string): Promise<ConnectHandoff | null> {
     const stored = this.ctx.storage.kv.get<StoredNonce>("nonce");
-    if (!stored || stored.stage !== "oauth" || !stored.verifier ||
-        Date.now() >= stored.expiresAt || !constantTimeEqual(stored.value, oauthNonce)) {
+    if (
+      !stored ||
+      stored.stage !== "oauth" ||
+      !stored.verifier ||
+      Date.now() >= stored.expiresAt ||
+      !constantTimeEqual(stored.value, oauthNonce)
+    ) {
       return null;
     }
     this.ctx.storage.kv.delete("nonce");
@@ -304,7 +363,8 @@ export class UserAccount extends DurableObject<Env> {
     const grant: StoredGrant = {
       refreshToken: tokens.refreshToken,
       accessToken: { token: tokens.accessToken, expires: Date.now() + tokens.expiresIn * 1000 },
-      grantedScopes: tokens.scopes ?? this.ctx.storage.kv.get<string[]>("scopes") ?? [...BILLING_SCOPES],
+      grantedScopes: tokens.scopes ??
+        this.ctx.storage.kv.get<string[]>("scopes") ?? [...BILLING_SCOPES],
     };
 
     let handoff: ConnectHandoff;
@@ -317,7 +377,9 @@ export class UserAccount extends DurableObject<Env> {
     } else {
       this.#writeGrant(grant);
       try {
-        handoff = await callback.complete(this.ctx.exports.GatekeeperUserImpl({ props: { userObjectId: this.ctx.id.toString() } }));
+        handoff = await callback.complete(
+          this.ctx.exports.GatekeeperUserImpl({ props: { userObjectId: this.ctx.id.toString() } }),
+        );
       } catch (err) {
         this.ctx.storage.kv.delete("refreshToken");
         throw err;
@@ -365,10 +427,12 @@ export class UserAccount extends DurableObject<Env> {
     const refreshed = await refreshTokens(this.#config(), refreshToken);
     if (!refreshed) {
       const callback = this.ctx.storage.kv.get<Fetcher<GatekeeperConnectCallback>>("callback");
-      callback?.credentialsExpired().catch(err =>
+      callback?.credentialsExpired().catch((err) =>
         logger.warn("failed to notify credential expiry", {
-          event: "credentials.expiry.notify.failed", error: err,
-        }));
+          event: "credentials.expiry.notify.failed",
+          error: err,
+        }),
+      );
       return null;
     }
     if (refreshed.refreshToken) {
@@ -402,8 +466,10 @@ export class UserAccount extends DurableObject<Env> {
 type GatekeeperUserImplProps = { userObjectId: string };
 
 @validateRpc()
-export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImplProps>
-                                implements CloudflareGatekeeperUser {
+export class GatekeeperUserImpl
+  extends WorkerEntrypoint<Env, GatekeeperUserImplProps>
+  implements CloudflareGatekeeperUser
+{
   #account() {
     const id = this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId);
     return this.ctx.exports.UserAccount.get(id);
@@ -414,7 +480,8 @@ export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImpl
     // Both reads start before either is awaited, and settle together so a failure in one cannot
     // abandon the other as an unhandled rejection.
     const [token, grantedScopes] = await Promise.all([
-      account.getAccessToken(), account.getGrantedScopes(),
+      account.getAccessToken(),
+      account.getGrantedScopes(),
     ]);
     const identity = token ? await fetchIdentity(token) : null;
     return {
@@ -432,10 +499,12 @@ export class GatekeeperUserImpl extends WorkerEntrypoint<Env, GatekeeperUserImpl
     return identity?.email ?? null;
   }
 
-  async ensureResources(resourceUrlPatterns: string[]): Promise<{url?: string}> {
+  async ensureResources(resourceUrlPatterns: string[]): Promise<{ url?: string }> {
     const account = this.#account();
-    const grantedPatterns = new Set(grantedObservabilityResourcePatterns(await account.getGrantedScopes()));
-    if (resourceUrlPatterns.every(pattern => grantedPatterns.has(pattern))) return {};
+    const grantedPatterns = new Set(
+      grantedObservabilityResourcePatterns(await account.getGrantedScopes()),
+    );
+    if (resourceUrlPatterns.every((pattern) => grantedPatterns.has(pattern))) return {};
 
     const union = [...new Set([...grantedPatterns, ...resourceUrlPatterns])];
     const initiationNonce = generateNonce();
@@ -512,20 +581,25 @@ export interface CloudflareVerifierApi extends GatekeeperUserVerifier {
 
 /** Verifies an observer's access using that observer's own Cloudflare credentials. */
 @validateRpc()
-export class CloudflareVerifier extends WorkerEntrypoint<Env, GatekeeperUserImplProps>
-    implements CloudflareVerifierApi {
+export class CloudflareVerifier
+  extends WorkerEntrypoint<Env, GatekeeperUserImplProps>
+  implements CloudflareVerifierApi
+{
   async hasObservabilityAccess(accountId: string, workerName?: string): Promise<boolean> {
     const id = this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId);
     const account = this.ctx.exports.UserAccount.get(id);
     try {
       await new CloudflareObservabilityApi(
-        () => account.getAccessToken(), accountId, workerName,
+        () => account.getAccessToken(),
+        accountId,
+        workerName,
       ).listKeys({ limit: 1 });
       return true;
     } catch (error) {
       if (deniesAccess(error)) {
         logger.info("observer denied access to bound telemetry", {
-          event: "observer.denied", status: error.status,
+          event: "observer.denied",
+          status: error.status,
         });
         return false;
       }
@@ -542,8 +616,9 @@ type CloudflareObservabilityGatekeeperProps = {
 
 @validateRpc()
 export class CloudflareObservabilityGatekeeper
-    extends DurableObject<Env, CloudflareObservabilityGatekeeperProps>
-    implements Gatekeeper<CloudflareObservabilitySession> {
+  extends DurableObject<Env, CloudflareObservabilityGatekeeperProps>
+  implements Gatekeeper<CloudflareObservabilitySession>
+{
   #account() {
     const id = this.ctx.exports.UserAccount.idFromString(this.ctx.props.userObjectId);
     return this.ctx.exports.UserAccount.get(id);
@@ -573,10 +648,16 @@ export class CloudflareObservabilityGatekeeper
     };
   }
 
-  async getTypeScriptTypes(): Promise<string> { return TYPES_CODE; }
-  async getAutoApprovableActions(): Promise<ActionKind[]> { return []; }
+  async getTypeScriptTypes(): Promise<string> {
+    return TYPES_CODE;
+  }
+  async getAutoApprovableActions(): Promise<ActionKind[]> {
+    return [];
+  }
 
-  async startSession(approvalQueue: RpcStub<ApprovalQueue>): Promise<CloudflareObservabilitySession> {
+  async startSession(
+    approvalQueue: RpcStub<ApprovalQueue>,
+  ): Promise<CloudflareObservabilitySession> {
     const target = this.ctx.props.workerName
       ? `Worker ${this.ctx.props.workerName}`
       : `Cloudflare account ${this.ctx.props.accountId}`;
@@ -587,7 +668,9 @@ export class CloudflareObservabilityGatekeeper
     // The overseer only hands a verifier back to its own vendor, making this strategy-B ACL check
     // authoritative for the one account or Worker represented by the binding.
     const verifier = user as unknown as Fetcher<CloudflareVerifierApi>;
-    if (!(await verifier.hasObservabilityAccess(this.ctx.props.accountId, this.ctx.props.workerName))) {
+    if (
+      !(await verifier.hasObservabilityAccess(this.ctx.props.accountId, this.ctx.props.workerName))
+    ) {
       throw new Error("This collaborator does not have access to the bound Workers telemetry.");
     }
   }
@@ -604,6 +687,10 @@ export class CloudflareObservabilityGatekeeper
   async applyAction(_action: number, _cache: RpcStub<GitCache>): Promise<void> {
     throw new Error("This resource is read-only.");
   }
-  async rejectAction(_action: number): Promise<void> { throw new Error("This resource is read-only."); }
-  async revertAction(_action: number): Promise<void> { throw new Error("This resource is read-only."); }
+  async rejectAction(_action: number): Promise<void> {
+    throw new Error("This resource is read-only.");
+  }
+  async revertAction(_action: number): Promise<void> {
+    throw new Error("This resource is read-only.");
+  }
 }

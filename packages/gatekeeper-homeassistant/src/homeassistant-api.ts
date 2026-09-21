@@ -156,12 +156,7 @@ export class HomeAssistantRest {
     });
   }
 
-  async getHistory(
-    entityIds: string[],
-    start: Date,
-    end?: Date,
-    minimal = true,
-  ): Promise<any[][]> {
+  async getHistory(entityIds: string[], start: Date, end?: Date, minimal = true): Promise<any[][]> {
     const params = new URLSearchParams();
     params.set("filter_entity_id", entityIds.join(","));
     if (end) params.set("end_time", end.toISOString());
@@ -285,9 +280,7 @@ export class HomeAssistantWebSocket {
     try {
       ws = new WebSocket(wsUrl);
     } catch (e: any) {
-      throw new HomeAssistantError(
-        `Failed to open WebSocket to ${wsUrl}: ${e?.message ?? e}`,
-      );
+      throw new HomeAssistantError(`Failed to open WebSocket to ${wsUrl}: ${e?.message ?? e}`);
     }
 
     // We must run an auth handshake before anything else. The handshake uses raw messages
@@ -298,7 +291,11 @@ export class HomeAssistantWebSocket {
     try {
       await new Promise<void>((resolve, reject) => {
         timeoutHandle = setTimeout(() => {
-          try { ws.close(); } catch { /* ignore */ }
+          try {
+            ws.close();
+          } catch {
+            /* ignore */
+          }
           reject(
             new HomeAssistantError(
               `Home Assistant WebSocket auth handshake did not complete within ${HA_WS_AUTH_TIMEOUT_MS}ms (${wsUrl}).`,

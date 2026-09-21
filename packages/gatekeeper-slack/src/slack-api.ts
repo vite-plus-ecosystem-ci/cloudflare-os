@@ -3,8 +3,13 @@
 
 import { AccountDescription } from "@gadgets/workshop-shared/gatekeeper";
 import {
-  SlackConversationInfo, SlackConversationKind, SlackFile, SlackMessage, SlackReaction,
-  SlackUser, SlackWorkspaceInfo,
+  SlackConversationInfo,
+  SlackConversationKind,
+  SlackFile,
+  SlackMessage,
+  SlackReaction,
+  SlackUser,
+  SlackWorkspaceInfo,
 } from "./types";
 
 const SLACK_API_BASE = "https://slack.com/api";
@@ -120,8 +125,11 @@ export type SlackSearchMatch = {
 
 /** Exchanges an OAuth code for Slack user-token credentials. */
 export async function exchangeAuthCode(
-    code: string, clientId: string, clientSecret: string, redirectUri: string)
-    : Promise<SlackOAuthGrant> {
+  code: string,
+  clientId: string,
+  clientSecret: string,
+  redirectUri: string,
+): Promise<SlackOAuthGrant> {
   let body = new URLSearchParams({
     code,
     client_id: clientId,
@@ -136,7 +144,8 @@ export async function exchangeAuthCode(
   let authedUser = data.authed_user;
   if (!authedUser?.access_token) {
     throw new Error(
-        "Slack did not return a user token. Make sure the app requests user scopes (user_scope).");
+      "Slack did not return a user token. Make sure the app requests user scopes (user_scope).",
+    );
   }
 
   return {
@@ -154,8 +163,10 @@ export async function exchangeAuthCode(
 
 /** Refreshes a rotating user token, returning null when reauthorization is required. */
 export async function refreshAccessToken(
-    refreshToken: string, clientId: string, clientSecret: string)
-    : Promise<SlackTokenRefresh | null> {
+  refreshToken: string,
+  clientId: string,
+  clientSecret: string,
+): Promise<SlackTokenRefresh | null> {
   let body = new URLSearchParams({
     client_id: clientId,
     client_secret: clientSecret,
@@ -171,8 +182,12 @@ export async function refreshAccessToken(
   let data = await response.json<any>();
 
   if (!data.ok) {
-    if (data.error === "invalid_refresh_token" || data.error === "token_expired" ||
-        data.error === "invalid_grant" || data.error === "token_revoked") {
+    if (
+      data.error === "invalid_refresh_token" ||
+      data.error === "token_expired" ||
+      data.error === "invalid_grant" ||
+      data.error === "token_revoked"
+    ) {
       return null;
     }
     throw new Error(`Slack token refresh failed: ${data.error ?? response.status}`);
@@ -195,7 +210,7 @@ export async function revokeToken(token: string): Promise<void> {
   let response = await fetch(SLACK_REVOKE_URL, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({ token }),
@@ -220,7 +235,8 @@ async function postToken(body: URLSearchParams): Promise<any> {
 
 function expiryFrom(expiresIn: unknown): Date {
   // Slack omits expires_in for legacy non-rotating tokens; use a distant sentinel expiry.
-  let seconds = typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0
+  let seconds =
+    typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn > 0
       ? expiresIn
       : 100 * 365 * 24 * 3600;
   return new Date(Date.now() + seconds * 1000);
@@ -258,13 +274,21 @@ const SLACK_ERROR_MESSAGES: Record<string, string> = {
 // errors that should propagate. `missing_scope`/`not_allowed_token_type` are treated as no-access:
 // a token that cannot demonstrate access is conservatively deemed to lack it.
 const ACCESS_ERROR_CODES = new Set([
-  "channel_not_found", "not_in_channel", "no_permission", "access_denied",
-  "missing_scope", "not_allowed_token_type",
+  "channel_not_found",
+  "not_in_channel",
+  "no_permission",
+  "access_denied",
+  "missing_scope",
+  "not_allowed_token_type",
 ]);
 
 // Slack error codes indicating the token itself is expired or revoked.
 const AUTH_ERROR_CODES = new Set([
-  "invalid_auth", "not_authed", "token_expired", "token_revoked", "account_inactive",
+  "invalid_auth",
+  "not_authed",
+  "token_expired",
+  "token_revoked",
+  "account_inactive",
 ]);
 
 /** An error from a Slack API call, carrying the raw error code for callers that must branch on it. */
@@ -275,9 +299,11 @@ export class SlackApiError extends Error {
   readonly status: number;
 
   constructor(code: string | undefined, status: number) {
-    super(code && SLACK_ERROR_MESSAGES[code]
+    super(
+      code && SLACK_ERROR_MESSAGES[code]
         ? SLACK_ERROR_MESSAGES[code]
-        : `Slack request failed: ${code ?? status}`);
+        : `Slack request failed: ${code ?? status}`,
+    );
     this.code = code;
     this.status = status;
   }
@@ -326,7 +352,7 @@ export class SlackApi {
   }
 
   async #withPermalinks(channelId: string, messages: SlackMessage[]): Promise<SlackMessage[]> {
-    if (messages.every(message => message.permalink)) return messages;
+    if (messages.every((message) => message.permalink)) return messages;
     let host = await this.#getWorkspaceHost();
     if (!host) return messages;
     for (let message of messages) {
@@ -338,7 +364,9 @@ export class SlackApi {
   // ── Low-level request helper ──────────────────────────────────────
 
   async #call<T extends SlackApiEnvelope>(
-      method: string, params: Record<string, string | number | undefined>): Promise<T> {
+    method: string,
+    params: Record<string, string | number | undefined>,
+  ): Promise<T> {
     let url = new URL(`${SLACK_API_BASE}/${method}`);
     for (let [key, value] of Object.entries(params)) {
       if (value !== undefined) url.searchParams.set(key, String(value));
@@ -347,14 +375,14 @@ export class SlackApi {
     for (let attempt = 0; ; attempt++) {
       let token = await this.#getToken();
       let response = await fetch(url.toString(), {
-        headers: { "Authorization": `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.status === 429 && attempt < RATE_LIMIT_MAX_RETRIES) {
         let retryAfter = Number(response.headers.get("Retry-After")) || 1;
         let waitMs = Math.min(retryAfter * 1000, RATE_LIMIT_MAX_WAIT_MS);
         response.body?.cancel();
-        await new Promise(resolve => setTimeout(resolve, waitMs));
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
         continue;
       }
 
@@ -380,9 +408,11 @@ export class SlackApi {
   }
 
   async getWorkspaceInfo(): Promise<SlackWorkspaceInfo> {
-    let data = await this.#call<SlackApiEnvelope & {
-      team?: { id: string; name: string; domain: string };
-    }>("team.info", {});
+    let data = await this.#call<
+      SlackApiEnvelope & {
+        team?: { id: string; name: string; domain: string };
+      }
+    >("team.info", {});
     return {
       teamId: data.team?.id ?? "",
       name: data.team?.name ?? "",
@@ -395,8 +425,9 @@ export class SlackApi {
   async getUser(userId: string): Promise<SlackUser> {
     let cached = this.#userCache.get(userId);
     if (cached) return cached;
-    let data = await this.#call<SlackApiEnvelope & { user?: RawUser }>(
-        "users.info", { user: userId });
+    let data = await this.#call<SlackApiEnvelope & { user?: RawUser }>("users.info", {
+      user: userId,
+    });
     if (!data.user) throw new Error(`Slack user not found: ${userId}`);
     let user = toUser(data.user);
     this.#userCache.set(userId, user);
@@ -406,8 +437,9 @@ export class SlackApi {
   /** `teamId` qualifies the account when the workspace host is unavailable; see uniqueName below. */
   async getAccountDescription(userId: string, teamId: string): Promise<AccountDescription> {
     let hostPromise = this.#getWorkspaceHost();
-    let data = await this.#call<SlackApiEnvelope & { user?: RawUser }>(
-        "users.info", { user: userId });
+    let data = await this.#call<SlackApiEnvelope & { user?: RawUser }>("users.info", {
+      user: userId,
+    });
     let profile = data.user?.profile;
     let handle = data.user?.name;
     // A Slack handle is unique only within a workspace, but the Workshop dedupes connected accounts
@@ -422,11 +454,11 @@ export class SlackApi {
   }
 
   async listUsers(cursor: string | undefined, limit: number): Promise<SlackPage<SlackUser>> {
-    let data = await this.#call<SlackApiEnvelope & { members?: RawUser[] }>(
-        "users.list", { cursor, limit });
-    let items = (data.members ?? [])
-        .filter(member => !member.deleted)
-        .map(toUser);
+    let data = await this.#call<SlackApiEnvelope & { members?: RawUser[] }>("users.list", {
+      cursor,
+      limit,
+    });
+    let items = (data.members ?? []).filter((member) => !member.deleted).map(toUser);
     for (let user of items) this.#userCache.set(user.id, user);
     return { items, nextCursor: nextCursor(data) };
   }
@@ -435,14 +467,17 @@ export class SlackApi {
 
   /** Resolve 1:1 DM peers because Slack's member listing may omit them. */
   async listUserConversations(
-      types: SlackConversationTypeFilter[], cursor: string | undefined, limit: number)
-      : Promise<SlackPage<SlackConversationInfo>> {
+    types: SlackConversationTypeFilter[],
+    cursor: string | undefined,
+    limit: number,
+  ): Promise<SlackPage<SlackConversationInfo>> {
     let data = await this.#call<SlackApiEnvelope & { channels?: RawConversation[] }>(
-        "users.conversations",
-        { types: types.join(","), cursor, limit, exclude_archived: "false" });
+      "users.conversations",
+      { types: types.join(","), cursor, limit, exclude_archived: "false" },
+    );
     let raws = data.channels ?? [];
-    await this.#prefetchIds(raws.filter(raw => raw.is_im && raw.user).map(raw => raw.user!));
-    let items = raws.map(raw => {
+    await this.#prefetchIds(raws.filter((raw) => raw.is_im && raw.user).map((raw) => raw.user!));
+    let items = raws.map((raw) => {
       let info = toConversationInfo(raw);
       if (raw.is_im && raw.user) info.peer = this.#userCache.get(raw.user);
       return info;
@@ -452,7 +487,9 @@ export class SlackApi {
 
   async getConversationInfo(conversationId: string): Promise<SlackConversationInfo> {
     let data = await this.#call<SlackApiEnvelope & { channel?: RawConversation }>(
-        "conversations.info", { channel: conversationId });
+      "conversations.info",
+      { channel: conversationId },
+    );
     if (!data.channel) throw new Error(`Slack conversation not found: ${conversationId}`);
     let info = toConversationInfo(data.channel);
     if (data.channel.is_im && data.channel.user) {
@@ -462,28 +499,47 @@ export class SlackApi {
   }
 
   async listConversationMembers(
-      conversationId: string, cursor: string | undefined, limit: number)
-      : Promise<SlackPage<string>> {
+    conversationId: string,
+    cursor: string | undefined,
+    limit: number,
+  ): Promise<SlackPage<string>> {
     let data = await this.#call<SlackApiEnvelope & { members?: string[] }>(
-        "conversations.members", { channel: conversationId, cursor, limit });
+      "conversations.members",
+      { channel: conversationId, cursor, limit },
+    );
     return { items: data.members ?? [], nextCursor: nextCursor(data) };
   }
 
   async listHistory(
-      conversationId: string, cursor: string | undefined, limit: number)
-      : Promise<SlackPage<SlackMessage>> {
+    conversationId: string,
+    cursor: string | undefined,
+    limit: number,
+  ): Promise<SlackPage<SlackMessage>> {
     let data = await this.#call<SlackApiEnvelope & { messages?: RawMessage[] }>(
-        "conversations.history", { channel: conversationId, cursor, limit });
-    let items = await this.#withPermalinks(conversationId, await this.#buildMessages(data.messages ?? []));
+      "conversations.history",
+      { channel: conversationId, cursor, limit },
+    );
+    let items = await this.#withPermalinks(
+      conversationId,
+      await this.#buildMessages(data.messages ?? []),
+    );
     return { items, nextCursor: nextCursor(data) };
   }
 
   async listReplies(
-      conversationId: string, threadTs: string, cursor: string | undefined, limit: number)
-      : Promise<SlackPage<SlackMessage>> {
+    conversationId: string,
+    threadTs: string,
+    cursor: string | undefined,
+    limit: number,
+  ): Promise<SlackPage<SlackMessage>> {
     let data = await this.#call<SlackApiEnvelope & { messages?: RawMessage[] }>(
-        "conversations.replies", { channel: conversationId, ts: threadTs, cursor, limit });
-    let items = await this.#withPermalinks(conversationId, await this.#buildMessages(data.messages ?? []));
+      "conversations.replies",
+      { channel: conversationId, ts: threadTs, cursor, limit },
+    );
+    let items = await this.#withPermalinks(
+      conversationId,
+      await this.#buildMessages(data.messages ?? []),
+    );
     return { items, nextCursor: nextCursor(data) };
   }
 
@@ -492,23 +548,30 @@ export class SlackApi {
 
   /** Channel-ID filtering is the authority boundary; query syntax is only a search hint. */
   async searchMessages(
-      query: string, cursor: string | undefined, count: number, restrictChannelId?: string)
-      : Promise<SlackPage<SlackSearchMatch>> {
+    query: string,
+    cursor: string | undefined,
+    count: number,
+    restrictChannelId?: string,
+  ): Promise<SlackPage<SlackSearchMatch>> {
     let page = cursor ? Number(cursor) : 1;
     if (!Number.isFinite(page) || page < 1) page = 1;
-    let data = await this.#call<SlackApiEnvelope & {
-      messages?: { matches?: RawMessage[]; paging?: { pages?: number; page?: number } };
-    }>("search.messages", { query, count, page, sort: "timestamp" });
+    let data = await this.#call<
+      SlackApiEnvelope & {
+        messages?: { matches?: RawMessage[]; paging?: { pages?: number; page?: number } };
+      }
+    >("search.messages", { query, count, page, sort: "timestamp" });
 
-    let matches = (data.messages?.matches ?? [])
-        .filter(match => !restrictChannelId || match.channel?.id === restrictChannelId);
+    let matches = (data.messages?.matches ?? []).filter(
+      (match) => !restrictChannelId || match.channel?.id === restrictChannelId,
+    );
     await this.#prefetchUsers(matches);
-    let items: SlackSearchMatch[] = matches.map(match => ({
+    let items: SlackSearchMatch[] = matches.map((match) => ({
       message: this.#toMessage(match),
       channelId: match.channel?.id ?? "",
     }));
     let paging = data.messages?.paging;
-    let hasMore = paging?.pages !== undefined && paging.page !== undefined
+    let hasMore =
+      paging?.pages !== undefined && paging.page !== undefined
         ? paging.page < paging.pages
         : (data.messages?.matches?.length ?? 0) === count;
     return { items, nextCursor: hasMore ? String(page + 1) : undefined };
@@ -518,7 +581,7 @@ export class SlackApi {
 
   async #buildMessages(raw: RawMessage[]): Promise<SlackMessage[]> {
     await this.#prefetchUsers(raw);
-    return raw.map(message => this.#toMessage(message));
+    return raw.map((message) => this.#toMessage(message));
   }
 
   async #prefetchUsers(messages: RawMessage[]): Promise<void> {
@@ -532,9 +595,11 @@ export class SlackApi {
 
   // Stay below the Workers limit of six concurrent outgoing requests.
   async #prefetchIds(ids: string[]): Promise<void> {
-    let missing = [...new Set(ids)].filter(id => !this.#userCache.has(id));
+    let missing = [...new Set(ids)].filter((id) => !this.#userCache.has(id));
     for (let i = 0; i < missing.length; i += 5) {
-      await Promise.all(missing.slice(i, i + 5).map(id => this.getUser(id).catch(() => undefined)));
+      await Promise.all(
+        missing.slice(i, i + 5).map((id) => this.getUser(id).catch(() => undefined)),
+      );
     }
   }
 
@@ -546,8 +611,11 @@ export class SlackApi {
   #toMessage(raw: RawMessage): SlackMessage {
     let author: SlackUser | null = null;
     if (raw.user) {
-      author = this.#userCache.get(raw.user)
-          ?? { id: raw.user, username: raw.user, isBot: isSystemOrBot({ id: raw.user }) };
+      author = this.#userCache.get(raw.user) ?? {
+        id: raw.user,
+        username: raw.user,
+        isBot: isSystemOrBot({ id: raw.user }),
+      };
     } else if (raw.bot_id) {
       author = { id: raw.bot_id, username: raw.username || "bot", isBot: true };
     }
@@ -555,7 +623,7 @@ export class SlackApi {
     return {
       ts: raw.ts,
       author,
-      text: resolveText(raw.text ?? "", id => this.#userName(id)),
+      text: resolveText(raw.text ?? "", (id) => this.#userName(id)),
       timestamp: new Date(Number(raw.ts.split(".")[0]) * 1000),
       // Search omits thread_ts; recover it from reply permalinks.
       threadTs: raw.thread_ts ?? threadTsFromPermalink(raw.permalink),
@@ -603,7 +671,11 @@ function threadTsFromPermalink(permalink: string | undefined): string | undefine
 
 // Construct Slack archive URLs that also match the thread resource pattern.
 function buildPermalink(
-    host: string, channelId: string, ts: string, threadTs: string | undefined): string {
+  host: string,
+  channelId: string,
+  ts: string,
+  threadTs: string | undefined,
+): string {
   let base = `https://${host}/archives/${channelId}/p${ts.replace(".", "")}`;
   if (threadTs && threadTs !== ts) {
     return `${base}?${new URLSearchParams({ thread_ts: threadTs, cid: channelId })}`;
@@ -658,16 +730,22 @@ const SLACK_TEXT_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">"
 /** Converts Slack mention/link markup and HTML entities to readable text. */
 export function resolveText(text: string, userName: (id: string) => string): string {
   let out = text
-      .replace(/<@([UW][A-Z0-9]+)(?:\|([^>]*))?>/g,
-          (_m, id: string, label?: string) => `@${label || userName(id)}`)
-      .replace(/<#(C[A-Z0-9]+)(?:\|([^>]*))?>/g,
-          (_m, id: string, label?: string) => `#${label || id}`)
-      .replace(/<!subteam\^[A-Z0-9]+(?:\|([^>]*))?>/g,
-          (_m, label?: string) => label || "@group")
-      .replace(/<!(here|channel|everyone)(?:\|[^>]*)?>/g, (_m, name: string) => `@${name}`)
-      .replace(/<(https?:[^|>]+)(?:\|([^>]*))?>/g,
-          (_m, url: string, label?: string) => label ? `${label} (${url})` : url)
-      .replace(/<(mailto:[^|>]+)(?:\|([^>]*))?>/g,
-          (_m, url: string, label?: string) => label || url.replace(/^mailto:/, ""));
+    .replace(
+      /<@([UW][A-Z0-9]+)(?:\|([^>]*))?>/g,
+      (_m, id: string, label?: string) => `@${label || userName(id)}`,
+    )
+    .replace(
+      /<#(C[A-Z0-9]+)(?:\|([^>]*))?>/g,
+      (_m, id: string, label?: string) => `#${label || id}`,
+    )
+    .replace(/<!subteam\^[A-Z0-9]+(?:\|([^>]*))?>/g, (_m, label?: string) => label || "@group")
+    .replace(/<!(here|channel|everyone)(?:\|[^>]*)?>/g, (_m, name: string) => `@${name}`)
+    .replace(/<(https?:[^|>]+)(?:\|([^>]*))?>/g, (_m, url: string, label?: string) =>
+      label ? `${label} (${url})` : url,
+    )
+    .replace(
+      /<(mailto:[^|>]+)(?:\|([^>]*))?>/g,
+      (_m, url: string, label?: string) => label || url.replace(/^mailto:/, ""),
+    );
   return out.replace(/&(amp|lt|gt);/g, (_match, name: string) => SLACK_TEXT_ENTITIES[name]);
 }

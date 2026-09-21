@@ -3,7 +3,7 @@ on:
   issue_comment:
     types: [created]
   pull_request_target:
-    types: [opened,synchronize]
+    types: [opened, synchronize]
   merge_group:
 
 permissions:
@@ -22,9 +22,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-signatures: 'signatures/version1/cla.json'
-          path-to-document: 'https://www.cloudflare.com/cla/'
+          path-to-signatures: "signatures/version1/cla.json"
+          path-to-document: "https://www.cloudflare.com/cla/"
           # branch should not be protected
-          branch: 'cla-signatures'
+          branch: "cla-signatures"
           allowlist: dependabot[bot],workers-devprod,github-actions[bot]
           lock-pullrequest-aftermerge: false

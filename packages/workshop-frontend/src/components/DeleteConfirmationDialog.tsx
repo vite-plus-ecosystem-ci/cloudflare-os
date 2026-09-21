@@ -1,19 +1,19 @@
-import { Dialog } from '@cloudflare/kumo'
-import { X } from '@phosphor-icons/react'
-import type { ReactNode } from 'react'
-import { WorkshopButton, WorkshopIconButton } from './WorkshopControls'
+import { Dialog } from "@cloudflare/kumo";
+import { X } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
+import { WorkshopButton, WorkshopIconButton } from "./WorkshopControls";
 
 interface DeleteConfirmationDialogProps {
-  open: boolean
-  title: string
-  description: ReactNode
-  isDeleting?: boolean
+  open: boolean;
+  title: string;
+  description: ReactNode;
+  isDeleting?: boolean;
   /** Label for the confirm button (defaults to "Delete"). */
-  confirmLabel?: string
+  confirmLabel?: string;
   /** Label for the confirm button while the action runs (defaults to "Deleting..."). */
-  confirmingLabel?: string
-  onOpenChange: (open: boolean) => void
-  onConfirm: () => void
+  confirmingLabel?: string;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
 }
 
 export default function DeleteConfirmationDialog({
@@ -21,8 +21,8 @@ export default function DeleteConfirmationDialog({
   title,
   description,
   isDeleting = false,
-  confirmLabel = 'Delete',
-  confirmingLabel = 'Deleting...',
+  confirmLabel = "Delete",
+  confirmingLabel = "Deleting...",
   onOpenChange,
   onConfirm,
 }: DeleteConfirmationDialogProps) {
@@ -30,7 +30,7 @@ export default function DeleteConfirmationDialog({
     <Dialog.Root
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!isDeleting) onOpenChange(nextOpen)
+        if (!isDeleting) onOpenChange(nextOpen);
       }}
     >
       <Dialog
@@ -63,11 +63,7 @@ export default function DeleteConfirmationDialog({
         <div className="flex items-center justify-end gap-2 border-t border-kumo-line bg-kumo-base px-5 py-3">
           <Dialog.Close
             render={(props) => (
-              <WorkshopButton
-                {...props}
-                className="!h-9"
-                disabled={isDeleting}
-              >
+              <WorkshopButton {...props} className="!h-9" disabled={isDeleting}>
                 Cancel
               </WorkshopButton>
             )}
@@ -83,5 +79,5 @@ export default function DeleteConfirmationDialog({
         </div>
       </Dialog>
     </Dialog.Root>
-  )
+  );
 }

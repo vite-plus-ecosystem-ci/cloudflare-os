@@ -28,17 +28,17 @@ export type PreviewOAuthState = Readonly<{
 /** Result of verifying an OAuth callback and applying preview relay policy. */
 export type PreviewOAuthCallbackResult =
   | Readonly<{
-    /** Indicates that this Worker owns the callback. */
-    kind: "local";
-    /** Verified account and nonce identifiers. */
-    state: PreviewOAuthState;
-  }>
+      /** Indicates that this Worker owns the callback. */
+      kind: "local";
+      /** Verified account and nonce identifiers. */
+      state: PreviewOAuthState;
+    }>
   | Readonly<{
-    /** Indicates that the stable Worker must relay the callback to its preview. */
-    kind: "relay";
-    /** Redirect containing only the provider result and unchanged signed state. */
-    response: Response;
-  }>;
+      /** Indicates that the stable Worker must relay the callback to its preview. */
+      kind: "relay";
+      /** Redirect containing only the provider result and unchanged signed state. */
+      response: Response;
+    }>;
 
 /** Thrown when preview OAuth runtime configuration is incomplete or invalid. */
 export class PreviewOAuthConfigurationError extends Error {
@@ -85,9 +85,13 @@ function previewRedirectsEnabled(env: PreviewOAuthEnv): boolean {
 function parseLocalState(state: object): PreviewOAuthState {
   const allowedKeys = new Set(["userObjectId", "oauthNonce"]);
   const value = state as Record<string, unknown>;
-  if (Object.keys(value).some(key => !allowedKeys.has(key)) ||
-      typeof value.userObjectId !== "string" || !HEX_64.test(value.userObjectId) ||
-      typeof value.oauthNonce !== "string" || !HEX_64.test(value.oauthNonce)) {
+  if (
+    Object.keys(value).some((key) => !allowedKeys.has(key)) ||
+    typeof value.userObjectId !== "string" ||
+    !HEX_64.test(value.userObjectId) ||
+    typeof value.oauthNonce !== "string" ||
+    !HEX_64.test(value.oauthNonce)
+  ) {
     throw new Error("Invalid OAuth state");
   }
   return { userObjectId: value.userObjectId, oauthNonce: value.oauthNonce };
@@ -95,10 +99,14 @@ function parseLocalState(state: object): PreviewOAuthState {
 
 function parseSignedState(payload: JWTPayload): PreviewOAuthState & { returnUrl?: string } {
   const allowedKeys = new Set(["userObjectId", "oauthNonce", "returnUrl", "iat", "exp"]);
-  if (Object.keys(payload).some(key => !allowedKeys.has(key)) ||
-      typeof payload.userObjectId !== "string" || !HEX_64.test(payload.userObjectId) ||
-      typeof payload.oauthNonce !== "string" || !HEX_64.test(payload.oauthNonce) ||
-      (payload.returnUrl !== undefined && typeof payload.returnUrl !== "string")) {
+  if (
+    Object.keys(payload).some((key) => !allowedKeys.has(key)) ||
+    typeof payload.userObjectId !== "string" ||
+    !HEX_64.test(payload.userObjectId) ||
+    typeof payload.oauthNonce !== "string" ||
+    !HEX_64.test(payload.oauthNonce) ||
+    (payload.returnUrl !== undefined && typeof payload.returnUrl !== "string")
+  ) {
     throw new Error("Invalid OAuth state");
   }
   return {
@@ -127,19 +135,27 @@ function validateReturnUrl(returnUrl: string, callback: URL, enabled: boolean): 
   if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) {
     throw new Error("Invalid OAuth return URL protocol");
   }
-  if (url.pathname !== callback.pathname || url.search || url.hash || url.username || url.password) {
+  if (
+    url.pathname !== callback.pathname ||
+    url.search ||
+    url.hash ||
+    url.username ||
+    url.password
+  ) {
     throw new Error("Invalid OAuth return URL path");
   }
 
   // Worker Preview hosts use either <preview-slug>-<deployed-host> or
   // <preview-slug>.<deployed-host>.
-  const allowed = url.origin === callback.origin || Boolean(
-    enabled &&
-    url.protocol === callback.protocol &&
-    url.port === callback.port &&
-    (url.hostname.endsWith(`-${callback.hostname}`) ||
-      url.hostname.endsWith(`.${callback.hostname}`)),
-  );
+  const allowed =
+    url.origin === callback.origin ||
+    Boolean(
+      enabled &&
+      url.protocol === callback.protocol &&
+      url.port === callback.port &&
+      (url.hostname.endsWith(`-${callback.hostname}`) ||
+        url.hostname.endsWith(`.${callback.hostname}`)),
+    );
   if (!allowed) throw new Error("Invalid OAuth return URL host");
   return url;
 }
@@ -157,8 +173,13 @@ function isCurrentCallback(url: URL, callback: URL): boolean {
  * accepted, so the trust model is unchanged — `state` is never taken from this list, since the kit
  * always sets its own last.
  */
-const RELAY_FORWARDED_PARAMS: readonly string[] =
-  ["code", "error", "error_description", "error_uri", "iss"];
+const RELAY_FORWARDED_PARAMS: readonly string[] = [
+  "code",
+  "error",
+  "error_description",
+  "error_uri",
+  "iss",
+];
 
 function relayCallback(
   target: URL,
@@ -167,7 +188,8 @@ function relayCallback(
   forwarded: readonly string[],
 ): Response {
   for (const key of forwarded) {
-    for (const value of callbackUrl.searchParams.getAll(key)) target.searchParams.append(key, value);
+    for (const value of callbackUrl.searchParams.getAll(key))
+      target.searchParams.append(key, value);
   }
   target.searchParams.set("state", state);
   return Response.redirect(target.toString(), 302);
@@ -201,11 +223,13 @@ export class PreviewOAuth {
     for (const key of options.relayParams ?? []) {
       if (key === "state") {
         throw new PreviewOAuthConfigurationError(
-          'OAuth relay parameters may not include "state", which the kit always sets itself.');
+          'OAuth relay parameters may not include "state", which the kit always sets itself.',
+        );
       }
       if (RELAY_FORWARDED_PARAMS.includes(key) || extras.has(key)) {
         throw new PreviewOAuthConfigurationError(
-          `OAuth relay parameter "${key}" is already forwarded.`);
+          `OAuth relay parameter "${key}" is already forwarded.`,
+        );
       }
       extras.add(key);
     }
@@ -215,9 +239,8 @@ export class PreviewOAuth {
     this.redirectUri = configuredRedirect || options.callbackUri;
     const redirect = configurationUrl(this.redirectUri, "OAUTH_REDIRECT_URI");
     this.#enabled = previewRedirectsEnabled(options.env);
-    const returnUrl = configuredRedirect && this.#callback.href !== redirect.href
-      ? options.callbackUri
-      : undefined;
+    const returnUrl =
+      configuredRedirect && this.#callback.href !== redirect.href ? options.callbackUri : undefined;
     const signingSecret = options.env.OAUTH_STATE_SIGNING_SECRET;
 
     if (returnUrl) {

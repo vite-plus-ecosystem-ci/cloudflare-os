@@ -1,11 +1,6 @@
 import { stripTrailingSlashes, type ConnectHandoff } from "@gadgets/workshop-shared/gatekeeper";
 import { NONCE_BYTES } from "./connect-nonce.js";
-import {
-  connectHandoffPageHtml,
-  errorPageHtml,
-  htmlResponse,
-  INVALID_LINK_HTML,
-} from "./html.js";
+import { connectHandoffPageHtml, errorPageHtml, htmlResponse, INVALID_LINK_HTML } from "./html.js";
 import type { McpLog } from "./log.js";
 
 type OAuthCallbackAccount = {
@@ -21,8 +16,10 @@ async function handleOAuthCallback(
   const error = url.searchParams.get("error");
   if (error) {
     const detail = url.searchParams.get("error_description") ?? error;
-    return htmlResponse(errorPageHtml(
-      "Authorization failed", `${detail} Start the connection again.`), 400);
+    return htmlResponse(
+      errorPageHtml("Authorization failed", `${detail} Start the connection again.`),
+      400,
+    );
   }
 
   const state = url.searchParams.get("state") ?? "";
@@ -40,11 +37,19 @@ async function handleOAuthCallback(
   let handoff: ConnectHandoff | null;
   try {
     handoff = await account.acceptAuthCode(
-      code, state.slice(separator + 1), url.searchParams.get("iss") ?? undefined);
+      code,
+      state.slice(separator + 1),
+      url.searchParams.get("iss") ?? undefined,
+    );
   } catch (err) {
     log.warn("oauth code exchange failed", { event: "connect.oauth.failed", error: err });
-    return htmlResponse(errorPageHtml(
-      "Could not finish connecting", err instanceof Error ? err.message : String(err)), 502);
+    return htmlResponse(
+      errorPageHtml(
+        "Could not finish connecting",
+        err instanceof Error ? err.message : String(err),
+      ),
+      502,
+    );
   }
   if (!handoff) return htmlResponse(INVALID_LINK_HTML, 400);
   return htmlResponse(connectHandoffPageHtml(handoff));

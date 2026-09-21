@@ -10,10 +10,12 @@ import { spawnSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
-  compareEvalResults, renderEvalComparison,
+  compareEvalResults,
+  renderEvalComparison,
 } from "../../packages/workshop-evals/src/comparison.ts";
 
-const USAGE = "Usage: node scripts/evals/compare-results.ts " +
+const USAGE =
+  "Usage: node scripts/evals/compare-results.ts " +
   "<baseline-results.json> <candidate-results.json> <comparison.json> <comparison.md> " +
   "<definition-path>...";
 
@@ -25,8 +27,9 @@ async function readResults(side: string, path: string): Promise<string> {
   try {
     return await readFile(path, "utf8");
   } catch (error) {
-    throw new Error(
-      `cannot read ${side} results at ${path}: ${errorMessage(error)}`, { cause: error });
+    throw new Error(`cannot read ${side} results at ${path}: ${errorMessage(error)}`, {
+      cause: error,
+    });
   }
 }
 
@@ -44,7 +47,9 @@ function ensureCommit(sha: string): void {
   }
 }
 
-function definitionsChanged(paths: string[]): (baselineSha: string, candidateSha: string) => boolean {
+function definitionsChanged(
+  paths: string[],
+): (baselineSha: string, candidateSha: string) => boolean {
   return (baselineSha, candidateSha) => {
     ensureCommit(baselineSha);
     const status = git(["diff", "--quiet", baselineSha, candidateSha, "--", ...paths]);
@@ -66,7 +71,8 @@ async function main(argv: string[]): Promise<void> {
   const report = compareEvalResults(
     await readResults("baseline", baselinePath),
     await readResults("candidate", candidatePath),
-    definitionsChanged(definitionPaths));
+    definitionsChanged(definitionPaths),
+  );
   const markdown = renderEvalComparison(report);
   await mkdir(dirname(resolve(jsonPath)), { recursive: true });
   await mkdir(dirname(resolve(markdownPath)), { recursive: true });

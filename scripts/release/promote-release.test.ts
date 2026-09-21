@@ -17,7 +17,8 @@ test("ciRunNumber parses CI ids and rejects everything else", () => {
 test("a higher published run number supersedes the candidate", () => {
   assert.equal(
     supersededBy("r000123-abc1234", ["r000122-aaaaaaa", "r000124-bbbbbbb"]),
-    "r000124-bbbbbbb");
+    "r000124-bbbbbbb",
+  );
 });
 
 test("equal or lower run numbers do not supersede", () => {

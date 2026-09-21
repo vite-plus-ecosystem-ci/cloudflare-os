@@ -37,7 +37,9 @@ export function isDoResetError(e: unknown): boolean {
  * A surfaced reset may still be absorbed by `retryOnDoReset` at the call site (correlate with
  * `user_do.reset.recovered`). */
 export function wrapDoStubForTelemetry<T extends { id: DurableObjectId }>(
-    stub: T, log: ReturnType<typeof createWorkshopLogger> = logger): T {
+  stub: T,
+  log: ReturnType<typeof createWorkshopLogger> = logger,
+): T {
   return new Proxy(stub, {
     get(target, prop) {
       const value = Reflect.get(target, prop) as unknown;
@@ -96,14 +98,15 @@ function shouldRetryAfterReset(e: unknown): boolean {
  * uses so the recovery is attributed to the component (and context, e.g. gadgetId) whose
  * surfaced warning it absorbs; defaults to the Worker's. */
 export async function retryOnDoReset<T>(
-    callWithFreshStub: () => Promise<T>,
-    log: ReturnType<typeof createWorkshopLogger> = logger): Promise<T> {
+  callWithFreshStub: () => Promise<T>,
+  log: ReturnType<typeof createWorkshopLogger> = logger,
+): Promise<T> {
   try {
     return await callWithFreshStub();
   } catch (e) {
-    if (!shouldRetryAfterReset(e)) throw e;  // identity rethrow, flags intact
+    if (!shouldRetryAfterReset(e)) throw e; // identity rethrow, flags intact
     await scheduler.wait(Math.random() * RETRY_JITTER_MS);
-    let recovered = await callWithFreshStub();  // a second rejection propagates by identity
+    let recovered = await callWithFreshStub(); // a second rejection propagates by identity
     log.info("recovered from user DO reset", { event: "user_do.reset.recovered" });
     return recovered;
   }

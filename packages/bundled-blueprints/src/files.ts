@@ -29,9 +29,11 @@ export function findInterruptedImportBackups(
   entries: Dirent[],
   label: string,
 ): Map<string, string> {
-  const visibleDirectories = new Set(entries
-      .filter(entry => entry.isDirectory() && !entry.name.startsWith("."))
-      .map(entry => entry.name));
+  const visibleDirectories = new Set(
+    entries
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+      .map((entry) => entry.name),
+  );
   const backups = new Map<string, string>();
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
@@ -55,7 +57,10 @@ function invalid(label: string, message: string): never {
   throw new Error(`${label}: ${message}`);
 }
 
-export function parseArchive(bytes: Uint8Array, label: string): {
+export function parseArchive(
+  bytes: Uint8Array,
+  label: string,
+): {
   metadata: Record<string, unknown>;
   content: Uint8Array;
 } {
@@ -79,8 +84,9 @@ export function parseArchive(bytes: Uint8Array, label: string): {
 
   let metadata: Record<string, unknown>;
   try {
-    metadata = JSON.parse(textDecoder.decode(
-        bytes.subarray(PREFIX_BYTES, PREFIX_BYTES + metadataLength)));
+    metadata = JSON.parse(
+      textDecoder.decode(bytes.subarray(PREFIX_BYTES, PREFIX_BYTES + metadataLength)),
+    );
   } catch (err) {
     invalid(label, `metadata is not valid UTF-8 JSON (${errorMessage(err)})`);
   }
@@ -122,12 +128,15 @@ export function extractFiles(content: Uint8Array, label: string): Map<string, st
     invalid(label, `content is not a valid Yjs V2 update (${errorMessage(err)})`);
   }
 
-  if ([...doc.share.keys()].some(name => name !== "")) {
+  if ([...doc.share.keys()].some((name) => name !== "")) {
     invalid(label, "content contains a non-canonical named Yjs root");
   }
   const root = doc.getMap();
   const entries = [...root];
-  validateFilePaths(entries.map(([filename]) => filename), label);
+  validateFilePaths(
+    entries.map(([filename]) => filename),
+    label,
+  );
   const files = new Map<string, string>();
   for (const [filename, value] of entries) {
     if (!(value instanceof Y.Text)) invalid(label, `${filename} is not text`);
@@ -150,7 +159,7 @@ export function buildContent(files: Map<string, string>, label: string): Uint8Ar
   }
   const update = Y.encodeStateAsUpdateV2(doc);
   if (update.byteLength > MAX_SOURCE_BYTES) invalid(label, "source snapshot is too large");
-  return gzipSync(update, {level: 9});
+  return gzipSync(update, { level: 9 });
 }
 
 /**
@@ -171,8 +180,9 @@ export async function readSourceFiles(
   if (!root.isDirectory()) invalid(label, "must be a directory");
 
   const visit = async (directory: string, prefix: string): Promise<void> => {
-    for (const entry of (await readdir(directory, { withFileTypes: true }))
-        .toSorted((a, b) => compareNames(a.name, b.name))) {
+    for (const entry of (await readdir(directory, { withFileTypes: true })).toSorted((a, b) =>
+      compareNames(a.name, b.name),
+    )) {
       const path = prefix ? `${prefix}/${entry.name}` : entry.name;
       validateFilePath(path, label);
       if (entry.isSymbolicLink()) invalid(label, `${path} must not be a symlink`);
@@ -372,8 +382,9 @@ async function bundleTypeScriptSources(
   const entries: EntryPoint[] = [];
   // Each TypeScript module's imports, read once and shared with the reachability walk below.
   const scans = new Map<string, ModuleScan>();
-  const typescript = [...files.keys()]
-    .some(path => path.endsWith(".ts") && !DECLARATION_PATTERN.test(path));
+  const typescript = [...files.keys()].some(
+    (path) => path.endsWith(".ts") && !DECLARATION_PATTERN.test(path),
+  );
   for (const [path, source] of files) {
     if (DECLARATION_PATTERN.test(path)) {
       // Ships no code, but can name a `lib/` module in type position (see importedModules).
@@ -381,19 +392,28 @@ async function bundleTypeScriptSources(
       continue;
     }
     if (UNSUPPORTED_TYPESCRIPT_PATTERN.test(path)) {
-      invalid(label, `${path} is not a gadget module: gadget TypeScript is plain .ts, not .tsx, ` +
-          `.mts or .cts`);
+      invalid(
+        label,
+        `${path} is not a gadget module: gadget TypeScript is plain .ts, not .tsx, ` +
+          `.mts or .cts`,
+      );
     }
     if (!path.endsWith(".ts")) {
       if (typescript && MODULE_PATTERN.test(path)) {
-        invalid(label, `${path} is a JavaScript module in a TypeScript blueprint; a blueprint is ` +
+        invalid(
+          label,
+          `${path} is a JavaScript module in a TypeScript blueprint; a blueprint is ` +
             `written in one or the other, since a module that ships as written cannot import ` +
-            `what the bundle compiled away`);
+            `what the bundle compiled away`,
+        );
       }
       if (typescript && path.split("/").at(-1) === "package.json") {
-        invalid(label, `${path} is a package.json in a TypeScript blueprint; the bundler would ` +
+        invalid(
+          label,
+          `${path} is a package.json in a TypeScript blueprint; the bundler would ` +
             `read it, and its browser field or imports map can send an import of one of the ` +
-            `blueprint's modules to another, so the tree ships none`);
+            `blueprint's modules to another, so the tree ships none`,
+        );
       }
       output.set(path, source);
       continue;
@@ -401,23 +421,32 @@ async function bundleTypeScriptSources(
     const scan = scanModule(path, source);
     scans.set(path, scan);
     if (scan.rebindsRequire) {
-      invalid(label, `${path} binds the name require; a bare require(...) is read as the module ` +
+      invalid(
+        label,
+        `${path} binds the name require; a bare require(...) is read as the module ` +
           `loader, which the bundler leaves alone once the name is rebound, so a module may not ` +
-          `rebind it`);
+          `rebind it`,
+      );
     }
     if (scan.dynamic) {
-      invalid(label, `${path} contains ${scan.dynamic}(...): a dynamic import whose path is not ` +
+      invalid(
+        label,
+        `${path} contains ${scan.dynamic}(...): a dynamic import whose path is not ` +
           `a string literal; the bundler would expand a pattern into every file it matches, or ` +
-          `leave a computed path unchecked`);
+          `leave a computed path unchecked`,
+      );
     }
     if (path.startsWith(LIB_PREFIX)) {
       libSources.add(path);
       continue;
     }
-    const entry = ENTRY_POINTS.find(candidate => `${candidate.name}.ts` === path);
+    const entry = ENTRY_POINTS.find((candidate) => `${candidate.name}.ts` === path);
     if (!entry) {
-      invalid(label, `${path} is not a gadget module: only client.ts, server.ts and ` +
-          `${LIB_PREFIX}**/*.ts are compiled`);
+      invalid(
+        label,
+        `${path} is not a gadget module: only client.ts, server.ts and ` +
+          `${LIB_PREFIX}**/*.ts are compiled`,
+      );
     }
     entries.push(entry);
   }
@@ -442,70 +471,85 @@ async function bundleTypeScriptSources(
   // Every input esbuild inlined into some bundle, as an archive path: what the bundles can witness
   // of a `lib/` module being wanted.
   const bundled = new Set<string>();
-  await Promise.all(entries.map(async entry => {
-    let metafile: Metafile;
-    let text: string;
-    try {
-      const result = await build({
-        absWorkingDir: rootDir,
-        entryPoints: [`${entry.name}.ts`],
-        bundle: true,
-        external: [...entry.external],
-        alias: { [PACKAGE_NAME]: packageDir },
-        format: "esm",
-        platform: entry.platform,
-        target: GADGET_TARGET,
-        charset: "utf8",
-        minify: false,
-        // A `"sideEffects": false` in whatever package.json encloses the tree applies to the
-        // package's own relative imports too, so esbuild would drop `import "./lib/setup.ts"` from
-        // the output with only a warning, which the silent log level swallows and the audit cannot
-        // see: the source names the module, so it counts as imported, and a dropped input is
-        // simply absent from the metafile. Blueprints and libraries write no `@__PURE__`
-        // annotations, so nothing else is kept.
-        ignoreAnnotations: true,
-        sourcemap: false,
-        write: false,
-        metafile: true,
-        logLevel: "silent",
-        // A blueprint's compile must not pick up whichever tsconfig sits above its directory --
-        // BUNDLED_BLUEPRINTS_DIR can name a tree anywhere.
-        tsconfigRaw: {},
-      });
-      metafile = result.metafile;
-      text = result.outputFiles[0]!.text;
-    } catch (err) {
-      invalid(label, `${entry.name}.ts failed to bundle: ${errorMessage(err)}`);
-    }
-    for (const input of auditInputs(metafile, entry, files, rootDir, librariesDir, label)) {
-      bundled.add(input);
-    }
-    for (const bundle of Object.values(metafile.outputs)) {
-      for (const imported of bundle.imports) {
-        if (imported.external && !matchesExternal(imported.path, entry.external)) {
-          invalid(label, `${entry.name}.ts imports ${imported.path}, which the ${entry.name} ` +
-              `runtime does not supply`);
+  await Promise.all(
+    entries.map(async (entry) => {
+      let metafile: Metafile;
+      let text: string;
+      try {
+        const result = await build({
+          absWorkingDir: rootDir,
+          entryPoints: [`${entry.name}.ts`],
+          bundle: true,
+          external: [...entry.external],
+          alias: { [PACKAGE_NAME]: packageDir },
+          format: "esm",
+          platform: entry.platform,
+          target: GADGET_TARGET,
+          charset: "utf8",
+          minify: false,
+          // A `"sideEffects": false` in whatever package.json encloses the tree applies to the
+          // package's own relative imports too, so esbuild would drop `import "./lib/setup.ts"` from
+          // the output with only a warning, which the silent log level swallows and the audit cannot
+          // see: the source names the module, so it counts as imported, and a dropped input is
+          // simply absent from the metafile. Blueprints and libraries write no `@__PURE__`
+          // annotations, so nothing else is kept.
+          ignoreAnnotations: true,
+          sourcemap: false,
+          write: false,
+          metafile: true,
+          logLevel: "silent",
+          // A blueprint's compile must not pick up whichever tsconfig sits above its directory --
+          // BUNDLED_BLUEPRINTS_DIR can name a tree anywhere.
+          tsconfigRaw: {},
+        });
+        metafile = result.metafile;
+        text = result.outputFiles[0]!.text;
+      } catch (err) {
+        invalid(label, `${entry.name}.ts failed to bundle: ${errorMessage(err)}`);
+      }
+      for (const input of auditInputs(metafile, entry, files, rootDir, librariesDir, label)) {
+        bundled.add(input);
+      }
+      for (const bundle of Object.values(metafile.outputs)) {
+        for (const imported of bundle.imports) {
+          if (imported.external && !matchesExternal(imported.path, entry.external)) {
+            invalid(
+              label,
+              `${entry.name}.ts imports ${imported.path}, which the ${entry.name} ` +
+                `runtime does not supply`,
+            );
+          }
         }
       }
-    }
-    if (scanModule(`${entry.name}.js`, text).dynamic === "import") {
-      invalid(label, `${entry.name}.ts contains a dynamic import whose path is not a string ` +
-          `literal; the bundler cannot check it`);
-    }
-    if (RESIDUAL_REQUIRE_PATTERN.test(text)) {
-      invalid(label, `${entry.name}.ts references require: a require(...) the bundler could not ` +
-          `resolve, or a module it took for CommonJS (a module.exports assignment, or a ` +
-          `package.json above the blueprint with "type": "commonjs"); the bundle is an ES module ` +
-          `and the gadget runtime has no require`);
-    }
-    output.set(`${entry.name}.js`, nameLibraryModules(text, metafile, rootDir, librariesDir));
-  }));
+      if (scanModule(`${entry.name}.js`, text).dynamic === "import") {
+        invalid(
+          label,
+          `${entry.name}.ts contains a dynamic import whose path is not a string ` +
+            `literal; the bundler cannot check it`,
+        );
+      }
+      if (RESIDUAL_REQUIRE_PATTERN.test(text)) {
+        invalid(
+          label,
+          `${entry.name}.ts references require: a require(...) the bundler could not ` +
+            `resolve, or a module it took for CommonJS (a module.exports assignment, or a ` +
+            `package.json above the blueprint with "type": "commonjs"); the bundle is an ES module ` +
+            `and the gadget runtime has no require`,
+        );
+      }
+      output.set(`${entry.name}.js`, nameLibraryModules(text, metafile, rootDir, librariesDir));
+    }),
+  );
   // A `lib/` module is wanted if some bundle inlined it, or if the source names it. Types are
   // erased before the bundle is written, so a module holding only the shared contract is inlined
   // nowhere and only the source can witness it (see importedModules); the metafile is kept beside
   // it so that a module the bundler reached by a path the parse did not attribute to an import is
   // still vouched for, rather than reported as unimported by a build that shipped it.
-  const imported = importedModules(files, scans, entries.map(entry => `${entry.name}.ts`));
+  const imported = importedModules(
+    files,
+    scans,
+    entries.map((entry) => `${entry.name}.ts`),
+  );
   for (const lib of libSources) {
     if (!imported.has(lib) && !bundled.has(lib)) {
       invalid(label, `${lib} is not imported by any entry point`);
@@ -572,9 +616,12 @@ function auditInputs(
     for (const imported of metafile.inputs[importer]?.imports ?? []) {
       if (imported.external) {
         if (imported.path.includes("*")) {
-          invalid(label, `${importer} imports ${imported.path}: a dynamic import of a template ` +
+          invalid(
+            label,
+            `${importer} imports ${imported.path}: a dynamic import of a template ` +
               `literal, which the bundler expands to every file the pattern matches and cannot ` +
-              `check`);
+              `check`,
+          );
         }
         continue;
       }
@@ -585,34 +632,49 @@ function auditInputs(
         const absolute = resolve(rootDir, input);
         if (files.has(importer)) {
           if (specifier !== PACKAGE_NAME && !specifier.startsWith(`${PACKAGE_NAME}/`)) {
-            invalid(label, `${importer} imports ${specifier}, which is outside the blueprint's ` +
-                `files`);
+            invalid(
+              label,
+              `${importer} imports ${specifier}, which is outside the blueprint's ` + `files`,
+            );
           }
           const library = specifier.startsWith(LIBRARY_PREFIX)
-              ? LIBRARY_SUBPATH.exec(specifier.slice(LIBRARY_PREFIX.length))
-              : null;
+            ? LIBRARY_SUBPATH.exec(specifier.slice(LIBRARY_PREFIX.length))
+            : null;
           if (!library) {
-            invalid(label, `${importer} imports ${specifier}, which is not a library import ` +
-                `(${LIBRARY_PREFIX}<name>/client or ${LIBRARY_PREFIX}<name>/server)`);
+            invalid(
+              label,
+              `${importer} imports ${specifier}, which is not a library import ` +
+                `(${LIBRARY_PREFIX}<name>/client or ${LIBRARY_PREFIX}<name>/server)`,
+            );
           }
           const [, name, side] = library;
           if (side !== entry.name) {
             invalid(label, `${importer} imports ${specifier} from the ${entry.name} side`);
           }
           if (absolute !== join(librariesDir, name, `${side}.ts`)) {
-            invalid(label, `${importer} imports ${specifier}, which does not resolve to the ` +
-                `library's ${side}.ts`);
+            invalid(
+              label,
+              `${importer} imports ${specifier}, which does not resolve to the ` +
+                `library's ${side}.ts`,
+            );
           }
-        } else if (!contains(librariesDir, absolute) ||
-            absolute.split(/[\\/]/u).includes("node_modules")) {
+        } else if (
+          !contains(librariesDir, absolute) ||
+          absolute.split(/[\\/]/u).includes("node_modules")
+        ) {
           invalid(label, `${importer} imports ${specifier}, which is outside the gadget libraries`);
         }
-      } else if (files.has(importer) &&
-          (!isRelative(specifier) || resolveWithinFiles(files, importer, specifier) !== input)) {
-        invalid(label, `${importer} imports ${specifier}, which the bundler resolved to ${input} ` +
+      } else if (
+        files.has(importer) &&
+        (!isRelative(specifier) || resolveWithinFiles(files, importer, specifier) !== input)
+      ) {
+        invalid(
+          label,
+          `${importer} imports ${specifier}, which the bundler resolved to ${input} ` +
             `rather than the module TypeScript resolves the specifier to; a package.json above ` +
             `the blueprint is steering it, or the bundler prefers a file TypeScript never reads ` +
-            `(one without an extension, say)`);
+            `(one without an extension, say)`,
+        );
       }
       if (!seen.has(input)) {
         seen.add(input);
@@ -673,9 +735,12 @@ function matchesExternal(specifier: string, externals: readonly string[]): boole
 function checkShippedImports(path: string, source: string, label: string): void {
   for (const specifier of scanModule(path, source).specifiers) {
     if (specifier === PACKAGE_NAME || specifier.startsWith(`${PACKAGE_NAME}/`)) {
-      invalid(label, `${path} imports ${specifier}: a gadget library is inlined by the build ` +
+      invalid(
+        label,
+        `${path} imports ${specifier}: a gadget library is inlined by the build ` +
           `into a TypeScript entry only; ${path} ships as written, and the runtime has nothing ` +
-          `to resolve the package name against`);
+          `to resolve the package name against`,
+      );
     }
   }
 }
@@ -712,7 +777,7 @@ function importedModules(
 
 /** Whether `specifier` is spelled relative to its importer, the only way to name a file of the blueprint's own. */
 const isRelative = (specifier: string): boolean =>
-    specifier.startsWith("./") || specifier.startsWith("../");
+  specifier.startsWith("./") || specifier.startsWith("../");
 
 /**
  * The one archive path a relative `specifier` written in `importer` names, or `undefined` when it
@@ -746,11 +811,16 @@ function resolveWithinFiles(
   }
   const path = segments.join("/");
   if (path === "") return undefined;
-  const candidates = RESOLVED_AS_WRITTEN.test(path) ? [path]
-      : JAVASCRIPT_EXTENSION.test(path)
-      ? [path.replace(JAVASCRIPT_EXTENSION, ".ts"), path.replace(JAVASCRIPT_EXTENSION, ".d.ts"), path]
+  const candidates = RESOLVED_AS_WRITTEN.test(path)
+    ? [path]
+    : JAVASCRIPT_EXTENSION.test(path)
+      ? [
+          path.replace(JAVASCRIPT_EXTENSION, ".ts"),
+          path.replace(JAVASCRIPT_EXTENSION, ".d.ts"),
+          path,
+        ]
       : [`${path}.ts`, `${path}.d.ts`, `${path}/index.ts`, `${path}/index.d.ts`];
-  return candidates.find(candidate => files.has(candidate));
+  return candidates.find((candidate) => files.has(candidate));
 }
 
 function validateFilePaths(paths: Iterable<string>, label: string): void {
@@ -771,8 +841,11 @@ export function validatePortablePaths(paths: Iterable<string>, label: string): v
     }
     const conflictingDirectory = portableDirectories.get(portable);
     if (conflictingDirectory) {
-      invalid(label, `${path} conflicts with directory ${conflictingDirectory} on ` +
-          `case-insensitive filesystems`);
+      invalid(
+        label,
+        `${path} conflicts with directory ${conflictingDirectory} on ` +
+          `case-insensitive filesystems`,
+      );
     }
     portablePaths.set(portable, path);
 
@@ -782,13 +855,18 @@ export function validatePortablePaths(paths: Iterable<string>, label: string): v
       const portableDirectory = portablePath(directory);
       const existingDirectory = portableDirectories.get(portableDirectory);
       if (existingDirectory && existingDirectory !== directory) {
-        invalid(label, `${directory} aliases directory ${existingDirectory} on ` +
-            `case-insensitive filesystems`);
+        invalid(
+          label,
+          `${directory} aliases directory ${existingDirectory} on ` +
+            `case-insensitive filesystems`,
+        );
       }
       const existingFile = portablePaths.get(portableDirectory);
       if (existingFile) {
-        invalid(label, `${path} conflicts with file ${existingFile} on ` +
-            `case-insensitive filesystems`);
+        invalid(
+          label,
+          `${path} conflicts with file ${existingFile} on ` + `case-insensitive filesystems`,
+        );
       }
       portableDirectories.set(portableDirectory, directory);
     }
@@ -807,16 +885,24 @@ export function validatePortablePaths(paths: Iterable<string>, label: string): v
 }
 
 function validateFilePath(path: string, label: string): void {
-  if (typeof path !== "string" || path.includes("\\") || path.includes("\0") ||
-      path.split("/").some(segment => segment === "" || segment === "." || segment === "..")) {
+  if (
+    typeof path !== "string" ||
+    path.includes("\\") ||
+    path.includes("\0") ||
+    path.split("/").some((segment) => segment === "" || segment === "." || segment === "..")
+  ) {
     invalid(label, `unsafe blueprint file path ${JSON.stringify(path)}`);
   }
   for (const segment of path.split("/")) {
-    if ([...segment].some(char => char.codePointAt(0)! <= 0x1f) || /[<>:"|?*]/u.test(segment) ||
-        /[. ]$/u.test(segment) ||
-        /^(con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/iu
-            .test(segment) ||
-        /^\.git(?:ignore)?$/iu.test(segment)) {
+    if (
+      [...segment].some((char) => char.codePointAt(0)! <= 0x1f) ||
+      /[<>:"|?*]/u.test(segment) ||
+      /[. ]$/u.test(segment) ||
+      /^(con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/iu.test(
+        segment,
+      ) ||
+      /^\.git(?:ignore)?$/iu.test(segment)
+    ) {
       invalid(label, `non-portable blueprint file path ${JSON.stringify(path)}`);
     }
   }

@@ -4,7 +4,7 @@
 // covers the RPC surface -- and, because capnweb-validate is *not* mocked here, importing
 // overseer.ts compiles the generated validators, including the recursive TreeNode return shape.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createTypedStorage } from "@gadgets/typed-storage";
 import { MAX_READ_FILES_PER_CALL } from "@gadgets/workshop-shared/api";
 import { WorkspaceGitCache, gitObjectMetadataCollection } from "../src/git-cache";
@@ -23,7 +23,9 @@ async function openWithFixtureRepo(role: "build" | "use") {
     },
   });
   let gitCache = new WorkspaceGitCache(storage, {
-    pull: async () => { throw new Error("test: nothing should pull"); },
+    pull: async () => {
+      throw new Error("test: nothing should pull");
+    },
   });
   for (let object of FIXTURE_OBJECTS) {
     if (PACKED_OIDS.includes(object.oid)) {
@@ -37,9 +39,13 @@ describe("commit reads over the Overseer interface", () => {
   it("serves the nested tree and file contents to a build collaborator", async () => {
     let client = await openWithFixtureRepo("build");
     let tree = await client.listTree(COMMIT_1);
-    expect(tree.map(node => [node.name, node.kind])).toStrictEqual([
-      ["README.md", "file"], ["docs", "dir"], ["link.md", "symlink"], ["run.sh", "executable"],
-      ["src", "dir"], ["vendored", "submodule"],
+    expect(tree.map((node) => [node.name, node.kind])).toStrictEqual([
+      ["README.md", "file"],
+      ["docs", "dir"],
+      ["link.md", "symlink"],
+      ["run.sh", "executable"],
+      ["src", "dir"],
+      ["vendored", "submodule"],
     ]);
     expect(await client.readFilesAtCommit(COMMIT_1, ["README.md", "nope.txt"])).toStrictEqual([
       ["README.md", { kind: "text", text: "# Fixture\n" }],
@@ -51,8 +57,9 @@ describe("commit reads over the Overseer interface", () => {
     let client = await openWithFixtureRepo("build");
     await expect(client.listTree("HEAD")).rejects.toThrow("Invalid commit id.");
     await expect(client.listTree(COMMIT_1.slice(0, 12))).rejects.toThrow("Invalid commit id.");
-    await expect(client.readFilesAtCommit("../../etc", ["README.md"]))
-        .rejects.toThrow("Invalid commit id.");
+    await expect(client.readFilesAtCommit("../../etc", ["README.md"])).rejects.toThrow(
+      "Invalid commit id.",
+    );
   });
 
   it("caps the paths per readFilesAtCommit call", async () => {
@@ -60,8 +67,9 @@ describe("commit reads over the Overseer interface", () => {
     let paths = Array.from({ length: MAX_READ_FILES_PER_CALL + 1 }, (_, i) => `f${i}.txt`);
     await expect(client.readFilesAtCommit(COMMIT_1, paths)).rejects.toThrow(/Too many paths/);
     // Exactly the cap is fine.
-    expect(await client.readFilesAtCommit(COMMIT_1, paths.slice(1)))
-        .toHaveLength(MAX_READ_FILES_PER_CALL);
+    expect(await client.readFilesAtCommit(COMMIT_1, paths.slice(1))).toHaveLength(
+      MAX_READ_FILES_PER_CALL,
+    );
   });
 
   it("denies both reads to a use collaborator", async () => {

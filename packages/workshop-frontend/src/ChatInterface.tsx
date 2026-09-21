@@ -13,14 +13,8 @@ import {
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { reportIssue } from './errorReporting'
-import {
-  Dialog,
-  DropdownMenu,
-  Popover,
-  Tooltip,
-  useKumoToastManager,
-} from "@cloudflare/kumo";
+import { reportIssue } from "./errorReporting";
+import { Dialog, DropdownMenu, Popover, Tooltip, useKumoToastManager } from "@cloudflare/kumo";
 
 import {
   CaretDown,
@@ -58,10 +52,7 @@ import { RpcStub, RpcTarget } from "capnweb";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import styles from "./ChatInterface.module.css";
-import {
-  getStoredSelectedModel,
-  persistSelectedModel,
-} from "./modelSelection";
+import { getStoredSelectedModel, persistSelectedModel } from "./modelSelection";
 import {
   Overseer,
   GatekeeperClient,
@@ -87,7 +78,8 @@ import { composeCodeChange, type CodeChange } from "@gadgets/workshop-shared/cod
 import type { ChatChangeRow } from "./features/code/otClient";
 import { ActionKind } from "@gadgets/workshop-shared/gatekeeper";
 import {
-  useSlashCommandChoice, type OverseerSource,
+  useSlashCommandChoice,
+  type OverseerSource,
 } from "./components/chat/slash-command-catalog";
 import GatekeeperModal from "./GatekeeperModal";
 import { GatekeeperIcon } from "./components/GatekeeperIcon";
@@ -143,23 +135,27 @@ export interface ChatLiveChangeRows {
  * additionally resolves each preview when its durable change row arrives (see
  * WorkpieceCodeInterface), which is the ordinary end of a successful one.
  */
-export type EditPreviewEvent = {
-  kind: "start";
-  toolCallId: string;
-  workpieceId: WorkpieceId;
-  filename: string;
-  /** editFile's replaced text; absent for writeFile (the streamed text replaces the whole file). */
-  textToReplace?: string;
-} | {
-  kind: "delta";
-  toolCallId: string;
-  delta: string;
-} | {
-  kind: "clear";
-  toolCallId: string;
-} | {
-  kind: "reset";
-};
+export type EditPreviewEvent =
+  | {
+      kind: "start";
+      toolCallId: string;
+      workpieceId: WorkpieceId;
+      filename: string;
+      /** editFile's replaced text; absent for writeFile (the streamed text replaces the whole file). */
+      textToReplace?: string;
+    }
+  | {
+      kind: "delta";
+      toolCallId: string;
+      delta: string;
+    }
+  | {
+      kind: "clear";
+      toolCallId: string;
+    }
+  | {
+      kind: "reset";
+    };
 
 /**
  * The selected chat's live edit-preview stream (see EditPreviewEvent), fed synchronously from
@@ -355,10 +351,9 @@ function pruneChatChangeRows(
     return true;
   }
   buffer.rows = kept;
-  buffer.seen = new Set(kept.map(row => `${row.generation}:${row.revision}`));
+  buffer.seen = new Set(kept.map((row) => `${row.generation}:${row.revision}`));
   return true;
 }
-
 
 const CAPSULE_LINK_PREFIX = "/__gadgets_capsule__/";
 const CAPSULE_TOKEN_PREFIX = "GADGETS_CAPSULE_";
@@ -376,11 +371,7 @@ type TokenizedCapsuleMessage = {
   mentionsByToken: Map<string, Mention>;
 };
 
-function generateCapsuleToken(
-  message: string,
-  index: number,
-  usedTokens: Set<string>,
-) {
+function generateCapsuleToken(message: string, index: number, usedTokens: Set<string>) {
   let attempt = 0;
   while (true) {
     const suffix = attempt === 0 ? "" : `_${attempt}`;
@@ -399,9 +390,7 @@ type Mention =
   | { kind: "format"; format: MessageFormatRef };
 
 function mentionText(mention: Mention): string {
-  return mention.kind === "capsule"
-      ? mention.capsule.description.title
-      : mention.format.noun;
+  return mention.kind === "capsule" ? mention.capsule.description.title : mention.format.noun;
 }
 
 function buildTokenizedCapsuleMessage(
@@ -410,12 +399,16 @@ function buildTokenizedCapsuleMessage(
   formats: MessageFormatRef[] | undefined,
 ): TokenizedCapsuleMessage {
   const spans = [
-    ...(capsules ?? []).map(capsule =>
-        ({position: capsule.position, length: capsule.length,
-          mention: {kind: "capsule", capsule} as Mention})),
-    ...(formats ?? []).map(format =>
-        ({position: format.position, length: format.length,
-          mention: {kind: "format", format} as Mention})),
+    ...(capsules ?? []).map((capsule) => ({
+      position: capsule.position,
+      length: capsule.length,
+      mention: { kind: "capsule", capsule } as Mention,
+    })),
+    ...(formats ?? []).map((format) => ({
+      position: format.position,
+      length: format.length,
+      mention: { kind: "format", format } as Mention,
+    })),
   ].toSorted((a, b) => a.position - b.position);
 
   const usedTokens = new Set<string>();
@@ -504,10 +497,7 @@ function splitTextOnCapsuleTokens(
   return parts;
 }
 
-function replaceCapsuleTokensInTree(
-  node: MarkdownAstNode,
-  mentionsByToken: Map<string, Mention>,
-) {
+function replaceCapsuleTokensInTree(node: MarkdownAstNode, mentionsByToken: Map<string, Mention>) {
   if (!node.children || node.children.length === 0) {
     return;
   }
@@ -515,10 +505,7 @@ function replaceCapsuleTokensInTree(
   const nextChildren: MarkdownAstNode[] = [];
   for (const child of node.children) {
     if (child.type === "text" && typeof child.value === "string") {
-      const replacementNodes = splitTextOnCapsuleTokens(
-        child.value,
-        mentionsByToken,
-      );
+      const replacementNodes = splitTextOnCapsuleTokens(child.value, mentionsByToken);
       if (replacementNodes) {
         nextChildren.push(...replacementNodes);
         continue;
@@ -597,7 +584,6 @@ function getToolCallSummary(
     case "saveCapsuleAsBinding":
       return { verb: "Saved resource", target: tc.input.bindingName };
     case "createGadget": {
-
       const output = outputOf?.(tc);
       return { verb: `Created ${output?.noun ?? "gadget"}`, target: tc.input.title };
     }
@@ -667,9 +653,16 @@ function createdWorkpiecesOf(m: ChangeChatMessage): CreatedWorkpieceName[] {
 // Whether the message records nothing but worktree creations. Reverting such a message changes
 // nothing, since no revert deletes a worktree, so it gets no discard affordance.
 function recordsOnlyWorktreeCreations(m: ChangeChatMessage): boolean {
-  return !!m.createdWorktrees?.length && m.change === undefined && !m.pins?.length &&
-    !m.createdGadgets?.length && !m.addedBindings?.length && !m.worktreeCommits?.length &&
-    m.mainlineMerge === undefined && !m.conversionBoundary;
+  return (
+    !!m.createdWorktrees?.length &&
+    m.change === undefined &&
+    !m.pins?.length &&
+    !m.createdGadgets?.length &&
+    !m.addedBindings?.length &&
+    !m.worktreeCommits?.length &&
+    m.mainlineMerge === undefined &&
+    !m.conversionBoundary
+  );
 }
 type ObservationChatMessage = ActionChatMessage & {
   actionLog: NonNullable<ActionChatMessage["actionLog"]> & { type: "observation" };
@@ -817,22 +810,38 @@ function getToolTarget(tc: AiToolCall): string | undefined {
 // Present-tense verb for an in-progress tool call.
 function getProvisionalToolVerb(toolName: AiToolCall["toolName"]): string {
   switch (toolName) {
-    case "readFile": return "Reading";
-    case "writeFile": return "Writing";
-    case "editFile": return "Editing";
-    case "describeBinding": return "Inspecting";
-    case "setBindingHook": return "Connecting";
-    case "setGadgetBinding": return "Wiring up";
-    case "saveCapsuleAsBinding": return "Saving";
-    case "createGadget": return "Creating gadget";
-    case "createWorktree": return "Creating worktree";
-    case "executeCode": return "Running code";
-    case "webFetch": return "Fetching";
-    case "observeUserChanges": return "Observing user changes";
-    case "giveUp": return "Stopping";
-    case "listBlueprints": return "Listing blueprints";
-    case "listConnectableResources": return "Listing connectable resources";
-    case "requestConnection": return "Requesting a connection";
+    case "readFile":
+      return "Reading";
+    case "writeFile":
+      return "Writing";
+    case "editFile":
+      return "Editing";
+    case "describeBinding":
+      return "Inspecting";
+    case "setBindingHook":
+      return "Connecting";
+    case "setGadgetBinding":
+      return "Wiring up";
+    case "saveCapsuleAsBinding":
+      return "Saving";
+    case "createGadget":
+      return "Creating gadget";
+    case "createWorktree":
+      return "Creating worktree";
+    case "executeCode":
+      return "Running code";
+    case "webFetch":
+      return "Fetching";
+    case "observeUserChanges":
+      return "Observing user changes";
+    case "giveUp":
+      return "Stopping";
+    case "listBlueprints":
+      return "Listing blueprints";
+    case "listConnectableResources":
+      return "Listing connectable resources";
+    case "requestConnection":
+      return "Requesting a connection";
   }
   const _exhaustive: never = toolName;
   return _exhaustive;
@@ -842,32 +851,48 @@ function getProvisionalToolVerb(toolName: AiToolCall["toolName"]): string {
 function describeProvisionalToolCount(toolName: AiToolCall["toolName"], count: number): string {
   if (count <= 1) return getProvisionalToolLabel(toolName);
   switch (toolName) {
-    case "readFile": return `Reading ${pluralize(count, "file")}`;
-    case "writeFile": return `Writing ${pluralize(count, "file")}`;
-    case "editFile": return `Making ${count} edits`;
-    case "webFetch": return `Fetching ${pluralize(count, "page")}`;
-    case "executeCode": return count === 1 ? "Running code" : `Running code ${formatTimes(count)}`;
-    case "describeBinding": return `Inspecting ${pluralize(count, "binding")}`;
-    case "setBindingHook": return `Connecting ${pluralize(count, "binding")}`;
-    case "setGadgetBinding": return `Wiring up ${pluralize(count, "binding")}`;
-    case "saveCapsuleAsBinding": return `Saving ${pluralize(count, "resource")}`;
-    case "createGadget": return `Creating ${pluralize(count, "gadget")}`;
-    case "createWorktree": return `Creating ${pluralize(count, "worktree")}`;
-    case "observeUserChanges": return `Observing ${pluralize(count, "change set")}`;
-    case "giveUp": return "Stopping";
-    case "listBlueprints": return "Listing blueprints";
-    case "listConnectableResources": return "Listing connectable resources";
-    case "requestConnection": return `Requesting ${pluralize(count, "connection")}`;
+    case "readFile":
+      return `Reading ${pluralize(count, "file")}`;
+    case "writeFile":
+      return `Writing ${pluralize(count, "file")}`;
+    case "editFile":
+      return `Making ${count} edits`;
+    case "webFetch":
+      return `Fetching ${pluralize(count, "page")}`;
+    case "executeCode":
+      return count === 1 ? "Running code" : `Running code ${formatTimes(count)}`;
+    case "describeBinding":
+      return `Inspecting ${pluralize(count, "binding")}`;
+    case "setBindingHook":
+      return `Connecting ${pluralize(count, "binding")}`;
+    case "setGadgetBinding":
+      return `Wiring up ${pluralize(count, "binding")}`;
+    case "saveCapsuleAsBinding":
+      return `Saving ${pluralize(count, "resource")}`;
+    case "createGadget":
+      return `Creating ${pluralize(count, "gadget")}`;
+    case "createWorktree":
+      return `Creating ${pluralize(count, "worktree")}`;
+    case "observeUserChanges":
+      return `Observing ${pluralize(count, "change set")}`;
+    case "giveUp":
+      return "Stopping";
+    case "listBlueprints":
+      return "Listing blueprints";
+    case "listConnectableResources":
+      return "Listing connectable resources";
+    case "requestConnection":
+      return `Requesting ${pluralize(count, "connection")}`;
   }
   const _exhaustive: never = toolName;
   return _exhaustive;
 }
 
 // Builds the label + detail lines for the in-progress tool-call row.
-function buildProvisionalToolSummary(
-  calls: ProvisionalToolCallState[],
-): { label: string; detailLines: string[] } {
-
+function buildProvisionalToolSummary(calls: ProvisionalToolCallState[]): {
+  label: string;
+  detailLines: string[];
+} {
   if (calls.length === 1 && calls[0].outputFormat) {
     return { label: `Creating ${calls[0].outputFormat.noun}`, detailLines: [] };
   }
@@ -884,10 +909,7 @@ function buildProvisionalToolSummary(
 
   if (toolNames.length > 1) {
     const parts = toolNames.map((toolName) =>
-      describeProvisionalToolCount(
-        toolName,
-        calls.filter((c) => c.toolName === toolName).length,
-      ),
+      describeProvisionalToolCount(toolName, calls.filter((c) => c.toolName === toolName).length),
     );
     return {
       label: parts.map((part, i) => (i === 0 ? part : lowerFirst(part))).join(", "),
@@ -899,7 +921,9 @@ function buildProvisionalToolSummary(
   if (calls.length === 1) {
     const target = detailLines[0];
     return {
-      label: target ? `${getProvisionalToolVerb(toolName)} ${target}` : getProvisionalToolLabel(toolName),
+      label: target
+        ? `${getProvisionalToolVerb(toolName)} ${target}`
+        : getProvisionalToolLabel(toolName),
       detailLines: [],
     };
   }
@@ -933,14 +957,18 @@ function buildToolCallGroups(
     labelParts.push(`${summary.verb}${summary.target ? ` ${summary.target}` : ""}`);
   } else if (toolCalls.length > 1 && distinctToolNames.length === 1) {
     const summary = getToolCallSummary(toolCalls[0], outputOf);
-    labelParts.push(detailLines.length === 1 && summary.target && observations.length === 0
-      ? `${summary.verb} ${summary.target}`
-      : describeToolCallCount(toolCalls[0].toolName, toolCalls.length));
+    labelParts.push(
+      detailLines.length === 1 && summary.target && observations.length === 0
+        ? `${summary.verb} ${summary.target}`
+        : describeToolCallCount(toolCalls[0].toolName, toolCalls.length),
+    );
   } else if (toolCalls.length > 1 && distinctToolNames.length <= 3) {
-    labelParts.push(...distinctToolNames.map((toolName) => {
-      const count = toolCalls.filter((tc) => tc.toolName === toolName).length;
-      return describeToolCallCount(toolName, count);
-    }));
+    labelParts.push(
+      ...distinctToolNames.map((toolName) => {
+        const count = toolCalls.filter((tc) => tc.toolName === toolName).length;
+        return describeToolCallCount(toolName, count);
+      }),
+    );
   } else if (toolCalls.length > 0) {
     labelParts.push(`${toolCalls.length} tool calls`);
   }
@@ -952,22 +980,22 @@ function buildToolCallGroups(
   const firstToolCall = toolCalls[0];
   const firstObservation = observations[0];
 
-  return [{
-    // Use the first work item id so expansion survives streaming → committed.
-    key: firstToolCall
-      ? `group-${firstToolCall.toolCallId}`
-      : `group-observation-${firstObservation.chatId}-${firstObservation.sequence}`,
-    Icon: firstToolCall
-      ? getToolIcon(firstToolCall.toolName, outputOf?.(firstToolCall))
-      : MagnifyingGlass,
-    label: labelParts
-      .map((part, index) => index === 0 ? part : lowerFirst(part))
-      .join(", "),
-    detailLines,
-    calls: toolCalls,
-    observations,
-    hasError: toolCalls.some((tc) => Boolean(tc.error)),
-  }];
+  return [
+    {
+      // Use the first work item id so expansion survives streaming → committed.
+      key: firstToolCall
+        ? `group-${firstToolCall.toolCallId}`
+        : `group-observation-${firstObservation.chatId}-${firstObservation.sequence}`,
+      Icon: firstToolCall
+        ? getToolIcon(firstToolCall.toolName, outputOf?.(firstToolCall))
+        : MagnifyingGlass,
+      label: labelParts.map((part, index) => (index === 0 ? part : lowerFirst(part))).join(", "),
+      detailLines,
+      calls: toolCalls,
+      observations,
+      hasError: toolCalls.some((tc) => Boolean(tc.error)),
+    },
+  ];
 }
 
 function WorkIcon({ Icon }: { Icon: PhosphorIcon }) {
@@ -980,13 +1008,14 @@ function WorkIcon({ Icon }: { Icon: PhosphorIcon }) {
 // The plain-text counterpart to the markdown path's token substitution (see
 // buildTokenizedCapsuleMessage): markdown needs tokens because it reflows the text it is given,
 // while text rendered as typed can be cut at the offsets directly.
-function TextWithMentions(
-  { text, mentions }: {
-    text: string;
-    // `length` 0 inserts between characters, for something that was removed from the text.
-    mentions: { key: string; position: number; length: number; node: ReactNode }[];
-  },
-) {
+function TextWithMentions({
+  text,
+  mentions,
+}: {
+  text: string;
+  // `length` 0 inserts between characters, for something that was removed from the text.
+  mentions: { key: string; position: number; length: number; node: ReactNode }[];
+}) {
   const parts: ReactNode[] = [];
   let cursor = 0;
   for (const mention of [...mentions].toSorted((a, b) => a.position - b.position)) {
@@ -1004,42 +1033,47 @@ function TextWithMentions(
 // Renders a user message that invoked a slash command: their words, with the command shown back
 // where they typed it and any formats they named as chips. What the command expanded into is the
 // agent's context, and isn't shown.
-function SlashCommandMention(
-  { name, args, id, commandPosition, formats, getOverseer }: {
-    name?: string;
-    args: string;
-    id: SlashCommandId;
-    commandPosition?: number;
-    formats?: MessageFormatRef[];
-    getOverseer: OverseerSource;
-  },
-) {
+function SlashCommandMention({
+  name,
+  args,
+  id,
+  commandPosition,
+  formats,
+  getOverseer,
+}: {
+  name?: string;
+  args: string;
+  id: SlashCommandId;
+  commandPosition?: number;
+  formats?: MessageFormatRef[];
+  getOverseer: OverseerSource;
+}) {
   const choice = useSlashCommandChoice(getOverseer, name ? id : undefined);
   const mention = name ? <span className="text-kumo-brand">/{name}</span> : null;
-  const command = choice
-    ? (
-      <Tooltip
-        content={
-          <span className="block max-w-xs">
-            {/* No `block` here: it would outrank the `-webkit-box` that line-clamp needs.
+  const command = choice ? (
+    <Tooltip
+      content={
+        <span className="block max-w-xs">
+          {/* No `block` here: it would outrank the `-webkit-box` that line-clamp needs.
                 An explicit leading is required: the clamp reserves a whole number of lines at
                 the *inherited* line height, so without one the reserved box and the rendered
                 lines disagree and the last line is sliced through the middle. Two lines rather
                 than three keeps the whole tooltip inside its own height budget. */}
-            <span className="line-clamp-2 leading-[18px]">{choice.description}</span>
-            {/* Provider, then whatever identifies the command within it: for a skill that is
+          <span className="line-clamp-2 leading-[18px]">{choice.description}</span>
+          {/* Provider, then whatever identifies the command within it: for a skill that is
                 its collection and path. Same line the picker shows. */}
-            <span className="mt-0.5 block truncate text-kumo-subtle">
-              {[choice.providerLabel, choice.resourceLabel].filter(Boolean).join(" · ")}
-            </span>
+          <span className="mt-0.5 block truncate text-kumo-subtle">
+            {[choice.providerLabel, choice.resourceLabel].filter(Boolean).join(" · ")}
           </span>
-        }
-        asChild
-      >
-        {mention}
-      </Tooltip>
-    )
-    : mention;
+        </span>
+      }
+      asChild
+    >
+      {mention}
+    </Tooltip>
+  ) : (
+    mention
+  );
 
   if (!name) return <>{args}</>;
 
@@ -1057,7 +1091,13 @@ function SlashCommandMention(
           key: "command",
           position: at,
           length: 0,
-          node: <>{spaceBefore ? " " : ""}{command}{spaceAfter ? " " : ""}</>,
+          node: (
+            <>
+              {spaceBefore ? " " : ""}
+              {command}
+              {spaceAfter ? " " : ""}
+            </>
+          ),
         },
         ...(formats ?? []).map((format, i) => ({
           key: `format-${i}`,
@@ -1082,12 +1122,7 @@ function CapsuleMention({ capsule }: { capsule: CapsuleSpecifier }) {
     </>
   );
   return safeUrl ? (
-    <a
-      href={safeUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={styles.capsuleMention}
-    >
+    <a href={safeUrl} target="_blank" rel="noopener noreferrer" className={styles.capsuleMention}>
       {body}
     </a>
   ) : (
@@ -1109,10 +1144,11 @@ function FormatMention({ format }: { format: MessageFormatRef }) {
 }
 
 function CodeBlock({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
-  const code = isValidElement<{ children?: ReactNode }>(children) &&
-      typeof children.props.children === "string"
-    ? children.props.children.replace(/\n$/, "")
-    : "";
+  const code =
+    isValidElement<{ children?: ReactNode }>(children) &&
+    typeof children.props.children === "string"
+      ? children.props.children.replace(/\n$/, "")
+      : "";
 
   return (
     <div className={styles.codeBlock}>
@@ -1130,9 +1166,7 @@ function CodeBlock({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
   );
 }
 
-function getMarkdownComponents(
-  mentionsByToken?: Map<string, Mention>,
-): Components {
+function getMarkdownComponents(mentionsByToken?: Map<string, Mention>): Components {
   return {
     pre: ({ node: _node, ...props }) => <CodeBlock {...props} />,
     table: ({ node: _node, children, ...props }) => (
@@ -1145,9 +1179,11 @@ function getMarkdownComponents(
         const token = decodeURIComponent(href.slice(CAPSULE_LINK_PREFIX.length));
         const mention = mentionsByToken.get(token);
         if (mention) {
-          return mention.kind === "capsule"
-              ? <CapsuleMention capsule={mention.capsule} />
-              : <FormatMention format={mention.format} />;
+          return mention.kind === "capsule" ? (
+            <CapsuleMention capsule={mention.capsule} />
+          ) : (
+            <FormatMention format={mention.format} />
+          );
         }
       }
 
@@ -1157,12 +1193,7 @@ function getMarkdownComponents(
       }
 
       return (
-        <a
-          {...props}
-          href={safeHref}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a {...props} href={safeHref} target="_blank" rel="noopener noreferrer">
           {children}
         </a>
       );
@@ -1178,38 +1209,39 @@ const MARKDOWN_COMPONENTS_NO_CAPSULES = getMarkdownComponents();
  * single newline in a user message survives to the DOM as a literal "\n" so the
  * `whitespace-pre-wrap` wrapper at the user-message render site renders it as a hard break.
  */
-export const MarkdownMessage = memo(function MarkdownMessage(
-  { message, capsules, formats }: {
-    message: string;
-    capsules?: CapsuleSpecifier[];
-    formats?: MessageFormatRef[];
-  },
-): ReactNode {
+export const MarkdownMessage = memo(function MarkdownMessage({
+  message,
+  capsules,
+  formats,
+}: {
+  message: string;
+  capsules?: CapsuleSpecifier[];
+  formats?: MessageFormatRef[];
+}): ReactNode {
   const tokenizedMessage = useMemo(
-    () => capsules?.length || formats?.length
-      ? buildTokenizedCapsuleMessage(message, capsules, formats)
-      : null,
+    () =>
+      capsules?.length || formats?.length
+        ? buildTokenizedCapsuleMessage(message, capsules, formats)
+        : null,
     [capsules, formats, message],
   );
   const components = useMemo(
-    () => tokenizedMessage
-      ? getMarkdownComponents(tokenizedMessage.mentionsByToken)
-      : MARKDOWN_COMPONENTS_NO_CAPSULES,
+    () =>
+      tokenizedMessage
+        ? getMarkdownComponents(tokenizedMessage.mentionsByToken)
+        : MARKDOWN_COMPONENTS_NO_CAPSULES,
     [tokenizedMessage],
   );
   const remarkPlugins = useMemo(
-    () => tokenizedMessage
-      ? [remarkGfm, createCapsuleRemarkPlugin(tokenizedMessage.mentionsByToken)]
-      : REMARK_PLUGINS_NO_CAPSULES,
+    () =>
+      tokenizedMessage
+        ? [remarkGfm, createCapsuleRemarkPlugin(tokenizedMessage.mentionsByToken)]
+        : REMARK_PLUGINS_NO_CAPSULES,
     [tokenizedMessage],
   );
 
   return (
-    <ReactMarkdown
-      skipHtml={true}
-      remarkPlugins={remarkPlugins}
-      components={components}
-    >
+    <ReactMarkdown skipHtml={true} remarkPlugins={remarkPlugins} components={components}>
       {tokenizedMessage?.markdown ?? message}
     </ReactMarkdown>
   );
@@ -1225,7 +1257,8 @@ function useAttachmentObjectUrl(content: Uint8Array | undefined, mimeType: strin
     }
 
     const url = URL.createObjectURL(
-      new Blob([content as BlobPart], {type: mimeType || "application/octet-stream"}));
+      new Blob([content as BlobPart], { type: mimeType || "application/octet-stream" }),
+    );
     setObjectUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [content, mimeType]);
@@ -1240,17 +1273,17 @@ type AttachmentPreviewModalProps = {
   onDownload?: AttachmentDownloadHandler;
 };
 
-const AttachmentPreviewModal = memo(function AttachmentPreviewModal(
-  {
-    attachment,
-    onClose,
-    onDownload,
-  }: AttachmentPreviewModalProps,
-) {
+const AttachmentPreviewModal = memo(function AttachmentPreviewModal({
+  attachment,
+  onClose,
+  onDownload,
+}: AttachmentPreviewModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isImage = (attachment?.mimeType ?? "").startsWith("image/");
   const objectUrl = useAttachmentObjectUrl(
-    isImage ? attachment?.content : undefined, attachment?.mimeType ?? "");
+    isImage ? attachment?.content : undefined,
+    attachment?.mimeType ?? "",
+  );
 
   // Dialog keyboard handling: Escape closes, Tab stays trapped, focus restores on close.
   useEffect(() => {
@@ -1263,7 +1296,8 @@ const AttachmentPreviewModal = memo(function AttachmentPreviewModal(
       }
       if (event.key === "Tab" && containerRef.current) {
         const focusable = containerRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], iframe, [tabindex]:not([tabindex="-1"])');
+          'button, [href], iframe, [tabindex]:not([tabindex="-1"])',
+        );
         if (focusable.length === 0) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
@@ -1308,7 +1342,10 @@ const AttachmentPreviewModal = memo(function AttachmentPreviewModal(
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div ref={containerRef} className={`relative max-h-[calc(var(--app-height)-32px)] ${modalWidthClass} overflow-hidden ${modalSurfaceClass} p-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]`}>
+      <div
+        ref={containerRef}
+        className={`relative max-h-[calc(var(--app-height)-32px)] ${modalWidthClass} overflow-hidden ${modalSurfaceClass} p-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]`}
+      >
         <button
           type="button"
           onClick={onClose}
@@ -1333,9 +1370,12 @@ const AttachmentPreviewModal = memo(function AttachmentPreviewModal(
                 </div>
                 <div className="text-[14px] font-medium text-kumo-default">{title}</div>
                 <div className="text-[12px] leading-5 text-kumo-subtle">
-                  {attachment.mimeType || "Unknown file type"}{sizeLabel ? ` · ${sizeLabel}` : ""}
+                  {attachment.mimeType || "Unknown file type"}
+                  {sizeLabel ? ` · ${sizeLabel}` : ""}
                 </div>
-                <div className="text-[12px] leading-5 text-kumo-inactive">This file can’t be previewed here.</div>
+                <div className="text-[12px] leading-5 text-kumo-inactive">
+                  This file can’t be previewed here.
+                </div>
                 {onDownload && (
                   <button
                     type="button"
@@ -1359,14 +1399,15 @@ type ChatAttachmentThumbnailProps = {
   onPreview: (id: string) => void;
 };
 
-const ChatAttachmentThumbnail = memo(function ChatAttachmentThumbnail(
-  {
-    attachment,
-    onPreview,
-  }: ChatAttachmentThumbnailProps,
-) {
+const ChatAttachmentThumbnail = memo(function ChatAttachmentThumbnail({
+  attachment,
+  onPreview,
+}: ChatAttachmentThumbnailProps) {
   const isImage = attachment.mimeType.startsWith("image/");
-  const objectUrl = useAttachmentObjectUrl(isImage ? attachment.content : undefined, attachment.mimeType);
+  const objectUrl = useAttachmentObjectUrl(
+    isImage ? attachment.content : undefined,
+    attachment.mimeType,
+  );
   const [imageState, setImageState] = useState<"loading" | "loaded" | "error">("loading");
 
   return (
@@ -1388,7 +1429,9 @@ const ChatAttachmentThumbnail = memo(function ChatAttachmentThumbnail(
             onError={() => setImageState("error")}
           />
           {imageState !== "loaded" && (
-            <div className="absolute inset-0 grid place-items-center bg-kumo-elevated text-[11px] text-kumo-inactive">Loading image…</div>
+            <div className="absolute inset-0 grid place-items-center bg-kumo-elevated text-[11px] text-kumo-inactive">
+              Loading image…
+            </div>
           )}
         </>
       ) : (
@@ -1406,16 +1449,15 @@ type ChatAttachmentGridProps = {
   onDownload?: AttachmentDownloadHandler;
 };
 
-const ChatAttachmentGrid = memo(function ChatAttachmentGrid(
-  {
-    attachments,
-    onDownload,
-  }: ChatAttachmentGridProps,
-) {
+const ChatAttachmentGrid = memo(function ChatAttachmentGrid({
+  attachments,
+  onDownload,
+}: ChatAttachmentGridProps) {
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null);
-  const previewAttachment = previewAttachmentId === null
-    ? null
-    : attachments.find((attachment) => attachment.id === previewAttachmentId) ?? null;
+  const previewAttachment =
+    previewAttachmentId === null
+      ? null
+      : (attachments.find((attachment) => attachment.id === previewAttachmentId) ?? null);
   const handlePreview = useCallback((id: string) => setPreviewAttachmentId(id), []);
   const handleClose = useCallback(() => setPreviewAttachmentId(null), []);
 
@@ -1439,9 +1481,7 @@ const ChatAttachmentGrid = memo(function ChatAttachmentGrid(
   );
 });
 
-const ToolCallDetails = memo(function ToolCallDetails(
-  { toolCall: tc }: { toolCall: AiToolCall },
-) {
+const ToolCallDetails = memo(function ToolCallDetails({ toolCall: tc }: { toolCall: AiToolCall }) {
   return (
     <div className="space-y-2">
       {tc.error && (
@@ -1477,9 +1517,11 @@ const ToolCallDetails = memo(function ToolCallDetails(
   );
 });
 
-const ObservationDetails = memo(function ObservationDetails(
-  { observation }: { observation: ObservationChatMessage },
-) {
+const ObservationDetails = memo(function ObservationDetails({
+  observation,
+}: {
+  observation: ObservationChatMessage;
+}) {
   const log = observation.actionLog;
   const safeResourceUrl = safeExternalUrl(log.resourceUrl);
   const metadata = log.resourceTitle;
@@ -1491,9 +1533,7 @@ const ObservationDetails = memo(function ObservationDetails(
           <WorkIcon Icon={MagnifyingGlass} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="m-0 font-medium text-kumo-default">
-            {log.description.title}
-          </p>
+          <p className="m-0 font-medium text-kumo-default">{log.description.title}</p>
           {metadata && (
             <p className="mt-0.5 mb-0 truncate text-[12px] leading-4 text-kumo-inactive">
               {safeResourceUrl && log.resourceTitle ? (
@@ -1505,7 +1545,9 @@ const ObservationDetails = memo(function ObservationDetails(
                 >
                   {metadata}
                 </a>
-              ) : metadata}
+              ) : (
+                metadata
+              )}
             </p>
           )}
           <div className="mt-1.5 text-[12px] leading-[18px] tracking-[-0.2px] text-kumo-subtle">
@@ -1609,11 +1651,7 @@ const NestedObservationRow = memo(function NestedObservationRow({
   );
 });
 
-const ThinkingTraceRow = memo(function ThinkingTraceRow({
-  reasoning,
-}: {
-  reasoning: string;
-}) {
+const ThinkingTraceRow = memo(function ThinkingTraceRow({ reasoning }: { reasoning: string }) {
   return (
     <div className="min-w-0 py-1 text-kumo-subtle">
       <div className={`min-w-0 text-[13px] leading-[19px] ${styles.markdownContent}`}>
@@ -1648,9 +1686,10 @@ const ToolGroupRow = memo(function ToolGroupRow({
   onFooterRevert?: (sequence: number) => void;
   outputOf?: ToolOutputResolver;
 }) {
-  const footerLabel = footerChangeSequence !== undefined
-    ? getDiscardLabel(footerIsTrailing, footerCreatedWorkpieces)
-    : null;
+  const footerLabel =
+    footerChangeSequence !== undefined
+      ? getDiscardLabel(footerIsTrailing, footerCreatedWorkpieces)
+      : null;
   return (
     <div className="group -ml-0.5">
       <button
@@ -1683,8 +1722,8 @@ const ToolGroupRow = memo(function ToolGroupRow({
           )}
         </span>
       </button>
-      {open && (
-        group.calls.length === 1 && group.observations.length === 0 ? (
+      {open &&
+        (group.calls.length === 1 && group.observations.length === 0 ? (
           <div className="themed-surface-inset ml-8 mt-1 space-y-3 rounded-2xl border border-kumo-line/70 bg-kumo-elevated/45 p-3">
             <ToolCallDetails toolCall={group.calls[0]} />
           </div>
@@ -1718,8 +1757,7 @@ const ToolGroupRow = memo(function ToolGroupRow({
               );
             })}
           </div>
-        )
-      )}
+        ))}
       {footerChangeSequence !== undefined && footerTimestamp && footerLabel && onFooterRevert && (
         <div className="ml-0 mt-0.5 flex items-center gap-1 opacity-100 transition-opacity duration-150 ease-out sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
           <Tooltip content={footerLabel} asChild>
@@ -1746,7 +1784,6 @@ const ToolGroupRow = memo(function ToolGroupRow({
     </div>
   );
 });
-
 
 // Helper to compute the state of messages (merged/reverted status and active changes)
 interface MessageState {
@@ -1791,7 +1828,7 @@ type ChatDisplayEntry =
       type: "message";
       key: string;
       message: AiChatMessage;
-      slashCommand?: Extract<AiChatMessage, {type: "slashCommand"}>;
+      slashCommand?: Extract<AiChatMessage, { type: "slashCommand" }>;
       toolCalls?: AiToolCall[];
       toolCallGroups?: ToolCallGroup[];
       lastMessageSequence?: number;
@@ -1823,7 +1860,9 @@ type WorkMessageParts = {
   lastWorkTimestamp: Date;
 };
 
-function isAssistantMessageWithoutVisibleText(msg: AiChatMessage): msg is Extract<AiChatMessage, { type: "message" }> {
+function isAssistantMessageWithoutVisibleText(
+  msg: AiChatMessage,
+): msg is Extract<AiChatMessage, { type: "message" }> {
   return (
     msg.type === "message" &&
     msg.author.type !== "user" &&
@@ -1834,7 +1873,9 @@ function isAssistantMessageWithoutVisibleText(msg: AiChatMessage): msg is Extrac
 
 // Tool-only turns can leave behind empty assistant messages. Don't render them as transcript rows.
 function isEmptyAssistantMessage(msg: AiChatMessage): boolean {
-  return isAssistantMessageWithoutVisibleText(msg) && (!msg.toolCalls || msg.toolCalls.length === 0);
+  return (
+    isAssistantMessageWithoutVisibleText(msg) && (!msg.toolCalls || msg.toolCalls.length === 0)
+  );
 }
 
 // Assistant messages with tool calls but no text are displayed as work rows.
@@ -1849,11 +1890,7 @@ function getWorkOnlyMessageParts(msg: AiChatMessage): WorkMessageParts | null {
     };
   }
 
-  if (
-    isAssistantMessageWithoutVisibleText(msg) &&
-    !!msg.toolCalls &&
-    msg.toolCalls.length > 0
-  ) {
+  if (isAssistantMessageWithoutVisibleText(msg) && !!msg.toolCalls && msg.toolCalls.length > 0) {
     return {
       toolCalls: msg.toolCalls,
       observations: [],
@@ -1899,9 +1936,7 @@ function getSavedEditsDiscardLabel(
   isTrailing: boolean | undefined,
   createdWorkpieces?: CreatedWorkpieceName[],
 ): string {
-  const base = isTrailing
-    ? "Discard saved edits"
-    : "Discard saved edits and later changes";
+  const base = isTrailing ? "Discard saved edits" : "Discard saved edits and later changes";
   return base + describeCreatedWorkpieceDeletion(createdWorkpieces);
 }
 
@@ -1943,11 +1978,18 @@ function DiscardPendingChangesPopover({
             Discard all pending changes?
           </Popover.Title>
           <p className="mt-0.5 text-[11.5px] leading-4 tracking-[-0.15px] text-kumo-subtle">
-            Return to the last accepted version. Any gadgets or worktrees created by these
-            changes will be permanently deleted. Pending changes can&apos;t be restored.
+            Return to the last accepted version. Any gadgets or worktrees created by these changes
+            will be permanently deleted. Pending changes can&apos;t be restored.
           </p>
           <p className="mt-2 border-t border-kumo-line pt-2 text-[11px] leading-[15px] tracking-[-0.1px] text-kumo-inactive">
-            Use the <ArrowUUpLeft size={12} className="mx-0.5 inline-block align-[-2px]" aria-hidden="true" /><span className="sr-only">undo arrow</span> under any agent response to discard from that turn onward.
+            Use the{" "}
+            <ArrowUUpLeft
+              size={12}
+              className="mx-0.5 inline-block align-[-2px]"
+              aria-hidden="true"
+            />
+            <span className="sr-only">undo arrow</span> under any agent response to discard from
+            that turn onward.
           </p>
         </div>
         <div className="flex items-center justify-end gap-0.5 border-t border-kumo-line px-2 py-1.5">
@@ -1978,9 +2020,12 @@ function DiscardPendingChangesPopover({
 function transcriptToolCalls(toolCalls: AiToolCall[]): AiToolCall[] {
   // Successful creations render as cards (see CreatedWorkpieceChatCard); failed calls retain
   // their error summary.
-  return toolCalls.filter((tc) =>
-    (tc.toolName !== "createGadget" && tc.toolName !== "createWorktree") ||
-    tc.output === undefined || Boolean(tc.error));
+  return toolCalls.filter(
+    (tc) =>
+      (tc.toolName !== "createGadget" && tc.toolName !== "createWorktree") ||
+      tc.output === undefined ||
+      Boolean(tc.error),
+  );
 }
 
 export function buildChatDisplayEntries(
@@ -2001,8 +2046,13 @@ export function buildChatDisplayEntries(
   const requestFor = new Map<number, number>();
   boundaries.forEach((boundary, index) => {
     const until = boundaries[index + 1]?.to ?? Infinity;
-    const request = messages.find(msg => msg.sequence >= boundary.to && msg.sequence < until &&
-        msg.type === "slashCommand" && msg.request.id.builtin === true);
+    const request = messages.find(
+      (msg) =>
+        msg.sequence >= boundary.to &&
+        msg.sequence < until &&
+        msg.type === "slashCommand" &&
+        msg.request.id.builtin === true,
+    );
     if (request) requestFor.set(boundary.to, request.sequence);
   });
 
@@ -2017,14 +2067,17 @@ export function buildChatDisplayEntries(
       rowsAtCut.set(boundary.to, result.length);
       // Announced at a request further down, so all that belongs here is the line showing where the
       // messages the agent still holds verbatim begin -- revealed only while the summary is open.
-      result.push(requestFor.has(boundary.to)
-        ? {type: "compactionCut", key: `cut-${boundary.to}`, boundary}
-        : {type: "compactionBoundary", key: `compacted-${boundary.to}`, boundary});
+      result.push(
+        requestFor.has(boundary.to)
+          ? { type: "compactionCut", key: `cut-${boundary.to}`, boundary }
+          : { type: "compactionBoundary", key: `compacted-${boundary.to}`, boundary },
+      );
     }
   };
 
   const maybePushModelChange = (msg: AiChatMessage) => {
-    if (msg.type !== "message" || msg.author.type !== "agent" || isEmptyAssistantMessage(msg)) return;
+    if (msg.type !== "message" || msg.author.type !== "agent" || isEmptyAssistantMessage(msg))
+      return;
     if (lastAgentAuthorId === null) {
       lastAgentAuthorId = msg.author.id;
       return;
@@ -2049,7 +2102,7 @@ export function buildChatDisplayEntries(
     msg.conversionBoundary !== true &&
     (changeStatus.get(msg.sequence) ?? "pending") === "pending";
 
-  for (let i = 0; i < messages.length; ) {
+  for (let i = 0; i < messages.length;) {
     const msg = messages[i];
     maybePushBoundaries(msg.sequence);
     maybePushModelChange(msg);
@@ -2059,7 +2112,7 @@ export function buildChatDisplayEntries(
       // no provider reply. What it leaves behind is its boundary, announced here. A request that
       // compacted nothing has no boundary and so shows nothing, which is what happened.
       if (msg.request.id.builtin === true) {
-        const announced = boundaries.find(({to}) => requestFor.get(to) === msg.sequence);
+        const announced = boundaries.find(({ to }) => requestFor.get(to) === msg.sequence);
         if (announced) {
           // Everything between the cut and here survived: the tail the agent kept reading verbatim.
           // The cut's own row does not count towards it.
@@ -2221,8 +2274,12 @@ const EARLIER_PAGE_PREFETCH_PX = 600;
 
 function isPureWorkRowEntry(entry: ChatDisplayEntry): boolean {
   if (entry.type === "workRun") return true;
-  if (entry.type === "modelChange" || entry.type === "compactionBoundary" ||
-      entry.type === "compactionCut") return false;
+  if (
+    entry.type === "modelChange" ||
+    entry.type === "compactionBoundary" ||
+    entry.type === "compactionCut"
+  )
+    return false;
   const m = entry.message;
   return (
     m.type === "action" ||
@@ -2253,10 +2310,7 @@ function entryStartsWithWorkRow(entry: ChatDisplayEntry): boolean {
   );
 }
 
-function rhythmTopClass(
-  prev: ChatDisplayEntry | null,
-  curr: ChatDisplayEntry,
-): string {
+function rhythmTopClass(prev: ChatDisplayEntry | null, curr: ChatDisplayEntry): string {
   if (!prev) return "";
   if (curr.type === "modelChange") return "mt-4";
   if (prev.type === "modelChange") return "mt-2";
@@ -2309,10 +2363,7 @@ export function computeMessageStates(
       }
     } else if (msg.type === "revert") {
       // Mark changes as reverted and drop from active set
-      while (
-        updates.length > 0 &&
-        updates[updates.length - 1].sequence >= msg.revertFrom
-      ) {
+      while (updates.length > 0 && updates[updates.length - 1].sequence >= msg.revertFrom) {
         const reverted = updates.pop()!;
         changeStatus.set(reverted.sequence, "reverted");
       }
@@ -2358,19 +2409,27 @@ export function computeChatEpochChanges(
   const changes: CodeChange[] = [];
   let rowsThrough = 0;
 
-  if (compacted && (messages.length === 0 || messages[0].sequence >= compacted.to) &&
-      (epoch === undefined || compacted.to - 1 >= epoch)) {
+  if (
+    compacted &&
+    (messages.length === 0 || messages[0].sequence >= compacted.to) &&
+    (epoch === undefined || compacted.to - 1 >= epoch)
+  ) {
     // The boundary's proposed-changes entry is folded in at sequence `to - 1` by
     // computeMessageStates, so a revert reaching across the boundary marks that sequence.
-    if (compacted.proposedChange !== undefined &&
-        changeStatus.get(compacted.to - 1) !== "reverted") {
+    if (
+      compacted.proposedChange !== undefined &&
+      changeStatus.get(compacted.to - 1) !== "reverted"
+    ) {
       changes.push(compacted.proposedChange);
     }
   }
 
   for (const msg of messages) {
-    if (msg.type !== "changes" || (epoch !== undefined && msg.sequence < epoch) ||
-        changeStatus.get(msg.sequence) === "reverted") {
+    if (
+      msg.type !== "changes" ||
+      (epoch !== undefined && msg.sequence < epoch) ||
+      changeStatus.get(msg.sequence) === "reverted"
+    ) {
       continue;
     }
     if (msg.change !== undefined) changes.push(msg.change);
@@ -2383,7 +2442,7 @@ export function computeChatEpochChanges(
 
   return {
     epochChange:
-        changes.length === 0 ? undefined : changes.reduce((a, b) => composeCodeChange(a, b)),
+      changes.length === 0 ? undefined : changes.reduce((a, b) => composeCodeChange(a, b)),
     rowsThrough,
   };
 }
@@ -2422,10 +2481,7 @@ interface ChatInterfaceProps {
   workspaceId: string | undefined;
   overseer: RpcStub<Overseer>;
   selectedChatId: number | null;
-  onNavigateToChat: (
-    chatId: number | null,
-    options?: { replace?: boolean },
-  ) => void;
+  onNavigateToChat: (chatId: number | null, options?: { replace?: boolean }) => void;
   // The selected chat's code-branch snapshot (see ChatCodeChanges): its code base and the
   // current epoch's recorded changes, delivered together so the code view always layers a
   // consistent pair.
@@ -2481,12 +2537,7 @@ const CHAT_TIME_BUCKET_LABELS: Record<ChatTimeBucket, string> = {
   thisWeek: "Earlier this week",
   earlier: "Earlier",
 };
-const CHAT_TIME_BUCKET_ORDER: ChatTimeBucket[] = [
-  "today",
-  "yesterday",
-  "thisWeek",
-  "earlier",
-];
+const CHAT_TIME_BUCKET_ORDER: ChatTimeBucket[] = ["today", "yesterday", "thisWeek", "earlier"];
 
 function startOfDay(d: Date): Date {
   const out = new Date(d);
@@ -2667,13 +2718,15 @@ function ChatInterface({
   const chatChangeRowsRef = useRef<Map<number, ChatChangeRowBuffer>>(new Map());
   // Live-row subscribers by chat, notified synchronously from changeApplied (before any pruning;
   // see ChatLiveChangeRows.subscribe).
-  const chatChangeRowListenersRef =
-      useRef<Map<number, Set<(row: ChatChangeRow) => void>>>(new Map());
+  const chatChangeRowListenersRef = useRef<Map<number, Set<(row: ChatChangeRow) => void>>>(
+    new Map(),
+  );
   // Per-chat streaming edit previews (retained for subscribe-time replay; see
   // StreamingEditPreview) and their event subscribers, fed synchronously from stream events.
   const editPreviewsRef = useRef<Map<number, StreamingEditPreview>>(new Map());
-  const editPreviewListenersRef =
-      useRef<Map<number, Set<(event: EditPreviewEvent) => void>>>(new Map());
+  const editPreviewListenersRef = useRef<Map<number, Set<(event: EditPreviewEvent) => void>>>(
+    new Map(),
+  );
   // Last server-instance generation seen (survives reconnects). Used to detect a full DO restart,
   // in which case in-flight provisional streams were lost and must be discarded. See
   // AiChatSubscriber.streamGeneration.
@@ -2710,28 +2763,18 @@ function ChatInterface({
   const [discardChangesTarget, setDiscardChangesTarget] = useState<{
     chatId: number;
   } | null>(null);
-  const [discardingChangesChatIds, setDiscardingChangesChatIds] = useState(
-    () => new Set<number>(),
-  );
+  const [discardingChangesChatIds, setDiscardingChangesChatIds] = useState(() => new Set<number>());
   // Chat whose accept came back "stale" (mainline advanced past its pins), awaiting the user's
   // decision in the update-from-mainline dialog.
   const [staleAcceptChatId, setStaleAcceptChatId] = useState<number | null>(null);
   const [isUpdatingFromMainline, setIsUpdatingFromMainline] = useState(false);
 
-  const [expandedToolCalls, setExpandedToolCalls] = useState<Set<string>>(
-    new Set(),
-  );
-  const [showThinkingTraces, setShowThinkingTraces] = useState(
-    () => getStoredShowThinkingTraces(),
-  );
-  const [expandedActions, setExpandedActions] = useState<Set<number>>(
-    new Set(),
-  );
+  const [expandedToolCalls, setExpandedToolCalls] = useState<Set<string>>(new Set());
+  const [showThinkingTraces, setShowThinkingTraces] = useState(() => getStoredShowThinkingTraces());
+  const [expandedActions, setExpandedActions] = useState<Set<number>>(new Set());
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
   const [expandedCompactions, setExpandedCompactions] = useState<Set<number>>(new Set());
-  const [processingActions, setProcessingActions] = useState<Set<number>>(
-    new Set(),
-  );
+  const [processingActions, setProcessingActions] = useState<Set<number>>(new Set());
   // Connection-request (agent requestConnection) accept flow. When set, the GatekeeperModal opens
   // pre-seeded with the agent's vendor/resource; on creation we finalize acceptConnectionRequest.
   const [connectionAccept, setConnectionAccept] = useState<{
@@ -2745,16 +2788,10 @@ function ChatInterface({
   // `connectionAccept`.
   const connectionAcceptRef = useRef<typeof connectionAccept>(null);
   connectionAcceptRef.current = connectionAccept;
-  const [processingConnections, setProcessingConnections] = useState<Set<string>>(
-    new Set(),
-  );
-  const [availableModels, setAvailableModels] = useState<AiChatAuthorInfo[]>(
-    [],
-  );
+  const [processingConnections, setProcessingConnections] = useState<Set<string>>(new Set());
+  const [availableModels, setAvailableModels] = useState<AiChatAuthorInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
-  const [sidebarActiveTab, setSidebarActiveTab] = useState<
-    "chat" | "connections"
-  >("chat");
+  const [sidebarActiveTab, setSidebarActiveTab] = useState<"chat" | "connections">("chat");
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
 
   // Sidebar resize handling.
@@ -2766,14 +2803,11 @@ function ChatInterface({
   // then "stick" to the cursor even after release. Pointer capture routes all
   // pointermove/pointerup events to the handle until release, regardless of
   // what's under the cursor — including iframes.
-  const handleSidebarPointerDown = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
-      setIsSidebarResizing(true);
-    },
-    [],
-  );
+  const handleSidebarPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsSidebarResizing(true);
+  }, []);
   const handleSidebarPointerMove = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
@@ -2782,15 +2816,12 @@ function ChatInterface({
     },
     [onSidebarResize],
   );
-  const handleSidebarPointerUp = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      }
-      setIsSidebarResizing(false);
-    },
-    [],
-  );
+  const handleSidebarPointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    setIsSidebarResizing(false);
+  }, []);
 
   const indexActionMessage = (msg: AiChatMessage) => {
     if (msg.type !== "action") return;
@@ -2832,9 +2863,12 @@ function ChatInterface({
 
     if (page.compacted) {
       let boundaries = cacheRef.current.compacted.get(chatId) ?? [];
-      cacheRef.current.compacted.set(chatId, [
-        ...boundaries.filter(({to}) => to !== page.compacted!.to), page.compacted,
-      ].toSorted((a, b) => a.to - b.to));
+      cacheRef.current.compacted.set(
+        chatId,
+        [...boundaries.filter(({ to }) => to !== page.compacted!.to), page.compacted].toSorted(
+          (a, b) => a.to - b.to,
+        ),
+      );
     }
   };
 
@@ -2852,7 +2886,7 @@ function ChatInterface({
         cacheHistoryPage(chatId, await overseer.getChatHistory(chatId));
         forceUpdate();
       } catch (err) {
-        reportIssue("chat.compaction-boundary-refresh", err, {handled: true});
+        reportIssue("chat.compaction-boundary-refresh", err, { handled: true });
       }
     })();
   };
@@ -2905,17 +2939,13 @@ function ChatInterface({
 
   // Get sorted list of chats from cache
   const chatList = useMemo(
-    () => Array.from(cacheRef.current.chats.values()).sort(
-      (a, b) => b.lastActive.getTime() - a.lastActive.getTime(),
-    ),
+    () =>
+      Array.from(cacheRef.current.chats.values()).sort(
+        (a, b) => b.lastActive.getTime() - a.lastActive.getTime(),
+      ),
     [chatListVersion],
   );
-  const {
-    visibleChatList,
-    chatListNow,
-    bucketedVisibleChats,
-    chatListScopes,
-  } = useMemo(() => {
+  const { visibleChatList, chatListNow, bucketedVisibleChats, chatListScopes } = useMemo(() => {
     const directCount = chatList.filter((chat) => !chat.spawnerName).length;
     const agentCount = chatList.length - directCount;
     const visible = chatList.filter((chat) => {
@@ -2980,12 +3010,7 @@ function ChatInterface({
 
   // In sidebar mode, auto-select the most recent chat when none is selected.
   useEffect(() => {
-    if (
-      sidebarMode &&
-      selectedChatId === null &&
-      chatListReady &&
-      chatList.length > 0
-    ) {
+    if (sidebarMode && selectedChatId === null && chatListReady && chatList.length > 0) {
       onNavigateToChatRef.current(chatList[0].id, { replace: true });
     }
   }, [sidebarMode, selectedChatId, chatListReady, chatList]);
@@ -2994,9 +3019,7 @@ function ChatInterface({
   // Memoized to prevent creating new array on every render
   const currentMessages = useMemo(() => {
     if (selectedChatId === null) return [];
-    return (cacheRef.current.messages.get(selectedChatId) || []).filter(
-      (msg) => msg !== undefined,
-    );
+    return (cacheRef.current.messages.get(selectedChatId) || []).filter((msg) => msg !== undefined);
   }, [selectedChatId, updateCounter]);
   const currentCompactions = useMemo(() => {
     if (selectedChatId === null) return [];
@@ -3010,20 +3033,21 @@ function ChatInterface({
   // A pending agent connection request blocks the composer: the user must accept ("Set up") or deny
   // it before continuing the conversation.
   const hasPendingConnectionRequest = useMemo(
-    () => currentMessages.some(
-      (msg) => msg.type === "connectionRequest" && msg.state === "pending",
-    ),
+    () =>
+      currentMessages.some((msg) => msg.type === "connectionRequest" && msg.state === "pending"),
     [currentMessages],
   );
   // A pending awaitDecision action also blocks the composer: the agent turn is suspended until the
   // user approves or rejects it, so (like a connection request) further input must wait.
   const hasPendingAwaitedAction = useMemo(
-    () => currentMessages.some(
-      (msg) => msg.type === "action" &&
-        msg.actionLog?.type === "action" &&
-        msg.actionLog.state === "pending" &&
-        msg.actionLog.description.awaitDecision === true,
-    ),
+    () =>
+      currentMessages.some(
+        (msg) =>
+          msg.type === "action" &&
+          msg.actionLog?.type === "action" &&
+          msg.actionLog.state === "pending" &&
+          msg.actionLog.description.awaitDecision === true,
+      ),
     [currentMessages],
   );
   // A gadget's stamped format, looked up by the id a finished createGadget call reports, so the
@@ -3039,7 +3063,11 @@ function ChatInterface({
       // checkpoints get their own compact row so the discard action is attached to the
       // edit that actually created it.
       buildChatDisplayEntries(
-          currentMessages, messageStates.changeStatus, currentCompactions, resolveToolOutput),
+        currentMessages,
+        messageStates.changeStatus,
+        currentCompactions,
+        resolveToolOutput,
+      ),
     [currentMessages, messageStates, currentCompactions, resolveToolOutput],
   );
 
@@ -3087,29 +3115,33 @@ function ChatInterface({
 
   // Download a committed chat attachment. Image bytes are already inlined on the message; other
   // attachments are fetched on demand over the authenticated RPC connection.
-  const downloadChatAttachment = useCallback(async (chatId: number, attachment: ChatAttachmentRef) => {
-    try {
-      let bytes = attachment.content;
-      const mimeType = attachment.mimeType;
-      const name = attachment.name;
-      if (!bytes) {
-        bytes = await overseer.getChatAttachmentContent(chatId, attachment.id);
-      }
-      const url = URL.createObjectURL(
-        new Blob([bytes as BlobPart], {type: mimeType || "application/octet-stream"}));
+  const downloadChatAttachment = useCallback(
+    async (chatId: number, attachment: ChatAttachmentRef) => {
       try {
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = name ?? "attachment";
-        a.click();
-      } finally {
-        setTimeout(() => URL.revokeObjectURL(url), 0);
+        let bytes = attachment.content;
+        const mimeType = attachment.mimeType;
+        const name = attachment.name;
+        if (!bytes) {
+          bytes = await overseer.getChatAttachmentContent(chatId, attachment.id);
+        }
+        const url = URL.createObjectURL(
+          new Blob([bytes as BlobPart], { type: mimeType || "application/octet-stream" }),
+        );
+        try {
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = name ?? "attachment";
+          a.click();
+        } finally {
+          setTimeout(() => URL.revokeObjectURL(url), 0);
+        }
+      } catch (err: any) {
+        console.error("Failed to download chat attachment:", err);
+        toasts.add({ title: err?.message || "Failed to download attachment", variant: "error" });
       }
-    } catch (err: any) {
-      console.error("Failed to download chat attachment:", err);
-      toasts.add({ title: err?.message || "Failed to download attachment", variant: "error" });
-    }
-  }, [overseer, toasts]);
+    },
+    [overseer, toasts],
+  );
 
   const onSelectedChatProposedChangesChangeRef = useRef(onSelectedChatProposedChangesChange);
   onSelectedChatProposedChangesChangeRef.current = onSelectedChatProposedChangesChange;
@@ -3129,9 +3161,7 @@ function ChatInterface({
   }, [currentProposedWorkpiecesKey, metadataLoaded, selectedChatId]);
 
   const currentProvisionalState =
-    selectedChatId !== null
-      ? (provisionalRef.current.get(selectedChatId) ?? null)
-      : null;
+    selectedChatId !== null ? (provisionalRef.current.get(selectedChatId) ?? null) : null;
 
   const currentRowBuffer =
     selectedChatId !== null ? (chatChangeRowsRef.current.get(selectedChatId) ?? null) : null;
@@ -3141,7 +3171,7 @@ function ChatInterface({
   // (rather than tracked) so pruning -- materialization watermarks, generation bumps -- can
   // never leave it stale.
   const currentHasUserDraftRows =
-    currentRowBuffer !== null && currentRowBuffer.rows.some(row => row.submission !== undefined);
+    currentRowBuffer !== null && currentRowBuffer.rows.some((row) => row.submission !== undefined);
 
   const provisionalToolCalls = currentProvisionalState?.toolCalls ?? [];
   const useConstrainedChatWidth = sidebarMode || constrainChatWidth;
@@ -3198,7 +3228,8 @@ function ChatInterface({
             workpieceId: streaming.workpieceId,
             filename: streaming.filename,
             ...(streaming.textToReplace !== undefined
-              ? { textToReplace: streaming.textToReplace } : {}),
+              ? { textToReplace: streaming.textToReplace }
+              : {}),
           });
           if (streaming.text !== "") {
             listener({ kind: "delta", toolCallId: streaming.toolCallId, delta: streaming.text });
@@ -3227,14 +3258,16 @@ function ChatInterface({
   // Notify parent when agent active state changes
   const onAgentActiveChangeRef = useRef(onAgentActiveChange);
   onAgentActiveChangeRef.current = onAgentActiveChange;
-  const previousAgentStateRef = useRef({chatId: selectedChatId, active: isAgentActive});
+  const previousAgentStateRef = useRef({ chatId: selectedChatId, active: isAgentActive });
   useEffect(() => {
     let previous = previousAgentStateRef.current;
-    if (selectedChatId !== null &&
-        (selectedChatId !== previous.chatId || isAgentActive !== previous.active)) {
+    if (
+      selectedChatId !== null &&
+      (selectedChatId !== previous.chatId || isAgentActive !== previous.active)
+    ) {
       onAgentActiveChangeRef.current?.(selectedChatId, isAgentActive);
     }
-    previousAgentStateRef.current = {chatId: selectedChatId, active: isAgentActive};
+    previousAgentStateRef.current = { chatId: selectedChatId, active: isAgentActive };
   }, [isAgentActive, selectedChatId]);
 
   // Loads the page before the oldest message on screen. Held in a ref because the scroll handler is
@@ -3250,8 +3283,7 @@ function ChatInterface({
     const el = messagesContainerRef.current;
     if (!el) return;
     // Allow a small tolerance for fractional scroll positions and layout rounding.
-    isScrolledToBottomRef.current =
-      el.scrollHeight - el.scrollTop - el.clientHeight <= 8;
+    isScrolledToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 8;
     // Approaching the top pulls in the previous page, so a compacted thread reads as one continuous
     // scroll rather than making the user ask for their own history.
     if (el.scrollTop <= EARLIER_PAGE_PREFETCH_PX) loadEarlierRef.current();
@@ -3274,12 +3306,7 @@ function ChatInterface({
     if (isScrolledToBottomRef.current) {
       scrollMessagesToBottom();
     }
-  }, [
-    currentMessages,
-    hasVisibleProvisionalContent,
-    isAgentActive,
-    scrollMessagesToBottom,
-  ]);
+  }, [currentMessages, hasVisibleProvisionalContent, isAgentActive, scrollMessagesToBottom]);
 
   // Always scroll to bottom and close transient chat UI when switching chats.
   useLayoutEffect(() => {
@@ -3333,10 +3360,14 @@ function ChatInterface({
   // neither directly: the epoch reset they perform arrives through the metadata's codeBase
   // (advanced epoch, cleared pins, bumped generation), redelivered with the merge.
   const currentCodeBaseSignature = currentChatMetadata
-    ? JSON.stringify(currentChatMetadata.codeBase ?? null) : undefined;
+    ? JSON.stringify(currentChatMetadata.codeBase ?? null)
+    : undefined;
   useEffect(() => {
-    if (selectedChatId === null || currentCodeBaseSignature === undefined ||
-        !cacheRef.current.messages.has(selectedChatId)) {
+    if (
+      selectedChatId === null ||
+      currentCodeBaseSignature === undefined ||
+      !cacheRef.current.messages.has(selectedChatId)
+    ) {
       // No chat selected, or its metadata or history hasn't loaded yet -- the code view can't
       // build the chat's doc until both have.
       onChatChangesChange?.(undefined);
@@ -3356,12 +3387,7 @@ function ChatInterface({
     );
 
     onChatChangesChange?.({ chatId: selectedChatId, codeBase, epochChange, rowsThrough });
-  }, [
-    proposedChangesVersion,
-    selectedChatId,
-    currentCodeBaseSignature,
-    onChatChangesChange,
-  ]);
+  }, [proposedChangesVersion, selectedChatId, currentCodeBaseSignature, onChatChangesChange]);
 
   useEffect(() => {
     onLiveRowsChange?.(currentLiveRows);
@@ -3431,7 +3457,7 @@ function ChatInterface({
       // claiming history that is whole again.
       let boundaries = cacheRef.current.compacted.get(chat.id);
       if (boundaries !== undefined) {
-        let live = boundaries.filter(({to}) => to <= (chat.compactedTo ?? -1));
+        let live = boundaries.filter(({ to }) => to <= (chat.compactedTo ?? -1));
         if (live.length < boundaries.length) cacheRef.current.compacted.set(chat.id, live);
       }
 
@@ -3440,9 +3466,12 @@ function ChatInterface({
       // already loaded makes this idempotent: paging back adds boundaries rather than replacing
       // them, so an extra fetch can neither miss a compaction nor undo an expansion. Rolling the
       // last boundary away needs the same fetch, since the history it used to hide is live again.
-      if (cacheRef.current.messages.has(chat.id) && (chat.compactedTo === undefined
+      if (
+        cacheRef.current.messages.has(chat.id) &&
+        (chat.compactedTo === undefined
           ? prevChat?.compactedTo !== undefined
-          : !cacheRef.current.compacted.get(chat.id)?.some(({to}) => to === chat.compactedTo))) {
+          : !cacheRef.current.compacted.get(chat.id)?.some(({ to }) => to === chat.compactedTo))
+      ) {
         refreshBoundaryRef.current(chat.id);
       }
 
@@ -3453,11 +3482,19 @@ function ChatInterface({
       // (The buffers are advisory replay caches -- the OT client dedupes and prunes on its own
       // stream position -- so pruning here is memory hygiene, not correctness.)
       const codeBase = chat.codeBase;
-      if (prevChat !== undefined && codeBase !== undefined &&
-          (prevChat.codeBase?.generation ?? 0) !== codeBase.generation) {
+      if (
+        prevChat !== undefined &&
+        codeBase !== undefined &&
+        (prevChat.codeBase?.generation ?? 0) !== codeBase.generation
+      ) {
         const keepFrom = codeBase.prior?.generation ?? codeBase.generation;
-        if (pruneChatChangeRows(chatChangeRowsRef.current, chat.id,
-                                row => row.generation >= keepFrom)) {
+        if (
+          pruneChatChangeRows(
+            chatChangeRowsRef.current,
+            chat.id,
+            (row) => row.generation >= keepFrom,
+          )
+        ) {
           setLiveRowsVersion((prev) => prev + 1);
         }
       }
@@ -3505,7 +3542,10 @@ function ChatInterface({
       if (buffer.seen.has(key)) return;
       buffer.seen.add(key);
       const row: ChatChangeRow = {
-        generation, revision, author, change,
+        generation,
+        revision,
+        author,
+        change,
         ...(submission !== undefined ? { submission } : {}),
       };
       buffer.rows.push(row);
@@ -3557,9 +3597,13 @@ function ChatInterface({
       // restart per generation, so an unqualified prune could clear the wrong stream's rows.
       if (msg.type === "changes" && msg.watermark !== undefined) {
         const { changesGeneration, throughRevision } = msg.watermark;
-        if (pruneChatChangeRows(chatChangeRowsRef.current, msg.chatId,
-                                row => row.generation !== changesGeneration ||
-                                       row.revision > throughRevision)) {
+        if (
+          pruneChatChangeRows(
+            chatChangeRowsRef.current,
+            msg.chatId,
+            (row) => row.generation !== changesGeneration || row.revision > throughRevision,
+          )
+        ) {
           setLiveRowsVersion((prev) => prev + 1);
         }
       }
@@ -3617,37 +3661,21 @@ function ChatInterface({
           provisional.reasoning += event.delta;
           break;
         case "toolCallStarted": {
-          getOrCreateProvisionalToolCall(
-            provisional,
-            event.toolCallId,
-            event.toolName,
-          );
+          getOrCreateProvisionalToolCall(provisional, event.toolCallId, event.toolName);
           break;
         }
         case "toolCodeDelta": {
-          const toolCall = getOrCreateProvisionalToolCall(
-            provisional,
-            event.toolCallId,
-            null,
-          );
+          const toolCall = getOrCreateProvisionalToolCall(provisional, event.toolCallId, null);
           toolCall.code += event.delta;
           break;
         }
         case "toolOutputDelta": {
-          const toolCall = getOrCreateProvisionalToolCall(
-            provisional,
-            event.toolCallId,
-            null,
-          );
+          const toolCall = getOrCreateProvisionalToolCall(provisional, event.toolCallId, null);
           toolCall.output += event.delta;
           break;
         }
         case "toolCallFinished": {
-          const toolCall = getOrCreateProvisionalToolCall(
-            provisional,
-            event.toolCallId,
-            null,
-          );
+          const toolCall = getOrCreateProvisionalToolCall(provisional, event.toolCallId, null);
           toolCall.finished = true;
           break;
         }
@@ -3660,21 +3688,13 @@ function ChatInterface({
           }
           break;
         case "toolCallOutputFormat": {
-          const toolCall = getOrCreateProvisionalToolCall(
-            provisional,
-            event.toolCallId,
-            null,
-          );
+          const toolCall = getOrCreateProvisionalToolCall(provisional, event.toolCallId, null);
           toolCall.outputFormat = event.output;
           break;
         }
         case "toolCallTarget": {
           // Surfaces the file name during streaming for writes and edits so the frontend can update.
-          const toolCall = getOrCreateProvisionalToolCall(
-            provisional,
-            event.toolCallId,
-            null,
-          );
+          const toolCall = getOrCreateProvisionalToolCall(provisional, event.toolCallId, null);
           toolCall.target = event.file.filename;
           break;
         }
@@ -3683,8 +3703,7 @@ function ChatInterface({
             toolCallId: event.toolCallId,
             workpieceId: event.file.workpieceId,
             filename: event.file.filename,
-            ...(event.textToReplace !== undefined
-              ? { textToReplace: event.textToReplace } : {}),
+            ...(event.textToReplace !== undefined ? { textToReplace: event.textToReplace } : {}),
             text: "",
           });
           emitEditPreviewEvent(chatId, {
@@ -3692,8 +3711,7 @@ function ChatInterface({
             toolCallId: event.toolCallId,
             workpieceId: event.file.workpieceId,
             filename: event.file.filename,
-            ...(event.textToReplace !== undefined
-              ? { textToReplace: event.textToReplace } : {}),
+            ...(event.textToReplace !== undefined ? { textToReplace: event.textToReplace } : {}),
           });
           break;
         case "editPreviewDelta": {
@@ -3701,8 +3719,11 @@ function ChatInterface({
           if (preview !== undefined && preview.toolCallId === event.toolCallId) {
             preview.text += event.delta;
           }
-          emitEditPreviewEvent(chatId,
-            { kind: "delta", toolCallId: event.toolCallId, delta: event.delta });
+          emitEditPreviewEvent(chatId, {
+            kind: "delta",
+            toolCallId: event.toolCallId,
+            delta: event.delta,
+          });
           break;
         }
         case "editPreviewClear": {
@@ -3741,10 +3762,7 @@ function ChatInterface({
         // Don't await - subscribeToChat returns a promise that doesn't resolve until disconnect
         // Store the promise itself as the subscription
         // Pass the subscriber instance (which is now a proper class instance)
-        const subscription = overseer.subscribeToChat(
-          subscriberRef.current,
-          startAfter,
-        );
+        const subscription = overseer.subscribeToChat(subscriberRef.current, startAfter);
 
         subscriptionRef.current = subscription;
 
@@ -3753,10 +3771,7 @@ function ChatInterface({
 
           // After subscribing, load the list of chats and models
           // This is safe because subscription will catch any new activity
-          const [chats, models] = await Promise.all([
-            overseer.listChats(),
-            overseer.listModels(),
-          ]);
+          const [chats, models] = await Promise.all([overseer.listChats(), overseer.listModels()]);
 
           chats.forEach((chat) => {
             cacheRef.current.chats.set(chat.id, chat);
@@ -3772,7 +3787,7 @@ function ChatInterface({
         }
       } catch (err) {
         if (!logRpcFailure("Failed to subscribe to chats:", err)) {
-          reportIssue('chat.subscription-load', err)
+          reportIssue("chat.subscription-load", err);
           toasts.add({ title: "Unable to load conversations", variant: "error" });
         }
       }
@@ -3811,8 +3826,10 @@ function ChatInterface({
     const targets = [...cacheRef.current.actionMessages.values()].flatMap((locations) => {
       const location = locations.values().next().value;
       const msg = location && getCachedActionMessage(location)?.msg;
-      return msg && (!msg.actionLog || msg.actionLog.state === "pending" ||
-          msg.actionLog.type === "bindHook") ? [location] : [];
+      return msg &&
+        (!msg.actionLog || msg.actionLog.state === "pending" || msg.actionLog.type === "bindHook")
+        ? [location]
+        : [];
     });
 
     const refresh = async (location: { chatId: number; sequence: number }) => {
@@ -3821,8 +3838,12 @@ function ChatInterface({
         if (cancelled || fetched?.type !== "action" || !fetched.actionLog) return;
         // Resolution is monotonic: never regress a card another channel already resolved.
         const current = getCachedActionMessage(location)?.msg;
-        if (fetched.actionLog.state === "pending" &&
-            current?.actionLog && current.actionLog.state !== "pending") return;
+        if (
+          fetched.actionLog.state === "pending" &&
+          current?.actionLog &&
+          current.actionLog.state !== "pending"
+        )
+          return;
         if (applyActionLogUpdateToCachedMessages(fetched.actionLog)) scheduleUpdate();
       } catch (err) {
         console.error("Failed to refresh action card:", err);
@@ -3839,7 +3860,9 @@ function ChatInterface({
         }
       })();
     }
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [overseer]);
 
   // Reset per-chat UI state when selectedChatId changes
@@ -3851,7 +3874,6 @@ function ChatInterface({
     setIsEditingTitle(false);
     setSidebarActiveTab("chat");
   }, [selectedChatId]);
-
 
   // Load chat history when selectedChatId changes to a non-null value
   useEffect(() => {
@@ -3932,7 +3954,9 @@ function ChatInterface({
     }
   };
 
-  loadEarlierRef.current = () => { void handleShowEarlierMessages(); };
+  loadEarlierRef.current = () => {
+    void handleShowEarlierMessages();
+  };
 
   // Handle sending a message (always called from ChatComposer with explicit messageText)
   const handleSend = async (
@@ -3942,7 +3966,7 @@ function ChatInterface({
     attachments?: ChatAttachmentHandle[],
     formats?: MessageFormatRef[],
   ) => {
-    const message = typeof messageText === "string" ? messageText.trim() : messageText ?? "";
+    const message = typeof messageText === "string" ? messageText.trim() : (messageText ?? "");
     if (!message && (!attachments || attachments.length === 0)) return;
 
     // Use provided modelId or fall back to selectedModel
@@ -3951,8 +3975,7 @@ function ChatInterface({
     try {
       if (selectedChatId === null) {
         // Create a new chat (with optional capsules).
-        const newChatId = await overseer.newChat(
-            message, model, capsules, attachments, formats);
+        const newChatId = await overseer.newChat(message, model, capsules, attachments, formats);
         onNavigateToChatRef.current(newChatId);
       } else {
         // Send message to existing chat.
@@ -3981,12 +4004,11 @@ function ChatInterface({
     attachments?: ChatAttachmentHandle[],
     formats?: MessageFormatRef[],
   ) => {
-    const message = typeof messageText === "string" ? messageText.trim() : messageText ?? "";
+    const message = typeof messageText === "string" ? messageText.trim() : (messageText ?? "");
     if (!message && (!attachments || attachments.length === 0)) return;
     const model = modelId !== undefined ? modelId : selectedModel;
     try {
-      const newChatId = await overseer.newChat(
-          message, model, capsules, attachments, formats);
+      const newChatId = await overseer.newChat(message, model, capsules, attachments, formats);
       onNavigateToChatRef.current(newChatId);
     } catch (err) {
       if (!logRpcFailure("Failed to create new chat:", err, { reportSite: "chat.new" })) {
@@ -4144,7 +4166,8 @@ function ChatInterface({
       setStaleAcceptChatId(null);
       if (conflictPaths.length > 0) {
         toasts.add({
-          title: `Updated this draft with the gadget's latest changes. ` +
+          title:
+            `Updated this draft with the gadget's latest changes. ` +
             `${conflictPaths.length} ${conflictPaths.length === 1 ? "file has" : "files have"} ` +
             `conflicts marked in the code -- resolve them (or ask the agent to), then accept again.`,
           variant: "warning",
@@ -4199,16 +4222,14 @@ function ChatInterface({
       // message, so revertChanges(0) erases them along with the recorded batches (and a
       // rows-only revert degenerates to a draft discard server-side).
       await overseer.revertChanges(target.chatId, 0);
-      setDiscardChangesTarget((current) =>
-        current?.chatId === target.chatId ? null : current,
-      );
+      setDiscardChangesTarget((current) => (current?.chatId === target.chatId ? null : current));
       toasts.add({ title: "Pending changes discarded", variant: "success" });
     } catch (err) {
       console.error("Failed to discard pending changes:", err);
       // See handleRevertChanges: the server's refusals are instructive, so surface them.
       toasts.add({
-        title: err instanceof Error && err.message
-          ? err.message : "Failed to discard pending changes",
+        title:
+          err instanceof Error && err.message ? err.message : "Failed to discard pending changes",
         variant: "error",
       });
     } finally {
@@ -4251,7 +4272,10 @@ function ChatInterface({
     return changed;
   };
 
-  const applyOptimisticActionState = (actionId: number, state: "approved" | "rejected"): boolean => {
+  const applyOptimisticActionState = (
+    actionId: number,
+    state: "approved" | "rejected",
+  ): boolean => {
     let changed = false;
     const locations = cacheRef.current.actionMessages.get(actionId);
     if (!locations) return false;
@@ -4283,7 +4307,11 @@ function ChatInterface({
 
     for (const [key, location] of locations) {
       const cached = getCachedActionMessage(location);
-      if (!cached || cached.msg.actionId !== actionId || cached.msg.actionLog?.type !== "bindHook") {
+      if (
+        !cached ||
+        cached.msg.actionId !== actionId ||
+        cached.msg.actionLog?.type !== "bindHook"
+      ) {
         locations.delete(key);
         continue;
       }
@@ -4302,34 +4330,43 @@ function ChatInterface({
   };
 
   // Handle reverting changes from a specific sequence number onward
-  const handleRevertChanges = useCallback(async (revertFrom: number) => {
-    if (selectedChatId === null) return;
+  const handleRevertChanges = useCallback(
+    async (revertFrom: number) => {
+      if (selectedChatId === null) return;
 
-    try {
-      await overseer.revertChanges(selectedChatId, revertFrom);
-      toasts.add({ title: "Draft rewound", variant: "success" });
-    } catch (err) {
-      console.error("Failed to rewind draft:", err);
-      // The server's refusals here are instructive (e.g. a still-proposed update-from-mainline
-      // batch can't be reverted), so surface them rather than a generic failure.
-      toasts.add({
-        title: err instanceof Error && err.message ? err.message : "Failed to rewind draft",
-        variant: "error",
-      });
-    }
-  }, [overseer, selectedChatId, toasts]);
+      try {
+        await overseer.revertChanges(selectedChatId, revertFrom);
+        toasts.add({ title: "Draft rewound", variant: "success" });
+      } catch (err) {
+        console.error("Failed to rewind draft:", err);
+        // The server's refusals here are instructive (e.g. a still-proposed update-from-mainline
+        // batch can't be reverted), so surface them rather than a generic failure.
+        toasts.add({
+          title: err instanceof Error && err.message ? err.message : "Failed to rewind draft",
+          variant: "error",
+        });
+      }
+    },
+    [overseer, selectedChatId, toasts],
+  );
 
   // Pending "always approve this type" confirmation, opened from a pending action card.
-  const [autoApproveConfirm, setAutoApproveConfirm] = useState<
-    { actionId: number; gatekeeperId: number; resourceTitle: string;
-      actionKind: ActionKind; actionLabel: string } | null
-  >(null);
+  const [autoApproveConfirm, setAutoApproveConfirm] = useState<{
+    actionId: number;
+    gatekeeperId: number;
+    resourceTitle: string;
+    actionKind: ActionKind;
+    actionLabel: string;
+  } | null>(null);
 
   // Enable auto-approval of an action tag on its connection (gated by the confirm dialog). The
   // server applies the now-eligible pending action(s) via its drain, and the action state flips to
   // "approved" through the actions subscription -- so we don't optimistically mutate it here.
-  const { alwaysApproveTag, isTagAutoApproved } =
-    useAlwaysApproveTag(overseer, setProcessingActions, onAutoApproveChange);
+  const { alwaysApproveTag, isTagAutoApproved } = useAlwaysApproveTag(
+    overseer,
+    setProcessingActions,
+    onAutoApproveChange,
+  );
 
   const resolveAction = useResolveAction(overseer, setProcessingActions, (actionId, state) => {
     if (applyOptimisticActionState(actionId, state)) forceUpdate();
@@ -4452,13 +4489,13 @@ function ChatInterface({
     });
   };
 
-
   // Compaction summaries are collapsed by default: the marker answers where the cut fell, and the
   // summary is there for anyone who wants to see what the model was left with.
   const toggleCompactionSummary = (to: number) => {
     setExpandedCompactions((prev) => {
       const next = new Set(prev);
-      if (next.has(to)) next.delete(to); else next.add(to);
+      if (next.has(to)) next.delete(to);
+      else next.add(to);
       return next;
     });
   };
@@ -4478,10 +4515,7 @@ function ChatInterface({
 
   // Handle retrying the agent after an error
   const handleRetry = async () => {
-    if (
-      selectedChatId === null ||
-      selectedModel === null
-    ) {
+    if (selectedChatId === null || selectedModel === null) {
       return;
     }
 
@@ -4493,30 +4527,27 @@ function ChatInterface({
     }
   };
 
-  const handleCopyMessage = useCallback(async (message: string) => {
-    const ok = await copyToClipboard(message);
-    toasts.add({
-      title: ok ? "Copied message" : "Unable to copy message",
-      variant: ok ? "success" : "error",
-    });
-  }, [toasts]);
-
-  const lastDurablePendingChange = useMemo(
-    () => {
-      for (let i = currentMessages.length - 1; i >= 0; i--) {
-        const msg = currentMessages[i];
-        if (
-          msg.type === "changes" &&
-          messageStates.changeStatus.get(msg.sequence) === "pending"
-        ) {
-          return msg;
-        }
-      }
-
-      return null;
+  const handleCopyMessage = useCallback(
+    async (message: string) => {
+      const ok = await copyToClipboard(message);
+      toasts.add({
+        title: ok ? "Copied message" : "Unable to copy message",
+        variant: ok ? "success" : "error",
+      });
     },
-    [currentMessages, messageStates],
+    [toasts],
   );
+
+  const lastDurablePendingChange = useMemo(() => {
+    for (let i = currentMessages.length - 1; i >= 0; i--) {
+      const msg = currentMessages[i];
+      if (msg.type === "changes" && messageStates.changeStatus.get(msg.sequence) === "pending") {
+        return msg;
+      }
+    }
+
+    return null;
+  }, [currentMessages, messageStates]);
 
   // Track the last visible agent message in each completed turn. This keeps hover actions like
   // copy/timestamp on the final response instead of repeating them for every streamed step.
@@ -4618,13 +4649,14 @@ function ChatInterface({
         !recordsOnlyWorktreeCreations(m)
       ) {
         const created = createdWorkpiecesOf(m);
-        pendingTurnChanges = pendingTurnChanges === null
-          ? { revertFrom: m.sequence, through: m.sequence, createdWorkpieces: created }
-          : {
-              revertFrom: pendingTurnChanges.revertFrom,
-              through: m.sequence,
-              createdWorkpieces: [...pendingTurnChanges.createdWorkpieces, ...created],
-            };
+        pendingTurnChanges =
+          pendingTurnChanges === null
+            ? { revertFrom: m.sequence, through: m.sequence, createdWorkpieces: created }
+            : {
+                revertFrom: pendingTurnChanges.revertFrom,
+                through: m.sequence,
+                createdWorkpieces: [...pendingTurnChanges.createdWorkpieces, ...created],
+              };
         attachPendingTurnChanges();
       }
     }
@@ -4694,13 +4726,15 @@ function ChatInterface({
       if (!(m.createdGadgets || m.createdWorktrees)) continue;
       creations = [
         ...creations,
-        ...(status === "reverted" ? [] : m.createdGadgets ?? []).map(({ gadgetId, title }): CreatedWorkpieceCardInfo => ({
-          type: "gadget",
-          workpieceId: gadgetId,
-          title,
-          isPending: status === "pending",
-          output: outputOfWorkpiece(gadgetId),
-        })),
+        ...(status === "reverted" ? [] : (m.createdGadgets ?? [])).map(
+          ({ gadgetId, title }): CreatedWorkpieceCardInfo => ({
+            type: "gadget",
+            workpieceId: gadgetId,
+            title,
+            isPending: status === "pending",
+            output: outputOfWorkpiece(gadgetId),
+          }),
+        ),
         ...(m.createdWorktrees ?? []).map(({ worktreeId, title }): CreatedWorkpieceCardInfo => ({
           type: "worktree",
           workpieceId: worktreeId,
@@ -4713,9 +4747,7 @@ function ChatInterface({
     return out;
   }, [currentMessages, messageStates, outputOfWorkpiece]);
 
-  const renderConnectionRequestCard = (
-    msg: AiChatMessage & { type: "connectionRequest" },
-  ) => {
+  const renderConnectionRequestCard = (msg: AiChatMessage & { type: "connectionRequest" }) => {
     const isPending = msg.state === "pending";
     const isAccepted = msg.state === "accepted";
     const isDenied = msg.state === "denied";
@@ -4736,24 +4768,18 @@ function ChatInterface({
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <span className="font-medium text-kumo-default">
-                  Connect {msg.vendorName}
-                </span>
+                <span className="font-medium text-kumo-default">Connect {msg.vendorName}</span>
                 {scope && (
                   <span className="rounded-full bg-kumo-tint px-2 py-0.5 text-[11px] leading-4 text-kumo-subtle">
                     {scope}
                   </span>
                 )}
                 {stateLabel && (
-                  <span className={`text-[12px] font-medium ${stateLabelCls}`}>
-                    {stateLabel}
-                  </span>
+                  <span className={`text-[12px] font-medium ${stateLabelCls}`}>{stateLabel}</span>
                 )}
               </div>
               {msg.reason && (
-                <p className="mt-1 text-[13px] leading-[18px] text-kumo-subtle">
-                  {msg.reason}
-                </p>
+                <p className="mt-1 text-[13px] leading-[18px] text-kumo-subtle">{msg.reason}</p>
               )}
             </div>
             {isPending && (
@@ -4794,11 +4820,7 @@ function ChatInterface({
 
     if (log.type === "bindHook") {
       const isDeleted = log.hookId === undefined;
-      const stateLabel = isDeleted
-        ? "Deleted"
-        : log.enabled
-          ? "Enabled"
-          : "Disabled";
+      const stateLabel = isDeleted ? "Deleted" : log.enabled ? "Enabled" : "Disabled";
       const stateLabelCls = isDeleted
         ? "text-kumo-inactive"
         : log.enabled
@@ -4818,12 +4840,12 @@ function ChatInterface({
                   <span className="font-medium text-kumo-default">
                     Hook: {log.description.title}
                   </span>
-                  <span className={`text-[12px] font-medium ${stateLabelCls}`}>
-                    {stateLabel}
-                  </span>
+                  <span className={`text-[12px] font-medium ${stateLabelCls}`}>{stateLabel}</span>
                 </div>
                 {log.description.description && (
-                  <div className={`mt-1 text-[13px] leading-[18px] text-kumo-subtle ${styles.markdownContent}`}>
+                  <div
+                    className={`mt-1 text-[13px] leading-[18px] text-kumo-subtle ${styles.markdownContent}`}
+                  >
                     <MarkdownMessage message={log.description.description} />
                   </div>
                 )}
@@ -4912,20 +4934,15 @@ function ChatInterface({
     // decision. Resolved actions are history, and collapse so a long thread stays scannable.
     const showDescription = isPending || open;
     const metadata = log.resourceTitle;
-    const stateLabel = isApproved
-      ? "Approved"
-      : isRejected
-        ? "Denied"
-        : null;
-    const stateLabelCls = isRejected
-      ? "text-kumo-danger"
-      : "text-kumo-inactive";
+    const stateLabel = isApproved ? "Approved" : isRejected ? "Denied" : null;
+    const stateLabelCls = isRejected ? "text-kumo-danger" : "text-kumo-inactive";
     // Auto-approval target: offer "Always approve this type" only when enabling a rule would
     // actually apply this action -- a tagged action on a connection that the gatekeeper marked
     // auto-approvable. (A non-auto-approvable action stays a manual gate even with a rule; an
     // auto-approvable action with an existing rule wouldn't still be pending.)
     const autoApproveTarget =
-      log.gatekeeperId !== undefined && log.description.actionKind !== undefined &&
+      log.gatekeeperId !== undefined &&
+      log.description.actionKind !== undefined &&
       log.description.autoApprovable === true
         ? {
             actionId: msg.actionId,
@@ -4940,15 +4957,18 @@ function ChatInterface({
       <>
         {autoApproveTarget &&
           !isTagAutoApproved(autoApproveTarget.gatekeeperId, autoApproveTarget.actionKind.tag) && (
-          <Tooltip content="Always approve this type of action on this connection, without future prompts." asChild>
-            <span className="flex">
-              <AlwaysApproveButton
-                onClick={() => setAutoApproveConfirm(autoApproveTarget)}
-                disabled={isProc}
-              />
-            </span>
-          </Tooltip>
-        )}
+            <Tooltip
+              content="Always approve this type of action on this connection, without future prompts."
+              asChild
+            >
+              <span className="flex">
+                <AlwaysApproveButton
+                  onClick={() => setAutoApproveConfirm(autoApproveTarget)}
+                  disabled={isProc}
+                />
+              </span>
+            </Tooltip>
+          )}
         <ResolveButton
           tone="deny"
           onClick={() => void resolveAction(msg.actionId, "deny")}
@@ -4995,7 +5015,10 @@ function ChatInterface({
         <div className="group/work max-w-[860px] text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle">
           <div className="rounded-2xl border border-kumo-brand/40 bg-kumo-brand/10 px-4 py-3">
             <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-kumo-tint text-kumo-brand" aria-hidden="true">
+              <span
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-kumo-tint text-kumo-brand"
+                aria-hidden="true"
+              >
                 <ShieldCheck size={20} weight="fill" />
               </span>
               <div className="min-w-0 flex-1">
@@ -5005,7 +5028,9 @@ function ChatInterface({
                   </span>
                   {resourceMeta}
                 </div>
-                <div className={`chat-panel mt-1 max-h-[200px] overflow-y-auto pr-1 text-[13px] leading-[18px] text-kumo-subtle ${styles.markdownContent}`}>
+                <div
+                  className={`chat-panel mt-1 max-h-[200px] overflow-y-auto pr-1 text-[13px] leading-[18px] text-kumo-subtle ${styles.markdownContent}`}
+                >
                   <MarkdownMessage message={log.description.description} />
                 </div>
               </div>
@@ -5065,7 +5090,9 @@ function ChatInterface({
         )}
         {showDescription && (
           <div className="themed-surface-inset ml-8 mt-1 space-y-1.5 rounded-2xl border border-kumo-line/70 bg-kumo-elevated/45 p-3 text-[13px] leading-[19px] tracking-[-0.25px] text-kumo-subtle">
-            <div className={`chat-panel max-h-[200px] overflow-y-auto pr-1 ${styles.markdownContent}`}>
+            <div
+              className={`chat-panel max-h-[200px] overflow-y-auto pr-1 ${styles.markdownContent}`}
+            >
               <MarkdownMessage message={log.description.description} />
             </div>
             {resourceMeta}
@@ -5128,9 +5155,7 @@ function ChatInterface({
             <div className="w-5 h-5 border-2 border-kumo-brand border-t-transparent rounded-full animate-spin" />
           </div>
         ) : chatList.length === 0 ? (
-          <p className="text-sm text-kumo-inactive text-center py-8">
-            No conversations yet
-          </p>
+          <p className="text-sm text-kumo-inactive text-center py-8">No conversations yet</p>
         ) : (
           <div className="flex flex-col gap-1">
             {visibleChatList.length === 0 ? (
@@ -5156,124 +5181,131 @@ function ChatInterface({
                       {CHAT_TIME_BUCKET_LABELS[bucket]}
                     </p>
                     {items.map((chat) => (
-              <div key={chat.id} className="relative">
-                {(() => {
-                  const isRenaming = renamingChatId === chat.id;
-                  return (
-                  <div
-                    onClick={isRenaming ? undefined : () => onNavigateToChat(chat.id)}
-                    className={`group flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-[background-color] duration-150 ease-out ${
-                      isRenaming
-                        ? "cursor-default bg-kumo-base ring-1 ring-kumo-ring/40"
-                        : sidebarMode && chat.id === selectedChatId
-                          ? "cursor-pointer bg-kumo-recessed"
-                          : "cursor-pointer hover:bg-kumo-tint"
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex min-w-0 items-center gap-2">
-                        {isRenaming ? (
-                          <input
-                            type="text"
-                            value={renamingInput}
-                            onChange={(e) => setRenamingInput(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => {
-                              if (isImeComposing(e)) return;
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleSaveListRename(chat.id);
-                              } else if (e.key === "Escape") {
-                                e.preventDefault();
-                                cancelListRename();
-                              }
-                            }}
-                            onBlur={() => handleSaveListRename(chat.id)}
-                            autoFocus
-                            spellCheck={false}
-                            autoCapitalize="off"
-                            autoCorrect="off"
-                            aria-label={`Rename ${chat.title}`}
-                            className="min-w-0 flex-1 bg-transparent text-[13px] leading-[18px] font-medium tracking-[-0.25px] text-kumo-default outline-none placeholder:text-kumo-inactive"
-                          />
-                        ) : (
-                          <span className="truncate text-[13px] leading-[18px] font-medium tracking-[-0.25px] text-kumo-default">
-                            {chat.title}
-                          </span>
-                        )}
-                        {!isRenaming && chat.activeAgent ? (
-                          <span className="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 text-[11px] leading-4 font-medium text-kumo-brand">
-                            <span className="h-1.5 w-1.5 rounded-full bg-kumo-brand animate-pulse" />
-                            Working
-                          </span>
-                        ) : !isRenaming && chatHasProposedChanges(chat) ? (
-                          <Tooltip content="This conversation has pending changes" asChild>
-                            <span className="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 text-[11px] leading-4 font-medium text-kumo-warning">
-                              <span className="h-1.5 w-1.5 rounded-full bg-kumo-warning" />
-                              Pending changes
-                            </span>
-                          </Tooltip>
-                        ) : null}
-                      </div>
-                      <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] leading-4 text-kumo-inactive">
-                        {chat.spawnerName && (
-                          <>
-                            <span className="truncate">Agent · {chat.spawnerName}</span>
-                            <span className="flex-shrink-0" aria-hidden="true">·</span>
-                          </>
-                        )}
-                        <span className="flex-shrink-0">
-                          {formatChatRowTime(chat.lastActive, bucket, chatListNow)}
-                        </span>
-                        {chat.totalCost != null && (
-                          <>
-                            <span className="flex-shrink-0" aria-hidden="true">·</span>
-                            <span className="flex-shrink-0 font-mono">
-                              ${chat.totalCost.toFixed(4)}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {!isRenaming && (
-                      <DropdownMenu>
-                        <DropdownMenu.Trigger
-                          render={
-                            <WorkshopIconButton
-                              aria-label={`Actions for ${chat.title}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="!h-9 !w-9 flex-shrink-0 text-kumo-inactive opacity-100 focus:opacity-100 group-hover:opacity-100 data-[popup-open]:opacity-100 sm:!h-7 sm:!w-7 sm:opacity-0"
+                      <div key={chat.id} className="relative">
+                        {(() => {
+                          const isRenaming = renamingChatId === chat.id;
+                          return (
+                            <div
+                              onClick={isRenaming ? undefined : () => onNavigateToChat(chat.id)}
+                              className={`group flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-[background-color] duration-150 ease-out ${
+                                isRenaming
+                                  ? "cursor-default bg-kumo-base ring-1 ring-kumo-ring/40"
+                                  : sidebarMode && chat.id === selectedChatId
+                                    ? "cursor-pointer bg-kumo-recessed"
+                                    : "cursor-pointer hover:bg-kumo-tint"
+                              }`}
                             >
-                              <DotsThreeVertical size={14} />
-                            </WorkshopIconButton>
-                          }
-                        />
-                        <DropdownMenu.Content
-                          onClick={(event) => event.stopPropagation()}
-                          className="themed-floating-shadow !z-[1100] !min-w-[144px] rounded-lg border border-kumo-line bg-kumo-base p-1"
-                        >
-                          <DropdownMenu.Item
-                            icon={<Pencil size={12} className="mr-2" />}
-                            onClick={() => startListRename(chat.id, chat.title)}
-                            className="!h-auto rounded-md !px-2.5 !py-1.5 text-[12px] leading-4 tracking-[-0.2px] text-kumo-default transition-colors data-highlighted:bg-kumo-tint"
-                          >
-                            Rename
-                          </DropdownMenu.Item>
-                          <DropdownMenu.Item
-                            icon={<Trash size={12} className="mr-2" />}
-                            variant="danger"
-                            onClick={() => handleDeleteChat(chat.id, chat.title)}
-                            className="!h-auto rounded-md !px-2.5 !py-1.5 text-[12px] leading-4 tracking-[-0.2px] transition-colors data-highlighted:bg-kumo-danger-tint"
-                          >
-                            Delete
-                          </DropdownMenu.Item>
-                        </DropdownMenu.Content>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                  );
-                })()}
-              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  {isRenaming ? (
+                                    <input
+                                      type="text"
+                                      value={renamingInput}
+                                      onChange={(e) => setRenamingInput(e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onKeyDown={(e) => {
+                                        if (isImeComposing(e)) return;
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          handleSaveListRename(chat.id);
+                                        } else if (e.key === "Escape") {
+                                          e.preventDefault();
+                                          cancelListRename();
+                                        }
+                                      }}
+                                      onBlur={() => handleSaveListRename(chat.id)}
+                                      autoFocus
+                                      spellCheck={false}
+                                      autoCapitalize="off"
+                                      autoCorrect="off"
+                                      aria-label={`Rename ${chat.title}`}
+                                      className="min-w-0 flex-1 bg-transparent text-[13px] leading-[18px] font-medium tracking-[-0.25px] text-kumo-default outline-none placeholder:text-kumo-inactive"
+                                    />
+                                  ) : (
+                                    <span className="truncate text-[13px] leading-[18px] font-medium tracking-[-0.25px] text-kumo-default">
+                                      {chat.title}
+                                    </span>
+                                  )}
+                                  {!isRenaming && chat.activeAgent ? (
+                                    <span className="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 text-[11px] leading-4 font-medium text-kumo-brand">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-kumo-brand animate-pulse" />
+                                      Working
+                                    </span>
+                                  ) : !isRenaming && chatHasProposedChanges(chat) ? (
+                                    <Tooltip
+                                      content="This conversation has pending changes"
+                                      asChild
+                                    >
+                                      <span className="inline-flex flex-shrink-0 cursor-pointer items-center gap-1 text-[11px] leading-4 font-medium text-kumo-warning">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-kumo-warning" />
+                                        Pending changes
+                                      </span>
+                                    </Tooltip>
+                                  ) : null}
+                                </div>
+                                <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] leading-4 text-kumo-inactive">
+                                  {chat.spawnerName && (
+                                    <>
+                                      <span className="truncate">Agent · {chat.spawnerName}</span>
+                                      <span className="flex-shrink-0" aria-hidden="true">
+                                        ·
+                                      </span>
+                                    </>
+                                  )}
+                                  <span className="flex-shrink-0">
+                                    {formatChatRowTime(chat.lastActive, bucket, chatListNow)}
+                                  </span>
+                                  {chat.totalCost != null && (
+                                    <>
+                                      <span className="flex-shrink-0" aria-hidden="true">
+                                        ·
+                                      </span>
+                                      <span className="flex-shrink-0 font-mono">
+                                        ${chat.totalCost.toFixed(4)}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              {!isRenaming && (
+                                <DropdownMenu>
+                                  <DropdownMenu.Trigger
+                                    render={
+                                      <WorkshopIconButton
+                                        aria-label={`Actions for ${chat.title}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="!h-9 !w-9 flex-shrink-0 text-kumo-inactive opacity-100 focus:opacity-100 group-hover:opacity-100 data-[popup-open]:opacity-100 sm:!h-7 sm:!w-7 sm:opacity-0"
+                                      >
+                                        <DotsThreeVertical size={14} />
+                                      </WorkshopIconButton>
+                                    }
+                                  />
+                                  <DropdownMenu.Content
+                                    onClick={(event) => event.stopPropagation()}
+                                    className="themed-floating-shadow !z-[1100] !min-w-[144px] rounded-lg border border-kumo-line bg-kumo-base p-1"
+                                  >
+                                    <DropdownMenu.Item
+                                      icon={<Pencil size={12} className="mr-2" />}
+                                      onClick={() => startListRename(chat.id, chat.title)}
+                                      className="!h-auto rounded-md !px-2.5 !py-1.5 text-[12px] leading-4 tracking-[-0.2px] text-kumo-default transition-colors data-highlighted:bg-kumo-tint"
+                                    >
+                                      Rename
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                      icon={<Trash size={12} className="mr-2" />}
+                                      variant="danger"
+                                      onClick={() => handleDeleteChat(chat.id, chat.title)}
+                                      className="!h-auto rounded-md !px-2.5 !py-1.5 text-[12px] leading-4 tracking-[-0.2px] transition-colors data-highlighted:bg-kumo-danger-tint"
+                                    >
+                                      Delete
+                                    </DropdownMenu.Item>
+                                  </DropdownMenu.Content>
+                                </DropdownMenu>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     ))}
                   </section>
                 ))}
@@ -5291,9 +5323,7 @@ function ChatInterface({
           {/* Attachments and pending resource operations belong to this workspace's composer. */}
           <ChatComposer
             key={workspaceId}
-            createCapsuleGatekeeper={(accountId, url) =>
-              overseer.newGatekeeper(accountId, url)
-            }
+            createCapsuleGatekeeper={(accountId, url) => overseer.newGatekeeper(accountId, url)}
             getOverseer={getOverseer}
             onSend={handleNewChatSend}
             isAgentActive={false}
@@ -5304,9 +5334,11 @@ function ChatInterface({
             onToggleThinkingTraces={toggleShowThinkingTraces}
             minRows={2}
             newChat
-            draftStorageKey={currentUser && workspaceId
-              ? composerDraftStorageKey(currentUser.id, `workspace:${workspaceId}:new`)
-              : undefined}
+            draftStorageKey={
+              currentUser && workspaceId
+                ? composerDraftStorageKey(currentUser.id, `workspace:${workspaceId}:new`)
+                : undefined
+            }
           />
           {/* Reserve the same height as the token/cost row to avoid layout shift. */}
           <div aria-hidden className="min-h-[1rem]" />
@@ -5317,9 +5349,7 @@ function ChatInterface({
 
   // ─── main render ─────────────────────────────────────────────────────────────
   return (
-    <div
-      className={`flex h-full bg-kumo-base ${sidebarMode ? "flex-row" : "flex-col"}`}
-    >
+    <div className={`flex h-full bg-kumo-base ${sidebarMode ? "flex-row" : "flex-col"}`}>
       {/* ── Sidebar mode: conversations list on the left ───────────────────── */}
       {sidebarMode && (
         <>
@@ -5376,11 +5406,9 @@ function ChatInterface({
           )}
 
           {/* Connections tab content */}
-          {sidebarMode &&
-            sidebarActiveTab === "connections" &&
-            renderExtraTab && (
-              <div className="flex-1 overflow-auto">{renderExtraTab()}</div>
-            )}
+          {sidebarMode && sidebarActiveTab === "connections" && renderExtraTab && (
+            <div className="flex-1 overflow-auto">{renderExtraTab()}</div>
+          )}
 
           {/* Chat content — hidden when connections tab is active in sidebar mode */}
           {(!sidebarMode || sidebarActiveTab === "chat") && (
@@ -5509,7 +5537,9 @@ function ChatInterface({
                                   : `The ${kept === 1 ? "message" : `${kept} messages`} after the cut ${kept === 1 ? "was" : "were"} kept in full.`}
                               </p>
                             )}
-                            <div className={`min-w-0 text-[13px] leading-[19px] ${styles.markdownContent}`}>
+                            <div
+                              className={`min-w-0 text-[13px] leading-[19px] ${styles.markdownContent}`}
+                            >
                               <MarkdownMessage message={entry.boundary.summary} />
                             </div>
                           </div>
@@ -5527,7 +5557,10 @@ function ChatInterface({
                                 aria-expanded={expanded}
                                 className="inline-flex cursor-pointer items-center gap-3 rounded-md px-1.5 text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle transition-colors duration-150 ease-out hover:text-kumo-default focus-visible:text-kumo-default focus-visible:outline-none"
                               >
-                                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive" aria-hidden="true">
+                                <span
+                                  className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive"
+                                  aria-hidden="true"
+                                >
                                   <Brain size={16} />
                                 </span>
                                 <span className="font-medium">
@@ -5546,7 +5579,11 @@ function ChatInterface({
 
                         return (
                           <div key={entry.key} className={`${entryTopClass} mb-4 max-w-[860px]`}>
-                            <div className="flex items-center gap-3" role="separator" aria-label="Context compacted">
+                            <div
+                              className="flex items-center gap-3"
+                              role="separator"
+                              aria-label="Context compacted"
+                            >
                               <span className="h-px flex-1 bg-kumo-line" aria-hidden="true" />
                               <button
                                 type="button"
@@ -5571,9 +5608,15 @@ function ChatInterface({
 
                       if (entry.type === "modelChange") {
                         return (
-                          <div key={entry.key} className={`${entryTopClass} max-w-[860px] py-1 text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle`}>
+                          <div
+                            key={entry.key}
+                            className={`${entryTopClass} max-w-[860px] py-1 text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle`}
+                          >
                             <div className="flex items-center gap-3 px-1.5 py-1">
-                              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive" aria-hidden="true">
+                              <span
+                                className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive"
+                                aria-hidden="true"
+                              >
                                 <Swap size={16} />
                               </span>
                               <span className="min-w-0 truncate">
@@ -5600,11 +5643,13 @@ function ChatInterface({
                           ? `${actor} brought the gadget's latest changes into this draft${
                               conflictCount > 0
                                 ? ` — ${conflictCount} ${conflictCount === 1 ? "file has" : "files have"} conflicts marked in the code`
-                                : ""}`
+                                : ""
+                            }`
                           : createdGadgets.length > 0
-                          ? `${actor} created ${createdGadgets.length === 1 ? "gadget" : "gadgets"} ${
-                              createdGadgets.map((g) => `“${g.title}”`).join(", ")}`
-                          : `${actor} saved edits`;
+                            ? `${actor} created ${createdGadgets.length === 1 ? "gadget" : "gadgets"} ${createdGadgets
+                                .map((g) => `“${g.title}”`)
+                                .join(", ")}`
+                            : `${actor} saved edits`;
                         // A still-proposed mainline merge can't be reverted: it advanced the
                         // chat's pins, and erasing it would let a later accept silently overwrite
                         // the mainline content it brought in (the server refuses too).
@@ -5615,32 +5660,39 @@ function ChatInterface({
                               createdWorkpiecesOf(entry.message),
                             );
                         return (
-                          <div key={entry.key} className={`${entryTopClass} group/savedChanges max-w-[860px] py-1 text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle`}>
+                          <div
+                            key={entry.key}
+                            className={`${entryTopClass} group/savedChanges max-w-[860px] py-1 text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle`}
+                          >
                             <div className="flex items-center gap-3 px-1.5 py-1">
-                              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive" aria-hidden="true">
+                              <span
+                                className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive"
+                                aria-hidden="true"
+                              >
                                 <PencilSimple size={15} />
                               </span>
-                              <span className="min-w-0 truncate font-medium">
-                                {label}
-                              </span>
+                              <span className="min-w-0 truncate font-medium">{label}</span>
                               <div className="flex flex-shrink-0 items-center gap-1 opacity-100 transition-opacity duration-150 ease-out sm:opacity-0 sm:group-hover/savedChanges:opacity-100 sm:group-focus-within/savedChanges:opacity-100">
                                 {/* Edits from before the current epoch (i.e. before the chat's
                                     conversion to git-backed storage) can't be discarded
                                     individually -- only the banner's discard-all covers them. */}
                                 {entry.message.sequence >= chatEpoch && (
-                                <Tooltip content={discardLabel} asChild>
-                                  <button
-                                    type="button"
-                                    disabled={isAgentActive || mainlineMerge !== undefined}
-                                    onClick={() => handleRevertChanges(entry.message.sequence)}
-                                    className="flex cursor-pointer items-center rounded-md p-1 text-kumo-inactive transition-[color,opacity,transform] duration-150 ease-out hover:text-kumo-default focus-visible:text-kumo-default focus-visible:outline-none active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40"
-                                    aria-label={discardLabel}
-                                  >
-                                    <ArrowUUpLeft size={15} />
-                                  </button>
-                                </Tooltip>
+                                  <Tooltip content={discardLabel} asChild>
+                                    <button
+                                      type="button"
+                                      disabled={isAgentActive || mainlineMerge !== undefined}
+                                      onClick={() => handleRevertChanges(entry.message.sequence)}
+                                      className="flex cursor-pointer items-center rounded-md p-1 text-kumo-inactive transition-[color,opacity,transform] duration-150 ease-out hover:text-kumo-default focus-visible:text-kumo-default focus-visible:outline-none active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40"
+                                      aria-label={discardLabel}
+                                    >
+                                      <ArrowUUpLeft size={15} />
+                                    </button>
+                                  </Tooltip>
                                 )}
-                                <Tooltip content={formatFullTimestamp(entry.message.timestamp)} asChild>
+                                <Tooltip
+                                  content={formatFullTimestamp(entry.message.timestamp)}
+                                  asChild
+                                >
                                   <span className="px-1 font-mono text-[11px] leading-4 text-kumo-inactive">
                                     {entry.message.timestamp.toLocaleTimeString([], {
                                       hour: "2-digit",
@@ -5663,7 +5715,10 @@ function ChatInterface({
                           ? entry.toolCallGroups.length - 1
                           : -1;
                         return (
-                          <div key={entry.key} className={`${entryTopClass} min-w-0 w-full max-w-[860px] space-y-2`}>
+                          <div
+                            key={entry.key}
+                            className={`${entryTopClass} min-w-0 w-full max-w-[860px] space-y-2`}
+                          >
                             {entry.toolCallGroups.map((group, groupIndex) => (
                               <ToolGroupRow
                                 outputOf={resolveToolOutput}
@@ -5709,71 +5764,21 @@ function ChatInterface({
 
                       return (
                         <div key={entry.key} className={entryTopClass}>
-                        {/* ── user / AI text message ── */}
-                        {msg.type === "slashCommand" && (
-                          <div className="group/message relative flex flex-col items-end">
-                            <div className="themed-user-bubble-shadow w-fit max-w-[min(680px,78%)] rounded-[24px] rounded-br-lg border border-transparent bg-kumo-bubble-user px-4 py-2.5 text-[14px] leading-[22px] tracking-[-0.25px] text-kumo-default">
-                              <span className="whitespace-pre-wrap">
-                                <SlashCommandMention
-                                  name={msg.skillName}
-                                  args={msg.request.args}
-                                  id={msg.request.id}
-                                  commandPosition={msg.request.commandPosition}
-                                  getOverseer={getOverseer}
-                                />
-                              </span>
-                            </div>
-                            <div className="mt-0.5 flex items-center justify-end gap-2 pr-1 text-[11px] leading-4 text-kumo-inactive opacity-100 transition-opacity duration-150 ease-out sm:opacity-0 sm:group-hover/message:opacity-100 sm:group-focus-within/message:opacity-100">
-                              {!(hideOwnUserName && msg.author.id === currentUser?.id) && (
-                                <span className="font-medium">{msg.author.name}</span>
-                              )}
-                              <Tooltip content={formatFullTimestamp(msg.timestamp)} asChild>
-                                <span className="font-mono">
-                                  {msg.timestamp.toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
-                              </Tooltip>
-                            </div>
-                          </div>
-                        )}
-                        {msg.type === "message" && (
-                          msg.author.type === "user" ? (
+                          {/* ── user / AI text message ── */}
+                          {msg.type === "slashCommand" && (
                             <div className="group/message relative flex flex-col items-end">
-                              <div className={`themed-user-bubble-shadow w-fit max-w-[min(680px,78%)] rounded-[24px] rounded-br-lg border border-transparent bg-kumo-bubble-user px-4 py-2.5 text-[14px] leading-[22px] tracking-[-0.25px] text-kumo-default ${styles.markdownContent}`}>
-                                {msg.attachments && msg.attachments.length > 0 && (
-                                  <ChatAttachmentGrid
-                                    attachments={msg.attachments}
-                                    onDownload={(attachment) => { void downloadChatAttachment(msg.chatId, attachment); }}
+                              <div className="themed-user-bubble-shadow w-fit max-w-[min(680px,78%)] rounded-[24px] rounded-br-lg border border-transparent bg-kumo-bubble-user px-4 py-2.5 text-[14px] leading-[22px] tracking-[-0.25px] text-kumo-default">
+                                <span className="whitespace-pre-wrap">
+                                  <SlashCommandMention
+                                    name={msg.skillName}
+                                    args={msg.request.args}
+                                    id={msg.request.id}
+                                    commandPosition={msg.request.commandPosition}
+                                    getOverseer={getOverseer}
                                   />
-                                )}
-                                {entry.slashCommand ? (
-                                  // What the command expanded into is the agent's context, not
-                                  // something to re-read here.
-                                  <div className="whitespace-pre-wrap">
-                                    <SlashCommandMention
-                                      name={entry.slashCommand.skillName}
-                                      args={entry.slashCommand.request.args}
-                                      id={entry.slashCommand.request.id}
-                                      commandPosition={entry.slashCommand.request.commandPosition}
-                                      formats={msg.formats}
-                                      getOverseer={getOverseer}
-                                    />
-                                  </div>
-                                ) : msg.message.trim() && (
-                                  // pre-wrap renders users' single newlines as hard breaks.
-                                  <div className="whitespace-pre-wrap">
-                                    <MarkdownMessage
-                                      message={msg.message}
-                                      capsules={msg.capsules}
-                                      formats={msg.formats}
-                                    />
-                                  </div>
-                                )}
+                                </span>
                               </div>
                               <div className="mt-0.5 flex items-center justify-end gap-2 pr-1 text-[11px] leading-4 text-kumo-inactive opacity-100 transition-opacity duration-150 ease-out sm:opacity-0 sm:group-hover/message:opacity-100 sm:group-focus-within/message:opacity-100">
-                                {/* hideOwnUserName implies currentUser is non-null (see memo). */}
                                 {!(hideOwnUserName && msg.author.id === currentUser?.id) && (
                                   <span className="font-medium">{msg.author.name}</span>
                                 )}
@@ -5787,85 +5792,54 @@ function ChatInterface({
                                 </Tooltip>
                               </div>
                             </div>
-                          ) : (() => {
-                            const messageToolGroups = entry.toolCallGroups;
-                            const hasMessageText = msg.message.trim().length > 0;
-                            const showReasoning = showThinkingTraces && !!msg.reasoning;
-                            const actionMessageSeq = entry.lastMessageSequence ?? msg.sequence;
-                            const pendingChange = pendingChangeByTurnItemSeq.get(
-                              actionMessageSeq,
-                            ) ?? null;
-                            const createdWorkpieces =
-                              createdWorkpiecesByTurnItemSeq.get(actionMessageSeq) ?? [];
-                            const attachActionsToToolGroups =
-                              !hasMessageText &&
-                              !!pendingChange &&
-                              !!messageToolGroups &&
-                              messageToolGroups.length > 0;
-                            const showActions =
-                              completedAgentTurnMessageSeqs.has(actionMessageSeq) &&
-                              (hasMessageText || (!!pendingChange && !attachActionsToToolGroups));
-                            const keepActionsVisible =
-                              actionMessageSeq === latestCompletedAgentTurnMessageSeq;
-                            const showFooterOnGroupIndex = attachActionsToToolGroups && pendingChange && messageToolGroups
-                              ? messageToolGroups.length - 1
-                              : -1;
-                            return (
-                          <div className="min-w-0 w-full max-w-[860px] space-y-2">
-                            <div className="group/agentMessage relative space-y-1.5">
-                              {showReasoning && (
-                                <ThinkingTraceRow reasoning={msg.reasoning!} />
-                              )}
-
-                              {hasMessageText && (
-                                <div className={`text-[14px] leading-[22px] tracking-[-0.25px] text-kumo-default ${styles.markdownContent}`}>
-                                  <MarkdownMessage
-                                    message={msg.message}
-                                    capsules={msg.capsules}
-                                    formats={msg.formats}
-                                  />
-                                </div>
-                              )}
-
-                              {showActions && (
-                                <div className={`mt-0.5 -ml-1 flex items-center gap-1 transition-opacity duration-150 ease-out ${
-                                  keepActionsVisible
-                                    ? "opacity-100"
-                                    : "opacity-100 sm:opacity-0 sm:group-hover/agentMessage:opacity-100 sm:group-focus-within/agentMessage:opacity-100"
-                                }`}>
-                                  {hasMessageText && (
-                                    <Tooltip content="Copy message" asChild>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleCopyMessage(msg.message)}
-                                        className="flex cursor-pointer items-center rounded-md p-1 text-kumo-inactive transition-[color,transform] duration-150 ease-out hover:text-kumo-default focus-visible:text-kumo-default focus-visible:outline-none active:scale-[0.96]"
-                                        aria-label="Copy message"
-                                      >
-                                        <Copy size={15} />
-                                      </button>
-                                    </Tooltip>
+                          )}
+                          {msg.type === "message" &&
+                            (msg.author.type === "user" ? (
+                              <div className="group/message relative flex flex-col items-end">
+                                <div
+                                  className={`themed-user-bubble-shadow w-fit max-w-[min(680px,78%)] rounded-[24px] rounded-br-lg border border-transparent bg-kumo-bubble-user px-4 py-2.5 text-[14px] leading-[22px] tracking-[-0.25px] text-kumo-default ${styles.markdownContent}`}
+                                >
+                                  {msg.attachments && msg.attachments.length > 0 && (
+                                    <ChatAttachmentGrid
+                                      attachments={msg.attachments}
+                                      onDownload={(attachment) => {
+                                        void downloadChatAttachment(msg.chatId, attachment);
+                                      }}
+                                    />
                                   )}
-                                  {pendingChange && (() => {
-                                    const label = getDiscardLabel(
-                                      pendingChange.through === lastDurablePendingChange?.sequence,
-                                      pendingChange.createdWorkpieces,
-                                    );
-                                    return (
-                                    <Tooltip content={label} asChild>
-                                      <button
-                                        type="button"
-                                        disabled={isAgentActive}
-                                        onClick={() => handleRevertChanges(pendingChange.revertFrom)}
-                                        className="flex cursor-pointer items-center rounded-md p-1 text-kumo-inactive transition-[color,opacity,transform] duration-150 ease-out hover:text-kumo-default focus-visible:text-kumo-default focus-visible:outline-none active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40"
-                                        aria-label={label}
-                                      >
-                                        <ArrowUUpLeft size={15} />
-                                      </button>
-                                    </Tooltip>
-                                    );
-                                  })()}
+                                  {entry.slashCommand ? (
+                                    // What the command expanded into is the agent's context, not
+                                    // something to re-read here.
+                                    <div className="whitespace-pre-wrap">
+                                      <SlashCommandMention
+                                        name={entry.slashCommand.skillName}
+                                        args={entry.slashCommand.request.args}
+                                        id={entry.slashCommand.request.id}
+                                        commandPosition={entry.slashCommand.request.commandPosition}
+                                        formats={msg.formats}
+                                        getOverseer={getOverseer}
+                                      />
+                                    </div>
+                                  ) : (
+                                    msg.message.trim() && (
+                                      // pre-wrap renders users' single newlines as hard breaks.
+                                      <div className="whitespace-pre-wrap">
+                                        <MarkdownMessage
+                                          message={msg.message}
+                                          capsules={msg.capsules}
+                                          formats={msg.formats}
+                                        />
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                                <div className="mt-0.5 flex items-center justify-end gap-2 pr-1 text-[11px] leading-4 text-kumo-inactive opacity-100 transition-opacity duration-150 ease-out sm:opacity-0 sm:group-hover/message:opacity-100 sm:group-focus-within/message:opacity-100">
+                                  {/* hideOwnUserName implies currentUser is non-null (see memo). */}
+                                  {!(hideOwnUserName && msg.author.id === currentUser?.id) && (
+                                    <span className="font-medium">{msg.author.name}</span>
+                                  )}
                                   <Tooltip content={formatFullTimestamp(msg.timestamp)} asChild>
-                                    <span className="px-1 font-mono text-[11px] leading-4 text-kumo-inactive">
+                                    <span className="font-mono">
                                       {msg.timestamp.toLocaleTimeString([], {
                                         hour: "2-digit",
                                         minute: "2-digit",
@@ -5873,398 +5847,544 @@ function ChatInterface({
                                     </span>
                                   </Tooltip>
                                 </div>
-                              )}
-                            </div>
+                              </div>
+                            ) : (
+                              (() => {
+                                const messageToolGroups = entry.toolCallGroups;
+                                const hasMessageText = msg.message.trim().length > 0;
+                                const showReasoning = showThinkingTraces && !!msg.reasoning;
+                                const actionMessageSeq = entry.lastMessageSequence ?? msg.sequence;
+                                const pendingChange =
+                                  pendingChangeByTurnItemSeq.get(actionMessageSeq) ?? null;
+                                const createdWorkpieces =
+                                  createdWorkpiecesByTurnItemSeq.get(actionMessageSeq) ?? [];
+                                const attachActionsToToolGroups =
+                                  !hasMessageText &&
+                                  !!pendingChange &&
+                                  !!messageToolGroups &&
+                                  messageToolGroups.length > 0;
+                                const showActions =
+                                  completedAgentTurnMessageSeqs.has(actionMessageSeq) &&
+                                  (hasMessageText ||
+                                    (!!pendingChange && !attachActionsToToolGroups));
+                                const keepActionsVisible =
+                                  actionMessageSeq === latestCompletedAgentTurnMessageSeq;
+                                const showFooterOnGroupIndex =
+                                  attachActionsToToolGroups && pendingChange && messageToolGroups
+                                    ? messageToolGroups.length - 1
+                                    : -1;
+                                return (
+                                  <div className="min-w-0 w-full max-w-[860px] space-y-2">
+                                    <div className="group/agentMessage relative space-y-1.5">
+                                      {showReasoning && (
+                                        <ThinkingTraceRow reasoning={msg.reasoning!} />
+                                      )}
 
-                            {createdWorkpieces.map((created) => (
-                              <CreatedWorkpieceChatCard
-                                key={created.workpieceId}
-                                created={created}
-                                onOpen={() => onOpenGadget(created.workpieceId)}
-                              />
+                                      {hasMessageText && (
+                                        <div
+                                          className={`text-[14px] leading-[22px] tracking-[-0.25px] text-kumo-default ${styles.markdownContent}`}
+                                        >
+                                          <MarkdownMessage
+                                            message={msg.message}
+                                            capsules={msg.capsules}
+                                            formats={msg.formats}
+                                          />
+                                        </div>
+                                      )}
+
+                                      {showActions && (
+                                        <div
+                                          className={`mt-0.5 -ml-1 flex items-center gap-1 transition-opacity duration-150 ease-out ${
+                                            keepActionsVisible
+                                              ? "opacity-100"
+                                              : "opacity-100 sm:opacity-0 sm:group-hover/agentMessage:opacity-100 sm:group-focus-within/agentMessage:opacity-100"
+                                          }`}
+                                        >
+                                          {hasMessageText && (
+                                            <Tooltip content="Copy message" asChild>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleCopyMessage(msg.message)}
+                                                className="flex cursor-pointer items-center rounded-md p-1 text-kumo-inactive transition-[color,transform] duration-150 ease-out hover:text-kumo-default focus-visible:text-kumo-default focus-visible:outline-none active:scale-[0.96]"
+                                                aria-label="Copy message"
+                                              >
+                                                <Copy size={15} />
+                                              </button>
+                                            </Tooltip>
+                                          )}
+                                          {pendingChange &&
+                                            (() => {
+                                              const label = getDiscardLabel(
+                                                pendingChange.through ===
+                                                  lastDurablePendingChange?.sequence,
+                                                pendingChange.createdWorkpieces,
+                                              );
+                                              return (
+                                                <Tooltip content={label} asChild>
+                                                  <button
+                                                    type="button"
+                                                    disabled={isAgentActive}
+                                                    onClick={() =>
+                                                      handleRevertChanges(pendingChange.revertFrom)
+                                                    }
+                                                    className="flex cursor-pointer items-center rounded-md p-1 text-kumo-inactive transition-[color,opacity,transform] duration-150 ease-out hover:text-kumo-default focus-visible:text-kumo-default focus-visible:outline-none active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40"
+                                                    aria-label={label}
+                                                  >
+                                                    <ArrowUUpLeft size={15} />
+                                                  </button>
+                                                </Tooltip>
+                                              );
+                                            })()}
+                                          <Tooltip
+                                            content={formatFullTimestamp(msg.timestamp)}
+                                            asChild
+                                          >
+                                            <span className="px-1 font-mono text-[11px] leading-4 text-kumo-inactive">
+                                              {msg.timestamp.toLocaleTimeString([], {
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                              })}
+                                            </span>
+                                          </Tooltip>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {createdWorkpieces.map((created) => (
+                                      <CreatedWorkpieceChatCard
+                                        key={created.workpieceId}
+                                        created={created}
+                                        onOpen={() => onOpenGadget(created.workpieceId)}
+                                      />
+                                    ))}
+
+                                    {messageToolGroups && messageToolGroups.length > 0 && (
+                                      <div className="space-y-1">
+                                        {messageToolGroups.map((group, groupIndex) => (
+                                          <ToolGroupRow
+                                            outputOf={resolveToolOutput}
+                                            key={group.key}
+                                            group={group}
+                                            open={expandedToolCalls.has(group.key)}
+                                            expandedKeys={expandedToolCalls}
+                                            onToggle={toggleToolCallExpansion}
+                                            footerChangeSequence={
+                                              groupIndex === showFooterOnGroupIndex
+                                                ? pendingChange?.revertFrom
+                                                : undefined
+                                            }
+                                            footerTimestamp={
+                                              groupIndex === showFooterOnGroupIndex
+                                                ? msg.timestamp
+                                                : undefined
+                                            }
+                                            footerIsTrailing={
+                                              pendingChange?.through ===
+                                              lastDurablePendingChange?.sequence
+                                            }
+                                            footerCreatedWorkpieces={
+                                              groupIndex === showFooterOnGroupIndex
+                                                ? pendingChange?.createdWorkpieces
+                                                : undefined
+                                            }
+                                            footerDisabled={isAgentActive}
+                                            onFooterRevert={handleRevertChanges}
+                                          />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()
                             ))}
 
-                            {messageToolGroups && messageToolGroups.length > 0 && (
-                              <div className="space-y-1">
-                                {messageToolGroups.map((group, groupIndex) => (
-                                  <ToolGroupRow
-                                    outputOf={resolveToolOutput}
-                                    key={group.key}
-                                    group={group}
-                                    open={expandedToolCalls.has(group.key)}
-                                    expandedKeys={expandedToolCalls}
-                                    onToggle={toggleToolCallExpansion}
-                                    footerChangeSequence={
-                                      groupIndex === showFooterOnGroupIndex
-                                        ? pendingChange?.revertFrom
-                                        : undefined
+                          {(msg.type === "merge" || msg.type === "revert") &&
+                            (() => {
+                              const isMerge = msg.type === "merge";
+                              const ts = isMerge
+                                ? messageStates.mergeTimestamps.get(msg.sequence)
+                                : messageStates.revertTimestamps.get(msg.sequence);
+                              return (
+                                <div className="max-w-[860px] py-1 text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle">
+                                  <Tooltip
+                                    content={
+                                      isMerge
+                                        ? `Accepted draft changes${ts ? ` through ${formatFullTimestamp(ts)}` : ""}.`
+                                        : `Returned to the gadget state before the prompt sent ${ts ? `at ${ts.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "earlier"}.`
                                     }
-                                    footerTimestamp={
-                                      groupIndex === showFooterOnGroupIndex
-                                        ? msg.timestamp
-                                        : undefined
-                                    }
-                                    footerIsTrailing={
-                                      pendingChange?.through === lastDurablePendingChange?.sequence
-                                    }
-                                    footerCreatedWorkpieces={
-                                      groupIndex === showFooterOnGroupIndex
-                                        ? pendingChange?.createdWorkpieces
-                                        : undefined
-                                    }
-                                    footerDisabled={isAgentActive}
-                                    onFooterRevert={handleRevertChanges}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                            );
-                          })()
-                        )}
-
-                        {(msg.type === "merge" || msg.type === "revert") &&
-                          (() => {
-                            const isMerge = msg.type === "merge";
-                            const ts = isMerge
-                              ? messageStates.mergeTimestamps.get(msg.sequence)
-                              : messageStates.revertTimestamps.get(
-                                  msg.sequence,
-                                );
-                            return (
-                              <div className="max-w-[860px] py-1 text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle">
-                                <Tooltip
-                                  content={
-                                    isMerge
-                                      ? `Accepted draft changes${ts ? ` through ${formatFullTimestamp(ts)}` : ""}.`
-                                      : `Returned to the gadget state before the prompt sent ${ts ? `at ${ts.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "earlier"}.`
-                                  }
-                                  asChild
-                                >
-                                  <span className="inline-flex items-center gap-3 px-1.5">
-                                    <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive" aria-hidden="true">
-                                      {isMerge ? <Check size={16} /> : <ArrowUUpLeft size={16} />}
-                                    </span>
-                                    <span className="font-medium">
-                                      {msg.author.name}{" "}
-                                      {isMerge
-                                        ? "accepted changes"
-                                        : "discarded changes"}
-                                    </span>
-                                  </span>
-                                </Tooltip>
-                              </div>
-                            );
-                          })()}
-
-                        {msg.type === "action" && renderActionCard(msg)}
-
-                        {msg.type === "connectionRequest" && renderConnectionRequestCard(msg)}
-
-                        {msg.type === "useGadget" && (
-                          <div className="max-w-[860px] text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle">
-                            <Tooltip content={`Used the gadget at ${formatFullTimestamp(msg.timestamp)}`} asChild>
-                              <span className="inline-flex items-center gap-3 px-1.5 py-1">
-                                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive" aria-hidden="true">
-                                  <Plug size={16} />
-                                </span>
-                                <span>Used the gadget</span>
-                              </span>
-                            </Tooltip>
-                          </div>
-                        )}
-
-                        {msg.type === "error" &&
-                          (() => {
-                            const key = `${msg.chatId}-${msg.sequence}`;
-                            const isLast =
-                              msg.sequence === lastMessageSequence &&
-                              !isAgentActive;
-                            const expanded = expandedErrors.has(key);
-                            return (
-                              <div className="group/work max-w-[860px] text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle">
-                                <div className="flex w-full items-center gap-2 px-1.5 py-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleErrorExpansion(key)}
-                                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md text-left transition-colors duration-150 ease-out hover:text-kumo-default focus-visible:text-kumo-default focus-visible:outline-none active:scale-[0.995]"
-                                    aria-expanded={expanded}
+                                    asChild
                                   >
-                                    <Tooltip content={formatFullTimestamp(msg.timestamp)} asChild>
-                                      <span className="flex min-w-0 flex-1 items-center gap-2">
-                                        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-danger" aria-hidden="true">
-                                          <WarningCircle size={16} weight="fill" />
-                                        </span>
-                                        <span className="flex min-w-0 flex-1 items-center gap-1">
-                                          <span className="min-w-0 truncate">
-                                            <span className="font-medium text-kumo-danger">Error: </span>
-                                            <span className="text-kumo-subtle">{msg.message}</span>
-                                          </span>
-                                          <CaretRight
-                                            size={13}
-                                            weight="bold"
-                                            className={`flex-shrink-0 text-kumo-inactive transition-transform duration-150 ease-out ${expanded ? "rotate-90" : ""}`}
-                                          />
-                                        </span>
+                                    <span className="inline-flex items-center gap-3 px-1.5">
+                                      <span
+                                        className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive"
+                                        aria-hidden="true"
+                                      >
+                                        {isMerge ? <Check size={16} /> : <ArrowUUpLeft size={16} />}
                                       </span>
-                                    </Tooltip>
-                                  </button>
-                                  {isLast && msg.code === "usage_limit" && (
-                                    <Tooltip content="Add credits to continue." asChild>
-                                      <button
-                                        type="button"
-                                        onClick={() => setUsageModalOpen(true)}
-                                        className="flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 text-[13px] leading-4 font-medium text-kumo-default transition-[color,opacity,transform] duration-150 ease-out hover:text-kumo-default-hover focus-visible:text-kumo-default-hover focus-visible:outline-none active:scale-[0.98]"
-                                      >
-                                        <Lightning size={12} weight="bold" />
-                                        Continue
-                                      </button>
-                                    </Tooltip>
-                                  )}
-                                  {isLast && msg.code !== "usage_limit" && (
-                                    <Tooltip content="Retry the last action." asChild>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRetry()}
-                                        disabled={selectedModel === null}
-                                        className="flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 text-[13px] leading-4 font-medium text-kumo-default transition-[color,opacity,transform] duration-150 ease-out hover:text-kumo-default-hover focus-visible:text-kumo-default-hover focus-visible:outline-none active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-                                      >
-                                        <ArrowsClockwise size={12} weight="bold" />
-                                        Retry
-                                      </button>
-                                    </Tooltip>
+                                      <span className="font-medium">
+                                        {msg.author.name}{" "}
+                                        {isMerge ? "accepted changes" : "discarded changes"}
+                                      </span>
+                                    </span>
+                                  </Tooltip>
+                                </div>
+                              );
+                            })()}
+
+                          {msg.type === "action" && renderActionCard(msg)}
+
+                          {msg.type === "connectionRequest" && renderConnectionRequestCard(msg)}
+
+                          {msg.type === "useGadget" && (
+                            <div className="max-w-[860px] text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle">
+                              <Tooltip
+                                content={`Used the gadget at ${formatFullTimestamp(msg.timestamp)}`}
+                                asChild
+                              >
+                                <span className="inline-flex items-center gap-3 px-1.5 py-1">
+                                  <span
+                                    className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive"
+                                    aria-hidden="true"
+                                  >
+                                    <Plug size={16} />
+                                  </span>
+                                  <span>Used the gadget</span>
+                                </span>
+                              </Tooltip>
+                            </div>
+                          )}
+
+                          {msg.type === "error" &&
+                            (() => {
+                              const key = `${msg.chatId}-${msg.sequence}`;
+                              const isLast = msg.sequence === lastMessageSequence && !isAgentActive;
+                              const expanded = expandedErrors.has(key);
+                              return (
+                                <div className="group/work max-w-[860px] text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle">
+                                  <div className="flex w-full items-center gap-2 px-1.5 py-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleErrorExpansion(key)}
+                                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md text-left transition-colors duration-150 ease-out hover:text-kumo-default focus-visible:text-kumo-default focus-visible:outline-none active:scale-[0.995]"
+                                      aria-expanded={expanded}
+                                    >
+                                      <Tooltip content={formatFullTimestamp(msg.timestamp)} asChild>
+                                        <span className="flex min-w-0 flex-1 items-center gap-2">
+                                          <span
+                                            className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-danger"
+                                            aria-hidden="true"
+                                          >
+                                            <WarningCircle size={16} weight="fill" />
+                                          </span>
+                                          <span className="flex min-w-0 flex-1 items-center gap-1">
+                                            <span className="min-w-0 truncate">
+                                              <span className="font-medium text-kumo-danger">
+                                                Error:{" "}
+                                              </span>
+                                              <span className="text-kumo-subtle">
+                                                {msg.message}
+                                              </span>
+                                            </span>
+                                            <CaretRight
+                                              size={13}
+                                              weight="bold"
+                                              className={`flex-shrink-0 text-kumo-inactive transition-transform duration-150 ease-out ${expanded ? "rotate-90" : ""}`}
+                                            />
+                                          </span>
+                                        </span>
+                                      </Tooltip>
+                                    </button>
+                                    {isLast && msg.code === "usage_limit" && (
+                                      <Tooltip content="Add credits to continue." asChild>
+                                        <button
+                                          type="button"
+                                          onClick={() => setUsageModalOpen(true)}
+                                          className="flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 text-[13px] leading-4 font-medium text-kumo-default transition-[color,opacity,transform] duration-150 ease-out hover:text-kumo-default-hover focus-visible:text-kumo-default-hover focus-visible:outline-none active:scale-[0.98]"
+                                        >
+                                          <Lightning size={12} weight="bold" />
+                                          Continue
+                                        </button>
+                                      </Tooltip>
+                                    )}
+                                    {isLast && msg.code !== "usage_limit" && (
+                                      <Tooltip content="Retry the last action." asChild>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRetry()}
+                                          disabled={selectedModel === null}
+                                          className="flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 text-[13px] leading-4 font-medium text-kumo-default transition-[color,opacity,transform] duration-150 ease-out hover:text-kumo-default-hover focus-visible:text-kumo-default-hover focus-visible:outline-none active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                          <ArrowsClockwise size={12} weight="bold" />
+                                          Retry
+                                        </button>
+                                      </Tooltip>
+                                    )}
+                                  </div>
+                                  {expanded && (
+                                    <div className="ml-8 mt-1">
+                                      <pre className="max-h-48 overflow-auto rounded-xl border border-kumo-line/70 bg-kumo-base p-3 font-mono text-[12px] leading-[18px] text-kumo-subtle whitespace-pre-wrap">
+                                        {msg.message}
+                                      </pre>
+                                    </div>
                                   )}
                                 </div>
-                                {expanded && (
-                                  <div className="ml-8 mt-1">
-                                    <pre className="max-h-48 overflow-auto rounded-xl border border-kumo-line/70 bg-kumo-base p-3 font-mono text-[12px] leading-[18px] text-kumo-subtle whitespace-pre-wrap">
-                                      {msg.message}
-                                    </pre>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
+                              );
+                            })()}
 
-                        {msg.type === "agentCallback" && (
-                          <div className="max-w-[860px] text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle">
-                            <Tooltip content={`Call received at ${formatFullTimestamp(msg.timestamp)}`} asChild>
-                              <div className="flex items-center gap-3 px-1.5 py-1">
-                                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive" aria-hidden="true">
-                                  <Code size={16} />
-                                </span>
-                                <span className="min-w-0 truncate font-mono text-[13px]">
-                                  {msg.methodName}()
-                                </span>
-                                {msg.bindingName !== undefined && (
-                                  <span className="min-w-0 flex-shrink truncate font-mono text-[12px] leading-4 text-kumo-inactive">
-                                    env.{msg.bindingName}
+                          {msg.type === "agentCallback" && (
+                            <div className="max-w-[860px] text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle">
+                              <Tooltip
+                                content={`Call received at ${formatFullTimestamp(msg.timestamp)}`}
+                                asChild
+                              >
+                                <div className="flex items-center gap-3 px-1.5 py-1">
+                                  <span
+                                    className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive"
+                                    aria-hidden="true"
+                                  >
+                                    <Code size={16} />
                                   </span>
-                                )}
-                              </div>
-                            </Tooltip>
-                            {msg.argsSummary && (
-                              <div className="ml-8 mt-1">
-                                <pre className="max-h-24 overflow-auto rounded-xl border border-kumo-line/70 bg-kumo-base p-3 font-mono text-[12px] leading-[18px] text-kumo-subtle whitespace-pre-wrap">
-                                  {msg.argsSummary}
-                                </pre>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                                  <span className="min-w-0 truncate font-mono text-[13px]">
+                                    {msg.methodName}()
+                                  </span>
+                                  {msg.bindingName !== undefined && (
+                                    <span className="min-w-0 flex-shrink truncate font-mono text-[12px] leading-4 text-kumo-inactive">
+                                      env.{msg.bindingName}
+                                    </span>
+                                  )}
+                                </div>
+                              </Tooltip>
+                              {msg.argsSummary && (
+                                <div className="ml-8 mt-1">
+                                  <pre className="max-h-24 overflow-auto rounded-xl border border-kumo-line/70 bg-kumo-base p-3 font-mono text-[12px] leading-[18px] text-kumo-subtle whitespace-pre-wrap">
+                                    {msg.argsSummary}
+                                  </pre>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
 
-                    {currentRowBuffer && currentHasUserDraftRows && (() => {
-                      const lastEditedAt = currentRowBuffer.lastUserEditAt;
-                      const lastEntry = displayEntries[displayEntries.length - 1] ?? null;
-                      const draftTopClass = !lastEntry
-                        ? ""
-                        : isUserMessageEntry(lastEntry)
-                          ? "mt-6"
-                          : entryEndsInWorkRow(lastEntry)
-                            ? "mt-2"
-                            : "mt-4";
-                      return (
-                        <div className={`${draftTopClass} max-w-[860px] py-1 text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle`}>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1.5">
-                            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive" aria-hidden="true">
-                              <Pencil size={16} />
-                            </span>
-                            <Tooltip
-                              content={`Your edits are still a live draft.${lastEditedAt !== null ? ` Last edited ${formatFullTimestamp(lastEditedAt)}` : ''}`}
-                              asChild
-                            >
-                              <span className="font-medium text-kumo-subtle">
-                                Draft changes pending
-                              </span>
-                            </Tooltip>
-                            <div className="flex flex-wrap items-center gap-2 text-[13px] leading-4">
-                              <Tooltip content="Throw away these draft edits." asChild>
-                                <button
-                                  type="button"
-                                  disabled={isAgentActive}
-                                  onClick={handleDiscardDraftChanges}
-                                  className="cursor-pointer rounded-md px-1 py-0.5 font-medium text-kumo-inactive transition-colors duration-150 ease-out hover:text-kumo-danger focus-visible:text-kumo-danger focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-                                >
-                                  Discard
-                                </button>
-                              </Tooltip>
-                              <Tooltip content="Save these edits as a draft version. They won't affect the gadget until you accept changes." asChild>
-                                <button
-                                  type="button"
-                                  disabled={isAgentActive}
-                                  onClick={handleFinalizeDraftChanges}
-                                  className="cursor-pointer rounded-md px-1 py-0.5 font-medium text-kumo-default transition-[color,opacity,transform] duration-150 ease-out hover:text-kumo-default-hover focus-visible:text-kumo-default-hover focus-visible:outline-none active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-                                >
-                                  Save draft
-                                </button>
-                              </Tooltip>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {isAgentActive && activeAgent && (() => {
-                      // Placeholder shown only while the agent is active but hasn't produced
-                      // visible output yet; once real output appears, that speaks for itself.
-                      const hasShownReasoning =
-                        showThinkingTraces && !!currentProvisionalState?.reasoning;
-                      // Only while awaiting the agent's first output this turn; otherwise it
-                      // flashes again in the gap after the last message finalizes but before
-                      // isAgentActive clears.
-                      const lastMessage =
-                        currentMessages.length > 0
-                          ? currentMessages[currentMessages.length - 1]
-                          : null;
-                      const awaitingFirstResponse =
-                        !lastMessage ||
-                        lastMessage.author.type === "user" ||
-                        lastMessage.author.type === "gadget";
-                      const showThinking =
-                        !isCompacting &&
-                        awaitingFirstResponse &&
-                        !currentProvisionalState?.text &&
-                        !hasShownReasoning &&
-                        provisionalToolCalls.length === 0;
-
-                      // Match the spacing this response gets once finalized (see rhythmTopClass)
-                      // so it doesn't shift when streaming completes.
-                      const lastEntry =
-                        displayEntries.length > 0
-                          ? displayEntries[displayEntries.length - 1]
-                          : null;
-                      const provisionalTopClass = !lastEntry
-                        ? ""
-                        : lastEntry.type === "modelChange"
-                          ? "mt-2"
+                    {currentRowBuffer &&
+                      currentHasUserDraftRows &&
+                      (() => {
+                        const lastEditedAt = currentRowBuffer.lastUserEditAt;
+                        const lastEntry = displayEntries[displayEntries.length - 1] ?? null;
+                        const draftTopClass = !lastEntry
+                          ? ""
                           : isUserMessageEntry(lastEntry)
-                            ? "mt-5"
-                            : "mt-4";
-
-                      return (
-                        <div className={`group/agent min-w-0 w-full max-w-[860px] space-y-2 ${provisionalTopClass}`}>
-                          {isCompacting && (
-                            <div className={`inline-flex px-1.5 py-1 text-[14px] leading-5 tracking-[-0.25px] ${styles.thinkingShimmer}`}>
-                              Compacting…
-                            </div>
-                          )}
-
-                          {showThinking && (
-                            <div className={`inline-flex px-1.5 py-1 text-[14px] leading-5 tracking-[-0.25px] ${styles.thinkingShimmer}`}>
-                              Thinking
-                            </div>
-                          )}
-
-                          {showThinkingTraces && currentProvisionalState?.reasoning && (
-                            <ThinkingTraceRow reasoning={currentProvisionalState.reasoning} />
-                          )}
-
-                          {currentProvisionalState?.text && (
-                            <div className={`text-[14px] leading-[22px] tracking-[-0.25px] text-kumo-default ${styles.markdownContent}`}>
-                              <MarkdownMessage message={currentProvisionalState.text} />
-                            </div>
-                          )}
-
-                          {provisionalToolCalls.length > 0 && (() => {
-                            const first = provisionalToolCalls[0];
-                            const { label, detailLines } =
-                              buildProvisionalToolSummary(provisionalToolCalls);
-                            const expansionKey = `group-${first.toolCallId}`;
-                            const isExpanded = expandedToolCalls.has(expansionKey);
-                            const detailCalls = provisionalToolCalls.filter(
-                              (t) => t.code || t.output,
-                            );
-                            return (
-                              <div className="space-y-1">
-                                <div className="group/work -ml-0.5">
+                            ? "mt-6"
+                            : entryEndsInWorkRow(lastEntry)
+                              ? "mt-2"
+                              : "mt-4";
+                        return (
+                          <div
+                            className={`${draftTopClass} max-w-[860px] py-1 text-[14px] leading-5 tracking-[-0.25px] text-kumo-subtle`}
+                          >
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1.5">
+                              <span
+                                className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-kumo-inactive"
+                                aria-hidden="true"
+                              >
+                                <Pencil size={16} />
+                              </span>
+                              <Tooltip
+                                content={`Your edits are still a live draft.${lastEditedAt !== null ? ` Last edited ${formatFullTimestamp(lastEditedAt)}` : ""}`}
+                                asChild
+                              >
+                                <span className="font-medium text-kumo-subtle">
+                                  Draft changes pending
+                                </span>
+                              </Tooltip>
+                              <div className="flex flex-wrap items-center gap-2 text-[13px] leading-4">
+                                <Tooltip content="Throw away these draft edits." asChild>
                                   <button
                                     type="button"
-                                    onClick={() => toggleToolCallExpansion(expansionKey)}
-                                    className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-1.5 py-1 text-left text-kumo-subtle transition-colors duration-150 ease-out hover:text-kumo-default focus-visible:text-kumo-default focus-visible:outline-none active:scale-[0.995]"
-                                    aria-expanded={isExpanded}
+                                    disabled={isAgentActive}
+                                    onClick={handleDiscardDraftChanges}
+                                    className="cursor-pointer rounded-md px-1 py-0.5 font-medium text-kumo-inactive transition-colors duration-150 ease-out hover:text-kumo-danger focus-visible:text-kumo-danger focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
                                   >
-                                    <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
-                                      <WorkIcon Icon={getToolIcon(first.toolName, first.outputFormat)} />
-                                    </span>
-                                    <span className="min-w-0 flex-1">
-                                      <span className="flex min-w-0 items-center gap-2 text-[14px] leading-5 tracking-[-0.25px]">
-                                        <span className="min-w-0 truncate">{label}</span>
-                                        <CaretRight
-                                          size={13}
-                                          weight="bold"
-                                          className={`flex-shrink-0 text-kumo-inactive transition-transform duration-150 ease-out ${isExpanded ? "rotate-90" : ""}`}
-                                        />
-                                      </span>
-                                      {detailLines.length > 1 && (
-                                        <span className="mt-1 block truncate font-mono text-[12px] leading-4 text-kumo-inactive">
-                                          {detailLines.join(" · ")}
-                                        </span>
-                                      )}
-                                    </span>
+                                    Discard
                                   </button>
-                                  {isExpanded && detailCalls.length > 0 && (
-                                    <div className="ml-8 mt-1 space-y-1">
-                                      {detailCalls.map((toolCall) => (
-                                        <div
-                                          key={`stream-tool-${toolCall.toolCallId}`}
-                                          className="themed-surface-inset space-y-3 rounded-2xl border border-kumo-line/70 bg-kumo-elevated/45 p-3"
-                                        >
-                                          {toolCall.code && (
-                                            <>
-                                              <span className="font-mono text-[11px] leading-4 text-kumo-inactive uppercase tracking-[0.08em]">Code</span>
-                                              <pre className="max-h-56 overflow-auto rounded-xl border border-kumo-line/70 bg-kumo-base p-3 font-mono text-[12px] leading-[18px] text-kumo-subtle whitespace-pre-wrap">
-                                                {toolCall.code}
-                                              </pre>
-                                            </>
-                                          )}
-                                          {toolCall.output && (
-                                            <>
-                                              <span className="font-mono text-[11px] leading-4 text-kumo-inactive uppercase tracking-[0.08em]">Output</span>
-                                              <pre className="max-h-56 overflow-auto rounded-xl border border-kumo-line/70 bg-kumo-base p-3 font-mono text-[12px] leading-[18px] text-kumo-subtle whitespace-pre-wrap">
-                                                {toolCall.output}
-                                              </pre>
-                                            </>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
+                                </Tooltip>
+                                <Tooltip
+                                  content="Save these edits as a draft version. They won't affect the gadget until you accept changes."
+                                  asChild
+                                >
+                                  <button
+                                    type="button"
+                                    disabled={isAgentActive}
+                                    onClick={handleFinalizeDraftChanges}
+                                    className="cursor-pointer rounded-md px-1 py-0.5 font-medium text-kumo-default transition-[color,opacity,transform] duration-150 ease-out hover:text-kumo-default-hover focus-visible:text-kumo-default-hover focus-visible:outline-none active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                                  >
+                                    Save draft
+                                  </button>
+                                </Tooltip>
                               </div>
-                            );
-                          })()}
-                        </div>
-                      );
-                    })()}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                    {isAgentActive &&
+                      activeAgent &&
+                      (() => {
+                        // Placeholder shown only while the agent is active but hasn't produced
+                        // visible output yet; once real output appears, that speaks for itself.
+                        const hasShownReasoning =
+                          showThinkingTraces && !!currentProvisionalState?.reasoning;
+                        // Only while awaiting the agent's first output this turn; otherwise it
+                        // flashes again in the gap after the last message finalizes but before
+                        // isAgentActive clears.
+                        const lastMessage =
+                          currentMessages.length > 0
+                            ? currentMessages[currentMessages.length - 1]
+                            : null;
+                        const awaitingFirstResponse =
+                          !lastMessage ||
+                          lastMessage.author.type === "user" ||
+                          lastMessage.author.type === "gadget";
+                        const showThinking =
+                          !isCompacting &&
+                          awaitingFirstResponse &&
+                          !currentProvisionalState?.text &&
+                          !hasShownReasoning &&
+                          provisionalToolCalls.length === 0;
+
+                        // Match the spacing this response gets once finalized (see rhythmTopClass)
+                        // so it doesn't shift when streaming completes.
+                        const lastEntry =
+                          displayEntries.length > 0
+                            ? displayEntries[displayEntries.length - 1]
+                            : null;
+                        const provisionalTopClass = !lastEntry
+                          ? ""
+                          : lastEntry.type === "modelChange"
+                            ? "mt-2"
+                            : isUserMessageEntry(lastEntry)
+                              ? "mt-5"
+                              : "mt-4";
+
+                        return (
+                          <div
+                            className={`group/agent min-w-0 w-full max-w-[860px] space-y-2 ${provisionalTopClass}`}
+                          >
+                            {isCompacting && (
+                              <div
+                                className={`inline-flex px-1.5 py-1 text-[14px] leading-5 tracking-[-0.25px] ${styles.thinkingShimmer}`}
+                              >
+                                Compacting…
+                              </div>
+                            )}
+
+                            {showThinking && (
+                              <div
+                                className={`inline-flex px-1.5 py-1 text-[14px] leading-5 tracking-[-0.25px] ${styles.thinkingShimmer}`}
+                              >
+                                Thinking
+                              </div>
+                            )}
+
+                            {showThinkingTraces && currentProvisionalState?.reasoning && (
+                              <ThinkingTraceRow reasoning={currentProvisionalState.reasoning} />
+                            )}
+
+                            {currentProvisionalState?.text && (
+                              <div
+                                className={`text-[14px] leading-[22px] tracking-[-0.25px] text-kumo-default ${styles.markdownContent}`}
+                              >
+                                <MarkdownMessage message={currentProvisionalState.text} />
+                              </div>
+                            )}
+
+                            {provisionalToolCalls.length > 0 &&
+                              (() => {
+                                const first = provisionalToolCalls[0];
+                                const { label, detailLines } =
+                                  buildProvisionalToolSummary(provisionalToolCalls);
+                                const expansionKey = `group-${first.toolCallId}`;
+                                const isExpanded = expandedToolCalls.has(expansionKey);
+                                const detailCalls = provisionalToolCalls.filter(
+                                  (t) => t.code || t.output,
+                                );
+                                return (
+                                  <div className="space-y-1">
+                                    <div className="group/work -ml-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleToolCallExpansion(expansionKey)}
+                                        className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-1.5 py-1 text-left text-kumo-subtle transition-colors duration-150 ease-out hover:text-kumo-default focus-visible:text-kumo-default focus-visible:outline-none active:scale-[0.995]"
+                                        aria-expanded={isExpanded}
+                                      >
+                                        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
+                                          <WorkIcon
+                                            Icon={getToolIcon(first.toolName, first.outputFormat)}
+                                          />
+                                        </span>
+                                        <span className="min-w-0 flex-1">
+                                          <span className="flex min-w-0 items-center gap-2 text-[14px] leading-5 tracking-[-0.25px]">
+                                            <span className="min-w-0 truncate">{label}</span>
+                                            <CaretRight
+                                              size={13}
+                                              weight="bold"
+                                              className={`flex-shrink-0 text-kumo-inactive transition-transform duration-150 ease-out ${isExpanded ? "rotate-90" : ""}`}
+                                            />
+                                          </span>
+                                          {detailLines.length > 1 && (
+                                            <span className="mt-1 block truncate font-mono text-[12px] leading-4 text-kumo-inactive">
+                                              {detailLines.join(" · ")}
+                                            </span>
+                                          )}
+                                        </span>
+                                      </button>
+                                      {isExpanded && detailCalls.length > 0 && (
+                                        <div className="ml-8 mt-1 space-y-1">
+                                          {detailCalls.map((toolCall) => (
+                                            <div
+                                              key={`stream-tool-${toolCall.toolCallId}`}
+                                              className="themed-surface-inset space-y-3 rounded-2xl border border-kumo-line/70 bg-kumo-elevated/45 p-3"
+                                            >
+                                              {toolCall.code && (
+                                                <>
+                                                  <span className="font-mono text-[11px] leading-4 text-kumo-inactive uppercase tracking-[0.08em]">
+                                                    Code
+                                                  </span>
+                                                  <pre className="max-h-56 overflow-auto rounded-xl border border-kumo-line/70 bg-kumo-base p-3 font-mono text-[12px] leading-[18px] text-kumo-subtle whitespace-pre-wrap">
+                                                    {toolCall.code}
+                                                  </pre>
+                                                </>
+                                              )}
+                                              {toolCall.output && (
+                                                <>
+                                                  <span className="font-mono text-[11px] leading-4 text-kumo-inactive uppercase tracking-[0.08em]">
+                                                    Output
+                                                  </span>
+                                                  <pre className="max-h-56 overflow-auto rounded-xl border border-kumo-line/70 bg-kumo-base p-3 font-mono text-[12px] leading-[18px] text-kumo-subtle whitespace-pre-wrap">
+                                                    {toolCall.output}
+                                                  </pre>
+                                                </>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                          </div>
+                        );
+                      })()}
                   </div>
                 )}
               </div>
 
               {/* ── Bottom: input, update state, and cost ──────────────── */}
-              <div className={`flex-shrink-0 bg-kumo-base ${sidebarMode ? "" : "border-t border-kumo-line"}`}>
+              <div
+                className={`flex-shrink-0 bg-kumo-base ${sidebarMode ? "" : "border-t border-kumo-line"}`}
+              >
                 <div className={useConstrainedChatWidth ? "mx-auto w-full max-w-[920px]" : ""}>
                   {/* Remount all transient composer state when the conversation changes. */}
                   <ChatComposer
@@ -6287,12 +6407,14 @@ function ChatInterface({
                     onStop={handleStop}
                     showThinkingTraces={showThinkingTraces}
                     onToggleThinkingTraces={toggleShowThinkingTraces}
-                    draftStorageKey={currentUser && workspaceId && selectedChatId !== null
-                      ? composerDraftStorageKey(
-                          currentUser.id,
-                          `workspace:${workspaceId}:chat:${selectedChatId}`,
-                        )
-                      : undefined}
+                    draftStorageKey={
+                      currentUser && workspaceId && selectedChatId !== null
+                        ? composerDraftStorageKey(
+                            currentUser.id,
+                            `workspace:${workspaceId}:chat:${selectedChatId}`,
+                          )
+                        : undefined
+                    }
                     blockedReason={
                       hasPendingConnectionRequest
                         ? "Set up or deny the connection request above to continue."
@@ -6301,8 +6423,8 @@ function ChatInterface({
                           : undefined
                     }
                     draftUpdateBanner={(() => {
-                      if (!currentChatMetadata ||
-                          !chatHasProposedChanges(currentChatMetadata)) return null;
+                      if (!currentChatMetadata || !chatHasProposedChanges(currentChatMetadata))
+                        return null;
 
                       // Accepting always merges everything the chat proposes (drafts swept in,
                       // no partial accepts -- see Overseer.mergeChanges()), so the banner needs
@@ -6314,7 +6436,10 @@ function ChatInterface({
                       const changesActionsDisabled = isAgentActive || isDiscardingChanges;
                       return (
                         <div className="themed-surface-inset relative flex items-center gap-2 overflow-hidden rounded-t-[calc(1rem-1px)] border-b border-kumo-line bg-kumo-elevated px-3.5 py-2">
-                          <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-kumo-brand/40 to-transparent" aria-hidden="true" />
+                          <span
+                            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-kumo-brand/40 to-transparent"
+                            aria-hidden="true"
+                          />
                           <span className="min-w-0 flex-1 truncate text-[12px] font-medium leading-4 tracking-[-0.2px] text-kumo-default">
                             Pending changes
                           </span>
@@ -6324,17 +6449,26 @@ function ChatInterface({
                             isDiscarding={isDiscardingChanges}
                             onOpenChange={(open) => {
                               if (isDiscardingChanges) return;
-                              setDiscardChangesTarget(open ? {
-                                chatId: currentChatMetadata.id,
-                              } : null);
+                              setDiscardChangesTarget(
+                                open
+                                  ? {
+                                      chatId: currentChatMetadata.id,
+                                    }
+                                  : null,
+                              );
                             }}
                             onConfirm={handleDiscardPendingChanges}
                           />
-                          <Tooltip content={isAgentActive
-                            ? "Wait for the agent to finish before accepting changes."
-                            : isDiscardingChanges
-                              ? "Wait for pending changes to finish discarding."
-                              : "Keep this draft and make it the gadget's current version."} asChild>
+                          <Tooltip
+                            content={
+                              isAgentActive
+                                ? "Wait for the agent to finish before accepting changes."
+                                : isDiscardingChanges
+                                  ? "Wait for pending changes to finish discarding."
+                                  : "Keep this draft and make it the gadget's current version."
+                            }
+                            asChild
+                          >
                             <WorkshopButton
                               disabled={changesActionsDisabled}
                               onClick={() => handleMergeChanges()}
@@ -6353,9 +6487,7 @@ function ChatInterface({
                   {/* Token / cost summary. */}
                   <div className="-mt-1 flex min-h-[1.25rem] items-start justify-end gap-4 px-4 pb-1 font-mono text-[11px] leading-4 text-kumo-inactive">
                     {currentChatMetadata?.totalTokens != null && (
-                      <span>
-                        {currentChatMetadata.totalTokens.toLocaleString()} tokens
-                      </span>
+                      <span>{currentChatMetadata.totalTokens.toLocaleString()} tokens</span>
                     )}
                     {currentChatMetadata?.totalCost != null && (
                       <span>${currentChatMetadata.totalCost.toFixed(4)}</span>
@@ -6387,9 +6519,9 @@ function ChatInterface({
               </Dialog.Title>
               <Dialog.Description className="mt-1 text-[12px] leading-4 font-normal tracking-[-0.2px] text-kumo-subtle">
                 Someone else&apos;s changes were accepted in the meantime, so this draft&apos;s
-                changes can&apos;t be applied as-is. Bring the latest changes into this draft
-                first; any conflicts will be marked in the code for you (or the agent) to resolve
-                before accepting again.
+                changes can&apos;t be applied as-is. Bring the latest changes into this draft first;
+                any conflicts will be marked in the code for you (or the agent) to resolve before
+                accepting again.
               </Dialog.Description>
             </div>
             <Dialog.Close
@@ -6409,18 +6541,16 @@ function ChatInterface({
           <div className="flex items-center justify-end gap-2 border-t border-kumo-line bg-kumo-base px-5 py-3">
             <Dialog.Close
               render={(props) => (
-                <WorkshopButton
-                  {...props}
-                  className="!h-9"
-                  disabled={isUpdatingFromMainline}
-                >
+                <WorkshopButton {...props} className="!h-9" disabled={isUpdatingFromMainline}>
                   Not now
                 </WorkshopButton>
               )}
             />
             <WorkshopButton
               tone="primary"
-              onClick={() => { void handleUpdateFromMainline(); }}
+              onClick={() => {
+                void handleUpdateFromMainline();
+              }}
               disabled={isUpdatingFromMainline}
               className="!h-9 min-w-[64px]"
             >
@@ -6433,7 +6563,13 @@ function ChatInterface({
       <DeleteConfirmationDialog
         open={deleteTarget !== null}
         title="Delete conversation?"
-        description={<>This removes <span className="font-medium text-kumo-default">{deleteTarget?.title}</span>. You can&apos;t undo this.</>}
+        description={
+          <>
+            This removes{" "}
+            <span className="font-medium text-kumo-default">{deleteTarget?.title}</span>. You
+            can&apos;t undo this.
+          </>
+        }
         isDeleting={isDeleting}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
@@ -6470,10 +6606,7 @@ function ChatInterface({
         initialResourceUrl={connectionAccept?.resourceUrl}
         initialResourceUrlPattern={connectionAccept?.resourceUrlPattern}
       />
-      <OutOfCreditsModal
-        open={usageModalOpen}
-        onClose={() => setUsageModalOpen(false)}
-      />
+      <OutOfCreditsModal open={usageModalOpen} onClose={() => setUsageModalOpen(false)} />
     </div>
   );
 }

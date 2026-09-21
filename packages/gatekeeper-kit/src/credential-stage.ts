@@ -64,8 +64,12 @@ export function stageCredentials<T>(
 function storedStage<T>(kv: KvMutable): StagedCredentials<T> | undefined {
   const staged = kv.get<StagedCredentials<T>>(STAGED_CREDENTIALS_KEY);
   if (staged === undefined) return undefined;
-  if (typeof staged?.stageId === "string" && Number.isFinite(staged.expiresAt)
-      && staged.creds !== undefined) return staged;
+  if (
+    typeof staged?.stageId === "string" &&
+    Number.isFinite(staged.expiresAt) &&
+    staged.creds !== undefined
+  )
+    return staged;
   kv.delete(STAGED_CREDENTIALS_KEY);
   return undefined;
 }
@@ -92,7 +96,10 @@ function liveStage<T>(kv: KvMutable, now: number): StagedCredentials<T> | undefi
  * @param now Current Unix time in milliseconds.
  * @returns The staged credentials and their stage id, or `null` when nothing live is staged.
  */
-export function peekStagedCredentials<T>(kv: KvMutable, now: number): StagedCredentialsView<T> | null {
+export function peekStagedCredentials<T>(
+  kv: KvMutable,
+  now: number,
+): StagedCredentialsView<T> | null {
   const staged = liveStage<T>(kv, now);
   return staged ? { creds: staged.creds, stageId: staged.stageId } : null;
 }

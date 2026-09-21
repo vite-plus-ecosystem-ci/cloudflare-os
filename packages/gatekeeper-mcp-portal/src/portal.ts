@@ -28,8 +28,11 @@ import { MAX_TOOLS_PER_SERVER, type ServerTrust } from "@gadgets/mcp-shared/tool
 import { bindingNameFragment, hostOf } from "@gadgets/mcp-shared/util";
 import type { McpLog, McpLogFields } from "@gadgets/mcp-shared/log";
 import { generateSessionTypes, sessionTypeName } from "@gadgets/mcp-shared/schema-to-ts";
-import { McpAccountBase, type ConnectedServer, type ConnectOutcome }
-  from "@gadgets/mcp-shared/account";
+import {
+  McpAccountBase,
+  type ConnectedServer,
+  type ConnectOutcome,
+} from "@gadgets/mcp-shared/account";
 import { generateNonce } from "@gadgets/mcp-shared/connect-nonce";
 import { withClient, type ConnectionAccount } from "@gadgets/mcp-shared/connection";
 import { McpSessionBase } from "@gadgets/mcp-shared/session";
@@ -92,9 +95,9 @@ const VENDOR_ID = "mcp_portal";
 const MAX_PORTAL_TOOL_INDEX = 1000;
 
 const logger = createLogger<McpLogFields>({
-  component: "gatekeeper.mcp-portal", vendorId: VENDOR_ID,
+  component: "gatekeeper.mcp-portal",
+  vendorId: VENDOR_ID,
 });
-
 
 const PORTAL_LOGO_URL = `data:image/svg+xml,${encodeURIComponent(PORTAL_LOGO_SVG)}`;
 const PORTAL_AVATAR: AvatarImage = { url: PORTAL_LOGO_URL };
@@ -115,8 +118,9 @@ async function listPortalServers(
   account: DurableObjectStub<McpAccount>,
   endpoint: string,
 ): Promise<PortalServerListing> {
-  const result = await withClient(env, account, endpoint,
-    client => client.callTool(PORTAL_LIST_SERVERS_TOOL, {}));
+  const result = await withClient(env, account, endpoint, (client) =>
+    client.callTool(PORTAL_LIST_SERVERS_TOOL, {}),
+  );
   if (result.isError) throw new Error("The portal could not list its upstream servers.");
   return parsePortalServers(result);
 }
@@ -166,8 +170,9 @@ async function validatePortalScope(
 
   const listing = await tryListPortalServers(env, account, endpoint);
   if (listing === null) {
-    const portalTool = await withClient(env, account, endpoint,
-      client => client.findTool(PORTAL_LIST_SERVERS_TOOL));
+    const portalTool = await withClient(env, account, endpoint, (client) =>
+      client.findTool(PORTAL_LIST_SERVERS_TOOL),
+    );
     if (!portalTool) {
       throw new Error("The configured MCP endpoint does not expose the portal server-list tool.");
     }
@@ -178,21 +183,17 @@ async function validatePortalScope(
   let catalog: ToolIndex;
   switch (portalCatalogValidationMode(scope, servers)) {
     case "named-tools":
-      catalog = await withClient(env, account, endpoint,
-        client => client.listMatchingToolIndex(
-          requestedTools.size,
-          tool => requestedTools.has(tool.name),
-        ));
+      catalog = await withClient(env, account, endpoint, (client) =>
+        client.listMatchingToolIndex(requestedTools.size, (tool) => requestedTools.has(tool.name)),
+      );
       break;
     case "reported-server":
       catalog = { tools: [], truncated: false };
       break;
     case "server-evidence":
-      catalog = await withClient(env, account, endpoint,
-        client => client.listMatchingToolIndex(
-          1,
-          tool => isPortalToolGrantable(tool.name, scope.serverId),
-        ));
+      catalog = await withClient(env, account, endpoint, (client) =>
+        client.listMatchingToolIndex(1, (tool) => isPortalToolGrantable(tool.name, scope.serverId)),
+      );
       break;
   }
   return { scope, upstream: validateToolScopeAgainstCatalog(scope, catalog, servers) };
@@ -211,10 +212,11 @@ async function listAvailablePortalServers(
   const reported = await tryListPortalServers(env, account, endpoint);
   if (reported?.complete) return reported.servers;
 
-  const index = await withClient(env, account, endpoint,
-    client => client.listToolIndex(MAX_PORTAL_TOOL_INDEX));
-  if (!looksLikePortal(
-    index.tools, { truncated: index.truncated, cap: MAX_PORTAL_TOOL_INDEX })) return [];
+  const index = await withClient(env, account, endpoint, (client) =>
+    client.listToolIndex(MAX_PORTAL_TOOL_INDEX),
+  );
+  if (!looksLikePortal(index.tools, { truncated: index.truncated, cap: MAX_PORTAL_TOOL_INDEX }))
+    return [];
   if (index.truncated) {
     throw new Error("Could not retrieve the portal's complete server list. Try again.");
   }
@@ -228,8 +230,7 @@ export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     return handleMcpHttpRequest(req, {
       baseUrl: getBaseUrl(env),
-      accountForId: id => ctx.exports.McpAccount.get(
-        ctx.exports.McpAccount.idFromString(id)),
+      accountForId: (id) => ctx.exports.McpAccount.get(ctx.exports.McpAccount.idFromString(id)),
       log: logger,
       connect: async (request, account, initiationNonce) => {
         if (request.method !== "GET") return new Response("Method Not Allowed", { status: 405 });
@@ -248,9 +249,13 @@ async function continueConnect(
 ): Promise<Response> {
   const config = readPortalConfig(env);
   if (!config) {
-    return htmlResponse(errorPageHtml(
-      "No MCP server portal is configured",
-      "Ask an administrator to set this deployment's MCP server portal URL."), 503);
+    return htmlResponse(
+      errorPageHtml(
+        "No MCP server portal is configured",
+        "Ask an administrator to set this deployment's MCP server portal URL.",
+      ),
+      503,
+    );
   }
 
   let outcome: ConnectOutcome;
@@ -258,8 +263,10 @@ async function continueConnect(
     outcome = await account.beginConnect(initiationNonce, portalServer(config));
   } catch (err) {
     logger.warn("connect failed", { event: "connect.failed", error: err });
-    return htmlResponse(errorPageHtml(
-      "Could not connect", err instanceof Error ? err.message : String(err)), 502);
+    return htmlResponse(
+      errorPageHtml("Could not connect", err instanceof Error ? err.message : String(err)),
+      502,
+    );
   }
 
   if (outcome.kind === "invalid") return htmlResponse(INVALID_LINK_HTML, 400);
@@ -351,13 +358,11 @@ export class McpAccount extends McpAccountBase<Env> {
 // Account-facing interface
 
 @validateRpc()
-export class GatekeeperUserImpl
-  extends McpGatekeeperUserBase<Env>
-  implements GatekeeperUser {
-
+export class GatekeeperUserImpl extends McpGatekeeperUserBase<Env> implements GatekeeperUser {
   #account(): DurableObjectStub<McpAccount> {
     return this.ctx.exports.McpAccount.get(
-      this.ctx.exports.McpAccount.idFromString(this.ctx.props.accountObjectId));
+      this.ctx.exports.McpAccount.idFromString(this.ctx.props.accountObjectId),
+    );
   }
 
   protected [mcpGatekeeperUserContext]() {
@@ -391,7 +396,8 @@ export class GatekeeperUserImpl
     if (!sameEndpoint(server.endpoint, config.endpoint)) {
       throw new Error(
         `This connection is for ${hostOf(server.endpoint)}, but this deployment's portal is now ` +
-        `${hostOf(config.endpoint)}. Reconnect the account.`);
+          `${hostOf(config.endpoint)}. Reconnect the account.`,
+      );
     }
     if (portalAuthRequiresReconnect(server.auth, config.auth)) {
       throw new Error("This deployment's portal authentication changed. Reconnect the account.");
@@ -404,8 +410,8 @@ export class GatekeeperUserImpl
     const requested = new URL(url, server.endpoint);
     if (!sameEndpoint(requested.toString(), config.endpoint)) {
       throw new Error(
-        `This connection is for ${config.endpoint}, not ` +
-        `${endpointOfResourceUrl(requested)}.`);
+        `This connection is for ${config.endpoint}, not ` + `${endpointOfResourceUrl(requested)}.`,
+      );
     }
     if (!matchesResourceUrlPattern(resource.urlPattern, requested.toString())) {
       throw new Error(`"${url}" does not match this connection's resource type.`);
@@ -413,7 +419,11 @@ export class GatekeeperUserImpl
 
     const account = this.#account();
     const { scope, upstream } = await validatePortalScope(
-      this.env, account, server.endpoint, requested);
+      this.env,
+      account,
+      server.endpoint,
+      requested,
+    );
 
     const props: McpGatekeeperImplProps = {
       accountObjectId: this.ctx.props.accountObjectId,
@@ -445,10 +455,7 @@ export class GatekeeperUserImpl
 // Required by the `GatekeeperUser` contract but never interrogated, since `addObserver` refuses
 // everyone.
 @validateRpc()
-export class McpPortalVerifier
-  extends WorkerEntrypoint<Env>
-  implements GatekeeperUserVerifier
-{
+export class McpPortalVerifier extends WorkerEntrypoint<Env> implements GatekeeperUserVerifier {
   verify(): void {}
 }
 
@@ -473,14 +480,14 @@ class McpServerConfiguratorUI extends RpcTarget implements McpServerConfigurator
   }
 
   #server(): Promise<ConnectedServer> {
-    return this.#serverPromise ??= this.#account.getServer();
+    return (this.#serverPromise ??= this.#account.getServer());
   }
 
   #portalServers(): Promise<PortalServer[]> {
-    return this.#portalServersPromise ??= (async () => {
+    return (this.#portalServersPromise ??= (async () => {
       const server = await this.#server();
       return listAvailablePortalServers(this.#env, this.#account, server.endpoint);
-    })();
+    })());
   }
 
   // Ask the portal for its server index without first loading every upstream tool. Empty for an
@@ -488,8 +495,8 @@ class McpServerConfiguratorUI extends RpcTarget implements McpServerConfigurator
   // leaves the form unsubmittable.
   async listServerOptions(): Promise<ConfiguratorUIOption[]> {
     return (await this.#portalServers())
-      .filter(upstream => !isPortalServerHidden(this.#env, upstream.id))
-      .map(upstream => ({
+      .filter((upstream) => !isPortalServerHidden(this.#env, upstream.id))
+      .map((upstream) => ({
         value: upstream.id,
         title: upstream.name,
         // A server can be configured but switched off for this session, making a grant onto it valid
@@ -502,13 +509,13 @@ class McpServerConfiguratorUI extends RpcTarget implements McpServerConfigurator
   // detailed catalog is fetched, and `toolGrantOptions` decides what each source says.
   async listToolOptions(serverId: string): Promise<ConfiguratorUIOption[]> {
     if (!isValidToolName(serverId) || isPortalServerHidden(this.#env, serverId)) return [];
-    if (!(await this.#portalServers()).some(server => server.id === serverId)) return [];
+    if (!(await this.#portalServers()).some((server) => server.id === serverId)) return [];
     const server = await this.#server();
-    const tools = await withClient(this.#env, this.#account, server.endpoint,
-      client => client.listMatchingToolSummaries(
-        MAX_TOOLS_PER_SERVER,
-        tool => isPortalToolGrantable(tool.name, serverId),
-      ));
+    const tools = await withClient(this.#env, this.#account, server.endpoint, (client) =>
+      client.listMatchingToolSummaries(MAX_TOOLS_PER_SERVER, (tool) =>
+        isPortalToolGrantable(tool.name, serverId),
+      ),
+    );
     return toolGrantOptions({
       serverId,
       tools,
@@ -534,9 +541,7 @@ type McpGatekeeperImplProps = {
   scope: ToolScope & { serverId: string };
 };
 
-export class McpGatekeeperImpl
-  extends McpFacetBase<Env, McpGatekeeperImplProps, McpSessionImpl> {
-
+export class McpGatekeeperImpl extends McpFacetBase<Env, McpGatekeeperImplProps, McpSessionImpl> {
   protected get log() {
     return logger.with({
       serverId: this.ctx.props.serverId,
@@ -547,7 +552,8 @@ export class McpGatekeeperImpl
 
   protected account(): ConnectionAccount {
     return this.ctx.exports.McpAccount.get(
-      this.ctx.exports.McpAccount.idFromString(this.ctx.props.accountObjectId));
+      this.ctx.exports.McpAccount.idFromString(this.ctx.props.accountObjectId),
+    );
   }
 
   protected get trust(): ServerTrust {
@@ -570,7 +576,7 @@ export class McpGatekeeperImpl
 
   async describe(): Promise<ResourceDescription> {
     const tools = await this.tools();
-    const reads = tools.filter(entry => entry.mode === "read").length;
+    const reads = tools.filter((entry) => entry.mode === "read").length;
     const { scope } = this.ctx.props;
     const label = this.#scopeLabel();
 

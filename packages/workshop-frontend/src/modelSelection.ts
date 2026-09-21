@@ -5,9 +5,7 @@ const LAST_SELECTED_MODEL_KEY = "lastSelectedModel";
 /** Sentinel used for UI values and localStorage so an explicit null choice can persist. */
 export const NO_AGENT_OPTION_VALUE = "__gadgets_no_agent__";
 
-export function getStoredSelectedModel(
-  models: AiChatAuthorInfo[],
-): string | null {
+export function getStoredSelectedModel(models: AiChatAuthorInfo[]): string | null {
   const storedModel = localStorage.getItem(LAST_SELECTED_MODEL_KEY);
 
   if (storedModel === NO_AGENT_OPTION_VALUE) {
@@ -23,10 +21,7 @@ export function getStoredSelectedModel(
 }
 
 export function persistSelectedModel(modelId: string | null): void {
-  localStorage.setItem(
-    LAST_SELECTED_MODEL_KEY,
-    modelId ?? NO_AGENT_OPTION_VALUE,
-  );
+  localStorage.setItem(LAST_SELECTED_MODEL_KEY, modelId ?? NO_AGENT_OPTION_VALUE);
 }
 
 export function toModelSelectValue(modelId: string | null): string {

@@ -196,7 +196,7 @@ export interface Cursor<T> {
 export type NotionPageOptions = {
   /** Items per batch. Clamped to Notion's supported range of 1–100; defaults to the maximum. */
   pageSize?: number;
-}
+};
 
 // ---------------------------------------------------------------------------------------------
 // Workspace / search
@@ -209,7 +209,7 @@ export type NotionWorkspaceMetadata = {
   icon?: string;
   /** The user who authorized this connection. */
   authorizedBy: NotionUser | null;
-}
+};
 
 /** Options for {@link NotionWorkspace.search}. */
 export type NotionSearchOptions = NotionPageOptions & {
@@ -219,7 +219,7 @@ export type NotionSearchOptions = NotionPageOptions & {
   filter?: "page" | "database";
   /** Sort by last-edited time. Defaults to Notion's relevance ranking. */
   sort?: "lastEditedAscending" | "lastEditedDescending";
-}
+};
 
 /** The kind of a Notion object. */
 export type NotionObjectKind = "page" | "database";
@@ -235,7 +235,7 @@ export type NotionItemSummary = {
   icon?: string;
   createdAt: Date;
   lastEditedAt: Date;
-}
+};
 
 // ---------------------------------------------------------------------------------------------
 // Pages
@@ -268,7 +268,7 @@ export type NotionPageMetadata = {
   archived: boolean;
   /** True if the page is locked from editing in the Notion app. */
   locked: boolean;
-}
+};
 
 /** A page summary returned from database queries (includes its property values). */
 export type NotionPageSummary = {
@@ -280,7 +280,7 @@ export type NotionPageSummary = {
   lastEditedAt: Date;
   /** The row's property values, keyed by property name. */
   properties: Record<string, NotionPropertyValue>;
-}
+};
 
 /** A Notion user or bot. */
 export type NotionUser = {
@@ -293,7 +293,7 @@ export type NotionUser = {
   type?: "person" | "bot";
   /** Email, only present for people the connection is allowed to see it for. */
   email?: string;
-}
+};
 
 /** Options for creating a standalone or sub-page. */
 export type NotionCreatePageOptions = {
@@ -302,12 +302,10 @@ export type NotionCreatePageOptions = {
   content?: string;
   /** Optional page icon. */
   icon?: NotionIconInput;
-}
+};
 
 /** A page icon to set: a single emoji character, or an external image URL. */
-export type NotionIconInput =
-  | { emoji: string }
-  | { imageUrl: string };
+export type NotionIconInput = { emoji: string } | { imageUrl: string };
 
 // ---------------------------------------------------------------------------------------------
 // Databases & properties
@@ -321,12 +319,12 @@ export type NotionDatabaseMetadata = {
   icon?: string;
   createdAt: Date;
   lastEditedAt: Date;
-}
+};
 
 /** The schema of a database: its properties, keyed by property name. */
 export type NotionDatabaseSchema = {
   properties: Record<string, NotionPropertySchema>;
-}
+};
 
 /** Description of one database property (column). */
 export type NotionPropertySchema = {
@@ -336,14 +334,31 @@ export type NotionPropertySchema = {
   type: NotionPropertyType;
   /** For `select`, `multi_select`, and `status` properties: the allowed option names. */
   options?: string[];
-}
+};
 
 /** The set of Notion property value types. */
 export type NotionPropertyType =
-  | "title" | "rich_text" | "number" | "select" | "multi_select" | "status"
-  | "date" | "checkbox" | "url" | "email" | "phone_number" | "people"
-  | "relation" | "formula" | "rollup" | "files" | "unique_id"
-  | "created_time" | "last_edited_time" | "created_by" | "last_edited_by";
+  | "title"
+  | "rich_text"
+  | "number"
+  | "select"
+  | "multi_select"
+  | "status"
+  | "date"
+  | "checkbox"
+  | "url"
+  | "email"
+  | "phone_number"
+  | "people"
+  | "relation"
+  | "formula"
+  | "rollup"
+  | "files"
+  | "unique_id"
+  | "created_time"
+  | "last_edited_time"
+  | "created_by"
+  | "last_edited_by";
 
 /**
  * A property value as read from a page. A discriminated union on `type`. Rich text is flattened
@@ -400,7 +415,7 @@ export type NotionQueryOptions = NotionPageOptions & {
   filter?: NotionQueryFilter;
   /** Optional ordering. Earlier sorts take precedence. */
   sorts?: NotionQuerySort[];
-}
+};
 
 /** A sort directive for a database query. */
 export type NotionQuerySort = {
@@ -408,7 +423,7 @@ export type NotionQuerySort = {
   property?: string;
   timestamp?: "created_time" | "last_edited_time";
   direction: "ascending" | "descending";
-}
+};
 
 /**
  * A database query filter.
@@ -440,7 +455,7 @@ export type NotionCreateDatabasePageOptions = {
   content?: string;
   /** Optional page icon. */
   icon?: NotionIconInput;
-}
+};
 
 // ---------------------------------------------------------------------------------------------
 // Comments
@@ -452,4 +467,4 @@ export type NotionComment = {
   text: string;
   author: NotionUser | null;
   createdAt: Date;
-}
+};

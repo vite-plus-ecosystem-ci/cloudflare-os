@@ -22,7 +22,12 @@ import {
 } from "../../../src/actions";
 import type { ActionFence } from "../../../src/action-journal";
 import { KvTtlCache } from "../../../src/cache";
-import { advanceToOAuth, claimOAuth, NONCE_KEY, putInitiation } from "../../../src/connect-handshake";
+import {
+  advanceToOAuth,
+  claimOAuth,
+  NONCE_KEY,
+  putInitiation,
+} from "../../../src/connect-handshake";
 import {
   commitStagedCredentials,
   discardStagedCredentials,
@@ -130,8 +135,9 @@ type Actions = {
 function requireActionFence(fence: ActionFence | undefined, read: CredentialRead): void {
   if (fence && fence.generation !== read.generation) {
     throw new ActionApplyError(
-      "This action was approved under a connection that has since been replaced. "
-      + "Reject it and submit it again.");
+      "This action was approved under a connection that has since been replaced. " +
+        "Reject it and submit it again.",
+    );
   }
 }
 
@@ -156,45 +162,48 @@ type ProviderHost = {
   refs: ProvisionalIds<string>;
 };
 
-const actions = defineActions<ProviderHost, Actions>({
-  createProject: {
-    kind: { tag: "create-project", label: "Create a project" },
-    delivery: "continue-with-simulation",
-    // Non-idempotent at the provider, so a lost activation must not replay it.
-    claimBeforeApply: true,
-    describe: payload => ({
-      title: `Create project "${payload.name}"`,
-      description: `Creates **${payload.name}** in space ${payload.spaceId}.`,
-      implementsRevert: false,
-    }),
-    provides: payload => [payload.ref],
-    apply: async (payload, host, { fence }) => {
-      const id = await host.createProject(payload.name, payload.spaceId, fence);
-      host.refs.bind(payload.ref, id);
+const actions = defineActions<ProviderHost, Actions>(
+  {
+    createProject: {
+      kind: { tag: "create-project", label: "Create a project" },
+      delivery: "continue-with-simulation",
+      // Non-idempotent at the provider, so a lost activation must not replay it.
+      claimBeforeApply: true,
+      describe: (payload) => ({
+        title: `Create project "${payload.name}"`,
+        description: `Creates **${payload.name}** in space ${payload.spaceId}.`,
+        implementsRevert: false,
+      }),
+      provides: (payload) => [payload.ref],
+      apply: async (payload, host, { fence }) => {
+        const id = await host.createProject(payload.name, payload.spaceId, fence);
+        host.refs.bind(payload.ref, id);
+      },
+    },
+    renameProject: {
+      kind: { tag: "rename-project", label: "Rename a project" },
+      delivery: "continue-with-simulation",
+      describe: (payload) => ({
+        title: `Rename ${payload.target}`,
+        description: `Renames ${payload.target} to **${payload.name}**.`,
+        // The kit cannot check this claim, so the fixture must not make one it has no handler for.
+        implementsRevert: false,
+      }),
+      dependsOn: (payload) => [payload.target],
+      apply: async (payload, host, { fence }) => {
+        // Resolved, never defaulted: apply already refused an unresolved reference, so a
+        // provisional string reaching the provider would be a kit bug rather than a fallback.
+        await host.renameProject(host.refs.requireResolved(payload.target), payload.name, fence);
+      },
     },
   },
-  renameProject: {
-    kind: { tag: "rename-project", label: "Rename a project" },
-    delivery: "continue-with-simulation",
-    describe: payload => ({
-      title: `Rename ${payload.target}`,
-      description: `Renames ${payload.target} to **${payload.name}**.`,
-      // The kit cannot check this claim, so the fixture must not make one it has no handler for.
-      implementsRevert: false,
-    }),
-    dependsOn: payload => [payload.target],
-    apply: async (payload, host, { fence }) => {
-      // Resolved, never defaulted: apply already refused an unresolved reference, so a
-      // provisional string reaching the provider would be a kit bug rather than a fallback.
-      await host.renameProject(host.refs.requireResolved(payload.target), payload.name, fence);
-    },
+  {
+    // Both kinds name a project in one provider account, so neither means anything under another
+    // connection. Declaring it here is what makes `submit` refuse a call that forgot the fence.
+    fence: "authority",
+    isResolvedReference: (host, ref) => host.refs.isResolved(ref),
   },
-}, {
-  // Both kinds name a project in one provider account, so neither means anything under another
-  // connection. Declaring it here is what makes `submit` refuse a call that forgot the fence.
-  fence: "authority",
-  isResolvedReference: (host, ref) => host.refs.isResolved(ref),
-});
+);
 
 /**
  * The account Durable Object. Owns credentials and the connect handshake, and is the only holder of
@@ -202,9 +211,9 @@ const actions = defineActions<ProviderHost, Actions>({
  */
 export class ConformanceAccount extends DurableObject {
   readonly #creds = new CredentialCoordinator<Grant>(this.ctx.storage.kv, {
-    expiresAt: grant => grant.expiresAt,
+    expiresAt: (grant) => grant.expiresAt,
     // Rotation is per-token here, so revoking a fenced-out mint cannot kill the winner.
-    discardMint: grant => void provider.revoked.add(grant.refreshToken),
+    discardMint: (grant) => void provider.revoked.add(grant.refreshToken),
     vendorId: "conformance",
   });
   #reconnectExchangeBarrier?: {
@@ -227,8 +236,9 @@ export class ConformanceAccount extends DurableObject {
    * @returns The OAuth nonce, or `null` when the attempt is stale.
    */
   beginOAuth(initiationNonce: string): string | null {
-    return advanceToOAuth(this.ctx.storage.kv, initiationNonce, Date.now(),
-      { startedUnder: this.#creds.connectionGeneration() });
+    return advanceToOAuth(this.ctx.storage.kv, initiationNonce, Date.now(), {
+      startedUnder: this.#creds.connectionGeneration(),
+    });
   }
 
   /** Pauses the next reconnect after its provider exchange. */
@@ -348,7 +358,9 @@ export class ConformanceAccount extends DurableObject {
 
   /** @returns The credential triple, with refresh material projected out. */
   async getCredentials(): Promise<{ creds: PublicGrant } & CredentialRead> {
-    const { creds, identity, generation } = await this.#creds.snapshot(grant => this.#refresh(grant));
+    const { creds, identity, generation } = await this.#creds.snapshot((grant) =>
+      this.#refresh(grant),
+    );
     const { refreshToken: _refreshToken, ...publicGrant } = creds;
     return { creds: publicGrant, identity, generation };
   }
@@ -360,7 +372,7 @@ export class ConformanceAccount extends DurableObject {
    */
   reportCredentialsRejected(identity: string): Promise<RejectionVerdict> {
     return this.#creds.adjudicateRejection(identity, {
-      refresh: grant => this.#refresh(grant),
+      refresh: (grant) => this.#refresh(grant),
       notify: async () => {},
     });
   }
@@ -379,8 +391,9 @@ export class ConformanceAccount extends DurableObject {
       // The token endpoint refusing the refresh token is the grant's death, and only this frame
       // can say so: to every layer above it is an ordinary 401 from an unknown cause.
       if (error instanceof ProviderAuthError && /invalid_grant/.test(error.message)) {
-        throw new CredentialsExpiredError("This connection was revoked at the provider.",
-          { cause: error });
+        throw new CredentialsExpiredError("This connection was revoked at the provider.", {
+          cause: error,
+        });
       }
       throw error;
     }
@@ -395,7 +408,7 @@ export class ConformanceAccount extends DurableObject {
  */
 export class ConformanceVerifier extends WorkerEntrypoint<unknown, { user: string }> {
   async hasSpaces(spaceIds: readonly string[]): Promise<boolean[]> {
-    return spaceIds.map(spaceId => provider.hasAccess(this.ctx.props.user, spaceId));
+    return spaceIds.map((spaceId) => provider.hasAccess(this.ctx.props.user, spaceId));
   }
 }
 
@@ -407,7 +420,7 @@ export class ConformanceResource extends DurableObject {
 
   readonly #creds = new CredentialSource<PublicGrant>({
     account: () => this.#requireAccount(),
-    isAuthError: error => error instanceof ProviderAuthError,
+    isAuthError: (error) => error instanceof ProviderAuthError,
     expiredMessage: "Reconnect the conformance account.",
     vendorId: "conformance",
   });
@@ -418,7 +431,9 @@ export class ConformanceResource extends DurableObject {
   });
 
   // Named, so it cannot collide with another cache over this same storage.
-  readonly #cache = KvTtlCache.partitionedBy(this.ctx.storage.kv, this.#creds, { name: "projects" });
+  readonly #cache = KvTtlCache.partitionedBy(this.ctx.storage.kv, this.#creds, {
+    name: "projects",
+  });
 
   readonly #journal = new ActionJournal<TaggedAction<Actions>>(this.ctx.storage.kv, {
     namespace: "projects",
@@ -426,7 +441,7 @@ export class ConformanceResource extends DurableObject {
 
   readonly #refs = new ProvisionalIds<string>(this.ctx.storage.kv, {
     namespace: "projects",
-    isProvisional: ref => ref.startsWith("~"),
+    isProvisional: (ref) => ref.startsWith("~"),
   });
 
   readonly #host: ProviderHost = {
@@ -465,7 +480,7 @@ export class ConformanceResource extends DurableObject {
     this.#reconnectMidApply = false;
     const account = this.#requireAccount();
     await account.disconnect();
-    await account.completeConnect(await account.beginOAuth(await account.beginConnect()) ?? "");
+    await account.completeConnect((await account.beginOAuth(await account.beginConnect())) ?? "");
   }
 
   #requireGate(): ObservationGate {
@@ -484,7 +499,10 @@ export class ConformanceResource extends DurableObject {
    * @param user Provider-side user the collaborator maps to.
    */
   addObserver(id: string, user: string): Promise<void> {
-    return this.#observers.addObserver(id, this.ctx.exports.ConformanceVerifier({ props: { user } }));
+    return this.#observers.addObserver(
+      id,
+      this.ctx.exports.ConformanceVerifier({ props: { user } }),
+    );
   }
 
   /** @returns Every project, paged, with each page authorized before it is returned. */
@@ -501,26 +519,35 @@ export class ConformanceResource extends DurableObject {
       pageSize: 2,
       // Wider than the local page, so a walk serves one page from the buffer with no fetch.
       remotePageSize: 4,
-      fetchPage: (token, perPage) => this.#creds.run(
-        async (creds, read) => {
-          requireWalkFence(opened, read);
-          return provider.listProjects(creds, token, perPage);
-        },
-        { replayable: true }),
+      fetchPage: (token, perPage) =>
+        this.#creds.run(
+          async (creds, read) => {
+            requireWalkFence(opened, read);
+            return provider.listProjects(creds, token, perPage);
+          },
+          { replayable: true },
+        ),
       authorizePage: async (projects, { terminal }) => {
         // Re-checked here, not only in `fetchPage`: a refused page is held and re-offered without
         // refetching, so this is the only check the retry path runs.
         requireWalkFence(opened, await this.#creds.read());
         await (projects.length === 0
           ? walk.authorize(
-            {
-              title: "Projects",
-              description: terminal ? "Listed projects; there were none." : "Scanned an empty window.",
-            },
-            { kind: "baseline" })
+              {
+                title: "Projects",
+                description: terminal
+                  ? "Listed projects; there were none."
+                  : "Scanned an empty window.",
+              },
+              { kind: "baseline" },
+            )
           : walk.authorize(
-            { title: "Projects", description: `Read ${projects.length} projects.` },
-            { kind: "collections", ids: [...new Set(projects.map(project => project.spaceId))] }));
+              { title: "Projects", description: `Read ${projects.length} projects.` },
+              {
+                kind: "collections",
+                ids: [...new Set(projects.map((project) => project.spaceId))],
+              },
+            ));
       },
     });
   }
@@ -531,14 +558,15 @@ export class ConformanceResource extends DurableObject {
    * @returns Matching projects.
    */
   async searchProjects(query: string): Promise<Project[]> {
-    const { matches, spaces } = await this.#cache.cached(`search:${query}`, 60_000,
-      () => this.#creds.run(async creds => provider.searchProjects(creds, query),
-        { replayable: true }));
+    const { matches, spaces } = await this.#cache.cached(`search:${query}`, 60_000, () =>
+      this.#creds.run(async (creds) => provider.searchProjects(creds, query), { replayable: true }),
+    );
     // Every space searched, not just the ones that matched: a miss discloses absence in each of
     // them, so an observer excluded from one must not learn that.
     await this.#requireGate().authorize(
       { title: "Search", description: `Searched projects for "${query}".` },
-      spaces.length === 0 ? { kind: "baseline" } : { kind: "collections", ids: spaces });
+      spaces.length === 0 ? { kind: "baseline" } : { kind: "collections", ids: spaces },
+    );
     return matches;
   }
 
@@ -560,8 +588,10 @@ export class ConformanceResource extends DurableObject {
     const journalFor = (namespace: string) =>
       new ActionJournal<TaggedAction<Actions>>(this.ctx.storage.kv, { namespace });
     const staged = (name: string) =>
-      ({ kind: "createProject", payload: { ref: `~${name}`, name, spaceId: "s" } }) as
-        TaggedAction<Actions>;
+      ({
+        kind: "createProject",
+        payload: { ref: `~${name}`, name, spaceId: "s" },
+      }) as TaggedAction<Actions>;
     const left = journalFor("left");
     const right = journalFor("right");
     const leftId = left.allocate(staged("left-project"));
@@ -597,7 +627,8 @@ export class ConformanceResource extends DurableObject {
         // The provider was reached, so the effect may have landed: never say it did not.
         if (error instanceof ProviderTimeoutError) {
           throw new ActionOutcomeUnknownError(
-            "The provider timed out creating this project; check before submitting it again.");
+            "The provider timed out creating this project; check before submitting it again.",
+          );
         }
         throw error;
       }
@@ -627,8 +658,11 @@ export class ConformanceResource extends DurableObject {
     // Both kinds are declared connection-fenced, so the set refuses this call without a fence.
     // Staged inside a credentialed operation, so the fence is that operation's own read rather
     // than a second one a reconnect could land in front of.
-    return this.#creds.run((_creds, read) => actions.bind(this.#journal, this.#host)
-      .submit(this.#requireQueue(), kind, payload, { fence: read }));
+    return this.#creds.run((_creds, read) =>
+      actions
+        .bind(this.#journal, this.#host)
+        .submit(this.#requireQueue(), kind, payload, { fence: read }),
+    );
   }
 
   /**
@@ -652,10 +686,12 @@ export class ConformanceResource extends DurableObject {
    */
   record(id: number): { state: string; outcome?: string; error?: string } | undefined {
     const stored = this.#journal.get(id);
-    return stored && {
-      state: stored.state,
-      ...(stored.state === "failed" && stored.outcome ? { outcome: stored.outcome } : {}),
-      ...(stored.state === "failed" ? { error: stored.error } : {}),
-    };
+    return (
+      stored && {
+        state: stored.state,
+        ...(stored.state === "failed" && stored.outcome ? { outcome: stored.outcome } : {}),
+        ...(stored.state === "failed" ? { error: stored.error } : {}),
+      }
+    );
   }
 }

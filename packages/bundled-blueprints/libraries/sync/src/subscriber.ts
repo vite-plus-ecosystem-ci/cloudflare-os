@@ -19,11 +19,19 @@ export interface SyncHost {
  * `callbacks` is a plain object of functions (its own enumerable properties; a class instance's
  * prototype methods are not seen), and the result is what to pass to the server's `subscribe`.
  */
-export function createSubscriber<Callbacks extends object>(RpcTarget: SyncHost["RpcTarget"], callbacks: Callbacks): Callbacks {
+export function createSubscriber<Callbacks extends object>(
+  RpcTarget: SyncHost["RpcTarget"],
+  callbacks: Callbacks,
+): Callbacks {
   class Subscriber extends RpcTarget {}
   for (const [name, callback] of Object.entries(callbacks)) {
-    if (typeof callback !== "function") throw new TypeError(`Subscriber callback "${name}" is not a function.`);
-    Object.defineProperty(Subscriber.prototype, name, { value: callback, writable: true, configurable: true });
+    if (typeof callback !== "function")
+      throw new TypeError(`Subscriber callback "${name}" is not a function.`);
+    Object.defineProperty(Subscriber.prototype, name, {
+      value: callback,
+      writable: true,
+      configurable: true,
+    });
   }
   return new Subscriber() as Callbacks;
 }

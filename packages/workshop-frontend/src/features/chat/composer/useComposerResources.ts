@@ -11,15 +11,13 @@ import {
   type ComposerSelection,
   type ComposerUrlRange,
 } from "./composerDocument";
-import type {
-  CommitDocumentEditOptions,
-  ComposerDocumentSnapshot,
-} from "./draft/useComposerDraft";
+import type { CommitDocumentEditOptions, ComposerDocumentSnapshot } from "./draft/useComposerDraft";
 
 const URL_REGEX = /https?:\/\/[^\s)>\]]*/g;
 
 type CommittedTransition<T extends { document: ComposerDocument }> =
-  (T & { documentRevision: number; editRevision: number }) | null;
+  | (T & { documentRevision: number; editRevision: number })
+  | null;
 
 type ActiveResourceUrl = ComposerUrlRange & {
   snapshot: ComposerDocumentSnapshot;
@@ -46,12 +44,13 @@ const currentResourceUrl = (
   source: ActiveResourceUrl,
   document: ComposerDocument,
 ): ComposerUrlRange | null => {
-  const originalUrls = [
-    ...source.snapshot.document.text.matchAll(/https?:\/\/[^\s)>\]]*/g),
-  ];
-  const sourceIndex = originalUrls.findIndex((match) =>
-    match.index === source.start && match.index + match[0].length === source.end &&
-    match[0] === source.text);
+  const originalUrls = [...source.snapshot.document.text.matchAll(/https?:\/\/[^\s)>\]]*/g)];
+  const sourceIndex = originalUrls.findIndex(
+    (match) =>
+      match.index === source.start &&
+      match.index + match[0].length === source.end &&
+      match[0] === source.text,
+  );
   if (sourceIndex < 0) return null;
 
   const match = [...document.text.matchAll(/https?:\/\/[^\s)>\]]*/g)][sourceIndex];
@@ -68,8 +67,11 @@ const currentPresentationPosition = (
   let shift = 0;
   for (const [index, previous] of source.document.formats.entries()) {
     const current = document.formats[index];
-    if (current.noun !== previous.noun || current.icon !== previous.icon ||
-        current.start !== previous.start + shift) {
+    if (
+      current.noun !== previous.noun ||
+      current.icon !== previous.icon ||
+      current.start !== previous.start + shift
+    ) {
       return null;
     }
     if (position > previous.start && position < previous.start + previous.length) return null;
@@ -101,18 +103,24 @@ export const useComposerResources = ({
   const [attachModalOpen, setAttachModalOpen] = useState(false);
   const [isCreatingResource, setIsCreatingResource] = useState(false);
   const activeUrlRef = useRef(activeUrl);
-  const attachSnapshotRef = useRef<{
-    snapshot: ComposerDocumentSnapshot;
-    position: number;
-  } | undefined>(undefined);
+  const attachSnapshotRef = useRef<
+    | {
+        snapshot: ComposerDocumentSnapshot;
+        position: number;
+      }
+    | undefined
+  >(undefined);
   const operationRef = useRef(0);
   const lastScanRef = useRef({ position: -1, text: "", documentRevision: -1 });
   activeUrlRef.current = activeUrl;
 
-  useEffect(() => () => {
-    operationRef.current++;
-    attachSnapshotRef.current = undefined;
-  }, []);
+  useEffect(
+    () => () => {
+      operationRef.current++;
+      attachSnapshotRef.current = undefined;
+    },
+    [],
+  );
 
   const hideUrl = () => {
     activeUrlRef.current = null;
@@ -129,8 +137,11 @@ export const useComposerResources = ({
     const snapshot = getDocumentSnapshot();
     const { document, documentRevision } = snapshot;
     const scanned = lastScanRef.current;
-    if (scanned.position === position && scanned.text === document.text &&
-        scanned.documentRevision === documentRevision) {
+    if (
+      scanned.position === position &&
+      scanned.text === document.text &&
+      scanned.documentRevision === documentRevision
+    ) {
       return;
     }
     lastScanRef.current = { position, text: document.text, documentRevision };
@@ -141,13 +152,18 @@ export const useComposerResources = ({
       const start = match.index;
       const end = start + match[0].length;
       if (position < start || position > end) continue;
-      const isCapsule = document.capsules.some((capsule) =>
-        start >= capsule.start && end <= capsule.start + capsule.length);
+      const isCapsule = document.capsules.some(
+        (capsule) => start >= capsule.start && end <= capsule.start + capsule.length,
+      );
       if (isCapsule) break;
 
       const previous = activeUrlRef.current;
-      if (previous?.text === match[0] && previous.start === start && previous.end === end &&
-          previous.snapshot.documentRevision === documentRevision) {
+      if (
+        previous?.text === match[0] &&
+        previous.start === start &&
+        previous.end === end &&
+        previous.snapshot.documentRevision === documentRevision
+      ) {
         return;
       }
       const next = { text: match[0], start, end, snapshot };
@@ -180,15 +196,22 @@ export const useComposerResources = ({
           gatekeeper.describe(),
         ]);
         if (operationRef.current !== operation) return;
-        const result = commitDocumentEdit(source.snapshot, (document) => {
-          const url = currentResourceUrl(source, document);
-          return url && replaceComposerUrlWithCapsule(
-            document,
-            url,
-            { gatekeeperId, description, vendorId },
-            capsuleTokenText(description, vendorId),
-          );
-        }, { allowPresentationChanges: true });
+        const result = commitDocumentEdit(
+          source.snapshot,
+          (document) => {
+            const url = currentResourceUrl(source, document);
+            return (
+              url &&
+              replaceComposerUrlWithCapsule(
+                document,
+                url,
+                { gatekeeperId, description, vendorId },
+                capsuleTokenText(description, vendorId),
+              )
+            );
+          },
+          { allowPresentationChanges: true },
+        );
         if (!result) {
           onError("The prompt changed before the resource could be added");
           dismissUrl();
@@ -215,12 +238,11 @@ export const useComposerResources = ({
     const source = activeUrlRef.current;
     if (!source) return;
     const result = commitDocumentEdit(source.snapshot, (document) =>
-      refineComposerResourceUrl(
-        document,
-        source,
-        newUrl,
-        { start: placeholderStart, end: placeholderEnd },
-      ));
+      refineComposerResourceUrl(document, source, newUrl, {
+        start: placeholderStart,
+        end: placeholderEnd,
+      }),
+    );
     if (!result) {
       dismissUrl();
       return;
@@ -260,15 +282,21 @@ export const useComposerResources = ({
       ]);
       if (!source || attachSnapshotRef.current !== source) return;
       const vendorId = creationSpec.type === "gatekeeper" ? creationSpec.vendorId : undefined;
-      const result = commitDocumentEdit(source.snapshot, (document) => {
-        const position = currentPresentationPosition(source.snapshot, document, source.position);
-        return position === null ? null : insertComposerCapsule(
-          document,
-          position,
-          { gatekeeperId, description, vendorId },
-          capsuleTokenText(description, vendorId),
-        );
-      }, { allowPresentationChanges: true });
+      const result = commitDocumentEdit(
+        source.snapshot,
+        (document) => {
+          const position = currentPresentationPosition(source.snapshot, document, source.position);
+          return position === null
+            ? null
+            : insertComposerCapsule(
+                document,
+                position,
+                { gatekeeperId, description, vendorId },
+                capsuleTokenText(description, vendorId),
+              );
+        },
+        { allowPresentationChanges: true },
+      );
       closeAttachModal();
       if (!result) {
         onError("The prompt changed before the resource could be added");

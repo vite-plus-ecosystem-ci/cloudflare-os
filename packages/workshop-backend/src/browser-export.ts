@@ -37,11 +37,13 @@ const EXPORT_DOCUMENT_URL = "https://gadget-export.invalid/";
 // TODO: CSP and request interception do not cover WebRTC/STUN. The same gap exists for Gadgets
 // running inside an iframe in the user's browser. We should close the gap in both places. For now,
 // extending the same gap to remotely-rendered gadgets is acceptable.
-const EXPORT_DOCUMENT_CSP = "default-src 'none'; frame-src 'none'; script-src data:; " +
+const EXPORT_DOCUMENT_CSP =
+  "default-src 'none'; frame-src 'none'; script-src data:; " +
   "style-src data: 'unsafe-inline'; img-src data: blob:; media-src data: blob:; " +
   "font-src data:; object-src 'none'; base-uri 'none'; form-action 'none'; " +
   "connect-src 'none'; sandbox allow-scripts;";
-const STATIC_HTML_CSP = "default-src 'none'; frame-src 'none'; script-src 'none'; " +
+const STATIC_HTML_CSP =
+  "default-src 'none'; frame-src 'none'; script-src 'none'; " +
   "style-src data: 'unsafe-inline'; img-src data:; media-src data:; font-src data:; " +
   "object-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'none';";
 
@@ -57,8 +59,10 @@ async function closeBrowser(browser: Awaited<ReturnType<typeof launch>>): Promis
     await Promise.race([
       browser.close(),
       new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error("Closing the export browser timed out.")),
-            BROWSER_CLOSE_TIMEOUT_MS);
+        timer = setTimeout(
+          () => reject(new Error("Closing the export browser timed out.")),
+          BROWSER_CLOSE_TIMEOUT_MS,
+        );
       }),
     ]);
   } catch (error) {
@@ -81,8 +85,10 @@ export class BrowserRpcTransport implements RpcTransport {
   constructor(private page: Page) {}
 
   send(message: string): Promise<void> {
-    if (this.#pendingSendCount >= MAX_PENDING_RPC_SENDS ||
-        message.length > MAX_PENDING_RPC_SEND_CHARS - this.#pendingSendChars) {
+    if (
+      this.#pendingSendCount >= MAX_PENDING_RPC_SENDS ||
+      message.length > MAX_PENDING_RPC_SEND_CHARS - this.#pendingSendChars
+    ) {
       let error = new Error("The Gadget export RPC send queue overflowed.");
       this.abort(error);
       return Promise.reject(error);
@@ -91,7 +97,8 @@ export class BrowserRpcTransport implements RpcTransport {
     ++this.#pendingSendCount;
     this.#pendingSendChars += message.length;
     let delivered = this.#sendChain.then(() =>
-      this.#untilAborted(this.page.evaluate(sendToBrowser, message)));
+      this.#untilAborted(this.page.evaluate(sendToBrowser, message)),
+    );
     let settled = delivered.finally(() => {
       --this.#pendingSendCount;
       this.#pendingSendChars -= message.length;
@@ -101,9 +108,7 @@ export class BrowserRpcTransport implements RpcTransport {
   }
 
   async receive(): Promise<string> {
-    let message = await this.#untilAborted(
-      this.page.evaluate(receiveFromBrowser),
-    );
+    let message = await this.#untilAborted(this.page.evaluate(receiveFromBrowser));
     if (typeof message !== "string") {
       throw new Error("The Gadget export RPC message from the browser was not a string.");
     }
@@ -121,7 +126,9 @@ export class BrowserRpcTransport implements RpcTransport {
   #untilAborted<T>(work: Promise<T>): Promise<T> {
     return Promise.race([
       work,
-      this.#abortReason.promise.then(reason => { throw reason; }),
+      this.#abortReason.promise.then((reason) => {
+        throw reason;
+      }),
     ]);
   }
 }
@@ -137,9 +144,10 @@ delete globalThis.__workshopExportRuntime;
 `;
   let clientUrl = scriptUrl(clientPrefix + clientCode);
   let runtimeUrl = scriptUrl(
-      `globalThis.gadgetExportFormatId = ${JSON.stringify(formatId)};\n` +
+    `globalThis.gadgetExportFormatId = ${JSON.stringify(formatId)};\n` +
       `globalThis.__workshopExportClientUrl = ${JSON.stringify(clientUrl)};\n` +
-      BROWSER_EXPORT_RUNTIME);
+      BROWSER_EXPORT_RUNTIME,
+  );
 
   return `<!DOCTYPE html>
 <html>
@@ -203,83 +211,87 @@ export async function renderGadgetInBrowser(
     return releasePromise;
   };
   try {
-    let source = await deadline.race((async () => {
-      let page = await browser.newPage();
-      await page.emulateMediaType(
-        format.contentType === "application/pdf" ? "print" : "screen",
-      );
-      await page.setRequestInterception(true);
-      page.on("request", (request) => {
-        let url = request.url();
-        if (request.isNavigationRequest()) {
-          if (url === EXPORT_DOCUMENT_URL && request.frame() === page.mainFrame()) {
-            void request.respond({
-              status: 200,
-              contentType: "text/html",
-              headers: {"Content-Security-Policy": EXPORT_DOCUMENT_CSP},
-              body: makeExportHtml(clientCode, format.id),
-            });
+    let source = await deadline.race(
+      (async () => {
+        let page = await browser.newPage();
+        await page.emulateMediaType(format.contentType === "application/pdf" ? "print" : "screen");
+        await page.setRequestInterception(true);
+        page.on("request", (request) => {
+          let url = request.url();
+          if (request.isNavigationRequest()) {
+            if (url === EXPORT_DOCUMENT_URL && request.frame() === page.mainFrame()) {
+              void request.respond({
+                status: 200,
+                contentType: "text/html",
+                headers: { "Content-Security-Policy": EXPORT_DOCUMENT_CSP },
+                body: makeExportHtml(clientCode, format.id),
+              });
+            } else {
+              void request.abort();
+            }
+          } else if (url.startsWith("data:") || url.startsWith("blob:")) {
+            void request.continue();
           } else {
             void request.abort();
           }
-        } else if (url.startsWith("data:") || url.startsWith("blob:")) {
-          void request.continue();
-        } else {
-          void request.abort();
+        });
+        await page.goto(EXPORT_DOCUMENT_URL, { waitUntil: "load" });
+        let transport = new BrowserRpcTransport(page);
+        page.on("close", () => transport.abort(new Error("Browser page closed.")));
+        let rpcSession = new RpcSession(transport, gadget);
+        sessionCloser = rpcSession.getRemoteMain();
+        await page.evaluate(waitForClientModule);
+        const frame = page.mainFrame() as FrameWithIsolatedRealm;
+        const isolatedRealm = frame.isolatedRealm();
+        await isolatedRealm.evaluate(waitForDomSettled, DOM_SETTLE_MS);
+        await isolatedRealm.evaluate(setDocumentTitle, documentTitle);
+        switch (format.contentType) {
+          case "application/pdf":
+            return page.createPDFStream({
+              preferCSSPageSize: true,
+              printBackground: true,
+              waitForFonts: true,
+            });
+          case "text/html": {
+            await isolatedRealm.evaluate(HTML_SANITIZER_RUNTIME);
+            const html = await isolatedRealm.evaluate(
+              createStaticHtmlSnapshot,
+              STATIC_HTML_CSP,
+              MAX_EXPORT_BYTES,
+            );
+            return streamBytes(new TextEncoder().encode(html));
+          }
+          case "image/png": {
+            const clip = await isolatedRealm.evaluate(
+              getValidatedScreenshotClip,
+              MAX_SCREENSHOT_PIXELS,
+            );
+            return streamBytes(
+              await page.screenshot({
+                type: "png",
+                clip,
+                captureBeyondViewport: true,
+              }),
+            );
+          }
+          case "image/jpeg": {
+            const clip = await isolatedRealm.evaluate(
+              getValidatedScreenshotClip,
+              MAX_SCREENSHOT_PIXELS,
+            );
+            return streamBytes(
+              await page.screenshot({
+                type: "jpeg",
+                clip,
+                captureBeyondViewport: true,
+              }),
+            );
+          }
+          default:
+            throw new Error(`Unsupported browser export content type: ${format.contentType}`);
         }
-      });
-      await page.goto(EXPORT_DOCUMENT_URL, { waitUntil: "load" });
-      let transport = new BrowserRpcTransport(page);
-      page.on("close", () => transport.abort(new Error("Browser page closed.")));
-      let rpcSession = new RpcSession(transport, gadget);
-      sessionCloser = rpcSession.getRemoteMain();
-      await page.evaluate(waitForClientModule);
-      const frame = page.mainFrame() as FrameWithIsolatedRealm;
-      const isolatedRealm = frame.isolatedRealm();
-      await isolatedRealm.evaluate(waitForDomSettled, DOM_SETTLE_MS);
-      await isolatedRealm.evaluate(setDocumentTitle, documentTitle);
-      switch (format.contentType) {
-        case "application/pdf":
-          return page.createPDFStream({
-            preferCSSPageSize: true,
-            printBackground: true,
-            waitForFonts: true,
-          });
-        case "text/html": {
-          await isolatedRealm.evaluate(HTML_SANITIZER_RUNTIME);
-          const html = await isolatedRealm.evaluate(
-            createStaticHtmlSnapshot,
-            STATIC_HTML_CSP,
-            MAX_EXPORT_BYTES,
-          );
-          return streamBytes(new TextEncoder().encode(html));
-        }
-        case "image/png": {
-          const clip = await isolatedRealm.evaluate(
-            getValidatedScreenshotClip,
-            MAX_SCREENSHOT_PIXELS,
-          );
-          return streamBytes(await page.screenshot({
-            type: "png",
-            clip,
-            captureBeyondViewport: true,
-          }));
-        }
-        case "image/jpeg": {
-          const clip = await isolatedRealm.evaluate(
-            getValidatedScreenshotClip,
-            MAX_SCREENSHOT_PIXELS,
-          );
-          return streamBytes(await page.screenshot({
-            type: "jpeg",
-            clip,
-            captureBeyondViewport: true,
-          }));
-        }
-        default:
-          throw new Error(`Unsupported browser export content type: ${format.contentType}`);
-      }
-    })());
+      })(),
+    );
     return limitExportStream(source, deadline, release);
   } catch (error) {
     // Deliberately omits the caught value: failures here can carry Gadget-authored exception text,

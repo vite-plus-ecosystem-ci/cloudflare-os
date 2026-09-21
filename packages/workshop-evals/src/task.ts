@@ -39,7 +39,9 @@ export function defineEvalTask(task: EvalTask): EvalTask {
 
 /** Hash the prompts that define what the agent was asked to do. */
 export function taskVersion(task: EvalTask): string {
-  return createHash("sha256").update(JSON.stringify(task.turns.map(turn => turn.prompt))).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(task.turns.map((turn) => turn.prompt)))
+    .digest("hex");
 }
 
 export type EvalRunInput = {

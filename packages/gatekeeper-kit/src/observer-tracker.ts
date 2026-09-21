@@ -98,7 +98,11 @@ type Outcome = "committed" | "refused" | "unknown";
  * @param keys Set storage keys the read discloses.
  * @param created Keys whose markers this read wrote.
  */
-function claimSets(claims: Map<string, CollectionClaim>, keys: readonly string[], created: Set<string>) {
+function claimSets(
+  claims: Map<string, CollectionClaim>,
+  keys: readonly string[],
+  created: Set<string>,
+) {
   for (const key of keys) {
     const claim = claims.get(key) ?? { held: 0, created: false, refusedOnly: true };
     claim.held += 1;
@@ -239,15 +243,21 @@ export class ObserverTracker<V> {
     this.#collectionPrefix = options.collectionPrefix ?? "observed:";
     // The brand is asserted here and nowhere else on this path: whatever the caller's function
     // returns *is* the canonical spelling, by definition of the option.
-    this.#canonicalCollectionId =
-      (options.canonicalCollectionId ?? (collectionId => collectionId)) as (collectionId: string) => CanonicalCollectionId;
+    this.#canonicalCollectionId = (options.canonicalCollectionId ??
+      ((collectionId) => collectionId)) as (collectionId: string) => CanonicalCollectionId;
     // A cap of zero refuses every read, and a window of zero never advances.
     this.#maxTrackedCollections = requirePositiveInt(
-      "maxTrackedCollections", options.maxTrackedCollections ?? DEFAULT_MAX_TRACKED_COLLECTIONS);
+      "maxTrackedCollections",
+      options.maxTrackedCollections ?? DEFAULT_MAX_TRACKED_COLLECTIONS,
+    );
     this.#maxObservers = requirePositiveInt(
-      "maxObservers", options.maxObservers ?? DEFAULT_MAX_OBSERVERS);
+      "maxObservers",
+      options.maxObservers ?? DEFAULT_MAX_OBSERVERS,
+    );
     this.#concurrency = requirePositiveInt(
-      "concurrency", options.concurrency ?? DEFAULT_CONCURRENCY);
+      "concurrency",
+      options.concurrency ?? DEFAULT_CONCURRENCY,
+    );
 
     // Overlapping families scan into each other: collection ids would come back as verifier keys,
     // and stored verifiers would be handed to `hasCollectionAccess` as collection ids. An empty
@@ -255,7 +265,8 @@ export class ObserverTracker<V> {
     const overlap = reservedObserverOverlap(this.#collectionPrefix);
     if (overlap !== undefined) {
       throw new Error(
-        `Collection prefix "${this.#collectionPrefix}" overlaps the reserved prefix "${overlap}".`);
+        `Collection prefix "${this.#collectionPrefix}" overlaps the reserved prefix "${overlap}".`,
+      );
     }
   }
 
@@ -280,7 +291,8 @@ export class ObserverTracker<V> {
     if (!existing.includes(id) && existing.length >= this.#maxObservers) {
       throw new Error(
         `This binding already answers for ${existing.length} collaborators, the most it can ` +
-        "verify on every read. Remove one before adding another.");
+          "verify on every read. Remove one before adding another.",
+      );
     }
     const attemptKey = `${OBSERVER_ATTEMPT_PREFIX}${id}`;
     const nonceKey = `${OBSERVER_NONCE_PREFIX}${id}`;
@@ -294,7 +306,9 @@ export class ObserverTracker<V> {
 
       const checked = new Set<string>();
       for (;;) {
-        const collectionIds = this.#trackedCollections().filter(collectionId => !checked.has(collectionId));
+        const collectionIds = this.#trackedCollections().filter(
+          (collectionId) => !checked.has(collectionId),
+        );
         if (collectionIds.length === 0) {
           this.#requireCurrentAttempt(id, nonceKey, nonce);
           // Promotion and retirement in one awaitless run: the id is never both, and never neither.
@@ -424,28 +438,40 @@ export class ObserverTracker<V> {
     const { kv, hasCollectionAccess } = this.#options;
     // Canonicalized up front, so the keys written, the state compared, and the ids the oracle is
     // asked about are all the same spelling.
-    const canonical = [...new Set(collectionIds.map(collectionId => this.#canonicalCollectionId(collectionId)))];
+    const canonical = [
+      ...new Set(collectionIds.map((collectionId) => this.#canonicalCollectionId(collectionId))),
+    ];
     // Both partitions come from one state read per collection, before the first await, so the "pending"
     // writes below reflect storage as a concurrent addObserver will scan it.
-    const states = canonical.map(collectionId => [collectionId, this.#state(collectionId)] as const);
+    const states = canonical.map(
+      (collectionId) => [collectionId, this.#state(collectionId)] as const,
+    );
     const promote = states
       .filter(([, state]) => state !== "observed")
       .map(([collectionId]) => collectionId);
-    const untracked = states.filter(([, state]) => state === undefined).map(([collectionId]) => collectionId);
+    const untracked = states
+      .filter(([, state]) => state === undefined)
+      .map(([collectionId]) => collectionId);
     if (untracked.length > 0) {
       const tracked = this.#trackedCollections().length;
       if (tracked + untracked.length > this.#maxTrackedCollections) {
         throw new Error(
           `This binding has read ${tracked} distinct items, the most it can track while remaining ` +
-          "shareable. Bind a narrower scope.");
+            "shareable. Bind a narrower scope.",
+        );
       }
-      for (const collectionId of untracked) kv.put<CollectionState>(this.#collectionKey(collectionId), "pending");
+      for (const collectionId of untracked)
+        kv.put<CollectionState>(this.#collectionKey(collectionId), "pending");
     }
     // Claimed after the capacity throw and before the first await, like the markers themselves, so
     // no concurrent read can reclaim a marker this one still depends on.
     const claims = collectionClaims(kv);
-    const claimed = canonical.map(collectionId => this.#collectionKey(collectionId));
-    claimSets(claims, claimed, new Set(untracked.map(collectionId => this.#collectionKey(collectionId))));
+    const claimed = canonical.map((collectionId) => this.#collectionKey(collectionId));
+    claimSets(
+      claims,
+      claimed,
+      new Set(untracked.map((collectionId) => this.#collectionKey(collectionId))),
+    );
 
     const observers = [...this.#observers()];
     const access = await mapLimit(observers, this.#concurrency, async ([id, verifier]) => {
@@ -471,9 +497,11 @@ export class ObserverTracker<V> {
         // disagrees about excludes that observer rather than being read positionally. Excluding
         // rather than throwing keeps one broken verifier from failing the whole read.
         const verdicts = access[observer];
-        return verdicts === undefined
-          || verdicts.length !== canonical.length
-          || canonical.some((_collectionId, index) => verdicts[index] !== true);
+        return (
+          verdicts === undefined ||
+          verdicts.length !== canonical.length ||
+          canonical.some((_collectionId, index) => verdicts[index] !== true)
+        );
       })
       .map(([id]) => id);
 
@@ -481,7 +509,8 @@ export class ObserverTracker<V> {
       excludeObservers: excluded.length > 0 ? excluded : undefined,
       commit: () => {
         settleSets(claims, claimed, "committed");
-        for (const collectionId of promote) kv.put<CollectionState>(this.#collectionKey(collectionId), "observed");
+        for (const collectionId of promote)
+          kv.put<CollectionState>(this.#collectionKey(collectionId), "observed");
       },
       abandon: () => void settleSets(claims, claimed, "unknown"),
       discard: () => {
@@ -517,8 +546,8 @@ export class ObserverTracker<V> {
 
   /** @returns Every canonical collection ID retained by this tracker. */
   #trackedCollections(): CanonicalCollectionId[] {
-    return [...this.#options.kv.list<unknown>({ prefix: this.#collectionPrefix })].map(([key]) =>
-      key.slice(this.#collectionPrefix.length) as CanonicalCollectionId,
+    return [...this.#options.kv.list<unknown>({ prefix: this.#collectionPrefix })].map(
+      ([key]) => key.slice(this.#collectionPrefix.length) as CanonicalCollectionId,
     );
   }
 
