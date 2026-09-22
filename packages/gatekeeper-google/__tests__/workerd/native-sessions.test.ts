@@ -1,9 +1,13 @@
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import type {
-  ActionDescription, ApprovalQueue, GitCache, HookController, HookDescription,
+  ActionDescription,
+  ApprovalQueue,
+  GitCache,
+  HookController,
+  HookDescription,
   ObservationDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { GoogleDocsApi } from "../../src/docs-api";
 import { DriveApi } from "../../src/drive-api";
 import { GoogleDriveSessionImpl } from "../../src/google";
@@ -37,7 +41,8 @@ class TestApprovalQueue extends RpcTarget implements ApprovalQueue {
   }
 
   async bindHook<Hook extends RpcTarget>(
-    _controller: Fetcher<HookController<Hook>>, _callback: RpcStub<Hook>,
+    _controller: Fetcher<HookController<Hook>>,
+    _callback: RpcStub<Hook>,
     _description: HookDescription,
   ): Promise<void> {
     throw new Error("Unexpected hook binding");
@@ -62,18 +67,24 @@ function docTab(tabId: string, title: string, text: string, childTabs: unknown[]
       body: {
         content: [
           { startIndex: 0, endIndex: 1, sectionBreak: {} },
-          ...text ? [{
-            startIndex: 1,
-            endIndex: paragraph.length + 1,
-            paragraph: {
-              elements: [{
-                startIndex: 1,
-                endIndex: paragraph.length + 1,
-                textRun: { content: paragraph, textStyle: {} },
-              }],
-              paragraphStyle: { namedStyleType: "NORMAL_TEXT" },
-            },
-          }] : [],
+          ...(text
+            ? [
+                {
+                  startIndex: 1,
+                  endIndex: paragraph.length + 1,
+                  paragraph: {
+                    elements: [
+                      {
+                        startIndex: 1,
+                        endIndex: paragraph.length + 1,
+                        textRun: { content: paragraph, textStyle: {} },
+                      },
+                    ],
+                    paragraphStyle: { namedStyleType: "NORMAL_TEXT" },
+                  },
+                },
+              ]
+            : []),
         ],
       },
       lists: {},
@@ -86,9 +97,7 @@ function docTab(tabId: string, title: string, text: string, childTabs: unknown[]
 /** Two roots, a child and a grandchild — the shape `listTabs()` must flatten in preorder. */
 const NESTED_TABS = [
   docTab("overview", "Overview", "Overview body", [
-    docTab("details", "Details", "Details body", [
-      docTab("metrics", "Metrics", "Metrics body"),
-    ]),
+    docTab("details", "Details", "Details body", [docTab("metrics", "Metrics", "Metrics body")]),
   ]),
   docTab("appendix", "Appendix", "Appendix body"),
 ];
@@ -97,33 +106,36 @@ function installProvider(tabs: unknown[] = [docTab("solo", "Solo", "")]) {
   const urls: string[] = [];
   providerTabs = tabs;
   providerRevision = "revision-1";
-  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-    const url = new URL(input instanceof Request ? input.url : input.toString());
-    urls.push(url.toString());
-    if (url.hostname === "www.googleapis.com" && url.pathname.endsWith("/drive/v3/files")) {
-      return Response.json({ files: [providerFile("doc-1", DOC_MIME)] });
-    }
-    if (url.hostname === "www.googleapis.com" && url.pathname.includes("/drive/v3/files/")) {
-      const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
-      const mimeType = id === "doc-1" ? DOC_MIME : SHEET_MIME;
-      return Response.json(providerFile(id, mimeType));
-    }
-    if (url.hostname === "docs.googleapis.com") {
-      return Response.json({
-        documentId: "doc-1",
-        title: "Quarterly plan",
-        ...providerRevision === undefined ? {} : { revisionId: providerRevision },
-        tabs: providerTabs,
-      });
-    }
-    throw new Error(`Unexpected provider request: ${url.origin}${url.pathname}`);
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString());
+      urls.push(url.toString());
+      if (url.hostname === "www.googleapis.com" && url.pathname.endsWith("/drive/v3/files")) {
+        return Response.json({ files: [providerFile("doc-1", DOC_MIME)] });
+      }
+      if (url.hostname === "www.googleapis.com" && url.pathname.includes("/drive/v3/files/")) {
+        const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
+        const mimeType = id === "doc-1" ? DOC_MIME : SHEET_MIME;
+        return Response.json(providerFile(id, mimeType));
+      }
+      if (url.hostname === "docs.googleapis.com") {
+        return Response.json({
+          documentId: "doc-1",
+          title: "Quarterly plan",
+          ...(providerRevision === undefined ? {} : { revisionId: providerRevision }),
+          tabs: providerTabs,
+        });
+      }
+      throw new Error(`Unexpected provider request: ${url.origin}${url.pathname}`);
+    }),
+  );
   return urls;
 }
 
 /** Full `documents.get` calls, excluding the lightweight revision check. */
 function docFetches(): number {
-  return providerUrls.filter(url => {
+  return providerUrls.filter((url) => {
     const { hostname, searchParams } = new URL(url);
     return hostname === "docs.googleapis.com" && !searchParams.has("fields");
   }).length;
@@ -134,15 +146,17 @@ function newSession() {
   const queueStub: RpcStub<ApprovalQueue> = new RpcStub(queue);
   return {
     queue,
-    session: new RpcStub(new GoogleDriveSessionImpl(
-      new DriveApi(getAccessToken),
-      new GoogleDocsApi(getAccessToken),
-      new GoogleSheetsApi(getAccessToken),
-      { kind: "account" },
-      queueStub,
-      async fileIds => ({ pendingSets: fileIds, commit() {} }),
-      () => [],
-    )),
+    session: new RpcStub(
+      new GoogleDriveSessionImpl(
+        new DriveApi(getAccessToken),
+        new GoogleDocsApi(getAccessToken),
+        new GoogleSheetsApi(getAccessToken),
+        { kind: "account" },
+        queueStub,
+        async (fileIds) => ({ pendingSets: fileIds, commit() {} }),
+        () => [],
+      ),
+    ),
   };
 }
 
@@ -173,10 +187,12 @@ describe("Drive nested native sessions", () => {
     using session = newSession().session;
     using sheet = await session.openGoogleSheet("sheet-1");
 
-    await expect(Promise.resolve(sheet.readRange("A:A")))
-      .rejects.toThrow(/Invalid or unbounded A1 range/);
-    expect(providerUrls.some(url => new URL(url).hostname === "sheets.googleapis.com"))
-      .toBe(false);
+    await expect(Promise.resolve(sheet.readRange("A:A"))).rejects.toThrow(
+      /Invalid or unbounded A1 range/,
+    );
+    expect(providerUrls.some((url) => new URL(url).hostname === "sheets.googleapis.com")).toBe(
+      false,
+    );
   });
 
   it("gives each child an independently disposable approval-queue stub", async () => {
@@ -185,9 +201,11 @@ describe("Drive nested native sessions", () => {
     using doc = await session.openGoogleDoc("doc-1");
 
     session[Symbol.dispose]();
-    await expect(doc.getMetadata()).resolves.toEqual(expect.objectContaining({
-      title: "Quarterly plan",
-    }));
+    await expect(doc.getMetadata()).resolves.toEqual(
+      expect.objectContaining({
+        title: "Quarterly plan",
+      }),
+    );
     expect(resources.queue.observations).toHaveLength(2);
 
     doc[Symbol.dispose]();
@@ -233,8 +251,10 @@ describe("Drive Doc tab selection", () => {
 
     expect(docFetches()).toBe(1);
     expect(queue.observations.map(({ title }) => title)).toEqual([
-      "Open Google Doc from Google Drive", "List Google Doc tabs",
-      "Read Google Doc content", "Read Google Doc content",
+      "Open Google Doc from Google Drive",
+      "List Google Doc tabs",
+      "Read Google Doc content",
+      "Read Google Doc content",
     ]);
     expect(queue.observations.at(-1)?.description).toContain('tab "Appendix" (appendix)');
   });
@@ -280,8 +300,9 @@ describe("Drive Doc tab selection", () => {
 
     expect(await doc.getContent("metrics")).toBe("Metrics body\n");
     expect(docFetches()).toBe(1);
-    expect(providerUrls.some(url => new URL(url).searchParams.get("fields") === "revisionId"))
-      .toBe(true);
+    expect(
+      providerUrls.some((url) => new URL(url).searchParams.get("fields") === "revisionId"),
+    ).toBe(true);
   });
 
   // Google omits revisionId unless the caller can edit, which is the normal case for a Doc
@@ -299,8 +320,9 @@ describe("Drive Doc tab selection", () => {
     expect(await doc.listTabs()).toHaveLength(5);
     expect(docFetches()).toBe(2);
     // Nothing to compare, so the revision probe is not worth a request.
-    expect(providerUrls.some(url => new URL(url).searchParams.get("fields") === "revisionId"))
-      .toBe(false);
+    expect(
+      providerUrls.some((url) => new URL(url).searchParams.get("fields") === "revisionId"),
+    ).toBe(false);
   });
 
   it("pipelines a tab read before its session stub resolves", async () => {
@@ -316,10 +338,16 @@ describe("Drive Doc tab selection", () => {
   });
 
   it.each([
-    [undefined, "getContent: tabId is required for documents with multiple tabs. " +
-      "Call listTabs() to choose a tab."],
-    ["ghost", 'getContent: no tab with ID "ghost" exists in this document. ' +
-      "Call listTabs() to refresh the tab list."],
+    [
+      undefined,
+      "getContent: tabId is required for documents with multiple tabs. " +
+        "Call listTabs() to choose a tab.",
+    ],
+    [
+      "ghost",
+      'getContent: no tab with ID "ghost" exists in this document. ' +
+        "Call listTabs() to refresh the tab list.",
+    ],
   ] as const)("fails closed on selector %s", async (tabId, message) => {
     const { queue, session } = newSession();
     using owned = session;

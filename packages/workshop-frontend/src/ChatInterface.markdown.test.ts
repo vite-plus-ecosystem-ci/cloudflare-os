@@ -2,7 +2,7 @@
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { MarkdownMessage } from "./ChatInterface";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -50,9 +50,7 @@ describe("MarkdownMessage line breaks", () => {
     vi.stubGlobal("navigator", { clipboard: { writeText } });
     await render("```ts\nconst answer = 42;\n```");
 
-    const button = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Copy code"]',
-    );
+    const button = container.querySelector<HTMLButtonElement>('button[aria-label="Copy code"]');
     expect(button?.title).toBe("Copy code");
 
     await act(async () => button?.click());

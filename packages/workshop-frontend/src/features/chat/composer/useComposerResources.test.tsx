@@ -5,7 +5,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { RpcStub } from "capnweb";
 import type { GatekeeperClient } from "@gadgets/workshop-shared/api";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { ComposerDocument, ComposerSelection } from "./composerDocument";
 import type { StoredComposerDraft } from "./draft/composerDraft";
 
@@ -14,9 +14,10 @@ const iconState = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../components/format/formatIconImage", () => ({
-  formatIconDataUrl: () => new Promise<string>((resolve) => {
-    iconState.resolve = resolve;
-  }),
+  formatIconDataUrl: () =>
+    new Promise<string>((resolve) => {
+      iconState.resolve = resolve;
+    }),
 }));
 
 import { writeComposerDraft } from "./draft/composerDraft";
@@ -71,10 +72,8 @@ describe("useComposerResources", () => {
     createCapsuleGatekeeper: () => Promise<RpcStub<GatekeeperClient<any>> | null>,
     draftOptions: { storageKey?: string; logoSlot?: string } = {},
   ) => {
-    const onSelectionRequest = vi.fn<(
-      selection: ComposerSelection,
-      documentRevision: number,
-    ) => void>();
+    const onSelectionRequest =
+      vi.fn<(selection: ComposerSelection, documentRevision: number) => void>();
     const onConnectionCreated = vi.fn<() => void>();
     const onError = vi.fn<(message: string) => void>();
     let controls: {
@@ -102,7 +101,9 @@ describe("useComposerResources", () => {
     root = createRoot(container);
     await act(async () => root!.render(<Harness />));
     return {
-      get controls() { return controls; },
+      get controls() {
+        return controls;
+      },
       onConnectionCreated,
       onError,
       onSelectionRequest,
@@ -122,13 +123,15 @@ describe("useComposerResources", () => {
 
     expect(harness.controls.draft.document).toEqual({
       text: "Plan ",
-      capsules: [{
-        start: 0,
-        length: 4,
-        gatekeeperId: 7,
-        description,
-        vendorId: "vendor",
-      }],
+      capsules: [
+        {
+          start: 0,
+          length: 4,
+          gatekeeperId: 7,
+          description,
+          vendorId: "vendor",
+        },
+      ],
       formats: [],
       command: null,
     });
@@ -143,9 +146,12 @@ describe("useComposerResources", () => {
 
   it("disposes but rejects a resource result after a newer edit", async () => {
     let resolveDescription!: (value: typeof description) => void;
-    const gatekeeper = fakeGatekeeper(() => new Promise((resolve) => {
-      resolveDescription = resolve;
-    }));
+    const gatekeeper = fakeGatekeeper(
+      () =>
+        new Promise((resolve) => {
+          resolveDescription = resolve;
+        }),
+    );
     const harness = await renderHarness(async () => gatekeeper.stub);
     act(() => {
       harness.controls.draft.recordEdit();
@@ -176,9 +182,12 @@ describe("useComposerResources", () => {
 
   it("commits an accepted resource after the caret leaves its URL", async () => {
     let resolveDescription!: (value: typeof description) => void;
-    const gatekeeper = fakeGatekeeper(() => new Promise((resolve) => {
-      resolveDescription = resolve;
-    }));
+    const gatekeeper = fakeGatekeeper(
+      () =>
+        new Promise((resolve) => {
+          resolveDescription = resolve;
+        }),
+    );
     const harness = await renderHarness(async () => gatekeeper.stub);
     act(() => {
       harness.controls.draft.recordEdit();
@@ -213,13 +222,16 @@ describe("useComposerResources", () => {
       return 1;
     });
     let resolveDescription!: (value: typeof description) => void;
-    const gatekeeper = fakeGatekeeper(() => new Promise((resolve) => {
-      resolveDescription = resolve;
-    }));
-    const harness = await renderHarness(
-      async () => gatekeeper.stub,
-      { storageKey: "draft:user-a", logoSlot: "[icon]" },
+    const gatekeeper = fakeGatekeeper(
+      () =>
+        new Promise((resolve) => {
+          resolveDescription = resolve;
+        }),
     );
+    const harness = await renderHarness(async () => gatekeeper.stub, {
+      storageKey: "draft:user-a",
+      logoSlot: "[icon]",
+    });
     act(() => harness.controls.resources.scanAt(15));
     const creation = harness.controls.resources.createCapsule(3, "vendor");
     await act(async () => Promise.resolve());
@@ -241,9 +253,12 @@ describe("useComposerResources", () => {
 
   it("rejects a resource result after explicit dismissal", async () => {
     let resolveDescription!: (value: typeof description) => void;
-    const gatekeeper = fakeGatekeeper(() => new Promise((resolve) => {
-      resolveDescription = resolve;
-    }));
+    const gatekeeper = fakeGatekeeper(
+      () =>
+        new Promise((resolve) => {
+          resolveDescription = resolve;
+        }),
+    );
     const harness = await renderHarness(async () => gatekeeper.stub);
     act(() => {
       harness.controls.draft.recordEdit();
@@ -283,16 +298,19 @@ describe("useComposerResources", () => {
     const dispose = vi.fn<() => void>();
     const remove = vi.fn<() => Promise<void>>(async () => {});
     const gatekeeper = {
-      getId: () => new Promise<number>((resolve) => { resolveId = resolve; }),
+      getId: () =>
+        new Promise<number>((resolve) => {
+          resolveId = resolve;
+        }),
       describe: async () => description,
       getCreationSpec: async () => ({ type: "gatekeeper" as const, vendorId: "vendor" }),
       remove,
       [Symbol.dispose]: dispose,
     } as unknown as RpcStub<GatekeeperClient<any>>;
-    const harness = await renderHarness(
-      async () => null,
-      { storageKey: "draft:user-a", logoSlot: "[icon]" },
-    );
+    const harness = await renderHarness(async () => null, {
+      storageKey: "draft:user-a",
+      logoSlot: "[icon]",
+    });
     act(() => harness.controls.resources.openAttachModal(storedDraft.text.length));
     const creation = harness.controls.resources.attachCreated(gatekeeper);
 
@@ -318,9 +336,10 @@ describe("useComposerResources", () => {
     const dispose = vi.fn<() => void>();
     const remove = vi.fn<() => Promise<void>>(async () => {});
     const gatekeeper = {
-      getId: () => new Promise<number>((_resolve, reject) => {
-        rejectMetadata = reject;
-      }),
+      getId: () =>
+        new Promise<number>((_resolve, reject) => {
+          rejectMetadata = reject;
+        }),
       describe: async () => description,
       getCreationSpec: async () => ({ type: "gatekeeper" as const, vendorId: "vendor" }),
       remove,

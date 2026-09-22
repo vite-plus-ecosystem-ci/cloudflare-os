@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { applyVersioned, normalizeBaseVersion, operationStatus } from "../src/versioned.ts";
 
@@ -20,12 +20,19 @@ describe("applyVersioned", () => {
     expect(outcome.accepted).toEqual([{ id: "a", html: "<p>one!</p>", version: 4 }]);
     expect(outcome.items.get("a")).toEqual({ id: "a", html: "<p>one!</p>", version: 4 });
     expect(outcome.items.get("b")).toEqual({ id: "b", html: "<p>two</p>", version: 1 });
-    expect(outcome).toMatchObject({ deletedIds: [], conflicts: [], changed: true, status: "applied" });
+    expect(outcome).toMatchObject({
+      deletedIds: [],
+      conflicts: [],
+      changed: true,
+      status: "applied",
+    });
   });
 
   it("rejects a stale edit with the authoritative item and leaves the items untouched", () => {
     const current = blocks(["a", "<p>server</p>", 4]);
-    const outcome = applyVersioned(current, { upserts: [{ id: "a", html: "<p>mine</p>", baseVersion: 3 }] });
+    const outcome = applyVersioned(current, {
+      upserts: [{ id: "a", html: "<p>mine</p>", baseVersion: 3 }],
+    });
     expect(outcome.conflicts).toEqual([{ id: "a", reason: "stale", current: current[0] }]);
     expect(outcome.items.get("a")).toBe(current[0]);
     expect(outcome).toMatchObject({ accepted: [], changed: false, status: "conflict" });
@@ -45,17 +52,31 @@ describe("applyVersioned", () => {
   });
 
   it("treats identical content as no change, and lets the gadget judge nested content", () => {
-    const same = applyVersioned(blocks(["a", "<p>a</p>", 2]), { upserts: [{ id: "a", html: "<p>a</p>", baseVersion: 2 }] });
-    expect(same).toMatchObject({ accepted: [], conflicts: [], changed: false, status: "unchanged" });
+    const same = applyVersioned(blocks(["a", "<p>a</p>", 2]), {
+      upserts: [{ id: "a", html: "<p>a</p>", baseVersion: 2 }],
+    });
+    expect(same).toMatchObject({
+      accepted: [],
+      conflicts: [],
+      changed: false,
+      status: "unchanged",
+    });
     expect(same.items.get("a")?.version).toBe(2);
 
     type Cell = { id: string; fmt: { b?: boolean } | null; version: number };
     const cells: Cell[] = [{ id: "A1", fmt: { b: true }, version: 1 }];
-    const byDefault = applyVersioned(cells, { upserts: [{ id: "A1", fmt: { b: true }, baseVersion: 1 }] });
-    expect(byDefault.changed).toBe(true);
-    const judged = applyVersioned(cells, { upserts: [{ id: "A1", fmt: { b: true }, baseVersion: 1 }] }, {
-      isUnchanged: (current, incoming) => JSON.stringify(current.fmt) === JSON.stringify(incoming.fmt),
+    const byDefault = applyVersioned(cells, {
+      upserts: [{ id: "A1", fmt: { b: true }, baseVersion: 1 }],
     });
+    expect(byDefault.changed).toBe(true);
+    const judged = applyVersioned(
+      cells,
+      { upserts: [{ id: "A1", fmt: { b: true }, baseVersion: 1 }] },
+      {
+        isUnchanged: (current, incoming) =>
+          JSON.stringify(current.fmt) === JSON.stringify(incoming.fmt),
+      },
+    );
     expect(judged.changed).toBe(false);
   });
 
@@ -81,13 +102,20 @@ describe("applyVersioned", () => {
     });
     expect(outcome.accepted).toHaveLength(1);
     expect(outcome.deletedIds).toEqual([]);
-    expect(outcome.conflicts[0]).toMatchObject({ id: "a", reason: "stale", current: { version: 2 } });
+    expect(outcome.conflicts[0]).toMatchObject({
+      id: "a",
+      reason: "stale",
+      current: { version: 2 },
+    });
   });
 
   it("does not modify the items it was given", () => {
     const current = blocks(["a", "<p>a</p>"]);
     const map = new Map(current.map((block) => [block.id, block]));
-    applyVersioned(map.values(), { upserts: [{ id: "a", html: "<p>b</p>", baseVersion: 1 }], deletes: [] });
+    applyVersioned(map.values(), {
+      upserts: [{ id: "a", html: "<p>b</p>", baseVersion: 1 }],
+      deletes: [],
+    });
     expect(current[0]).toEqual({ id: "a", html: "<p>a</p>", version: 1 });
     expect(map.get("a")).toBe(current[0]);
   });
@@ -121,7 +149,9 @@ describe("operationStatus and normalizeBaseVersion", () => {
     expect(upsert.conflicts).toEqual([{ id: "a", reason: "stale", current: current[0] }]);
     expect(upsert.items.get("a")).toBe(current[0]);
 
-    const deletion = applyVersioned(current, { deletes: [{ id: "a", baseVersion: normalizeBaseVersion(2.9) }] });
+    const deletion = applyVersioned(current, {
+      deletes: [{ id: "a", baseVersion: normalizeBaseVersion(2.9) }],
+    });
     expect(deletion.conflicts).toEqual([{ id: "a", reason: "stale", current: current[0] }]);
     expect(deletion.items.get("a")).toBe(current[0]);
 

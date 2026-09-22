@@ -5,7 +5,7 @@ import {
   runDurableObjectAlarm,
   runInDurableObject,
 } from "cloudflare:test";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { HookInitiator } from "@gadgets/workshop-shared/gatekeeper";
 import { reportIssue } from "@gadgets/backend-utils/error-reporting";
 import type { ScheduledTaskHook } from "../src/types.js";
@@ -1126,14 +1126,18 @@ describe("ScheduleDriver", () => {
   it("releases the delivery capability once a schedule reaches a terminal state", async () => {
     const driver = testEnv.SCHEDULE_DRIVER.getByName("terminal-capabilities");
     const activationTime = Date.now();
-    await enableSchedule(driver, {
-      workspaceId: "workspace-a",
-      scheduleId: "one-shot",
-      spec: { kind: "once", fireAt: activationTime + 60_000, timeZone: "UTC" },
-      title: "Terminal task",
-      description: "Releases its capability when it completes.",
-      gadgetId,
-    }, activationTime);
+    await enableSchedule(
+      driver,
+      {
+        workspaceId: "workspace-a",
+        scheduleId: "one-shot",
+        spec: { kind: "once", fireAt: activationTime + 60_000, timeZone: "UTC" },
+        title: "Terminal task",
+        description: "Releases its capability when it completes.",
+        gadgetId,
+      },
+      activationTime,
+    );
 
     const capsKey = "caps:workspace-a:one-shot";
     const before = await runInDurableObject(driver, (_i, state) => state.storage.kv.get(capsKey));

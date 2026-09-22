@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 
 import { McpSessionBase, type McpSessionHost, type StoredAction } from "../src/session.js";
 import { MAX_TOOL_NAME_CHARS } from "../src/client.js";
@@ -57,11 +57,14 @@ it("tells an agent to return a pending action so its approval can appear in chat
 });
 
 it("searches progressively discovered tools and records the catalog read", async () => {
-  const found = classifyTool({
-    name: "jira_search_issues",
-    description: "Search Jira issues",
-    annotations: { readOnlyHint: true },
-  }, "byo");
+  const found = classifyTool(
+    {
+      name: "jira_search_issues",
+      description: "Search Jira issues",
+      annotations: { readOnlyHint: true },
+    },
+    "byo",
+  );
   const observations: unknown[] = [];
   const host = {
     serverName: "Jira",
@@ -70,35 +73,43 @@ it("searches progressively discovered tools and records the catalog read", async
     searchTools: async () => [found],
   } as unknown as McpSessionHost;
   const queue = {
-    authorizeObservation: (description: unknown) => { observations.push(description); },
+    authorizeObservation: (description: unknown) => {
+      observations.push(description);
+    },
   };
   const session = new McpSessionBase(host, queue as never);
 
-  await expect(session.listTools({ search: "issues" })).resolves.toEqual([{
-    name: "jira_search_issues",
-    description: "Search Jira issues",
-    mode: "read",
-    classifiedBy: "server-annotation",
-    inputSchema: undefined,
-    title: undefined,
-  }]);
+  await expect(session.listTools({ search: "issues" })).resolves.toEqual([
+    {
+      name: "jira_search_issues",
+      description: "Search Jira issues",
+      mode: "read",
+      classifiedBy: "server-annotation",
+      inputSchema: undefined,
+      title: undefined,
+    },
+  ]);
   expect(observations).toHaveLength(1);
 });
 
 it("calls a tool resolved beyond the initial generated catalog", async () => {
-  const expanded = classifyTool({
-    name: "jira_search_issues",
-    annotations: { readOnlyHint: true },
-  }, "byo");
+  const expanded = classifyTool(
+    {
+      name: "jira_search_issues",
+      annotations: { readOnlyHint: true },
+    },
+    "byo",
+  );
   const host = {
     serverName: "Jira",
     endpoint: "https://mcp.example.com",
     scope: { serverId: "jira" },
     tools: async () => [],
     findTool: async () => expanded,
-    call: async (fn: (client: never) => Promise<unknown>) => fn({
-      callTool: async () => ({ content: [{ type: "text", text: "PROJ-1" }] }),
-    } as never),
+    call: async (fn: (client: never) => Promise<unknown>) =>
+      fn({
+        callTool: async () => ({ content: [{ type: "text", text: "PROJ-1" }] }),
+      } as never),
   } as unknown as McpSessionHost;
   const queue = { authorizeObservation() {} };
   const session = new McpSessionBase(host, queue as never);
@@ -140,8 +151,9 @@ it("names the grant, not the server, when a scoped binding lacks the tool", asyn
   const session = new McpSessionBase(host, { authorizeObservation() {} } as never);
 
   await expect(session.listTools({ name: "gh_list_issues" })).resolves.toEqual([]);
-  await expect(session.callTool("gh_list_issues"))
-    .rejects.toThrow('This binding does not grant a tool named "gh_list_issues".');
+  await expect(session.callTool("gh_list_issues")).rejects.toThrow(
+    'This binding does not grant a tool named "gh_list_issues".',
+  );
 });
 
 it("says the server has no such tool when the whole endpoint was granted", async () => {
@@ -167,7 +179,9 @@ it("records what was searched, with the agent's text defused", async () => {
     searchTools: async () => [],
   } as unknown as McpSessionHost;
   const queue = {
-    authorizeObservation: (d: { description: string }) => { observations.push(d); },
+    authorizeObservation: (d: { description: string }) => {
+      observations.push(d);
+    },
   };
   const session = new McpSessionBase(host, queue as never);
 
@@ -182,11 +196,16 @@ it("returns the same compact summary shape from a complete local catalog", async
     serverName: "Jira",
     endpoint: "https://mcp.example.com",
     scope: { serverId: "jira" },
-    searchTools: async () => [classifyTool({
-      name: "jira_search_issues",
-      description: "x".repeat(4000),
-      inputSchema: { type: "object" },
-    }, "byo")],
+    searchTools: async () => [
+      classifyTool(
+        {
+          name: "jira_search_issues",
+          description: "x".repeat(4000),
+          inputSchema: { type: "object" },
+        },
+        "byo",
+      ),
+    ],
   } as unknown as McpSessionHost;
   const session = new McpSessionBase(host, { authorizeObservation() {} } as never);
 
@@ -198,7 +217,10 @@ it("returns the same compact summary shape from a complete local catalog", async
 
 it("refuses an empty or oversized query before calling the endpoint", async () => {
   let searches = 0;
-  const searchTools = async () => { searches++; return []; };
+  const searchTools = async () => {
+    searches++;
+    return [];
+  };
   const host = {
     serverName: "Jira",
     endpoint: "https://mcp.example.com",
@@ -210,18 +232,24 @@ it("refuses an empty or oversized query before calling the endpoint", async () =
   await expect(session.listTools({ search: "   " })).rejects.toThrow(/non-empty query/);
   await expect(session.listTools({ search: " _ - " })).rejects.toThrow(/search terms/);
   // Bounded on the trimmed text, which is what is actually searched and recorded.
-  await expect(session.listTools({ search: `${" ".repeat(50)}${"x".repeat(201)}` }))
-    .rejects.toThrow(/at most 200 characters/);
+  await expect(
+    session.listTools({ search: `${" ".repeat(50)}${"x".repeat(201)}` }),
+  ).rejects.toThrow(/at most 200 characters/);
   await expect(session.listTools({ search: `  ${"x".repeat(200)}  ` })).resolves.toEqual([]);
   expect(searches).toBe(1);
 });
 
 it("refuses ambiguous progressive list options", async () => {
-  const host = { serverName: "Jira", endpoint: "https://mcp.example.com", scope: {} } as unknown as McpSessionHost;
+  const host = {
+    serverName: "Jira",
+    endpoint: "https://mcp.example.com",
+    scope: {},
+  } as unknown as McpSessionHost;
   const session = new McpSessionBase(host, { authorizeObservation() {} } as never);
 
-  await expect(session.listTools({ name: "jira_search", search: "jira" } as never))
-    .rejects.toThrow(/exactly one/);
+  await expect(session.listTools({ name: "jira_search", search: "jira" } as never)).rejects.toThrow(
+    /exactly one/,
+  );
   await expect(session.listTools({} as never)).rejects.toThrow(/exactly one/);
 });
 
@@ -236,10 +264,10 @@ it("treats optional selectors set to undefined as absent", async () => {
   } as unknown as McpSessionHost;
   const session = new McpSessionBase(host, { authorizeObservation() {} } as never);
 
-  await expect(session.listTools({ search: "jira", name: undefined }))
-    .resolves.toHaveLength(1);
-  await expect(session.listTools({ name: "jira_search", search: undefined }))
-    .resolves.toHaveLength(1);
+  await expect(session.listTools({ search: "jira", name: undefined })).resolves.toHaveLength(1);
+  await expect(session.listTools({ name: "jira_search", search: undefined })).resolves.toHaveLength(
+    1,
+  );
 });
 
 it("refuses oversized tool names before consulting the host", async () => {
@@ -248,7 +276,10 @@ it("refuses oversized tool names before consulting the host", async () => {
     serverName: "Jira",
     endpoint: "https://mcp.example.com",
     scope: {},
-    findTool: async () => { finds++; return undefined; },
+    findTool: async () => {
+      finds++;
+      return undefined;
+    },
   } as unknown as McpSessionHost;
   const session = new McpSessionBase(host, { authorizeObservation() {} } as never);
   const oversized = "x".repeat(MAX_TOOL_NAME_CHARS + 1);

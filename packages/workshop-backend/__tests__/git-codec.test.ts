@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { deflate } from "pako";
 import {
   applyGitDelta,
@@ -31,7 +31,7 @@ import {
 } from "./git-cache-fixtures";
 
 function fixture(oid: string): PackableObject {
-  let object = FIXTURE_OBJECTS.find(o => o.oid === oid);
+  let object = FIXTURE_OBJECTS.find((o) => o.oid === oid);
   if (!object) throw new Error(`no fixture object ${oid}`);
   return { type: object.type, payload: b64Bytes(object.payload) };
 }
@@ -45,8 +45,9 @@ describe("loose object codec", () => {
 
   it("computes the well-known oid of a canonical blob", async () => {
     // `echo 'hello world' | git hash-object --stdin`
-    expect(await gitObjectOid("blob", new TextEncoder().encode("hello world\n")))
-        .toBe("3b18e512dba79e4c8300dd08aeb37f8e728b8dad");
+    expect(await gitObjectOid("blob", new TextEncoder().encode("hello world\n"))).toBe(
+      "3b18e512dba79e4c8300dd08aeb37f8e728b8dad",
+    );
   });
 
   it("round-trips every fixture object through encode/decode", () => {
@@ -59,21 +60,23 @@ describe("loose object codec", () => {
   });
 
   it("rejects garbage bytes", () => {
-    expect(() => decodeLooseObject(new Uint8Array([1, 2, 3, 4])))
-        .toThrow(/corrupt loose git object/);
+    expect(() => decodeLooseObject(new Uint8Array([1, 2, 3, 4]))).toThrow(
+      /corrupt loose git object/,
+    );
   });
 
   it("rejects a header whose size disagrees with the payload", () => {
     // Deflate the lying bytes directly (encodeLooseObject would write a correct header).
-    expect(() => decodeLooseObject(deflate(new TextEncoder().encode("blob 5\0abc"))))
-        .toThrow(/header size does not match payload/);
+    expect(() => decodeLooseObject(deflate(new TextEncoder().encode("blob 5\0abc")))).toThrow(
+      /header size does not match payload/,
+    );
   });
 });
 
 describe("tree parser", () => {
   it("parses all five entry modes from the real-git fixture tree", () => {
     let entries = parseGitTree(fixture(TREE_1).payload, TREE_1);
-    expect(entries.map(e => [e.name, e.mode])).toStrictEqual([
+    expect(entries.map((e) => [e.name, e.mode])).toStrictEqual([
       ["README.md", "100644"],
       ["docs", "40000"],
       ["link.md", "120000"],
@@ -81,13 +84,13 @@ describe("tree parser", () => {
       ["src", "40000"],
       ["vendored", "160000"],
     ]);
-    expect(entries.find(e => e.name === "vendored")!.oid).toBe(GITLINK_TARGET);
+    expect(entries.find((e) => e.name === "vendored")!.oid).toBe(GITLINK_TARGET);
   });
 
   it("decodes a non-ASCII UTF-8 entry name byte-identically", () => {
-    let docs = parseGitTree(fixture(TREE_1).payload, TREE_1).find(e => e.name === "docs")!;
+    let docs = parseGitTree(fixture(TREE_1).payload, TREE_1).find((e) => e.name === "docs")!;
     let entries = parseGitTree(fixture(docs.oid).payload, docs.oid);
-    expect(entries.map(e => e.name)).toStrictEqual(["naïve.md"]);
+    expect(entries.map((e) => e.name)).toStrictEqual(["naïve.md"]);
   });
 
   it("scans a tree with a non-UTF-8 entry name structurally", () => {
@@ -98,8 +101,9 @@ describe("tree parser", () => {
   });
 
   it("fails a strict parse of a non-UTF-8 entry name, naming the tree and the bytes", () => {
-    expect(() => parseGitTree(fixture(BAD_NAME_TREE).payload, BAD_NAME_TREE))
-        .toThrow(new RegExp(`${BAD_NAME_TREE}.*not valid UTF-8.*fffe2e747874`));
+    expect(() => parseGitTree(fixture(BAD_NAME_TREE).payload, BAD_NAME_TREE)).toThrow(
+      new RegExp(`${BAD_NAME_TREE}.*not valid UTF-8.*fffe2e747874`),
+    );
   });
 
   it("rejects an unsupported entry mode rather than misreading it", () => {
@@ -116,8 +120,9 @@ describe("commit parser", () => {
       tree: TREE_1,
       parents: [],
     });
-    expect(parseGitCommitRefs(fixture(COMMIT_3).payload, COMMIT_3).parents)
-        .toStrictEqual([COMMIT_2]);
+    expect(parseGitCommitRefs(fixture(COMMIT_3).payload, COMMIT_3).parents).toStrictEqual([
+      COMMIT_2,
+    ]);
   });
 
   it("skips multi-line gpgsig continuation lines", () => {
@@ -165,34 +170,39 @@ describe("pack decoding", () => {
 
   it("rejects a truncated pack", async () => {
     let pack = b64Bytes(PACK_NO_DELTA);
-    await expect(decodePackBytes(pack.subarray(0, pack.length - 40), { maxObjectSize: 1 << 26 }))
-        .rejects.toThrow(/invalid packfile/);
+    await expect(
+      decodePackBytes(pack.subarray(0, pack.length - 40), { maxObjectSize: 1 << 26 }),
+    ).rejects.toThrow(/invalid packfile/);
   });
 
   it("rejects a corrupted trailer", async () => {
     let pack = b64Bytes(PACK_NO_DELTA).slice();
     pack[pack.length - 1] ^= 0xff;
-    await expect(decodePackBytes(pack, { maxObjectSize: 1 << 26 }))
-        .rejects.toThrow(/trailer SHA-1 mismatch/);
+    await expect(decodePackBytes(pack, { maxObjectSize: 1 << 26 })).rejects.toThrow(
+      /trailer SHA-1 mismatch/,
+    );
   });
 
   it("rejects a pack declaring fewer objects than it carries (trailing garbage)", async () => {
     let pack = b64Bytes(PACK_NO_DELTA).slice();
     new DataView(pack.buffer).setUint32(8, PACKED_OIDS.length - 1);
-    await expect(decodePackBytes(pack, { maxObjectSize: 1 << 26 }))
-        .rejects.toThrow(/trailing garbage/);
+    await expect(decodePackBytes(pack, { maxObjectSize: 1 << 26 })).rejects.toThrow(
+      /trailing garbage/,
+    );
   });
 
   it("rejects a pack declaring more objects than it carries", async () => {
     let pack = b64Bytes(PACK_NO_DELTA).slice();
     new DataView(pack.buffer).setUint32(8, PACKED_OIDS.length + 1);
-    await expect(decodePackBytes(pack, { maxObjectSize: 1 << 26 }))
-        .rejects.toThrow(/invalid packfile/);
+    await expect(decodePackBytes(pack, { maxObjectSize: 1 << 26 })).rejects.toThrow(
+      /invalid packfile/,
+    );
   });
 
   it("enforces the object size cap while decoding", async () => {
-    await expect(decodePackBytes(b64Bytes(PACK_NO_DELTA), { maxObjectSize: 64 }))
-        .rejects.toThrow(/exceeds the 64-byte limit/);
+    await expect(decodePackBytes(b64Bytes(PACK_NO_DELTA), { maxObjectSize: 64 })).rejects.toThrow(
+      /exceeds the 64-byte limit/,
+    );
   });
 
   it("fails a ref-delta whose base is nowhere, and resolves it via resolveBase", async () => {
@@ -202,8 +212,8 @@ describe("pack decoding", () => {
     // Delta: baseSize, targetSize, then one copy op (offset byte + size byte) over the base.
     let delta = new Uint8Array([base.length, base.length, 0x91, 0, base.length]);
     let entryHeader = new Uint8Array([(7 << 4) | (delta.length & 0x0f)]);
-    expect(delta.length).toBeLessThan(16);  // single-byte size header
-    let oidBytes = Uint8Array.from(baseOid.match(/../g)!.map(h => parseInt(h, 16)));
+    expect(delta.length).toBeLessThan(16); // single-byte size header
+    let oidBytes = Uint8Array.from(baseOid.match(/../g)!.map((h) => parseInt(h, 16)));
     let header = new Uint8Array(12);
     header.set(new TextEncoder().encode("PACK"));
     new DataView(header.buffer).setUint32(4, 2);
@@ -212,12 +222,13 @@ describe("pack decoding", () => {
     let trailer = new Uint8Array(await crypto.subtle.digest("SHA-1", body));
     let pack = concatBytes([body, trailer]);
 
-    await expect(decodePackBytes(pack, { maxObjectSize: 1 << 20 }))
-        .rejects.toThrow(new RegExp(`delta base ${baseOid} is unavailable`));
+    await expect(decodePackBytes(pack, { maxObjectSize: 1 << 20 })).rejects.toThrow(
+      new RegExp(`delta base ${baseOid} is unavailable`),
+    );
 
     let objects = await decodePackBytes(pack, {
       maxObjectSize: 1 << 20,
-      resolveBase: oid => oid === baseOid ? { type: "blob", payload: base } : undefined,
+      resolveBase: (oid) => (oid === baseOid ? { type: "blob", payload: base } : undefined),
     });
     expect(objects).toHaveLength(1);
     expect(objects[0].type).toBe("blob");
@@ -250,11 +261,20 @@ describe("applyGitDelta", () => {
   it("applies copy and insert ops", () => {
     // target = base[4..9] ("quick") + " red " + base[10..15] ("brown")
     let delta = new Uint8Array([
-      BASE.length,        // base size
-      15,                 // target size
-      0x90 | 0x01, 4, 5,  // copy offset=4 size=5
-      5, 0x20, 0x72, 0x65, 0x64, 0x20,  // insert " red "
-      0x90 | 0x01, 10, 5, // copy offset=10 size=5
+      BASE.length, // base size
+      15, // target size
+      0x90 | 0x01,
+      4,
+      5, // copy offset=4 size=5
+      5,
+      0x20,
+      0x72,
+      0x65,
+      0x64,
+      0x20, // insert " red "
+      0x90 | 0x01,
+      10,
+      5, // copy offset=10 size=5
     ]);
     expect(new TextDecoder().decode(applyGitDelta(delta, BASE, 1024))).toBe("quick red brown");
   });

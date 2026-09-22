@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 /**
  * The suite that has to run in workerd, because what it covers -- the session-side git-cache
@@ -19,9 +19,7 @@ export default defineConfig({
         compatibilityDate: "2026-09-04",
         compatibilityFlags: ["allow_irrevocable_stub_storage", "nodejs_als"],
         // wrangler.jsonc's Text-module rules, which github.ts's .txt/.svg imports rely on.
-        modulesRules: [
-          { type: "Text", include: ["**/*.txt", "**/*.svg"] },
-        ],
+        modulesRules: [{ type: "Text", include: ["**/*.txt", "**/*.svg"] }],
         durableObjects: {
           USER_ACCOUNT: { className: "UserAccount", useSQLite: true },
           GITHUB_GATEKEEPER: { className: "GitHubGatekeeperImpl", useSQLite: true },
@@ -35,6 +33,11 @@ export default defineConfig({
     }),
   ],
   test: {
+    // Vitest v4 compatibility: preserve mock call history.
+    // Remove after tests no longer rely on calls from setup or earlier tests.
+    // https://release-v1-0-0-rc-0-viteplus-dev.voidzero-docs.workers.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
+    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+    clearMocks: false,
     include: ["__tests__/workerd/*.test.ts"],
     // Asserts the pool actually started, rather than trusting a green run to mean workerd.
     setupFiles: ["../../scripts/assert-workerd.ts"],

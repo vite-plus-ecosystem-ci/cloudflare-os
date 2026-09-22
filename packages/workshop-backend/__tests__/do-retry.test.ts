@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { isDoResetError, retryOnDoReset } from "../src/do-retry";
 import { createWorkshopLogger } from "../src/observability";
 
@@ -56,11 +56,12 @@ function failingThunk(errors: unknown[], value = "ok") {
 
 function recoveredEvents(spy: ReturnType<typeof vi.spyOn>): number {
   return spy.mock.calls.filter(
-      ([entry]) => (entry as { event?: unknown })?.event === "user_do.reset.recovered").length;
+    ([entry]) => (entry as { event?: unknown })?.event === "user_do.reset.recovered",
+  ).length;
 }
 
 function spies() {
-  vi.spyOn(Math, "random").mockReturnValue(0);  // pin the jitter to a zero wait
+  vi.spyOn(Math, "random").mockReturnValue(0); // pin the jitter to a zero wait
   return vi.spyOn(console, "info").mockImplementation(() => {});
 }
 
@@ -93,10 +94,12 @@ describe("retryOnDoReset", () => {
 
     const log = createWorkshopLogger("workshop.overseer").with({ gadgetId: "g1" });
     expect(await retryOnDoReset(thunk.call, log)).toBe("ok");
-    const recovered = info.mock.calls.map(([entry]) => entry as Record<string, unknown>)
-        .filter(entry => entry.event === "user_do.reset.recovered");
-    expect(recovered).toEqual(
-        [expect.objectContaining({ component: "workshop.overseer", gadgetId: "g1" })]);
+    const recovered = info.mock.calls
+      .map(([entry]) => entry as Record<string, unknown>)
+      .filter((entry) => entry.event === "user_do.reset.recovered");
+    expect(recovered).toEqual([
+      expect.objectContaining({ component: "workshop.overseer", gadgetId: "g1" }),
+    ]);
   });
 
   it("waits a jittered delay bounded by the retry window", async () => {
@@ -106,7 +109,7 @@ describe("retryOnDoReset", () => {
     const thunk = failingThunk([resetError(PRODUCTION_RESET)]);
 
     expect(await retryOnDoReset(thunk.call)).toBe("ok");
-    expect(wait).toHaveBeenCalledExactlyOnceWith(0.5 * 250);  // Math.random() * RETRY_JITTER_MS
+    expect(wait).toHaveBeenCalledExactlyOnceWith(0.5 * 250); // Math.random() * RETRY_JITTER_MS
   });
 
   it("retries a bare retryable rejection (connection lost)", async () => {
@@ -123,7 +126,7 @@ describe("retryOnDoReset", () => {
     const error = resetError({ retryable: true, overloaded: true });
     const thunk = failingThunk([error]);
 
-    await expect(retryOnDoReset(thunk.call)).rejects.toBe(error);  // identity, flags intact
+    await expect(retryOnDoReset(thunk.call)).rejects.toBe(error); // identity, flags intact
     expect(thunk.count()).toBe(1);
     expect(recoveredEvents(info)).toBe(0);
   });
@@ -160,8 +163,8 @@ describe("retryOnDoReset", () => {
     } catch (e) {
       caught = e;
     }
-    expect(caught).toBe(second);  // the retry's own rejection, not a re-wrap
-    expect(thunk.count()).toBe(2);  // single retry by construction
+    expect(caught).toBe(second); // the retry's own rejection, not a re-wrap
+    expect(thunk.count()).toBe(2); // single retry by construction
     // The frontend classifier reads the flags as own enumerable props; pin that they survive.
     expect({ ...(caught as object) }).toMatchObject(PRODUCTION_RESET);
     expect(recoveredEvents(info)).toBe(0);

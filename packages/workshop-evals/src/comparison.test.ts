@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { compareEvalResults, renderEvalComparison, validateEvalResults } from "./comparison.js";
 
 const MODEL = "@cf/deepseek-ai/deepseek-v4-pro-0813";
@@ -57,12 +57,15 @@ function trial(options: TrialOptions = {}) {
 }
 
 function report(
-    assertions: ReturnType<typeof trial>[],
-    ...emptyFiles: { name: string; message: string }[]): string {
-  return JSON.stringify({ testResults: [
-    { name: "/evals/project-doc.eval.ts", assertionResults: assertions },
-    ...emptyFiles.map(file => ({ ...file, assertionResults: [] })),
-  ] });
+  assertions: ReturnType<typeof trial>[],
+  ...emptyFiles: { name: string; message: string }[]
+): string {
+  return JSON.stringify({
+    testResults: [
+      { name: "/evals/project-doc.eval.ts", assertionResults: assertions },
+      ...emptyFiles.map((file) => ({ ...file, assertionResults: [] })),
+    ],
+  });
 }
 
 it("compares three-trial task cohorts", () => {
@@ -81,29 +84,31 @@ it("compares three-trial task cohorts", () => {
 
   expect(comparison.baselineSha).toBe(BASE_SHA);
   expect(comparison.candidateSha).toBe(HEAD_SHA);
-  expect(comparison.rows).toEqual([{
-    taskId: "project-doc",
-    model: MODEL,
-    reason: null,
-    baseline: {
-      trials: 3,
-      passed: 2,
-      meanDurationMs: 200,
-      meanModelTurns: 2,
-      meanToolCalls: 3,
-      meanToolErrors: 1 / 3,
-      meanCostUsd: (0.1 + 0.2 + 0.3) / 3,
+  expect(comparison.rows).toEqual([
+    {
+      taskId: "project-doc",
+      model: MODEL,
+      reason: null,
+      baseline: {
+        trials: 3,
+        passed: 2,
+        meanDurationMs: 200,
+        meanModelTurns: 2,
+        meanToolCalls: 3,
+        meanToolErrors: 1 / 3,
+        meanCostUsd: (0.1 + 0.2 + 0.3) / 3,
+      },
+      candidate: {
+        trials: 3,
+        passed: 3,
+        meanDurationMs: 300,
+        meanModelTurns: 2,
+        meanToolCalls: 3,
+        meanToolErrors: 0,
+        meanCostUsd: (0.2 + 0.3 + 0.4) / 3,
+      },
     },
-    candidate: {
-      trials: 3,
-      passed: 3,
-      meanDurationMs: 300,
-      meanModelTurns: 2,
-      meanToolCalls: 3,
-      meanToolErrors: 0,
-      meanCostUsd: (0.2 + 0.3 + 0.4) / 3,
-    },
-  }]);
+  ]);
   expect(renderEvalComparison(comparison)).toContain("+33.3 pp");
 });
 
@@ -128,28 +133,54 @@ it("separates infrastructure errors from failed agent outcomes", () => {
   ]);
   const baseline = report([trial(), trial(), trial()]);
   const candidateInfrastructure = report([
-    trial({ gitCommit: HEAD_SHA, status: "failed", errors: [{
-      name: "EvalRunError", message: "Verifier failed.",
-    }] }),
+    trial({
+      gitCommit: HEAD_SHA,
+      status: "failed",
+      errors: [
+        {
+          name: "EvalRunError",
+          message: "Verifier failed.",
+        },
+      ],
+    }),
     trial({ gitCommit: HEAD_SHA }),
     trial({ gitCommit: HEAD_SHA }),
   ]);
   const candidateAgentFailure = report([
-    trial({ gitCommit: HEAD_SHA, status: "failed", errors: [{
-      name: "AgentError", message: "Agent stopped.",
-    }] }),
-    trial({ gitCommit: HEAD_SHA, status: "failed", outcomeStatus: "timedOut", errors: [{
-      name: "AgentTimeout", message: "Agent timed out.",
-    }, {
-      name: "EvalRunError", message: "Agent timed out.",
-    }] }),
+    trial({
+      gitCommit: HEAD_SHA,
+      status: "failed",
+      errors: [
+        {
+          name: "AgentError",
+          message: "Agent stopped.",
+        },
+      ],
+    }),
+    trial({
+      gitCommit: HEAD_SHA,
+      status: "failed",
+      outcomeStatus: "timedOut",
+      errors: [
+        {
+          name: "AgentTimeout",
+          message: "Agent timed out.",
+        },
+        {
+          name: "EvalRunError",
+          message: "Agent timed out.",
+        },
+      ],
+    }),
     trial({ gitCommit: HEAD_SHA }),
   ]);
 
-  expect(compareEvalResults(baselineError, candidateAgentFailure).rows[0].reason)
-    .toBe("baseline run errors");
-  expect(compareEvalResults(baseline, candidateInfrastructure).rows[0].reason)
-    .toBe("candidate run errors");
+  expect(compareEvalResults(baselineError, candidateAgentFailure).rows[0].reason).toBe(
+    "baseline run errors",
+  );
+  expect(compareEvalResults(baseline, candidateInfrastructure).rows[0].reason).toBe(
+    "candidate run errors",
+  );
   expect(compareEvalResults(baseline, candidateAgentFailure).rows[0]).toMatchObject({
     reason: null,
     candidate: { trials: 3, passed: 1 },
@@ -163,17 +194,16 @@ it("does not compare changed tasks or unequal trial counts", () => {
     trial({ gitCommit: HEAD_SHA, taskVersion: "changed" }),
     trial({ gitCommit: HEAD_SHA, taskVersion: "changed" }),
   ]);
-  const shorter = report([
-    trial({ gitCommit: HEAD_SHA }),
-    trial({ gitCommit: HEAD_SHA }),
-  ]);
+  const shorter = report([trial({ gitCommit: HEAD_SHA }), trial({ gitCommit: HEAD_SHA })]);
 
   expect(compareEvalResults(baseline, changed).rows[0].reason).toBe("task version changed");
   const asked: string[][] = [];
-  expect(compareEvalResults(baseline, changed, (...shas) => {
-    asked.push(shas);
-    return true;
-  }).rows[0].reason).toBe("eval definition changed");
+  expect(
+    compareEvalResults(baseline, changed, (...shas) => {
+      asked.push(shas);
+      return true;
+    }).rows[0].reason,
+  ).toBe("eval definition changed");
   expect(asked).toEqual([[BASE_SHA, HEAD_SHA]]);
   expect(compareEvalResults(baseline, shorter).rows[0].reason).toBe("trial counts differ");
 });
@@ -191,21 +221,23 @@ it("accepts a complete baseline with agent failures but not infrastructure failu
     trial({ status: "failed", errors: [{ name: "EvalRunError", message: "Verifier failed." }] }),
   ]);
   const mixedCommits = report([trial(), trial({ gitCommit: HEAD_SHA })]);
-  const uncollected = report(
-    [trial(), trial()],
-    { name: "/evals/appointment-desk.eval.ts", message: "Cannot find module './verifier.js'" });
+  const uncollected = report([trial(), trial()], {
+    name: "/evals/appointment-desk.eval.ts",
+    message: "Cannot find module './verifier.js'",
+  });
 
   expect(() => validateEvalResults(complete, 2)).not.toThrow();
   expect(() => validateEvalResults(short, 2)).toThrow("expense-ledger on");
   expect(() => validateEvalResults(infrastructure, 2)).toThrow("infrastructure failures");
   expect(() => validateEvalResults(mixedCommits, 2)).toThrow("inconsistent commits");
-  expect(() => validateEvalResults(uncollected, 2))
-    .toThrow("appointment-desk.eval.ts ran no trials: Cannot find module");
+  expect(() => validateEvalResults(uncollected, 2)).toThrow(
+    "appointment-desk.eval.ts ran no trials: Cannot find module",
+  );
 });
 
 it("rejects malformed reports", () => {
-  expect(() => compareEvalResults("not json", report([trial()])))
-    .toThrow("baseline results are not valid JSON");
-  expect(() => compareEvalResults("{}", report([trial()])))
-    .toThrow("baseline results are invalid");
+  expect(() => compareEvalResults("not json", report([trial()]))).toThrow(
+    "baseline results are not valid JSON",
+  );
+  expect(() => compareEvalResults("{}", report([trial()]))).toThrow("baseline results are invalid");
 });
