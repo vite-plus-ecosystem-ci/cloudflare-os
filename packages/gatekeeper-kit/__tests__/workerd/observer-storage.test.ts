@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 // Exercise verifier-stub persistence, which the cloning Node fake cannot represent.
 function host(name: string) {
@@ -43,7 +43,8 @@ describe("tracked observers over real Durable Object storage", () => {
 
     // The fence is a durable marker under the binding's own storage, so it reaches a second
     // tracker built over the same `ctx.storage.kv` -- and would reach a later activation too.
-    expect(await tracker.admitDuringWithheldRead("mallory", { allowed: [] }))
-      .toMatch(/can no longer be observed/);
+    expect(await tracker.admitDuringWithheldRead("mallory", { allowed: [] })).toMatch(
+      /can no longer be observed/,
+    );
   });
 });

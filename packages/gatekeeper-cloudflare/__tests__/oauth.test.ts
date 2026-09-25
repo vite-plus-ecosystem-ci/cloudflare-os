@@ -1,5 +1,5 @@
 import { OAuthResponseError } from "@gadgets/gatekeeper-kit/oauth-client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   buildAuthorizeUrl,
   exchangeCode,
@@ -22,10 +22,13 @@ const config: CloudflareOAuthConfig = {
 /** Captures each token request, so the tests can assert on how the code is redeemed. */
 function captureRedeem(payload: Record<string, unknown>) {
   const calls: Array<{ url: string; init: RequestInit }> = [];
-  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-    calls.push({ url: String(input), init: init ?? {} });
-    return Response.json(payload);
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(input), init: init ?? {} });
+      return Response.json(payload);
+    }),
+  );
   return calls;
 }
 
@@ -97,7 +100,10 @@ describe("Cloudflare OAuth", () => {
   });
 
   it("rejects a refused redemption", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 401 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("nope", { status: 401 })),
+    );
 
     const error = await rejection(exchangeCode(config, "code", "verifier"));
 
@@ -123,7 +129,9 @@ describe("Cloudflare OAuth", () => {
     expect(challenge).toMatch(/^[\w-]+$/);
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
     const expected = btoa(String.fromCharCode(...new Uint8Array(digest)))
-      .replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+      .replaceAll("+", "-")
+      .replaceAll("/", "_")
+      .replace(/=+$/, "");
     expect(challenge).toBe(expected);
   });
 
@@ -159,26 +167,57 @@ describe("isGrantDeath", () => {
   it.each<[string, boolean, () => Response]>([
     ["invalid_grant", true, () => Response.json({ error: "invalid_grant" }, { status: 400 })],
     ["a 200 invalid_grant", true, () => Response.json({ error: "invalid_grant" })],
-    ["another OAuth error", true, () => Response.json({ error: "invalid_request" }, { status: 400 })],
+    [
+      "another OAuth error",
+      true,
+      () => Response.json({ error: "invalid_request" }, { status: 400 }),
+    ],
     ["invalid_client", false, () => Response.json({ error: "invalid_client" }, { status: 401 })],
     ["a bare 400", false, () => new Response("nope", { status: 400 })],
-    ["a WAF challenge", false, () => new Response("<html></html>", {
-      status: 403, headers: { "Content-Type": "text/html" },
-    })],
+    [
+      "a WAF challenge",
+      false,
+      () =>
+        new Response("<html></html>", {
+          status: 403,
+          headers: { "Content-Type": "text/html" },
+        }),
+    ],
     ["a 503", false, () => new Response("unavailable", { status: 503 })],
-    ["a 429 invalid_grant", false, () => Response.json({ error: "invalid_grant" }, { status: 429 })],
-    ["a redirect", false, () => new Response(null, {
-      status: 307, headers: { Location: "https://elsewhere.example/token" },
-    })],
+    [
+      "a 429 invalid_grant",
+      false,
+      () => Response.json({ error: "invalid_grant" }, { status: 429 }),
+    ],
+    [
+      "a redirect",
+      false,
+      () =>
+        new Response(null, {
+          status: 307,
+          headers: { Location: "https://elsewhere.example/token" },
+        }),
+    ],
     ["a malformed success", false, () => Response.json({})],
-    ["a network error", false, () => {
-      throw new TypeError("fetch failed");
-    }],
-    ["a timeout", false, () => {
-      throw new DOMException("The operation timed out.", "TimeoutError");
-    }],
+    [
+      "a network error",
+      false,
+      () => {
+        throw new TypeError("fetch failed");
+      },
+    ],
+    [
+      "a timeout",
+      false,
+      () => {
+        throw new DOMException("The operation timed out.", "TimeoutError");
+      },
+    ],
   ])("treats %s as grant death: %s", async (_, dead, respond) => {
-    vi.stubGlobal("fetch", vi.fn(async () => respond()));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => respond()),
+    );
 
     expect(isGrantDeath(await rejection(refreshTokens(config, "refresh")))).toBe(dead);
   });

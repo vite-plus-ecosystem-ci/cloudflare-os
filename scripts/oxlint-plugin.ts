@@ -1,4 +1,4 @@
-import type { Comment, Diagnostic, ESTree, Plugin, Rule } from "@oxlint/plugins";
+import type { Comment, Diagnostic, ESTree, Plugin, Rule } from "vite-plus/lint/plugins";
 
 const preferJsdoc: Rule = {
   meta: {
@@ -42,22 +42,29 @@ const preferJsdoc: Rule = {
     function checkComments(node: ESTree.Node) {
       const comments = sourceCode.getCommentsBefore(node);
       const lastComment = comments.at(-1);
-      if (!lastComment || lastComment.loc.end.line + 1 !== node.loc.start.line ||
-          !startsOnOwnLine(lastComment)) return;
+      if (
+        !lastComment ||
+        lastComment.loc.end.line + 1 !== node.loc.start.line ||
+        !startsOnOwnLine(lastComment)
+      )
+        return;
 
       if (lastComment.type === "Block") {
         const text = sourceCode.getText(lastComment);
-        if (text.startsWith("/**") || text.startsWith("/*!") ||
-            /^(?:[#@]__(?:NO_SIDE_EFFECTS|PURE)__|@ts-|c8 |eslint-|istanbul |oxlint-|prettier-|biome-)/i
-              .test(lastComment.value.trimStart())) return;
+        if (
+          text.startsWith("/**") ||
+          text.startsWith("/*!") ||
+          /^(?:[#@]__(?:NO_SIDE_EFFECTS|PURE)__|@ts-|c8 |eslint-|istanbul |oxlint-|prettier-|biome-)/i.test(
+            lastComment.value.trimStart(),
+          )
+        )
+          return;
         context.report({
           node,
           loc: lastComment.loc,
           messageId: "useJsdoc",
-          fix: (fixer) => fixer.replaceTextRange(
-            [lastComment.range[0], lastComment.range[0] + 2],
-            "/**",
-          ),
+          fix: (fixer) =>
+            fixer.replaceTextRange([lastComment.range[0], lastComment.range[0] + 2], "/**"),
         });
         return;
       }
@@ -67,25 +74,32 @@ const preferJsdoc: Rule = {
       while (firstIndex > 0) {
         const previous = comments[firstIndex - 1];
         const current = comments[firstIndex];
-        if (previous.type !== "Line" ||
-            previous.loc.end.line + 1 !== current.loc.start.line) break;
+        if (previous.type !== "Line" || previous.loc.end.line + 1 !== current.loc.start.line) break;
         firstIndex--;
       }
 
       const docComments = comments.slice(firstIndex);
       if (docComments.some((comment) => !startsOnOwnLine(comment))) return;
 
-      if (docComments.some((comment) =>
-        sourceCode.getText(comment).startsWith("///") ||
-        /^(?:@ts-|c8 |eslint-|istanbul |oxlint-|prettier-|biome-)/i
-          .test(comment.value.trimStart()))) return;
+      if (
+        docComments.some(
+          (comment) =>
+            sourceCode.getText(comment).startsWith("///") ||
+            /^(?:@ts-|c8 |eslint-|istanbul |oxlint-|prettier-|biome-)/i.test(
+              comment.value.trimStart(),
+            ),
+        )
+      )
+        return;
 
       const firstComment = docComments[0];
       const indent = " ".repeat(firstComment.loc.start.column);
-      const replacement = docComments.length === 1
-        ? `/**${firstComment.value.trimEnd()} */`
-        : `/**\n${docComments.map((comment) =>
-          `${indent} *${comment.value.trimEnd()}`).join("\n")}\n${indent} */`;
+      const replacement =
+        docComments.length === 1
+          ? `/**${firstComment.value.trimEnd()} */`
+          : `/**\n${docComments
+              .map((comment) => `${indent} *${comment.value.trimEnd()}`)
+              .join("\n")}\n${indent} */`;
 
       const report: Diagnostic = {
         node,
@@ -96,10 +110,8 @@ const preferJsdoc: Rule = {
         messageId: "useJsdoc",
       };
       if (!docComments.some((comment) => comment.value.includes("*/"))) {
-        report.fix = (fixer) => fixer.replaceTextRange(
-          [firstComment.range[0], lastComment.range[1]],
-          replacement,
-        );
+        report.fix = (fixer) =>
+          fixer.replaceTextRange([firstComment.range[0], lastComment.range[1]], replacement);
       }
       context.report(report);
     }
@@ -109,8 +121,10 @@ const preferJsdoc: Rule = {
     }
 
     function isPrivateMember(node: ESTree.Node) {
-      return ("accessibility" in node && node.accessibility === "private") ||
-        ("key" in node && node.key?.type === "PrivateIdentifier");
+      return (
+        ("accessibility" in node && node.accessibility === "private") ||
+        ("key" in node && node.key?.type === "PrivateIdentifier")
+      );
     }
 
     function isExportedApiMember(node: ESTree.Node) {
@@ -119,13 +133,22 @@ const preferJsdoc: Rule = {
       let root: ESTree.Node | null = node.parent;
       while (root) {
         if (classMemberTypes.has(root.type) && isPrivateMember(root)) return false;
-        if ((root.type === "FunctionDeclaration" || root.type === "FunctionExpression" ||
-            root.type === "ArrowFunctionExpression") && root.body &&
-            node.range[0] >= root.body.range[0] && node.range[1] <= root.body.range[1]) {
+        if (
+          (root.type === "FunctionDeclaration" ||
+            root.type === "FunctionExpression" ||
+            root.type === "ArrowFunctionExpression") &&
+          root.body &&
+          node.range[0] >= root.body.range[0] &&
+          node.range[1] <= root.body.range[1]
+        ) {
           return false;
         }
-        if ((root.type === "PropertyDefinition" || root.type === "AccessorProperty") && root.value &&
-            node.range[0] >= root.value.range[0] && node.range[1] <= root.value.range[1]) {
+        if (
+          (root.type === "PropertyDefinition" || root.type === "AccessorProperty") &&
+          root.value &&
+          node.range[0] >= root.value.range[0] &&
+          node.range[1] <= root.value.range[1]
+        ) {
           return false;
         }
         if (root.type === "StaticBlock") return false;
@@ -138,8 +161,11 @@ const preferJsdoc: Rule = {
       while (parent?.type === "VariableDeclarator" || parent?.type === "VariableDeclaration") {
         parent = parent.parent;
       }
-      return (parent?.type === "ExportDefaultDeclaration" ||
-          parent?.type === "ExportNamedDeclaration") && parent.declaration !== null;
+      return (
+        (parent?.type === "ExportDefaultDeclaration" ||
+          parent?.type === "ExportNamedDeclaration") &&
+        parent.declaration !== null
+      );
     }
 
     function checkApiMember(node: ESTree.Node) {

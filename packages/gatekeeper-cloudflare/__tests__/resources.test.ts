@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   ACCOUNT_OBSERVABILITY_RESOURCE,
   WORKER_OBSERVABILITY_RESOURCE,
@@ -33,25 +33,31 @@ describe("Cloudflare observability resources", () => {
   });
 
   it("accepts harmless dashboard state and a trailing slash", () => {
-    expect(parseObservabilityResourceUrl(
-      `${accountObservabilityUrl(ACCOUNT_ID)}/?time-window=1h#logs`,
-    )).toEqual({ accountId: ACCOUNT_ID });
+    expect(
+      parseObservabilityResourceUrl(`${accountObservabilityUrl(ACCOUNT_ID)}/?time-window=1h#logs`),
+    ).toEqual({ accountId: ACCOUNT_ID });
   });
 
   it("rejects lookalike dashboard URLs", () => {
-    expect(() => parseObservabilityResourceUrl(
-      "https://example.com/account-id/workers-and-pages/observability",
-    )).toThrow("Unsupported Cloudflare observability URL");
-    expect(() => parseObservabilityResourceUrl(
-      "https://dash.cloudflare.com/account-id/workers/services/view/api/production/metrics",
-    )).toThrow("Unsupported Cloudflare observability URL");
+    expect(() =>
+      parseObservabilityResourceUrl(
+        "https://example.com/account-id/workers-and-pages/observability",
+      ),
+    ).toThrow("Unsupported Cloudflare observability URL");
+    expect(() =>
+      parseObservabilityResourceUrl(
+        "https://dash.cloudflare.com/account-id/workers/services/view/api/production/metrics",
+      ),
+    ).toThrow("Unsupported Cloudflare observability URL");
   });
 
   it("rejects malformed account IDs and URL encoding", () => {
     expect(() => accountObservabilityUrl("account-id")).toThrow("account ID");
-    expect(() => parseObservabilityResourceUrl(
-      "https://dash.cloudflare.com/%EA/workers-and-pages/observability",
-    )).toThrow("Unsupported Cloudflare observability URL");
+    expect(() =>
+      parseObservabilityResourceUrl(
+        "https://dash.cloudflare.com/%EA/workers-and-pages/observability",
+      ),
+    ).toThrow("Unsupported Cloudflare observability URL");
   });
 });
 
@@ -66,10 +72,12 @@ describe("Cloudflare observability OAuth scopes", () => {
   });
 
   it("requests observability for either binding granularity", () => {
-    expect(observabilityScopesForResources([ACCOUNT_OBSERVABILITY_RESOURCE.urlPattern]))
-      .toContain("workers-observability.read");
-    expect(observabilityScopesForResources([WORKER_OBSERVABILITY_RESOURCE.urlPattern]))
-      .toContain("workers-observability.read");
+    expect(observabilityScopesForResources([ACCOUNT_OBSERVABILITY_RESOURCE.urlPattern])).toContain(
+      "workers-observability.read",
+    );
+    expect(observabilityScopesForResources([WORKER_OBSERVABILITY_RESOURCE.urlPattern])).toContain(
+      "workers-observability.read",
+    );
   });
 
   it("treats an omitted resource list as all supported resources", () => {
@@ -77,16 +85,16 @@ describe("Cloudflare observability OAuth scopes", () => {
   });
 
   it("rejects unknown resource patterns", () => {
-    expect(() => observabilityScopesForResources(["https://example.com/*"]))
-      .toThrow("Unsupported Cloudflare resource type");
+    expect(() => observabilityScopesForResources(["https://example.com/*"])).toThrow(
+      "Unsupported Cloudflare resource type",
+    );
   });
 
   it("maps the shared OAuth permission back to both resource types", () => {
-    expect(grantedObservabilityResourcePatterns(["workers-observability.read"]))
-      .toEqual([
-        ACCOUNT_OBSERVABILITY_RESOURCE.urlPattern,
-        WORKER_OBSERVABILITY_RESOURCE.urlPattern,
-      ]);
+    expect(grantedObservabilityResourcePatterns(["workers-observability.read"])).toEqual([
+      ACCOUNT_OBSERVABILITY_RESOURCE.urlPattern,
+      WORKER_OBSERVABILITY_RESOURCE.urlPattern,
+    ]);
     expect(grantedObservabilityResourcePatterns([])).toEqual([]);
   });
 });

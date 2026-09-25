@@ -1,13 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  GitHubApi,
-  revokeOAuthToken,
-  type GitHubIssueResponse,
-} from "../src/github-api";
-import {
-  assertIssueSearchResultsInRepo,
-  buildIssueSearchQuery,
-} from "../src/github-search";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { GitHubApi, revokeOAuthToken, type GitHubIssueResponse } from "../src/github-api";
+import { assertIssueSearchResultsInRepo, buildIssueSearchQuery } from "../src/github-search";
 
 function issueAt(htmlUrl: string): Pick<GitHubIssueResponse, "html_url"> {
   return { html_url: htmlUrl };
@@ -19,78 +12,97 @@ afterEach(() => {
 
 describe("assertIssueSearchResultsInRepo", () => {
   it("accepts exact repository path segments case-insensitively", () => {
-    expect(() => assertIssueSearchResultsInRepo("Cloudflare", "Workerd", [
-      issueAt("https://github.com/cloudflare/workerd/issues/1"),
-    ])).not.toThrow();
+    expect(() =>
+      assertIssueSearchResultsInRepo("Cloudflare", "Workerd", [
+        issueAt("https://github.com/cloudflare/workerd/issues/1"),
+      ]),
+    ).not.toThrow();
   });
 
   it("rejects results from another repository", () => {
-    expect(() => assertIssueSearchResultsInRepo("cloudflare", "workerd", [
-      issueAt("https://github.com/cloudflare/quiche/issues/1"),
-    ])).toThrow("outside the connected repository");
+    expect(() =>
+      assertIssueSearchResultsInRepo("cloudflare", "workerd", [
+        issueAt("https://github.com/cloudflare/quiche/issues/1"),
+      ]),
+    ).toThrow("outside the connected repository");
   });
 
   it("does not accept repository names that only share a prefix", () => {
-    expect(() => assertIssueSearchResultsInRepo("cloudflare", "workerd", [
-      issueAt("https://github.com/cloudflare/workerd-private/issues/1"),
-    ])).toThrow("outside the connected repository");
+    expect(() =>
+      assertIssueSearchResultsInRepo("cloudflare", "workerd", [
+        issueAt("https://github.com/cloudflare/workerd-private/issues/1"),
+      ]),
+    ).toThrow("outside the connected repository");
   });
 
   it("rejects pull requests returned by an injected search expression", () => {
-    expect(() => assertIssueSearchResultsInRepo("cloudflare", "workerd", [
-      issueAt("https://github.com/cloudflare/workerd/pull/1"),
-    ])).toThrow("non-issue result");
+    expect(() =>
+      assertIssueSearchResultsInRepo("cloudflare", "workerd", [
+        issueAt("https://github.com/cloudflare/workerd/pull/1"),
+      ]),
+    ).toThrow("non-issue result");
   });
 
   it("rejects malformed and non-GitHub result URLs", () => {
-    expect(() => assertIssueSearchResultsInRepo("cloudflare", "workerd", [
-      issueAt("not a URL"),
-    ])).toThrow("outside the connected repository");
-    expect(() => assertIssueSearchResultsInRepo("cloudflare", "workerd", [
-      issueAt("https://example.com/cloudflare/workerd/issues/1"),
-    ])).toThrow("outside the connected repository");
+    expect(() =>
+      assertIssueSearchResultsInRepo("cloudflare", "workerd", [issueAt("not a URL")]),
+    ).toThrow("outside the connected repository");
+    expect(() =>
+      assertIssueSearchResultsInRepo("cloudflare", "workerd", [
+        issueAt("https://example.com/cloudflare/workerd/issues/1"),
+      ]),
+    ).toThrow("outside the connected repository");
   });
 });
 
 describe("buildIssueSearchQuery", () => {
   it("builds a benign literal phrase search with structured filters", () => {
-    expect(buildIssueSearchQuery("cloudflare", "workerd", {
-      text: "durable objects",
-      state: "open",
-      labels: ["bug"],
-      author: "jasnell",
-    })).toBe(
+    expect(
+      buildIssueSearchQuery("cloudflare", "workerd", {
+        text: "durable objects",
+        state: "open",
+        labels: ["bug"],
+        author: "jasnell",
+      }),
+    ).toBe(
       '"durable objects" repo:cloudflare/workerd is:issue state:open label:"bug" author:"jasnell"',
     );
   });
 
   it("quotes every caller-controlled query fragment", () => {
-    expect(buildIssueSearchQuery("cloudflare", "workerd", {
-      text: "repo:cloudflare/quiche OR scheduler",
-      author: "jasnell OR repo:cloudflare/quiche",
-      assignee: "octocat OR repo:cloudflare/quiche",
-    })).toBe(
-      '"repo:cloudflare/quiche OR scheduler" repo:cloudflare/workerd is:issue '
-      + 'author:"jasnell OR repo:cloudflare/quiche" assignee:"octocat OR repo:cloudflare/quiche"',
+    expect(
+      buildIssueSearchQuery("cloudflare", "workerd", {
+        text: "repo:cloudflare/quiche OR scheduler",
+        author: "jasnell OR repo:cloudflare/quiche",
+        assignee: "octocat OR repo:cloudflare/quiche",
+      }),
+    ).toBe(
+      '"repo:cloudflare/quiche OR scheduler" repo:cloudflare/workerd is:issue ' +
+        'author:"jasnell OR repo:cloudflare/quiche" assignee:"octocat OR repo:cloudflare/quiche"',
     );
   });
 
   it("escapes quotes inside plain search text", () => {
-    expect(buildIssueSearchQuery("cloudflare", "workerd", {
-      text: 'bug" OR repo:cloudflare/quiche OR "',
-    })).toBe('"bug\\" OR repo:cloudflare/quiche OR \\"" repo:cloudflare/workerd is:issue');
+    expect(
+      buildIssueSearchQuery("cloudflare", "workerd", {
+        text: 'bug" OR repo:cloudflare/quiche OR "',
+      }),
+    ).toBe('"bug\\" OR repo:cloudflare/quiche OR \\"" repo:cloudflare/workerd is:issue');
   });
 });
 
 describe("GitHubApi.searchIssuesConditional", () => {
   it("enables GitHub advanced search parsing", async () => {
     let requestUrl: URL | undefined;
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-      requestUrl = new URL(String(input));
-      return new Response(JSON.stringify({ items: [] }), {
-        headers: { "content-type": "application/json" },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        requestUrl = new URL(String(input));
+        return new Response(JSON.stringify({ items: [] }), {
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
 
     const api = new GitHubApi(async () => "test-token");
     await api.searchIssuesConditional(
@@ -105,12 +117,15 @@ describe("GitHubApi.searchIssuesConditional", () => {
 
 function captureRequests(body: unknown = []): () => URL {
   let requestUrl: URL | undefined;
-  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-    requestUrl = new URL(String(input));
-    return new Response(JSON.stringify(body), {
-      headers: { "content-type": "application/json" },
-    });
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      requestUrl = new URL(String(input));
+      return new Response(JSON.stringify(body), {
+        headers: { "content-type": "application/json" },
+      });
+    }),
+  );
   return () => {
     if (!requestUrl) throw new Error("no request was made");
     return requestUrl;
@@ -127,13 +142,18 @@ describe("GitHubApi git reads", () => {
 
   it("requests the bare sha media type from the commit sha lookup", async () => {
     let accept: string | null = null;
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      accept = new Headers(init?.headers).get("Accept");
-      expect(new URL(String(input)).pathname).toBe("/repos/cloudflare/workerd/commits/feature%2Fthing");
-      return new Response("a".repeat(40), {
-        headers: { "content-type": "application/vnd.github.sha" },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        accept = new Headers(init?.headers).get("Accept");
+        expect(new URL(String(input)).pathname).toBe(
+          "/repos/cloudflare/workerd/commits/feature%2Fthing",
+        );
+        return new Response("a".repeat(40), {
+          headers: { "content-type": "application/vnd.github.sha" },
+        });
+      }),
+    );
 
     const api = new GitHubApi(async () => "test-token");
     const result = await api.getCommitShaConditional("cloudflare", "workerd", "feature/thing");
@@ -184,7 +204,11 @@ describe("GitHubApi git reads", () => {
   it("passes the protected filter to the branch list endpoint, omitting it when unset", async () => {
     const url = captureRequests();
     const api = new GitHubApi(async () => "test-token");
-    await api.listBranchesConditional("cloudflare", "workerd", { protected: true, per_page: 100, page: 1 });
+    await api.listBranchesConditional("cloudflare", "workerd", {
+      protected: true,
+      per_page: 100,
+      page: 1,
+    });
     expect(url().pathname).toBe("/repos/cloudflare/workerd/branches");
     expect(url().searchParams.get("protected")).toBe("true");
 
@@ -207,18 +231,22 @@ describe("revokeOAuthToken", () => {
     // working connection down with the duplicate or abandoned one being dropped.
     let requestUrl: URL | undefined;
     let init: RequestInit | undefined;
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, options?: RequestInit) => {
-      requestUrl = new URL(String(input));
-      init = options;
-      return new Response(null, { status: 204 });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, options?: RequestInit) => {
+        requestUrl = new URL(String(input));
+        init = options;
+        return new Response(null, { status: 204 });
+      }),
+    );
 
     await revokeOAuthToken("gho_token", "client/id", "client-secret");
 
     expect(init?.method).toBe("DELETE");
     expect(requestUrl?.pathname).toBe("/applications/client%2Fid/token");
     expect(JSON.parse(String(init?.body))).toEqual({ access_token: "gho_token" });
-    expect(new Headers(init?.headers).get("Authorization"))
-      .toBe(`Basic ${btoa("client/id:client-secret")}`);
+    expect(new Headers(init?.headers).get("Authorization")).toBe(
+      `Basic ${btoa("client/id:client-secret")}`,
+    );
   });
 });

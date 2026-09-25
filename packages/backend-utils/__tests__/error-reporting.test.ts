@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
   reportIssue,
@@ -64,7 +64,9 @@ describe("reportIssue", () => {
 
     expect(event?.correlation).toEqual({ requestId: "req-1" });
     expect(event?.http).toEqual({
-      kind: "server", routeTemplate: "/a/:id", responseStatusCode: 0,
+      kind: "server",
+      routeTemplate: "/a/:id",
+      responseStatusCode: 0,
     });
   });
 
@@ -89,7 +91,9 @@ describe("reportIssue", () => {
     await reporter.clear();
     const attributes: Record<string, unknown> = Object.fromEntries([["__proto__", "safe"]]);
     Object.defineProperty(attributes, "getter", {
-      get() { throw new Error("getter invoked"); },
+      get() {
+        throw new Error("getter invoked");
+      },
       enumerable: true,
     });
     attributes.nested = { secret: "do not traverse" };
@@ -129,8 +133,9 @@ describe("reportIssue", () => {
     expect(() => reportIssue("reporter-failure", new Error("boom"))).not.toThrow();
 
     await vi.waitFor(() => expect(debugSpy).toHaveBeenCalled());
-    expect(debugSpy.mock.calls.map(([entry]) => entry?.event))
-      .toContain("error_report.dispatch.failed");
+    expect(debugSpy.mock.calls.map(([entry]) => entry?.event)).toContain(
+      "error_report.dispatch.failed",
+    );
   });
 
   it("is a silent no-op when ERROR_REPORTER is unbound", () => {
