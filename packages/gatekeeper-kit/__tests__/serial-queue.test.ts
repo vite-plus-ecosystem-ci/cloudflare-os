@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { SerialTaskQueue } from "../src/serial-queue";
 
 describe("SerialTaskQueue", () => {
@@ -11,7 +11,9 @@ describe("SerialTaskQueue", () => {
       await slow.promise;
       order.push("first");
     });
-    const failing = queue.run(async () => { throw new Error("boom"); });
+    const failing = queue.run(async () => {
+      throw new Error("boom");
+    });
     const last = queue.run(async () => void order.push("last"));
 
     expect(order).toEqual([]);

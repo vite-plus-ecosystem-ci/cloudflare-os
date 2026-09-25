@@ -13,9 +13,8 @@
 
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import { env, runInDurableObject } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ActionDescription, GitObjectType, GitOid }
-  from "@gadgets/workshop-shared/gatekeeper";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import type { ActionDescription, GitObjectType, GitOid } from "@gadgets/workshop-shared/gatekeeper";
 import { FLUSH_PKT, ZERO_OID, encodePktLine, pktText } from "../../src/git-transport";
 import type { GatekeeperProps, Outcome, PushActionData } from "./worker";
 
@@ -25,23 +24,25 @@ const API_BASE = `https://api.github.com/repos/${OWNER}/${REPO}`;
 const RECEIVE_PACK_URL = `https://github.com/${OWNER}/${REPO}.git/git-receive-pack`;
 
 /** Deterministic fake full commit ids. */
-const BASE = "a".repeat(40);   // the branch head the work was based on
-const HEAD1 = "b".repeat(40);  // first agent-authored commit
-const HEAD2 = "c".repeat(40);  // second agent-authored commit, child of HEAD1
-const OTHER = "d".repeat(40);  // an unrelated head the remote may move to
+const BASE = "a".repeat(40); // the branch head the work was based on
+const HEAD1 = "b".repeat(40); // first agent-authored commit
+const HEAD2 = "c".repeat(40); // second agent-authored commit, child of HEAD1
+const OTHER = "d".repeat(40); // an unrelated head the remote may move to
 const TREE = "e".repeat(40);
 
 const PACK_BYTES = new TextEncoder().encode("PACK-STAND-IN");
 
 function commitPayload(parents: string[], message: string): Uint8Array {
-  return new TextEncoder().encode([
-    `tree ${TREE}`,
-    ...parents.map(parent => `parent ${parent}`),
-    "author Ada Lovelace <ada@example.com> 1700000000 +0000",
-    "committer Ada Lovelace <ada@example.com> 1700000100 +0000",
-    "",
-    `${message}\n`,
-  ].join("\n"));
+  return new TextEncoder().encode(
+    [
+      `tree ${TREE}`,
+      ...parents.map((parent) => `parent ${parent}`),
+      "author Ada Lovelace <ada@example.com> 1700000000 +0000",
+      "committer Ada Lovelace <ada@example.com> 1700000100 +0000",
+      "",
+      `${message}\n`,
+    ].join("\n"),
+  );
 }
 
 /**
@@ -68,12 +69,13 @@ class TestGitCache extends RpcTarget {
   async isAncestor(ancestor: GitOid, descendant: GitOid): Promise<boolean> {
     if (!this.commits.has(descendant)) {
       throw new Error(
-        `Cannot check ancestry: ${descendant} is not a commit in the workspace's git cache.`);
+        `Cannot check ancestry: ${descendant} is not a commit in the workspace's git cache.`,
+      );
     }
     return ancestor === descendant || this.ancestries.has(`${ancestor}:${descendant}`);
   }
 
-  async get(id: GitOid): Promise<{ type: GitObjectType, content: Uint8Array } | null> {
+  async get(id: GitOid): Promise<{ type: GitObjectType; content: Uint8Array } | null> {
     const payload = this.commits.get(id);
     return payload === undefined ? null : { type: "commit", content: payload };
   }
@@ -98,8 +100,8 @@ type ReceivePackExchange = { body: Uint8Array };
  * suite -- runner, hook DO, and facets -- shares one isolate.
  */
 class FakeGitHub {
-  readonly branches = new Map<string, string>();  // branch name → head commit id
-  readonly restCommits = new Map<string, { sha: string, message: string }>();  // ref → commit
+  readonly branches = new Map<string, string>(); // branch name → head commit id
+  readonly restCommits = new Map<string, { sha: string; message: string }>(); // ref → commit
   readonly receivePackExchanges: ReceivePackExchange[] = [];
   readonly receivePackResponses: Uint8Array[] = [];
   defaultBranch = "main";
@@ -120,7 +122,9 @@ class FakeGitHub {
   }
 
   async #handle(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    const url = new URL(typeof input === "string" ? input : (input as Request).url ?? String(input));
+    const url = new URL(
+      typeof input === "string" ? input : ((input as Request).url ?? String(input)),
+    );
     const path = url.origin + url.pathname;
 
     if (path === RECEIVE_PACK_URL) {
@@ -143,16 +147,20 @@ class FakeGitHub {
     }
 
     if (path === `${API_BASE}/branches`) {
-      const data = [...this.branches.entries()].map(([name, sha]) =>
-        ({ name, commit: { sha }, protected: false }));
+      const data = [...this.branches.entries()].map(([name, sha]) => ({
+        name,
+        commit: { sha },
+        protected: false,
+      }));
       return Response.json(data);
     }
 
     if (path.startsWith(`${API_BASE}/commits/`)) {
       const ref = decodeURIComponent(path.slice(`${API_BASE}/commits/`.length));
       const fromBranch = this.branches.get(ref);
-      const commit = this.restCommits.get(ref)
-        ?? (fromBranch !== undefined ? { sha: fromBranch, message: `rest ${ref}` } : undefined);
+      const commit =
+        this.restCommits.get(ref) ??
+        (fromBranch !== undefined ? { sha: fromBranch, message: `rest ${ref}` } : undefined);
       if (commit === undefined) {
         // Like GitHub: an unknown full commit id answers 422 ("No commit found for SHA"); only
         // an unknown branch/tag name answers 404.
@@ -195,7 +203,7 @@ class FakeGitHub {
 /** Records what the gatekeeper submits, standing in for the overseer's approval queue. */
 class TestApprovalQueue extends RpcTarget {
   readonly observations: string[] = [];
-  readonly submitted: { action: number, description: ActionDescription }[] = [];
+  readonly submitted: { action: number; description: ActionDescription }[] = [];
 
   async authorizeObservation(description: { title: string }): Promise<void> {
     this.observations.push(description.title);
@@ -241,8 +249,11 @@ async function repoGatekeeper() {
   return {
     preparePush: (branch: string, commitId: string, force: boolean, cache: TestGitCache) =>
       unwrap(hooks.preparePush(scenario, props, branch, commitId, force, stubOf(cache))),
-    submitPush: (queue: TestApprovalQueue, action: PushActionData, description: ActionDescription) =>
-      unwrap(hooks.submitPush(scenario, props, stubOf(queue), action, description)),
+    submitPush: (
+      queue: TestApprovalQueue,
+      action: PushActionData,
+      description: ActionDescription,
+    ) => unwrap(hooks.submitPush(scenario, props, stubOf(queue), action, description)),
     applyAction: (actionId: number, cache: TestGitCache) =>
       unwrap(hooks.applyAction(scenario, props, actionId, stubOf(cache))),
     revertAction: (actionId: number) => unwrap(hooks.revertAction(scenario, props, actionId)),
@@ -255,9 +266,13 @@ async function repoGatekeeper() {
     isSimulatedCommitId: (commitId: string) =>
       unwrap(hooks.isSimulatedCommitId(scenario, props, commitId)),
     getCommit: (ref: string | undefined, cache?: TestGitCache) =>
-      unwrap(hooks.getCommit(scenario, props, ref, cache === undefined ? undefined : stubOf(cache))),
+      unwrap(
+        hooks.getCommit(scenario, props, ref, cache === undefined ? undefined : stubOf(cache)),
+      ),
     resolveRef: (ref: string | undefined, cache?: TestGitCache) =>
-      unwrap(hooks.resolveRef(scenario, props, ref, cache === undefined ? undefined : stubOf(cache))),
+      unwrap(
+        hooks.resolveRef(scenario, props, ref, cache === undefined ? undefined : stubOf(cache)),
+      ),
     repoMetadata: () => unwrap(hooks.repoMetadata(scenario, props)),
   };
 }
@@ -266,8 +281,12 @@ type GatekeeperHandle = Awaited<ReturnType<typeof repoGatekeeper>>;
 
 /** preparePush + submitActionForApproval, the way the session's push() drives them. */
 async function queuePush(
-  gk: GatekeeperHandle, cache: TestGitCache, queue: TestApprovalQueue,
-  branch: string, commitId: string, force = false,
+  gk: GatekeeperHandle,
+  cache: TestGitCache,
+  queue: TestApprovalQueue,
+  branch: string,
+  commitId: string,
+  force = false,
 ) {
   const action = await gk.preparePush(branch, commitId, force, cache);
   if (action === null) return null;
@@ -281,7 +300,7 @@ async function queuePush(
 }
 
 /** The textual pkt-lines of a captured receive-pack request, plus the raw bytes after the flush. */
-function splitPushRequest(body: Uint8Array): { commands: string[], pack: Uint8Array } {
+function splitPushRequest(body: Uint8Array): { commands: string[]; pack: Uint8Array } {
   // The command block is pkt-lines up to the first flush; everything after is the raw pack.
   const commands: string[] = [];
   let offset = 0;
@@ -308,17 +327,24 @@ describe("queue time", () => {
     github.install();
     const gk = await repoGatekeeper();
     const queue = new TestApprovalQueue();
-    const cache = new TestGitCache().withAncestry(BASE, HEAD1).withAncestry(HEAD1, HEAD2)
+    const cache = new TestGitCache()
+      .withAncestry(BASE, HEAD1)
+      .withAncestry(HEAD1, HEAD2)
       .withAncestry(BASE, HEAD2);
 
     const first = await queuePush(gk, cache, queue, "main", HEAD1);
-    expect(first).toMatchObject({ type: "push", expectedOldSha: BASE, newSha: HEAD1, force: false });
+    expect(first).toMatchObject({
+      type: "push",
+      expectedOldSha: BASE,
+      newSha: HEAD1,
+      force: false,
+    });
 
     // The second push binds to the first's newSha (the simulated head), not the live head, so
     // approving both in order applies cleanly.
     const second = await queuePush(gk, cache, queue, "main", HEAD2);
     expect(second).toMatchObject({ expectedOldSha: HEAD1, newSha: HEAD2 });
-    expect(queue.submitted.map(s => s.description.pushedCommits)).toEqual([[HEAD1], [HEAD2]]);
+    expect(queue.submitted.map((s) => s.description.pushedCommits)).toEqual([[HEAD1], [HEAD2]]);
   });
 
   it("returns null (queuing nothing) when the branch is already at the commit", async () => {
@@ -335,14 +361,13 @@ describe("queue time", () => {
 
   it("fails a non-force non-fast-forward before anything is queued", async () => {
     const github = new FakeGitHub();
-    github.branches.set("main", OTHER);  // the branch moved past the head the work was based on
+    github.branches.set("main", OTHER); // the branch moved past the head the work was based on
     github.install();
     const gk = await repoGatekeeper();
     const queue = new TestApprovalQueue();
-    const cache = new TestGitCache().withAncestry(BASE, HEAD1);  // OTHER is not an ancestor
+    const cache = new TestGitCache().withAncestry(BASE, HEAD1); // OTHER is not an ancestor
 
-    await expect(queuePush(gk, cache, queue, "main", HEAD1))
-      .rejects.toThrow(/not a fast-forward/);
+    await expect(queuePush(gk, cache, queue, "main", HEAD1)).rejects.toThrow(/not a fast-forward/);
     expect(queue.submitted).toEqual([]);
 
     // force skips only the fast-forward policy check; the CAS at apply still binds OTHER.
@@ -352,7 +377,7 @@ describe("queue time", () => {
 
   it("exempts branch creation from the fast-forward check", async () => {
     const github = new FakeGitHub();
-    github.install();  // no branches: "feature" does not exist
+    github.install(); // no branches: "feature" does not exist
     const gk = await repoGatekeeper();
     const queue = new TestApprovalQueue();
     const cache = new TestGitCache().withCommit(HEAD1, commitPayload([BASE], "x"));
@@ -369,7 +394,8 @@ describe("simulation", () => {
     github.branches.set("other", OTHER);
     github.install();
     const gk = await repoGatekeeper();
-    const cache = new TestGitCache().withAncestry(BASE, HEAD1)
+    const cache = new TestGitCache()
+      .withAncestry(BASE, HEAD1)
       .withCommit(HEAD1, commitPayload([BASE], "feat: simulate me"));
     await queuePush(gk, cache, new TestApprovalQueue(), "main", HEAD1);
 
@@ -400,7 +426,7 @@ describe("simulation", () => {
 
     const page = await gk.listBranchesFirstPage(50);
     expect(page).toContainEqual({ name: "feature", headCommit: HEAD1, protected: false });
-    expect(page?.filter(branch => branch.name === "feature")).toHaveLength(1);
+    expect(page?.filter((branch) => branch.name === "feature")).toHaveLength(1);
   });
 
   it("drops an injected branch whose push was rejected before the page was drained, still withholding its head", async () => {
@@ -414,7 +440,7 @@ describe("simulation", () => {
     // The cursor snapshots the injected branch at build time; the rejection lands before the
     // page is drained, so serving the snapshot would list a branch that will never exist.
     const page = await gk.listBranchesFirstPageAfterReject(50, action.approvalId);
-    expect(page?.some(branch => branch.name === "feature")).toBe(false);
+    expect(page?.some((branch) => branch.name === "feature")).toBe(false);
 
     // The head never reached GitHub, and it is no longer a pending push -- but advertising
     // callbacks must keep withholding it, or the rejected push's commit would be durably
@@ -444,7 +470,7 @@ describe("simulation", () => {
 
   it("stops injecting a queued creation once the branch appears remotely", async () => {
     const github = new FakeGitHub();
-    github.install();  // "feature" does not exist at queue time
+    github.install(); // "feature" does not exist at queue time
     const gk = await repoGatekeeper();
     const cache = new TestGitCache().withCommit(HEAD1, commitPayload([BASE], "x"));
     await queuePush(gk, cache, new TestApprovalQueue(), "feature", HEAD1);
@@ -455,7 +481,7 @@ describe("simulation", () => {
     github.branches.set("feature", OTHER);
     const page = await gk.listBranchesFirstPage(50);
     expect(page).toContainEqual({ name: "feature", headCommit: OTHER, protected: false });
-    expect(page?.filter(branch => branch.name === "feature")).toHaveLength(1);
+    expect(page?.filter((branch) => branch.name === "feature")).toHaveLength(1);
   });
 
   it("serves getCommit for a queued commit id GitHub does not know yet", async () => {
@@ -463,7 +489,8 @@ describe("simulation", () => {
     github.branches.set("main", BASE);
     github.install();
     const gk = await repoGatekeeper();
-    const cache = new TestGitCache().withAncestry(BASE, HEAD1)
+    const cache = new TestGitCache()
+      .withAncestry(BASE, HEAD1)
       .withCommit(HEAD1, commitPayload([BASE], "pending"));
     await queuePush(gk, cache, new TestApprovalQueue(), "main", HEAD1);
 
@@ -479,7 +506,8 @@ describe("simulation", () => {
     github.branches.set("other", OTHER);
     github.install();
     const gk = await repoGatekeeper();
-    const cache = new TestGitCache().withAncestry(BASE, HEAD1)
+    const cache = new TestGitCache()
+      .withAncestry(BASE, HEAD1)
       .withCommit(HEAD1, commitPayload([BASE], "feat: simulate me"));
     await queuePush(gk, cache, new TestApprovalQueue(), "main", HEAD1);
 
@@ -494,7 +522,8 @@ describe("simulation", () => {
     github.branches.set("main", BASE);
     github.install();
     const gk = await repoGatekeeper();
-    const cache = new TestGitCache().withAncestry(BASE, HEAD1)
+    const cache = new TestGitCache()
+      .withAncestry(BASE, HEAD1)
       .withCommit(HEAD1, commitPayload([BASE], "pending"));
     await queuePush(gk, cache, new TestApprovalQueue(), "main", HEAD1);
 
@@ -526,7 +555,8 @@ describe("default branch", () => {
     github.branches.set("main", BASE);
     github.install();
     const gk = await repoGatekeeper();
-    const cache = new TestGitCache().withAncestry(BASE, HEAD1)
+    const cache = new TestGitCache()
+      .withAncestry(BASE, HEAD1)
       .withCommit(HEAD1, commitPayload([BASE], "feat: simulate me"));
     await queuePush(gk, cache, new TestApprovalQueue(), "main", HEAD1);
 
@@ -553,7 +583,8 @@ describe("apply", () => {
     const { commands, pack } = splitPushRequest(github.receivePackExchanges[0].body);
     expect(commands).toHaveLength(1);
     expect(commands[0]).toMatch(
-      new RegExp(`^${BASE} ${HEAD1} refs/heads/main\0report-status agent=`));
+      new RegExp(`^${BASE} ${HEAD1} refs/heads/main\0report-status agent=`),
+    );
     expect(pack).toEqual(PACK_BYTES);
 
     // A re-delivered apply (the overseer crashed before persisting its completion record) is
@@ -573,10 +604,9 @@ describe("apply", () => {
     const cache = new TestGitCache().withAncestry(BASE, HEAD1);
     const action = (await queuePush(gk, cache, new TestApprovalQueue(), "main", HEAD1))!;
 
-    github.branches.set("main", OTHER);  // moved between approval and apply
+    github.branches.set("main", OTHER); // moved between approval and apply
     github.respondToPush("unpack ok", "ng refs/heads/main fetch first");
-    await expect(gk.applyAction(action.approvalId, cache))
-      .rejects.toThrow(/has moved from/);
+    await expect(gk.applyAction(action.approvalId, cache)).rejects.toThrow(/has moved from/);
   });
 
   it("fails the same way for a force push -- the CAS is not loosened", async () => {
@@ -588,10 +618,9 @@ describe("apply", () => {
     const action = (await queuePush(gk, cache, new TestApprovalQueue(), "main", HEAD1, true))!;
     expect(action.expectedOldSha).toBe(OTHER);
 
-    github.branches.set("main", BASE);  // moved again after approval
+    github.branches.set("main", BASE); // moved again after approval
     github.respondToPush("unpack ok", "ng refs/heads/main fetch first");
-    await expect(gk.applyAction(action.approvalId, cache))
-      .rejects.toThrow(/has moved from/);
+    await expect(gk.applyAction(action.approvalId, cache)).rejects.toThrow(/has moved from/);
   });
 
   it("fails a creation push whose branch appeared in the interim", async () => {
@@ -601,10 +630,11 @@ describe("apply", () => {
     const cache = new TestGitCache().withCommit(HEAD1, commitPayload([BASE], "x"));
     const action = (await queuePush(gk, cache, new TestApprovalQueue(), "feature", HEAD1))!;
 
-    github.branches.set("feature", OTHER);  // created in the interim
+    github.branches.set("feature", OTHER); // created in the interim
     github.respondToPush("unpack ok", "ng refs/heads/feature reference already exists");
-    await expect(gk.applyAction(action.approvalId, cache))
-      .rejects.toThrow(/was created after this push was queued/);
+    await expect(gk.applyAction(action.approvalId, cache)).rejects.toThrow(
+      /was created after this push was queued/,
+    );
   });
 
   it("treats the branch already being at newSha as success (desired state)", async () => {
@@ -647,8 +677,7 @@ describe("revert", () => {
     expect(commands[0]).toMatch(new RegExp(`^${HEAD1} ${BASE} refs/heads/main\0`));
     // An empty pack: header ("PACK", version 2, zero objects) + SHA-1 trailer.
     expect(pack).toHaveLength(32);
-    expect([...pack.subarray(0, 12)])
-      .toEqual([0x50, 0x41, 0x43, 0x4b, 0, 0, 0, 2, 0, 0, 0, 0]);
+    expect([...pack.subarray(0, 12)]).toEqual([0x50, 0x41, 0x43, 0x4b, 0, 0, 0, 2, 0, 0, 0, 0]);
   });
 
   it("deletes a branch the push created, sending no pack", async () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   defaultExportFormats,
   exportServerFormat,
@@ -20,7 +20,7 @@ describe("Gadget export formats", () => {
     const first = defaultExportFormats();
     const second = defaultExportFormats();
 
-    expect(first.map(format => format.id)).toEqual(["html", "pdf"]);
+    expect(first.map((format) => format.id)).toEqual(["html", "pdf"]);
     expect(first).toEqual(second);
     expect(first).not.toBe(second);
     expect(first[0]).not.toBe(second[0]);
@@ -45,7 +45,7 @@ describe("Gadget export formats", () => {
       },
     ]);
 
-    expect(formats.map(format => format.id)).toEqual(["png", "csv"]);
+    expect(formats.map((format) => format.id)).toEqual(["png", "csv"]);
     expect(formats[1]).not.toHaveProperty("ignored");
   });
 
@@ -58,10 +58,14 @@ describe("Gadget export formats", () => {
       fileExtension: ".csv",
     };
     expect(() => validateExportFormats([format, format])).toThrow("id is not unique");
-    expect(() => validateExportFormats([{
-      ...format,
-      mode: "browser",
-    }])).toThrow("unsupported content type");
+    expect(() =>
+      validateExportFormats([
+        {
+          ...format,
+          mode: "browser",
+        },
+      ]),
+    ).toThrow("unsupported content type");
   });
 
   it("rejects unsafe file extensions and invalid media types", () => {
@@ -72,22 +76,38 @@ describe("Gadget export formats", () => {
       contentType: "text/csv",
       fileExtension: ".csv",
     };
-    expect(() => validateExportFormats([{
-      ...format,
-      fileExtension: "/report.csv",
-    }])).toThrow("invalid file extension");
-    expect(() => validateExportFormats([{
-      ...format,
-      fileExtension: ".1234567890123456",
-    }])).toThrow("between 1 and 16 characters");
-    expect(() => validateExportFormats([{
-      ...format,
-      fileExtension: ".csv.",
-    }])).toThrow("invalid file extension");
-    expect(() => validateExportFormats([{
-      ...format,
-      contentType: "not a media type",
-    }])).toThrow("invalid content type");
+    expect(() =>
+      validateExportFormats([
+        {
+          ...format,
+          fileExtension: "/report.csv",
+        },
+      ]),
+    ).toThrow("invalid file extension");
+    expect(() =>
+      validateExportFormats([
+        {
+          ...format,
+          fileExtension: ".1234567890123456",
+        },
+      ]),
+    ).toThrow("between 1 and 16 characters");
+    expect(() =>
+      validateExportFormats([
+        {
+          ...format,
+          fileExtension: ".csv.",
+        },
+      ]),
+    ).toThrow("invalid file extension");
+    expect(() =>
+      validateExportFormats([
+        {
+          ...format,
+          contentType: "not a media type",
+        },
+      ]),
+    ).toThrow("invalid content type");
   });
 
   it("uses defaults for missing-entrypoint errors and propagates other failures", async () => {
@@ -116,12 +136,13 @@ describe("Gadget export formats", () => {
   it("times out format discovery", async () => {
     vi.useFakeTimers();
     try {
-      const result = readCustomExportFormats({
-        getExportFormats: () => new Promise<never>(() => {}),
-      }, {});
-      const rejection = expect(result).rejects.toThrow(
-        "Listing Gadget export formats timed out.",
+      const result = readCustomExportFormats(
+        {
+          getExportFormats: () => new Promise<never>(() => {}),
+        },
+        {},
       );
+      const rejection = expect(result).rejects.toThrow("Listing Gadget export formats timed out.");
       await vi.advanceTimersByTimeAsync(30_000);
       await rejection;
     } finally {
@@ -158,7 +179,7 @@ describe("exportServerFormat", () => {
       await rejection;
 
       const cancel = vi.fn();
-      pending.resolve(new ReadableStream({cancel}));
+      pending.resolve(new ReadableStream({ cancel }));
       await vi.advanceTimersByTimeAsync(0);
       expect(cancel).toHaveBeenCalled();
     } finally {

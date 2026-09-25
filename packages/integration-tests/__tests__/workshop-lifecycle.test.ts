@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import { type Harness, startHarness } from "../src/harness.js";
 import { mockChatCompletion } from "../src/mock-model.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
@@ -46,13 +46,15 @@ it.concurrent("lists workspace metadata after activity and removes it after dele
 
   const listed = await waitFor("the active workspace to appear in the user's list", async () => {
     const workspaces = await authenticated.listGadgets();
-    return workspaces.some(entry => entry.id === id) ? workspaces : null;
+    return workspaces.some((entry) => entry.id === id) ? workspaces : null;
   });
-  expect(listed).toContainEqual(expect.objectContaining({
-    id,
-    title: "Renamed Workspace",
-    pinned: true,
-  }));
+  expect(listed).toContainEqual(
+    expect.objectContaining({
+      id,
+      title: "Renamed Workspace",
+      pinned: true,
+    }),
+  );
 
   await workspace.deleteSelf();
   workspace[Symbol.dispose]();
@@ -65,7 +67,8 @@ it.concurrent("lists workspace metadata after activity and removes it after dele
   using reconnected = connect(requireHarness().url);
   using relisted = await logIn(reconnected, owner);
   await waitFor("the deleted workspace to disappear from the user's list", async () =>
-    (await relisted.listGadgets()).some(entry => entry.id === id) ? null : true);
+    (await relisted.listGadgets()).some((entry) => entry.id === id) ? null : true,
+  );
 });
 
 it.concurrent("persists an ordered human-only chat without starting an agent", async () => {
@@ -77,11 +80,11 @@ it.concurrent("persists an ordered human-only chat without starting an agent", a
   await workspace.sendChatMessage(chatId, "Second message", null);
 
   const history = await workspace.getChatHistory(chatId);
-  expect(history.messages.map(message =>
-    message.type === "message" ? message.message : message.type)).toEqual([
-    "First message",
-    "Second message",
-  ]);
+  expect(
+    history.messages.map((message) =>
+      message.type === "message" ? message.message : message.type,
+    ),
+  ).toEqual(["First message", "Second message"]);
   const chats = await workspace.listChats();
   expect(chats).toEqual([expect.objectContaining({ id: chatId })]);
   expect(chats[0]?.activeAgent).toBeUndefined();
@@ -103,8 +106,9 @@ it.concurrent("creates, renames, reopens, and removes a Gadget capability", asyn
   await gadget.setTitle("Updated Status");
   using reopened = await workspace.getGadget(gadgetId);
   expect(await reopened.getTitle()).toBe("Updated Status");
-  await expect(workspace.createGadget("Conflict", undefined, "STATUS"))
-    .rejects.toThrow('already a gadget named "STATUS"');
+  await expect(workspace.createGadget("Conflict", undefined, "STATUS")).rejects.toThrow(
+    'already a gadget named "STATUS"',
+  );
 
   await gadget.remove();
   await expect(workspace.getGadget(gadgetId)).rejects.toThrow();

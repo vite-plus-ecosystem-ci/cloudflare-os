@@ -26,9 +26,9 @@
     "./simulation": "./src/simulation.ts"
   },
   "scripts": {
-    "test:run": "vitest run && vitest run -c vitest.worker.config.ts",
-    "test:watch:node": "vitest",
-    "test:watch:workerd": "vitest -c vitest.worker.config.ts"
+    "test:run": "vp test run && vp test run -c vitest.worker.config.ts",
+    "test:watch:node": "vp test",
+    "test:watch:workerd": "vp test -c vitest.worker.config.ts"
   },
   "dependencies": {
     "@gadgets/backend-utils": "workspace:*",

@@ -10,13 +10,12 @@
 // impl.getGatekeeperFacet on the instance, since a real Gatekeeper DO class cannot be minted
 // from a test.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { OverseerDurableObject } from "../src/overseer.js";
 import type { ActionDescription } from "@gadgets/workshop-shared/gatekeeper";
-import { concatBytes, decodePackBytes, encodeLooseObject, gitObjectOid }
-  from "../src/git-codec";
+import { concatBytes, decodePackBytes, encodeLooseObject, gitObjectOid } from "../src/git-codec";
 
 declare module "cloudflare:workers" {
   interface ProvidedEnv {
@@ -51,7 +50,7 @@ async function inOverseer(name: string, fn: (impl: any) => Promise<void>): Promi
 function commitPayload(tree: string, parents: string[], message: string): Uint8Array {
   let text = [
     `tree ${tree}`,
-    ...parents.map(parent => `parent ${parent}`),
+    ...parents.map((parent) => `parent ${parent}`),
     "author Test <test@example.com> 1700000000 +0000",
     "committer Test <test@example.com> 1700000000 +0000",
     "",
@@ -68,10 +67,13 @@ async function storeLocal(impl: any, type: string, payload: Uint8Array): Promise
 
 // Seeds the standard scenario: the gatekeeper has proven a base commit (empty tree), and a
 // locally-authored commit sits on top of it. Returns both oids.
-async function seedPushableHistory(impl: any): Promise<{ base: string, head: string }> {
+async function seedPushableHistory(impl: any): Promise<{ base: string; head: string }> {
   let treeOid = await impl.gitCache.putFromGatekeeper(GATEKEEPER, "tree", new Uint8Array(0));
   let base = await impl.gitCache.putFromGatekeeper(
-      GATEKEEPER, "commit", commitPayload(treeOid, [], "base"));
+    GATEKEEPER,
+    "commit",
+    commitPayload(treeOid, [], "base"),
+  );
   let head = await storeLocal(impl, "commit", commitPayload(treeOid, [base], "local work"));
   return { base, head };
 }
@@ -86,8 +88,9 @@ function pushDescription(heads: string[]): ActionDescription {
 }
 
 function marksOf(impl: any, actionId: number): string[] {
-  return Array.from(impl.storage.gitObjectMetadata.byPendingPushAction.get(actionId))
-      .map((record: any) => record.oid);
+  return Array.from(impl.storage.gitObjectMetadata.byPendingPushAction.get(actionId)).map(
+    (record: any) => record.oid,
+  );
 }
 
 async function collect(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
@@ -103,12 +106,13 @@ async function collect(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> 
 
 describe("push authorization through the Overseer chokepoints", () => {
   it("verifies, marks, applies with an action-scoped cache, and converts marks", async () => {
-    await inOverseer("push-apply", async impl => {
+    await inOverseer("push-apply", async (impl) => {
       let { base, head } = await seedPushableHistory(impl);
 
       await impl.submitAction(GATEKEEPER, 1, pushDescription([head]), { from: "user" });
-      let record = Array.from(impl.storage.actions.list())
-          .find((a: any) => a.type === "action") as any;
+      let record = Array.from(impl.storage.actions.list()).find(
+        (a: any) => a.type === "action",
+      ) as any;
       expect(record.state).toBe("pending");
       // The head is marked; the base and its tree are remote-known and are not.
       expect(marksOf(impl, record.id)).toStrictEqual([head]);
@@ -125,7 +129,7 @@ describe("push authorization through the Overseer chokepoints", () => {
       });
       await impl.applyPendingAction(record, USER, false);
 
-      expect((await decodePackBytes(sawPack!, { maxObjectSize: 1 << 20 }))).toHaveLength(1);
+      expect(await decodePackBytes(sawPack!, { maxObjectSize: 1 << 20 })).toHaveLength(1);
       expect(impl.storage.actions.get(record.id)!.state).toBe("approved");
       expect(marksOf(impl, record.id)).toStrictEqual([]);
       let meta = impl.storage.gitObjectMetadata.get(head)!;
@@ -138,39 +142,44 @@ describe("push authorization through the Overseer chokepoints", () => {
   });
 
   it("fails submitAction closed on unproven ancestry, queuing nothing", async () => {
-    await inOverseer("push-reject", async impl => {
+    await inOverseer("push-reject", async (impl) => {
       let treeOid = await storeLocal(impl, "tree", new Uint8Array(0));
       let root = await storeLocal(impl, "commit", commitPayload(treeOid, [], "unrelated root"));
 
-      await expect(impl.submitAction(GATEKEEPER, 1, pushDescription([root]), { from: "user" }))
-          .rejects.toThrow(/root commit/);
+      await expect(
+        impl.submitAction(GATEKEEPER, 1, pushDescription([root]), { from: "user" }),
+      ).rejects.toThrow(/root commit/);
       expect(Array.from(impl.storage.actions.list())).toStrictEqual([]);
-      expect(Array.from(impl.storage.gitObjectMetadata.byPendingPushAction.list()))
-          .toStrictEqual([]);
+      expect(Array.from(impl.storage.gitObjectMetadata.byPendingPushAction.list())).toStrictEqual(
+        [],
+      );
       expect(impl.storage.gitObjectMetadata.get(root)?.pendingPush ?? []).toStrictEqual([]);
     });
   });
 
   it("refuses a push while the workspace is restricted, queuing nothing", async () => {
-    await inOverseer("push-restricted", async impl => {
+    await inOverseer("push-restricted", async (impl) => {
       let { head } = await seedPushableHistory(impl);
       impl.storage.containsRestrictedData.put(true);
 
       // Proven ancestry does not help: the commits cannot be reviewed as text by the approver.
-      await expect(impl.submitAction(GATEKEEPER, 1, pushDescription([head]), { from: "user" }))
-          .rejects.toThrow(/git push cannot be reviewed as of yet/);
+      await expect(
+        impl.submitAction(GATEKEEPER, 1, pushDescription([head]), { from: "user" }),
+      ).rejects.toThrow(/git push cannot be reviewed as of yet/);
       expect(Array.from(impl.storage.actions.list())).toStrictEqual([]);
-      expect(Array.from(impl.storage.gitObjectMetadata.byPendingPushAction.list()))
-          .toStrictEqual([]);
+      expect(Array.from(impl.storage.gitObjectMetadata.byPendingPushAction.list())).toStrictEqual(
+        [],
+      );
     });
   });
 
   it("cleans a queued push's marks when its gatekeeper is removed", async () => {
-    await inOverseer("push-gatekeeper-removed", async impl => {
+    await inOverseer("push-gatekeeper-removed", async (impl) => {
       let { head } = await seedPushableHistory(impl);
       await impl.submitAction(GATEKEEPER, 1, pushDescription([head]), { from: "user" });
-      let record = Array.from(impl.storage.actions.list())
-          .find((a: any) => a.type === "action") as any;
+      let record = Array.from(impl.storage.actions.list()).find(
+        (a: any) => a.type === "action",
+      ) as any;
       expect(marksOf(impl, record.id)).toStrictEqual([head]);
 
       impl.removeGatekeeper(GATEKEEPER);
@@ -181,7 +190,7 @@ describe("push authorization through the Overseer chokepoints", () => {
   });
 
   it("hands sessions a gatekeeper-scoped cache via getGitCache()", async () => {
-    await inOverseer("push-session-cache", async impl => {
+    await inOverseer("push-session-cache", async (impl) => {
       let { head, base } = await seedPushableHistory(impl);
       void head;
       // Mimic ApprovalQueueImpl.getGitCache()'s minting: gatekeeper-scoped, no action.
