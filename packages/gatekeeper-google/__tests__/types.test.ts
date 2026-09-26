@@ -3,10 +3,12 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import ts from "typescript6";
 import {
-  DOCS_TYPES_MODULE_PREFIX, DRIVE_TYPES_MODULE_PREFIX, stripTypeModulePrefix,
+  DOCS_TYPES_MODULE_PREFIX,
+  DRIVE_TYPES_MODULE_PREFIX,
+  stripTypeModulePrefix,
 } from "../src/type-bundle";
 
 const SOURCE_DIR = join(dirname(fileURLToPath(import.meta.url)), "../src");
@@ -32,16 +34,17 @@ function compileAgentTypes(sourceText: string): string[] {
   const baseHost = ts.createCompilerHost(options);
   const host: ts.CompilerHost = {
     ...baseHost,
-    fileExists: name => name === fileName || baseHost.fileExists(name),
+    fileExists: (name) => name === fileName || baseHost.fileExists(name),
     getSourceFile: (name, languageVersion, onError, shouldCreateNewSourceFile) =>
       name === fileName
         ? ts.createSourceFile(name, sourceText, languageVersion, true)
         : baseHost.getSourceFile(name, languageVersion, onError, shouldCreateNewSourceFile),
-    readFile: name => name === fileName ? sourceText : baseHost.readFile(name),
+    readFile: (name) => (name === fileName ? sourceText : baseHost.readFile(name)),
   };
   const program = ts.createProgram([fileName], options, host);
-  return ts.getPreEmitDiagnostics(program).map(diagnostic =>
-    ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
+  return ts
+    .getPreEmitDiagnostics(program)
+    .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
 }
 
 /** Guidance the agent must still be reading when it picks a tab to act on. */
@@ -98,7 +101,10 @@ describe("embedded agent declarations", () => {
     expect(readTypes).toContain("getContent(tabId?: string): Promise<string>;");
   });
 
-  it.each([["Doc", docBundle], ["Drive", driveBundle]] as const)(
+  it.each([
+    ["Doc", docBundle],
+    ["Drive", driveBundle],
+  ] as const)(
     "carries the exact tab shape and its selection guidance into the %s bundle",
     (_name, bundle) => {
       const types = bundle();
@@ -113,9 +119,7 @@ describe("embedded agent declarations", () => {
     expect(readTypes).not.toContain("replaceText");
     expect(readTypes).not.toContain("appendText");
     const writeTypes = source("docs-types.d.ts");
-    expect(writeTypes).toContain(
-      "export interface GoogleDocSession extends GoogleDocReadSession",
-    );
+    expect(writeTypes).toContain("export interface GoogleDocSession extends GoogleDocReadSession");
     expect(writeTypes).toContain(
       "replaceText(oldMarkdown: string, newMarkdown: string, tabId?: string): Promise<void>;",
     );
@@ -124,9 +128,7 @@ describe("embedded agent declarations", () => {
 
   it("hands out only read-only native sessions from Drive", () => {
     const driveTypes = source("drive-types.d.ts");
-    expect(driveTypes).toContain(
-      "openGoogleDoc(fileId: string): Promise<GoogleDocReadSession>",
-    );
+    expect(driveTypes).toContain("openGoogleDoc(fileId: string): Promise<GoogleDocReadSession>");
     expect(driveTypes).toContain(
       "openGoogleSheet(fileId: string): Promise<GoogleSpreadsheetReadSession>",
     );

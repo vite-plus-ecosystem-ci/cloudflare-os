@@ -4,15 +4,17 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { RpcStub } from "capnweb";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Overseer, SlashCommandChoice } from "@gadgets/workshop-shared/api";
 
 const testState = vi.hoisted(() => ({
   addToast: vi.fn<(toast: unknown) => void>(),
-  gatekeeperModalProps: undefined as undefined | {
-    open: boolean;
-    onCreated: (gatekeeper: unknown) => Promise<void>;
-  },
+  gatekeeperModalProps: undefined as
+    | undefined
+    | {
+        open: boolean;
+        onCreated: (gatekeeper: unknown) => Promise<void>;
+      },
 }));
 
 vi.mock("@cloudflare/kumo", async (importOriginal) => ({
@@ -62,24 +64,29 @@ describe("ChatComposer", () => {
   it("sends on Enter without clearing document changes made while sending", async () => {
     let finishSend: (() => void) | undefined;
     const onSend = vi.fn<Parameters<typeof ChatComposer>[0]["onSend"]>(
-      () => new Promise<void>((resolve) => { finishSend = resolve; }),
+      () =>
+        new Promise<void>((resolve) => {
+          finishSend = resolve;
+        }),
     );
     const overseer = {} as RpcStub<Overseer>;
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
 
-    await act(async () => root!.render(
-      <ChatComposer
-        createCapsuleGatekeeper={async () => null}
-        getOverseer={() => overseer}
-        onSend={onSend}
-        isAgentActive={false}
-        models={[]}
-        selectedModel="model-a"
-        onModelChange={() => {}}
-      />,
-    ));
+    await act(async () =>
+      root!.render(
+        <ChatComposer
+          createCapsuleGatekeeper={async () => null}
+          getOverseer={() => overseer}
+          onSend={onSend}
+          isAgentActive={false}
+          models={[]}
+          selectedModel="model-a"
+          onModelChange={() => {}}
+        />,
+      ),
+    );
 
     const textarea = container.querySelector<HTMLTextAreaElement>('[role="combobox"]')!;
     await act(async () => {
@@ -128,18 +135,20 @@ describe("ChatComposer", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    await act(async () => root!.render(
-      <ChatComposer
-        createCapsuleGatekeeper={async () => null}
-        getOverseer={() => ({} as RpcStub<Overseer>)}
-        onSend={onSend}
-        isAgentActive={false}
-        models={[]}
-        selectedModel="model-a"
-        onModelChange={() => {}}
-        chatKey={7}
-      />,
-    ));
+    await act(async () =>
+      root!.render(
+        <ChatComposer
+          createCapsuleGatekeeper={async () => null}
+          getOverseer={() => ({}) as RpcStub<Overseer>}
+          onSend={onSend}
+          isAgentActive={false}
+          models={[]}
+          selectedModel="model-a"
+          onModelChange={() => {}}
+          chatKey={7}
+        />,
+      ),
+    );
 
     const textarea = container.querySelector<HTMLTextAreaElement>('[role="combobox"]')!;
     await act(async () => {
@@ -171,18 +180,20 @@ describe("ChatComposer", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    await act(async () => root!.render(
-      <ChatComposer
-        createCapsuleGatekeeper={async () => null}
-        getOverseer={() => overseer}
-        onSend={() => {}}
-        isAgentActive={false}
-        models={[]}
-        selectedModel="model-a"
-        onModelChange={() => {}}
-        attachLabel="Legacy resource"
-      />,
-    ));
+    await act(async () =>
+      root!.render(
+        <ChatComposer
+          createCapsuleGatekeeper={async () => null}
+          getOverseer={() => overseer}
+          onSend={() => {}}
+          isAgentActive={false}
+          models={[]}
+          selectedModel="model-a"
+          onModelChange={() => {}}
+          attachLabel="Legacy resource"
+        />,
+      ),
+    );
 
     const textarea = container.querySelector<HTMLTextAreaElement>('[role="combobox"]')!;
     await act(async () => {
@@ -195,20 +206,27 @@ describe("ChatComposer", () => {
     textarea.setSelectionRange(7, 7);
     const add = container.querySelector<HTMLButtonElement>('[aria-label="Add to conversation"]')!;
     await act(async () => add.click());
-    await act(async () => vi.waitFor(() => expect(
-      Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]'))
-        .some((option) => option.textContent?.includes("review")),
-    ).toBe(true)));
-    const skillOption = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]'))
-      .find((option) => option.textContent?.includes("review"))!;
+    await act(async () =>
+      vi.waitFor(() =>
+        expect(
+          Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).some(
+            (option) => option.textContent?.includes("review"),
+          ),
+        ).toBe(true),
+      ),
+    );
+    const skillOption = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+    ).find((option) => option.textContent?.includes("review"))!;
     await act(async () => {
       skillOption.click();
       await new Promise(requestAnimationFrame);
     });
 
     expect(textarea.value).toBe("before /review after");
-    expect(document.body.textContent)
-      .toContain("Slash command /review from Projects is ready to send");
+    expect(document.body.textContent).toContain(
+      "Slash command /review from Projects is ready to send",
+    );
     expect(document.activeElement).toBe(textarea);
 
     await act(async () => add.click());
@@ -218,7 +236,9 @@ describe("ChatComposer", () => {
     expect(document.querySelector('[aria-label="Search skills"]')).toBeNull();
     expect(container.textContent).not.toContain("Add resource");
     expect(container.textContent).not.toContain("Legacy resource");
-    const connection = actions.find((action) => action.textContent?.includes("Add a new connection"))!;
+    const connection = actions.find((action) =>
+      action.textContent?.includes("Add a new connection"),
+    )!;
     await act(async () => connection.click());
     expect(testState.gatekeeperModalProps?.open).toBe(true);
     expect(listSlashCommands).toHaveBeenCalledTimes(1);
@@ -238,17 +258,19 @@ describe("ChatComposer", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    await act(async () => root!.render(
-      <ChatComposer
-        createCapsuleGatekeeper={async () => null}
-        getOverseer={() => overseer}
-        onSend={onSend}
-        isAgentActive={false}
-        models={[]}
-        selectedModel="model-a"
-        onModelChange={() => {}}
-      />,
-    ));
+    await act(async () =>
+      root!.render(
+        <ChatComposer
+          createCapsuleGatekeeper={async () => null}
+          getOverseer={() => overseer}
+          onSend={onSend}
+          isAgentActive={false}
+          models={[]}
+          selectedModel="model-a"
+          onModelChange={() => {}}
+        />,
+      ),
+    );
 
     const textarea = container.querySelector<HTMLTextAreaElement>('[role="combobox"]')!;
     await act(async () => {
@@ -281,17 +303,19 @@ describe("ChatComposer", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    await act(async () => root!.render(
-      <ChatComposer
-        createCapsuleGatekeeper={async () => null}
-        getOverseer={() => overseer}
-        onSend={onSend}
-        isAgentActive={false}
-        models={[]}
-        selectedModel={null}
-        onModelChange={() => {}}
-      />,
-    ));
+    await act(async () =>
+      root!.render(
+        <ChatComposer
+          createCapsuleGatekeeper={async () => null}
+          getOverseer={() => overseer}
+          onSend={onSend}
+          isAgentActive={false}
+          models={[]}
+          selectedModel={null}
+          onModelChange={() => {}}
+        />,
+      ),
+    );
 
     const textarea = container.querySelector<HTMLTextAreaElement>('[role="combobox"]')!;
     await act(async () => {
@@ -306,7 +330,11 @@ describe("ChatComposer", () => {
     expect(document.querySelector('[role="listbox"]')).toBeNull();
     expect(overseer.listSlashCommands).not.toHaveBeenCalled();
     expect(onSend).toHaveBeenCalledWith(
-      "//deploy literally", null, undefined, undefined, undefined,
+      "//deploy literally",
+      null,
+      undefined,
+      undefined,
+      undefined,
     );
   });
 
@@ -328,23 +356,28 @@ describe("ChatComposer", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    await act(async () => root!.render(
-      <ChatComposer
-        createCapsuleGatekeeper={async () => null}
-        getOverseer={() => overseer}
-        onSend={() => {}}
-        isAgentActive={false}
-        models={[]}
-        selectedModel="model-a"
-        onModelChange={() => {}}
-      />,
-    ));
+    await act(async () =>
+      root!.render(
+        <ChatComposer
+          createCapsuleGatekeeper={async () => null}
+          getOverseer={() => overseer}
+          onSend={() => {}}
+          isAgentActive={false}
+          models={[]}
+          selectedModel="model-a"
+          onModelChange={() => {}}
+        />,
+      ),
+    );
 
     const add = container.querySelector<HTMLButtonElement>('[aria-label="Add to conversation"]')!;
     await act(async () => add.click());
-    await act(async () => vi.waitFor(() => expect(document.body.textContent).toContain("first skill")));
-    const connect = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]'))
-      .find((option) => option.textContent?.includes("Add a new connection"))!;
+    await act(async () =>
+      vi.waitFor(() => expect(document.body.textContent).toContain("first skill")),
+    );
+    const connect = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+    ).find((option) => option.textContent?.includes("Add a new connection"))!;
     await act(async () => connect.click());
     expect(testState.gatekeeperModalProps?.open).toBe(true);
 
@@ -363,12 +396,13 @@ describe("ChatComposer", () => {
     const textarea = container.querySelector<HTMLTextAreaElement>('[role="combobox"]')!;
     const resourceEnd = textarea.value.indexOf("Project") + "Project".length;
     textarea.setSelectionRange(resourceEnd, resourceEnd);
-    await act(async () => textarea.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Backspace", bubbles: true }),
-    ));
+    await act(async () =>
+      textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", bubbles: true })),
+    );
     await act(async () => add.click());
-    await act(async () => vi.waitFor(() => expect(document.body.textContent)
-      .toContain("new connection skill")));
+    await act(async () =>
+      vi.waitFor(() => expect(document.body.textContent).toContain("new connection skill")),
+    );
     expect(listSlashCommands).toHaveBeenCalledTimes(2);
   });
 });

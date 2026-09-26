@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { CursorPager, DEFAULT_MAX_PROVIDER_PAGES_PER_CALL } from "../src/cursor";
 import type { CursorPage, CursorPagerOptions } from "../src/cursor";
 
@@ -16,17 +16,16 @@ function pageServer(pages: string[][]) {
   return { fetchPage, requested };
 }
 
-function makePager(
-  pages: string[][],
-  overrides: Partial<CursorPagerOptions<string, string>> = {},
-) {
+function makePager(pages: string[][], overrides: Partial<CursorPagerOptions<string, string>> = {}) {
   let server = pageServer(pages);
   let authorized: string[][] = [];
   let pager = new CursorPager<string, string>({
     provider: "TestProvider",
     fetchPage: server.fetchPage,
-    buildEntries: async items => items,
-    authorize: async entries => { authorized.push(entries); },
+    buildEntries: async (items) => items,
+    authorize: async (entries) => {
+      authorized.push(entries);
+    },
     ...overrides,
   });
   return { pager, authorized, requested: server.requested };
@@ -98,7 +97,7 @@ describe("pages with no usable results", () => {
   // That is not the end of the results, and must not be reported as one.
   it("walks past pages that a scope filter emptied", async () => {
     let { pager } = makePager([["skip"], ["skip"], ["keep"]], {
-      buildEntries: async items => items.filter(item => item !== "skip"),
+      buildEntries: async (items) => items.filter((item) => item !== "skip"),
     });
     expect(await pager.next()).toEqual(["keep"]);
   });
@@ -123,7 +122,10 @@ describe("pages with no usable results", () => {
   });
 
   it("defaults the budget to DEFAULT_MAX_PROVIDER_PAGES_PER_CALL", async () => {
-    let pages = Array.from({ length: DEFAULT_MAX_PROVIDER_PAGES_PER_CALL + 1 }, () => [] as string[]);
+    let pages = Array.from(
+      { length: DEFAULT_MAX_PROVIDER_PAGES_PER_CALL + 1 },
+      () => [] as string[],
+    );
     let { pager, requested } = makePager(pages.concat([["a"]]));
     expect(await pager.next()).toEqual([]);
     expect(requested).toHaveLength(DEFAULT_MAX_PROVIDER_PAGES_PER_CALL);
@@ -147,8 +149,8 @@ describe("malformed provider responses", () => {
   it("refuses a page token identical to the one just sent", async () => {
     let pager = new CursorPager<string, string>({
       provider: "TestProvider",
-      fetchPage: async pageToken => ({ items: [], nextPageToken: pageToken ?? "loop" }),
-      buildEntries: async items => items,
+      fetchPage: async (pageToken) => ({ items: [], nextPageToken: pageToken ?? "loop" }),
+      buildEntries: async (items) => items,
       authorize: async () => {},
     });
     await expect(pager.next()).rejects.toThrow("TestProvider returned a repeated page token.");
@@ -162,7 +164,7 @@ describe("malformed provider responses", () => {
     let pager = new CursorPager<string, string>({
       provider: "TestProvider",
       fetchPage: async () => ({ items: [`p${step}`], nextPageToken: tokens[step++] }),
-      buildEntries: async items => items,
+      buildEntries: async (items) => items,
       authorize: async () => {},
     });
     expect(await pager.next()).toEqual(["p0"]);
@@ -189,17 +191,22 @@ describe("authorization", () => {
     let seen: [string[], boolean][] = [];
     let { pager } = makePager([[], ["a"]], {
       maxProviderPagesPerCall: 1,
-      authorize: async (entries, exhausted) => { seen.push([entries, exhausted]); },
+      authorize: async (entries, exhausted) => {
+        seen.push([entries, exhausted]);
+      },
     });
 
     expect(await pager.next()).toEqual([]);
     expect(await pager.next()).toEqual(["a"]);
-    expect(seen).toEqual([[[], false], [["a"], true]]);
+    expect(seen).toEqual([
+      [[], false],
+      [["a"], true],
+    ]);
   });
 
   it("authorizes the surviving entries, not the raw page", async () => {
     let { pager, authorized } = makePager([["keep", "skip"]], {
-      buildEntries: async items => items.filter(item => item !== "skip"),
+      buildEntries: async (items) => items.filter((item) => item !== "skip"),
     });
     await pager.next();
     expect(authorized).toEqual([["keep"]]);
@@ -249,28 +256,28 @@ describe("authorization", () => {
     let pager = new CursorPager<string, DisposableSentinel>({
       provider: "TestProvider",
       fetchPage: server.fetchPage,
-      buildEntries: async items => {
-        let entries = items.map(item => new DisposableSentinel(item));
+      buildEntries: async (items) => {
+        let entries = items.map((item) => new DisposableSentinel(item));
         built.push(entries);
         return entries;
       },
-      authorize: async entries => {
+      authorize: async (entries) => {
         authorized.push(entries);
         if (denied) throw authorizationError;
       },
-      disposeEntries: entries => {
+      disposeEntries: (entries) => {
         for (let entry of entries) entry[Symbol.dispose]();
       },
     });
 
     await expect(pager.next()).rejects.toBe(authorizationError);
-    expect(built[0].every(entry => entry.disposed)).toBe(true);
+    expect(built[0].every((entry) => entry.disposed)).toBe(true);
 
     denied = false;
     let returned = await pager.next();
     expect(returned).toBe(built[1]);
-    expect(returned?.map(entry => entry.value)).toEqual(["a", "b"]);
-    expect(returned?.every(entry => !entry.disposed)).toBe(true);
+    expect(returned?.map((entry) => entry.value)).toEqual(["a", "b"]);
+    expect(returned?.every((entry) => !entry.disposed)).toBe(true);
     expect(built).toHaveLength(2);
     expect(authorized).toEqual(built);
     expect(server.requested).toEqual([undefined, undefined]);
@@ -281,9 +288,13 @@ describe("authorization", () => {
     let pager = new CursorPager<string, DisposableSentinel>({
       provider: "TestProvider",
       fetchPage: async () => ({ items: ["a"] }),
-      buildEntries: async items => items.map(item => new DisposableSentinel(item)),
-      authorize: async () => { throw authorizationError; },
-      disposeEntries: () => { throw new Error("disposal failed"); },
+      buildEntries: async (items) => items.map((item) => new DisposableSentinel(item)),
+      authorize: async () => {
+        throw authorizationError;
+      },
+      disposeEntries: () => {
+        throw new Error("disposal failed");
+      },
     });
 
     await expect(pager.next()).rejects.toBe(authorizationError);
@@ -294,7 +305,7 @@ describe("terminal empty authorization", () => {
   it("leaves an empty result uncommitted when authorization is denied", async () => {
     let denied = true;
     let { pager, authorized, requested } = makePager([[], []], {
-      authorize: async entries => {
+      authorize: async (entries) => {
         authorized.push(entries);
         if (denied) throw new Error("denied");
       },
@@ -316,13 +327,13 @@ describe("serialization", () => {
     let server = pageServer([["a"], ["b"], ["c"]]);
     let pager = new CursorPager<string, string>({
       provider: "TestProvider",
-      fetchPage: async token => {
+      fetchPage: async (token) => {
         peak = Math.max(peak, ++inFlight);
         await Promise.resolve();
         inFlight--;
         return server.fetchPage(token);
       },
-      buildEntries: async items => items,
+      buildEntries: async (items) => items,
       authorize: async () => {},
     });
 

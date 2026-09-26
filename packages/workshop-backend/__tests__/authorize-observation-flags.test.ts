@@ -7,7 +7,7 @@
 // Runs against a real OverseerDurableObject (the TEST_OVERSEER binding); the gatekeeper facet is
 // the only fake.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { OverseerDurableObject } from "../src/overseer.js";
@@ -22,11 +22,13 @@ const OWNER = "alice";
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve!: () => void;
-  let promise = new Promise<void>(r => { resolve = r; });
+  let promise = new Promise<void>((r) => {
+    resolve = r;
+  });
   return { promise, resolve };
 }
 
-const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function getImpl(instance: OverseerDurableObject): any {
   let impl = (instance as unknown as { impl: any }).impl;
@@ -59,18 +61,24 @@ describe("authorizeObservation's containsRestrictedData and ownerInvitesOnly fla
       seedGatekeeper(impl, 1);
       // Mallory holds an observer record but no reachable role: the named exclusion admits the
       // observation and schedules her teardown.
-      impl.storage.observers.put(
-          { profileId: "mallory", observerId: "obs-m", accountChoices: { 1: 10 } });
+      impl.storage.observers.put({
+        profileId: "mallory",
+        observerId: "obs-m",
+        accountChoices: { 1: 10 },
+      });
 
       // The cross-worker teardown parks, holding the observation mid-flight before any decision
       // the delivery rests on has been made.
       let held = deferred();
       impl.getGatekeeperFacet = () => ({
-        removeObserver: async () => { await held.promise; },
+        removeObserver: async () => {
+          await held.promise;
+        },
       });
 
-      let observation = impl.authorizeObservation(
-          1, RESTRICTED_EXCLUDING_MALLORY, { from: "user" });
+      let observation = impl.authorizeObservation(1, RESTRICTED_EXCLUDING_MALLORY, {
+        from: "user",
+      });
       await tick();
 
       // Nothing is delivered while the teardown is in flight, so no flag is set: a teardown
@@ -102,12 +110,15 @@ describe("authorizeObservation's containsRestrictedData and ownerInvitesOnly fla
         profile: { id: "mallory", name: "Mallory" },
         addedBy: [{ type: "user", sharer: OWNER, created: new Date(), role: "build" }],
       });
-      impl.storage.observers.put(
-          { profileId: "mallory", observerId: "obs-m", accountChoices: { 1: 10 } });
+      impl.storage.observers.put({
+        profileId: "mallory",
+        observerId: "obs-m",
+        accountChoices: { 1: 10 },
+      });
 
-      await expect(impl.authorizeObservation(
-          1, RESTRICTED_EXCLUDING_MALLORY, { from: "user" }))
-          .rejects.toThrow(/not permitted to see/);
+      await expect(
+        impl.authorizeObservation(1, RESTRICTED_EXCLUDING_MALLORY, { from: "user" }),
+      ).rejects.toThrow(/not permitted to see/);
 
       // The blocked observation delivered no data, so the workspace is not restricted: no flag,
       // no action record -- and mallory, still authorized, was not torn down.
@@ -124,23 +135,38 @@ describe("authorizeObservation's containsRestrictedData and ownerInvitesOnly fla
       seedGatekeeper(impl, 1);
 
       // containsRestrictedData alone restricts the workspace but leaves share links working.
-      await impl.authorizeObservation(1, {
-        title: "Read a thing", description: "d", containsRestrictedData: true,
-      }, { from: "user" });
+      await impl.authorizeObservation(
+        1,
+        {
+          title: "Read a thing",
+          description: "d",
+          containsRestrictedData: true,
+        },
+        { from: "user" },
+      );
       expect(impl.storage.containsRestrictedData.get()).toBe(true);
       expect(impl.storage.ownerInvitesOnly.get()).toBe(false);
 
-      await impl.authorizeObservation(1, {
-        title: "Read a thing", description: "d", containsRestrictedData: true,
-        ownerInvitesOnly: true,
-      }, { from: "user" });
+      await impl.authorizeObservation(
+        1,
+        {
+          title: "Read a thing",
+          description: "d",
+          containsRestrictedData: true,
+          ownerInvitesOnly: true,
+        },
+        { from: "user" },
+      );
       expect(impl.storage.ownerInvitesOnly.get()).toBe(true);
 
       // The flag is enforced by the memoized sharing manager.
       let sharing = await impl.getSharingManager();
-      await expect(sharing.createShareLink({
-        caller: { profileId: OWNER, isOwner: true }, role: "use",
-      })).rejects.toThrow(/Share links are disabled/);
+      await expect(
+        sharing.createShareLink({
+          caller: { profileId: OWNER, isOwner: true },
+          role: "use",
+        }),
+      ).rejects.toThrow(/Share links are disabled/);
     });
   });
 
@@ -153,24 +179,35 @@ describe("authorizeObservation's containsRestrictedData and ownerInvitesOnly fla
         profile: { id: "mallory", name: "Mallory" },
         addedBy: [{ type: "user", sharer: OWNER, created: new Date(), role: "build" }],
       });
-      impl.storage.observers.put(
-          { profileId: "mallory", observerId: "obs-m", accountChoices: { 1: 10 } });
+      impl.storage.observers.put({
+        profileId: "mallory",
+        observerId: "obs-m",
+        accountChoices: { 1: 10 },
+      });
 
-      await expect(impl.authorizeObservation(
-          1, { ...RESTRICTED_EXCLUDING_MALLORY, ownerInvitesOnly: true }, { from: "user" }))
-          .rejects.toThrow(/not permitted to see/);
+      await expect(
+        impl.authorizeObservation(
+          1,
+          { ...RESTRICTED_EXCLUDING_MALLORY, ownerInvitesOnly: true },
+          { from: "user" },
+        ),
+      ).rejects.toThrow(/not permitted to see/);
 
       expect(impl.storage.ownerInvitesOnly.get()).toBe(false);
     });
   });
 
-  it("revokes access for people the owner did not add directly when ownerInvitesOnly is set",
-      async () => {
+  it("revokes access for people the owner did not add directly when ownerInvitesOnly is set", async () => {
     let stub = env.TEST_OVERSEER.getByName("owner-invites-only-revokes-indirect");
     await runInDurableObject(stub, async (instance: OverseerDurableObject) => {
       let impl = getImpl(instance);
       seedGatekeeper(impl, 1);
-      impl.storage.shareKeys.put({ id: "k1", created: new Date(), createdBy: OWNER, role: "build" });
+      impl.storage.shareKeys.put({
+        id: "k1",
+        created: new Date(),
+        createdBy: OWNER,
+        role: "build",
+      });
       impl.storage.collaborators.put({
         profile: { id: "bob", name: "Bob" },
         addedBy: [{ type: "user", sharer: OWNER, created: new Date(), role: "build" }],
@@ -179,21 +216,35 @@ describe("authorizeObservation's containsRestrictedData and ownerInvitesOnly fla
         profile: { id: "dave", name: "Dave" },
         addedBy: [{ type: "shareKey", keyId: "k1", created: new Date(), role: "build" }],
       });
-      impl.storage.observers.put(
-          { profileId: "bob", observerId: "obs-b", accountChoices: { 1: 10 } });
-      impl.storage.observers.put(
-          { profileId: "dave", observerId: "obs-d", accountChoices: { 1: 11 } });
+      impl.storage.observers.put({
+        profileId: "bob",
+        observerId: "obs-b",
+        accountChoices: { 1: 10 },
+      });
+      impl.storage.observers.put({
+        profileId: "dave",
+        observerId: "obs-d",
+        accountChoices: { 1: 11 },
+      });
 
       // Record the restart rather than aborting the DO under the test, and keep the best-effort
       // cleanup off the network.
       let restarts: string[] = [];
-      impl.scheduleAccessRestart = async (reason: string) => { restarts.push(reason); };
+      impl.scheduleAccessRestart = async (reason: string) => {
+        restarts.push(reason);
+      };
       impl.getGatekeeperFacet = () => ({ removeObserver: async () => {} });
       impl.refreshAffectedCollaboratorListings = async () => {};
 
-      await impl.authorizeObservation(1, {
-        title: "Read a thing", description: "d", ownerInvitesOnly: true,
-      }, { from: "user" });
+      await impl.authorizeObservation(
+        1,
+        {
+          title: "Read a thing",
+          description: "d",
+          ownerInvitesOnly: true,
+        },
+        { from: "user" },
+      );
 
       // Dave joined through a link, so he loses access: the workspace restarts and his observer
       // record is torn down. Bob, whom the owner added directly, keeps both.
@@ -205,9 +256,15 @@ describe("authorizeObservation's containsRestrictedData and ownerInvitesOnly fla
       expect(impl.storage.observers.get("bob")).toBeDefined();
 
       // Setting the flag again changes nothing, so it restarts nothing.
-      await impl.authorizeObservation(1, {
-        title: "Read a thing", description: "d", ownerInvitesOnly: true,
-      }, { from: "user" });
+      await impl.authorizeObservation(
+        1,
+        {
+          title: "Read a thing",
+          description: "d",
+          ownerInvitesOnly: true,
+        },
+        { from: "user" },
+      );
       expect(restarts).toHaveLength(1);
     });
   });
@@ -223,11 +280,19 @@ describe("authorizeObservation's containsRestrictedData and ownerInvitesOnly fla
       });
 
       let restarts: string[] = [];
-      impl.scheduleAccessRestart = async (reason: string) => { restarts.push(reason); };
+      impl.scheduleAccessRestart = async (reason: string) => {
+        restarts.push(reason);
+      };
 
-      await impl.authorizeObservation(1, {
-        title: "Read a thing", description: "d", ownerInvitesOnly: true,
-      }, { from: "user" });
+      await impl.authorizeObservation(
+        1,
+        {
+          title: "Read a thing",
+          description: "d",
+          ownerInvitesOnly: true,
+        },
+        { from: "user" },
+      );
 
       expect(impl.storage.ownerInvitesOnly.get()).toBe(true);
       expect(restarts).toEqual([]);

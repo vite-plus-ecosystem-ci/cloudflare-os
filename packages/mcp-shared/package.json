@@ -27,7 +27,7 @@
   "scripts": {
     "build": "tsc && tsc -p tsconfig.test.json",
     "clean": "rm -rf dist",
-    "test:run": "vitest run"
+    "test:run": "vp test run"
   },
   "dependencies": {
     "@gadgets/backend-utils": "workspace:*",
@@ -39,7 +39,6 @@
     "@gadgets/scripts": "workspace:*",
     "@types/node": "^26.1.0",
     "typescript": "catalog:",
-    "typescript6": "catalog:",
-    "vitest": "catalog:"
+    "typescript6": "catalog:"
   }
 }

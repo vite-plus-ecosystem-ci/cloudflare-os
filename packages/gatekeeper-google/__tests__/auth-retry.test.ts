@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { AccessTokenCache, type AccessTokenRequest } from "../src/auth-retry";
 
 /** A stub authority recording every request, answering with whatever token it currently holds. */
 function authority(initial: string) {
   let requests: (AccessTokenRequest | undefined)[] = [];
   let stored = initial;
-  let cache = new AccessTokenCache(async opts => {
+  let cache = new AccessTokenCache(async (opts) => {
     requests.push(opts);
     return { token: stored, expires: new Date(Date.now() + 3600_000) };
   });
@@ -13,7 +13,9 @@ function authority(initial: string) {
     cache,
     requests,
     /** What a reconnect does: replace the stored token, telling no gatekeeper about it. */
-    restore(token: string) { stored = token; },
+    restore(token: string) {
+      stored = token;
+    },
   };
 }
 

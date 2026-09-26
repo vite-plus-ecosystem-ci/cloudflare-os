@@ -6,6 +6,13 @@ import { vitestTask } from "@gadgets/scripts/vitest-task";
  * Vite+ reads per-package settings only from `vite.config.*`, so the two cannot share a file.
  */
 export default defineConfig({
+  test: {
+    // Vitest v4 compatibility: preserve mock call history.
+    // Remove after tests no longer rely on calls from setup or earlier tests.
+    // https://release-v1-0-0-rc-1-viteplus-dev.voidzero-docs.workers.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
+    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+    clearMocks: false,
+  },
   run: {
     tasks: {
       // Shared by every package whose tests run under vitest; see the module for why the two
@@ -31,18 +38,20 @@ export default defineConfig({
       "build:app": {
         command: "node build-app.ts",
         dependsOn: ["clean:error-reporting-artifacts"],
-        input: [
-          { auto: true },
-          { pattern: "!**/dist-app/**", base: "workspace" },
-          { pattern: "!**/src/generated/**", base: "workspace" },
-          // Wrangler's scratch bundles are randomly named, so without this a `pnpm dev-server` run
-          // guarantees a miss on the next one.
-          { pattern: "!**/.wrangler/**", base: "workspace" },
-        ],
-        output: ["dist-app/**", "src/generated/app.txt"],
-        // Read via `loadEnv` in vite.app.config.ts and baked into the bundle, so it belongs in the
-        // fingerprint.
-        env: ["VITE_FRONTEND_ERROR_REPORTING"],
+        cache: {
+          input: [
+            { auto: true },
+            { pattern: "!**/dist-app/**", base: "workspace" },
+            { pattern: "!**/src/generated/**", base: "workspace" },
+            // Wrangler's scratch bundles are randomly named, so without this a `pnpm dev-server` run
+            // guarantees a miss on the next one.
+            { pattern: "!**/.wrangler/**", base: "workspace" },
+          ],
+          output: ["dist-app/**", "src/generated/app.txt"],
+          // Read via `loadEnv` in vite.app.config.ts and baked into the bundle, so it belongs in the
+          // fingerprint.
+          env: ["VITE_FRONTEND_ERROR_REPORTING"],
+        },
       },
       // The same build unminified, run by the `pnpm dev-server` pre-flight. The app watcher cannot
       // skip its own initial build, so the pre-flight's output is rebuilt regardless; matching the
@@ -55,14 +64,16 @@ export default defineConfig({
       "build:app:dev": {
         command: "node build-app.ts --dev",
         dependsOn: ["clean:error-reporting-artifacts"],
-        input: [
-          { auto: true },
-          { pattern: "!**/dist-app/**", base: "workspace" },
-          { pattern: "!**/src/generated/**", base: "workspace" },
-          { pattern: "!**/.wrangler/**", base: "workspace" },
-        ],
-        output: ["src/generated/app.txt"],
-        env: ["VITE_FRONTEND_ERROR_REPORTING"],
+        cache: {
+          input: [
+            { auto: true },
+            { pattern: "!**/dist-app/**", base: "workspace" },
+            { pattern: "!**/src/generated/**", base: "workspace" },
+            { pattern: "!**/.wrangler/**", base: "workspace" },
+          ],
+          output: ["src/generated/app.txt"],
+          env: ["VITE_FRONTEND_ERROR_REPORTING"],
+        },
       },
     },
   },

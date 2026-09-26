@@ -1,11 +1,16 @@
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import { z } from "zod";
 import { openAgentSession, type WorkshopAgentSession } from "../src/agent-session.js";
 import {
-  startTestGatekeeperHarness, TEST_GATEKEEPER_WORKER, TEST_VENDOR_ID, type Harness,
+  startTestGatekeeperHarness,
+  TEST_GATEKEEPER_WORKER,
+  TEST_VENDOR_ID,
+  type Harness,
 } from "../src/harness.js";
 import {
-  scriptedChatCompletions, SCRIPTED_MODEL_CONFIG, SCRIPTED_MODEL_ID,
+  scriptedChatCompletions,
+  SCRIPTED_MODEL_CONFIG,
+  SCRIPTED_MODEL_ID,
   SCRIPTED_MODEL_PROFILE,
 } from "../src/mock-model.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
@@ -49,10 +54,14 @@ type TestActionState = z.infer<typeof TEST_ACTION_STATE>;
 
 async function actionState(label: string): Promise<TestActionState> {
   const response = await harness.fetchWorker(
-      TEST_GATEKEEPER_WORKER, "http://gatekeeper-test.test/control/action-state",
-      { method: "POST", body: JSON.stringify({ label }) });
+    TEST_GATEKEEPER_WORKER,
+    "http://gatekeeper-test.test/control/action-state",
+    { method: "POST", body: JSON.stringify({ label }) },
+  );
   if (response.status !== 200) {
-    throw new Error(`Reading test action state failed with ${response.status}: ${await response.text()}`);
+    throw new Error(
+      `Reading test action state failed with ${response.status}: ${await response.text()}`,
+    );
   }
   return TEST_ACTION_STATE.parse(await response.json());
 }
@@ -75,27 +84,43 @@ it("holds a scripted agent write until the user approves it", async () => {
     expect.objectContaining({
       type: "action",
       state: "pending",
-      description: expect.objectContaining({ title: "Set the test value to 7", awaitDecision: true }),
+      description: expect.objectContaining({
+        title: "Set the test value to 7",
+        awaitDecision: true,
+      }),
     }),
     expect.objectContaining({
       type: "action",
       state: "pending",
-      description: expect.objectContaining({ title: "Set the test value to 8", awaitDecision: true }),
+      description: expect.objectContaining({
+        title: "Set the test value to 8",
+        awaitDecision: true,
+      }),
     }),
   ]);
   expect(await actionState(label)).toEqual({
-    pending: [{ id: 1, value: 7 }, { id: 2, value: 8 }],
+    pending: [
+      { id: 1, value: 7 },
+      { id: 2, value: 8 },
+    ],
     applyCount: 0,
   });
   expect(model.requests).toHaveLength(1);
-  expect(firstTurn.history.some(message =>
-    message.type === "message" && message.author.type === "agent" &&
-    message.message === "The test value was updated.")).toBe(false);
+  expect(
+    firstTurn.history.some(
+      (message) =>
+        message.type === "message" &&
+        message.author.type === "agent" &&
+        message.message === "The test value was updated.",
+    ),
+  ).toBe(false);
 
-  await expect(session.approveActionsAndWait([first.id, first.id]))
-    .rejects.toThrow("Action IDs must be unique");
-  await expect(session.approveActionsAndWait([first.id, 999_999]))
-    .rejects.toThrow("Actions are not pending");
+  await expect(session.approveActionsAndWait([first.id, first.id])).rejects.toThrow(
+    "Action IDs must be unique",
+  );
+  await expect(session.approveActionsAndWait([first.id, 999_999])).rejects.toThrow(
+    "Actions are not pending",
+  );
   expect((await actionState(label)).applyCount).toBe(0);
 
   // The approval reserves the session before its first await, so a turn started in the same
@@ -106,10 +131,12 @@ it("holds a scripted agent write until the user approves it", async () => {
   expect(resumed.outcome).toEqual({ status: "completed" });
   expect(await actionState(label)).toEqual({ pending: [], value: 8, applyCount: 2 });
   const approved = (await session.listActions({ filter: "action" })).entries;
-  expect(approved).toEqual(expect.arrayContaining([
-    expect.objectContaining({ id: first.id, state: "approved", type: "action" }),
-    expect.objectContaining({ id: second.id, state: "approved", type: "action" }),
-  ]));
+  expect(approved).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: first.id, state: "approved", type: "action" }),
+      expect.objectContaining({ id: second.id, state: "approved", type: "action" }),
+    ]),
+  );
   for (const entry of approved) {
     if (entry.type !== "action") throw new Error("Approved test action was not an action record");
     expect(entry.resolvedBy).toMatchObject({ type: "user", id: session.username });
@@ -137,13 +164,15 @@ it("holds a scripted agent write until the user approves it", async () => {
       }),
     ]),
   });
-  expect(resumed.history).toEqual(expect.arrayContaining([
-    expect.objectContaining({
-      type: "message",
-      author: expect.objectContaining({ type: "agent" }),
-      message: "The test value was updated.",
-    }),
-  ]));
+  expect(resumed.history).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        type: "message",
+        author: expect.objectContaining({ type: "agent" }),
+        message: "The test value was updated.",
+      }),
+    ]),
+  );
   await expect(session.approveActionsAndWait([first.id])).rejects.toThrow();
   expect((await actionState(label)).applyCount).toBe(2);
   expect(model.remainingSteps()).toBe(0);

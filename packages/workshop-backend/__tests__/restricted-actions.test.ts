@@ -3,7 +3,7 @@
 // Runs against a real OverseerDurableObject (the TEST_OVERSEER binding); records are seeded
 // directly through the impl.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { OverseerDurableObject } from "../src/overseer.js";
@@ -70,8 +70,8 @@ function pokeDescription(autoApprovable = false, { incomplete = false } = {}): A
 
 function actionStates(impl: any): Array<{ gatekeeperId: number; state: string }> {
   return [...impl.storage.actions.list()]
-      .filter((rec: any) => rec.type === "action")
-      .map((rec: any) => ({ gatekeeperId: rec.gatekeeperId, state: rec.state }));
+    .filter((rec: any) => rec.type === "action")
+    .map((rec: any) => ({ gatekeeperId: rec.gatekeeperId, state: rec.state }));
 }
 
 describe("submitAction under the restricted-data latch", () => {
@@ -134,8 +134,12 @@ describe("submitAction under the restricted-data latch", () => {
       // A summary is not refused on any connection: it pends like any other action, and the
       // approval surfaces tell the approver it is incomplete.
       for (let gatekeeperId of [1, 2]) {
-        await impl.submitAction(gatekeeperId, 0, pokeDescription(false, { incomplete: true }),
-                                CALLER);
+        await impl.submitAction(
+          gatekeeperId,
+          0,
+          pokeDescription(false, { incomplete: true }),
+          CALLER,
+        );
       }
       expect(actionStates(impl)).toEqual([
         { gatekeeperId: 1, state: "pending" },
@@ -156,10 +160,17 @@ describe("submitAction under the restricted-data latch", () => {
 
       // Commits cannot be reviewed as text, so the claim does not count. Refused before push
       // ancestry is even checked, which is why an unproven head is fine here.
-      await expect(impl.submitAction(1, 0, {
-        ...pokeDescription(),
-        pushedCommits: ["0123456789abcdef0123456789abcdef01234567"],
-      }, CALLER)).rejects.toThrow(/git push cannot be reviewed as of yet/i);
+      await expect(
+        impl.submitAction(
+          1,
+          0,
+          {
+            ...pokeDescription(),
+            pushedCommits: ["0123456789abcdef0123456789abcdef01234567"],
+          },
+          CALLER,
+        ),
+      ).rejects.toThrow(/git push cannot be reviewed as of yet/i);
       expect(actionStates(impl)).toEqual([]);
     });
   });
@@ -172,8 +183,9 @@ describe("submitAction under the restricted-data latch", () => {
       impl.storage.gatekeepers.delete(1);
       let nextActionId = impl.storage.nextActionId.get();
 
-      await expect(impl.submitAction(1, 0, pokeDescription(), CALLER))
-          .rejects.toThrow(/has been removed from this workspace/i);
+      await expect(impl.submitAction(1, 0, pokeDescription(), CALLER)).rejects.toThrow(
+        /has been removed from this workspace/i,
+      );
       expect(actionStates(impl)).toEqual([]);
       expect(impl.storage.nextActionId.get()).toBe(nextActionId);
     });

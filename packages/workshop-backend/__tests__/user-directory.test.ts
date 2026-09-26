@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { UserDirectoryDurableObject } from "../src/user-directory.js";
 // Load the whole backend (the pool's `main`) up front. Otherwise the pool loads it on the first
 // RPC into the Durable Object, and that slow load counts against the first test's timeout.
@@ -25,7 +25,12 @@ function user(id: string, name: string) {
 async function expectRejection(call: Promise<unknown>, message: string): Promise<void> {
   let caught: unknown;
   let rejected = false;
-  try { await call; } catch (err) { rejected = true; caught = err; }
+  try {
+    await call;
+  } catch (err) {
+    rejected = true;
+    caught = err;
+  }
   expect(rejected).toBe(true);
   expect(String(caught)).toContain(message);
 }
@@ -73,17 +78,15 @@ describe("UserDirectoryDurableObject", () => {
     await stub.syncUser(user("al@example.com", "Al Li"), 0);
     await stub.syncUser(user("sally@example.com", "Sally"), 0);
     await stub.syncUser(user("%percent", "Percent"), 0);
-    await stub.syncUser(user("q@example.com", "A \"Quoted\" AND Person"), 0);
+    await stub.syncUser(user("q@example.com", 'A "Quoted" AND Person'), 0);
 
     await expect(stub.searchUsers("al", [])).resolves.toEqual([
       user("al@example.com", "Al Li"),
       user("sally@example.com", "Sally"),
     ]);
-    await expect(stub.searchUsers("%", [])).resolves.toEqual([
-      user("%percent", "Percent"),
-    ]);
-    await expect(stub.searchUsers("\"Quoted\" AND", [])).resolves.toEqual([
-      user("q@example.com", "A \"Quoted\" AND Person"),
+    await expect(stub.searchUsers("%", [])).resolves.toEqual([user("%percent", "Percent")]);
+    await expect(stub.searchUsers('"Quoted" AND', [])).resolves.toEqual([
+      user("q@example.com", 'A "Quoted" AND Person'),
     ]);
     await expect(stub.searchUsers("  ", [])).resolves.toEqual([]);
   });
@@ -120,7 +123,9 @@ describe("UserDirectoryDurableObject", () => {
     await expectRejection(stub.searchUsers("a".repeat(1001), []), "at most 1000 characters");
 
     const distinct = Array.from({ length: 1000 }, (_, index) => `user${index}`);
-    await expect(stub.searchUsers("ada", distinct)).resolves.toEqual([user("ada@example.com", "Ada")]);
+    await expect(stub.searchUsers("ada", distinct)).resolves.toEqual([
+      user("ada@example.com", "Ada"),
+    ]);
     // Duplicates collapse before the limit applies; one more distinct id is over it.
     await expect(stub.searchUsers("ada", [...distinct, ...distinct])).resolves.toEqual([
       user("ada@example.com", "Ada"),
@@ -130,18 +135,25 @@ describe("UserDirectoryDurableObject", () => {
 
   it("applies exclusions before capping broad matches at ten results", async () => {
     const stub = directory("limit");
-    await Promise.all(Array.from({ length: 12 }, (_, index) => stub.syncUser(user(
-      `user${index.toString().padStart(2, "0")}@example.com`,
-      `Common Person ${index.toString().padStart(2, "0")}`,
-    ), 0)));
+    await Promise.all(
+      Array.from({ length: 12 }, (_, index) =>
+        stub.syncUser(
+          user(
+            `user${index.toString().padStart(2, "0")}@example.com`,
+            `Common Person ${index.toString().padStart(2, "0")}`,
+          ),
+          0,
+        ),
+      ),
+    );
 
-    const results = await stub.searchUsers("common", [
-      "user00@example.com",
-      "user01@example.com",
-    ]);
+    const results = await stub.searchUsers("common", ["user00@example.com", "user01@example.com"]);
     expect(results).toHaveLength(10);
-    expect(results.map(result => result.id)).toEqual(
-      Array.from({ length: 10 }, (_, index) => `user${(index + 2).toString().padStart(2, "0")}@example.com`),
+    expect(results.map((result) => result.id)).toEqual(
+      Array.from(
+        { length: 10 },
+        (_, index) => `user${(index + 2).toString().padStart(2, "0")}@example.com`,
+      ),
     );
   });
 });
