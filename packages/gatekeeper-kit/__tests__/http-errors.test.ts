@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { HttpError, isNoAccessError, probeAccess } from "../src/http-errors";
 
 describe("isNoAccessError", () => {
@@ -15,19 +15,30 @@ describe("isNoAccessError", () => {
 describe("probeAccess", () => {
   it("maps no-access statuses to false and rethrows operational failures", async () => {
     expect(await probeAccess(async () => {})).toBe(true);
-    expect(await probeAccess(async () => { throw new HttpError(403, "denied"); })).toBe(false);
-    await expect(probeAccess(async () => { throw new HttpError(500, "boom"); }))
-      .rejects.toThrow("boom");
-    await expect(probeAccess(async () => { throw new Error("404 in text"); }))
-      .rejects.toThrow("404 in text");
+    expect(
+      await probeAccess(async () => {
+        throw new HttpError(403, "denied");
+      }),
+    ).toBe(false);
+    await expect(
+      probeAccess(async () => {
+        throw new HttpError(500, "boom");
+      }),
+    ).rejects.toThrow("boom");
+    await expect(
+      probeAccess(async () => {
+        throw new Error("404 in text");
+      }),
+    ).rejects.toThrow("404 in text");
   });
 
   it("classifies a resolved non-ok Response by status instead of reading it as access", async () => {
     // `fetch` resolves for HTTP errors, so `probeAccess(() => fetch(url))` must not report access.
     expect(await probeAccess(async () => new Response("ok"))).toBe(true);
     expect(await probeAccess(async () => new Response(null, { status: 403 }))).toBe(false);
-    await expect(probeAccess(async () => new Response(null, { status: 500 })))
-      .rejects.toThrow(HttpError);
+    await expect(probeAccess(async () => new Response(null, { status: 500 }))).rejects.toThrow(
+      HttpError,
+    );
   });
 
   it("still classifies when releasing the body fails", async () => {

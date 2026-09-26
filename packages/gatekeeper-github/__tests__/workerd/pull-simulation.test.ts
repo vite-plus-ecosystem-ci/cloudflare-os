@@ -8,13 +8,15 @@
 
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import { env, runInDurableObject } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ActionDescription, GitObjectType, GitOid }
-  from "@gadgets/workshop-shared/gatekeeper";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import type { ActionDescription, GitObjectType, GitOid } from "@gadgets/workshop-shared/gatekeeper";
 import { FLUSH_PKT, encodePktLine } from "../../src/git-transport";
 import type { GitHubCommitFilter, GitHubCreatePullRequestOptions } from "../../src/types";
 import type {
-  CreatePullRequestActionData, GatekeeperProps, Outcome, PushActionData,
+  CreatePullRequestActionData,
+  GatekeeperProps,
+  Outcome,
+  PushActionData,
 } from "./worker";
 
 const OWNER = "acme";
@@ -23,10 +25,10 @@ const API_BASE = `https://api.github.com/repos/${OWNER}/${REPO}`;
 const RECEIVE_PACK_URL = `https://github.com/${OWNER}/${REPO}.git/git-receive-pack`;
 
 /** Deterministic fake full oids. */
-const BASE = "a".repeat(40);   // main's head, known to GitHub
-const HEAD1 = "b".repeat(40);  // the agent-authored commit being pushed
-const HEAD2 = "c".repeat(40);  // a second agent-authored commit, child of HEAD1
-const OLD = "d".repeat(40);    // an existing PR's remote head, known to GitHub
+const BASE = "a".repeat(40); // main's head, known to GitHub
+const HEAD1 = "b".repeat(40); // the agent-authored commit being pushed
+const HEAD2 = "c".repeat(40); // a second agent-authored commit, child of HEAD1
+const OLD = "d".repeat(40); // an existing PR's remote head, known to GitHub
 const TREE_BASE = "1".repeat(40);
 const TREE_1 = "2".repeat(40);
 const TREE_2 = "6".repeat(40);
@@ -38,18 +40,20 @@ const BLOB_EXTRA = "7".repeat(40);
 const encoder = new TextEncoder();
 
 function commitPayload(tree: string, parents: string[], message: string): Uint8Array {
-  return encoder.encode([
-    `tree ${tree}`,
-    ...parents.map(parent => `parent ${parent}`),
-    "author Ada Lovelace <ada@example.com> 1700000000 +0000",
-    "committer Ada Lovelace <ada@example.com> 1700000100 +0000",
-    "",
-    `${message}\n`,
-  ].join("\n"));
+  return encoder.encode(
+    [
+      `tree ${tree}`,
+      ...parents.map((parent) => `parent ${parent}`),
+      "author Ada Lovelace <ada@example.com> 1700000000 +0000",
+      "committer Ada Lovelace <ada@example.com> 1700000100 +0000",
+      "",
+      `${message}\n`,
+    ].join("\n"),
+  );
 }
 
 function treePayload(entries: { mode: string; name: string; oid: string }[]): Uint8Array {
-  const pieces = entries.flatMap(entry => {
+  const pieces = entries.flatMap((entry) => {
     const oidBytes = new Uint8Array(20);
     for (let i = 0; i < 20; i++) {
       oidBytes[i] = parseInt(entry.oid.slice(i * 2, i * 2 + 2), 16);
@@ -70,7 +74,7 @@ function treePayload(entries: { mode: string; name: string; oid: string }[]): Ui
  * simulation reads, ancestry pairs for the push queue check, and stand-in pack bytes for apply.
  */
 class TestGitCache extends RpcTarget {
-  readonly objects = new Map<GitOid, { type: GitObjectType, content: Uint8Array }>();
+  readonly objects = new Map<GitOid, { type: GitObjectType; content: Uint8Array }>();
   readonly ancestries = new Set<string>();
 
   withObject(oid: GitOid, type: GitObjectType, content: Uint8Array): this {
@@ -86,12 +90,13 @@ class TestGitCache extends RpcTarget {
   async isAncestor(ancestor: GitOid, descendant: GitOid): Promise<boolean> {
     if (!this.objects.has(descendant)) {
       throw new Error(
-        `Cannot check ancestry: ${descendant} is not a commit in the workspace's git cache.`);
+        `Cannot check ancestry: ${descendant} is not a commit in the workspace's git cache.`,
+      );
     }
     return ancestor === descendant || this.ancestries.has(`${ancestor}:${descendant}`);
   }
 
-  async get(id: GitOid): Promise<{ type: GitObjectType, content: Uint8Array } | null> {
+  async get(id: GitOid): Promise<{ type: GitObjectType; content: Uint8Array } | null> {
     return this.objects.get(id) ?? null;
   }
 
@@ -110,27 +115,33 @@ function scenarioCache(): TestGitCache {
   return new TestGitCache()
     .withObject(BASE, "commit", commitPayload(TREE_BASE, [], "base"))
     .withObject(HEAD1, "commit", commitPayload(TREE_1, [BASE], "feat: add new.txt"))
-    .withObject(TREE_BASE, "tree", treePayload([
-      { mode: "100644", name: "hello.txt", oid: BLOB_HELLO_V1 },
-    ]))
-    .withObject(TREE_1, "tree", treePayload([
-      { mode: "100644", name: "hello.txt", oid: BLOB_HELLO_V2 },
-      { mode: "100644", name: "new.txt", oid: BLOB_NEW },
-    ]))
+    .withObject(
+      TREE_BASE,
+      "tree",
+      treePayload([{ mode: "100644", name: "hello.txt", oid: BLOB_HELLO_V1 }]),
+    )
+    .withObject(
+      TREE_1,
+      "tree",
+      treePayload([
+        { mode: "100644", name: "hello.txt", oid: BLOB_HELLO_V2 },
+        { mode: "100644", name: "new.txt", oid: BLOB_NEW },
+      ]),
+    )
     .withObject(BLOB_HELLO_V1, "blob", encoder.encode("hello\nworld\n"))
     .withObject(BLOB_HELLO_V2, "blob", encoder.encode("hello\nthere\nworld\n"))
     .withObject(BLOB_NEW, "blob", encoder.encode("fresh\n"))
     .withAncestry(BASE, HEAD1);
 }
 
-type FakeCommit = { sha: string, message: string, parents?: string[], tree?: string };
+type FakeCommit = { sha: string; message: string; parents?: string[]; tree?: string };
 type FakeCompare = {
-  base_commit: { sha: string },
+  base_commit: { sha: string };
   /** Omittable to fake a malformed response: GitHub documents it as always present. */
-  merge_base_commit?: { sha: string },
-  commits: FakeCommit[],
-  total_commits: number,
-  files: unknown[],
+  merge_base_commit?: { sha: string };
+  commits: FakeCommit[];
+  total_commits: number;
+  files: unknown[];
 };
 
 function commitResponse(commit: FakeCommit) {
@@ -144,11 +155,15 @@ function commitResponse(commit: FakeCommit) {
       tree: commit.tree === undefined ? undefined : { sha: commit.tree },
     },
     author: null,
-    parents: (commit.parents ?? []).map(sha => ({ sha })),
+    parents: (commit.parents ?? []).map((sha) => ({ sha })),
   };
 }
 
-function pullResponse(number: number, head: { ref: string, sha: string }, base: { ref: string, sha: string }) {
+function pullResponse(
+  number: number,
+  head: { ref: string; sha: string },
+  base: { ref: string; sha: string },
+) {
   return {
     number,
     html_url: `https://github.com/${OWNER}/${REPO}/pull/${number}`,
@@ -184,7 +199,7 @@ class FakeGitHub {
   readonly branches = new Map<string, string>();
   readonly restCommits = new Map<string, FakeCommit>();
   readonly compares = new Map<string, FakeCompare>();
-  readonly commitListings = new Map<string, FakeCommit[]>();  // sha → listing (no path filter)
+  readonly commitListings = new Map<string, FakeCommit[]>(); // sha → listing (no path filter)
   readonly pulls = new Map<number, ReturnType<typeof pullResponse>>();
   readonly receivePackResponses: Uint8Array[] = [];
   #nextPullNumber = 7;
@@ -205,7 +220,9 @@ class FakeGitHub {
   }
 
   async #handle(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    const url = new URL(typeof input === "string" ? input : (input as Request).url ?? String(input));
+    const url = new URL(
+      typeof input === "string" ? input : ((input as Request).url ?? String(input)),
+    );
     const path = url.origin + url.pathname;
 
     if (path === RECEIVE_PACK_URL) {
@@ -218,15 +235,20 @@ class FakeGitHub {
 
     if (path === "https://api.github.com/user") {
       return Response.json({
-        login: "ada", name: "Ada Lovelace",
-        html_url: "https://github.com/ada", avatar_url: "https://github.com/ada.png",
+        login: "ada",
+        name: "Ada Lovelace",
+        html_url: "https://github.com/ada",
+        avatar_url: "https://github.com/ada.png",
       });
     }
 
     if (path === API_BASE) {
       // Repo metadata: what resolves an omitted ref to the default branch.
       return Response.json({
-        description: null, visibility: "public", private: false, default_branch: "main",
+        description: null,
+        visibility: "public",
+        private: false,
+        default_branch: "main",
       });
     }
 
@@ -270,16 +292,20 @@ class FakeGitHub {
     }
 
     if (path === `${API_BASE}/pulls` && init?.method === "POST") {
-      const body = JSON.parse(await new Response(init.body as BodyInit).text()) as
-        { head: string, base: string };
+      const body = JSON.parse(await new Response(init.body as BodyInit).text()) as {
+        head: string;
+        base: string;
+      };
       const headSha = this.branches.get(body.head);
       const baseSha = this.branches.get(body.base);
       if (headSha === undefined || baseSha === undefined) {
         return Response.json({ message: "Validation Failed" }, { status: 422 });
       }
       const number = this.#nextPullNumber++;
-      this.pulls.set(number, pullResponse(
-        number, { ref: body.head, sha: headSha }, { ref: body.base, sha: baseSha }));
+      this.pulls.set(
+        number,
+        pullResponse(number, { ref: body.head, sha: headSha }, { ref: body.base, sha: baseSha }),
+      );
       return Response.json({ number }, { status: 201 });
     }
 
@@ -303,7 +329,7 @@ class FakeGitHub {
 
 /** Records what the gatekeeper submits, standing in for the overseer's approval queue. */
 class TestApprovalQueue extends RpcTarget {
-  readonly submitted: { action: number, description: ActionDescription }[] = [];
+  readonly submitted: { action: number; description: ActionDescription }[] = [];
 
   async authorizeObservation(): Promise<void> {}
 
@@ -343,37 +369,63 @@ async function repoGatekeeper() {
     preparePush: (branch: string, commitId: string, cache: TestGitCache) =>
       unwrap(hooks.preparePush(scenario, props, branch, commitId, false, stubOf(cache))),
     submitPush: (queue: TestApprovalQueue, action: PushActionData) =>
-      unwrap(hooks.submitPush(scenario, props, stubOf(queue), action, {
-        title: "push", description: "test push",
-        pushedCommits: [action.newSha], implementsRevert: true,
-      })),
+      unwrap(
+        hooks.submitPush(scenario, props, stubOf(queue), action, {
+          title: "push",
+          description: "test push",
+          pushedCommits: [action.newSha],
+          implementsRevert: true,
+        }),
+      ),
     prepareCreatePullRequest: (options: GitHubCreatePullRequestOptions) =>
       unwrap(hooks.prepareCreatePullRequest(scenario, props, options)),
     submitCreatePullRequest: (queue: TestApprovalQueue, action: CreatePullRequestActionData) =>
-      unwrap(hooks.submitCreatePullRequest(scenario, props, stubOf(queue), action, {
-        title: "create PR", description: "test PR", implementsRevert: false,
-      })),
+      unwrap(
+        hooks.submitCreatePullRequest(scenario, props, stubOf(queue), action, {
+          title: "create PR",
+          description: "test PR",
+          implementsRevert: false,
+        }),
+      ),
     applyAction: (actionId: number, cache: TestGitCache) =>
       unwrap(hooks.applyAction(scenario, props, actionId, stubOf(cache))),
     rejectAction: (actionId: number) => unwrap(hooks.rejectAction(scenario, props, actionId)),
     openPullRequest: (id: string, cache?: TestGitCache) =>
-      unwrap(hooks.openPullRequest(scenario, props, id, cache === undefined ? undefined : stubOf(cache))),
+      unwrap(
+        hooks.openPullRequest(scenario, props, id, cache === undefined ? undefined : stubOf(cache)),
+      ),
     pullDiffAll: (id: string, cache?: TestGitCache) =>
-      unwrap(hooks.pullDiffAll(scenario, props, id, cache === undefined ? undefined : stubOf(cache))),
+      unwrap(
+        hooks.pullDiffAll(scenario, props, id, cache === undefined ? undefined : stubOf(cache)),
+      ),
     pullCommitsAll: (id: string, cache?: TestGitCache) =>
-      unwrap(hooks.pullCommitsAll(scenario, props, id, cache === undefined ? undefined : stubOf(cache))),
+      unwrap(
+        hooks.pullCommitsAll(scenario, props, id, cache === undefined ? undefined : stubOf(cache)),
+      ),
     listCommitsFirstPage: (filter: GitHubCommitFilter | undefined, cache?: TestGitCache) =>
-      unwrap(hooks.listCommitsFirstPage(
-        scenario, props, filter, 50, cache === undefined ? undefined : stubOf(cache))),
+      unwrap(
+        hooks.listCommitsFirstPage(
+          scenario,
+          props,
+          filter,
+          50,
+          cache === undefined ? undefined : stubOf(cache),
+        ),
+      ),
     pullMergeBase: (id: string, cache?: TestGitCache) =>
-      unwrap(hooks.pullMergeBase(scenario, props, id, cache === undefined ? undefined : stubOf(cache))),
+      unwrap(
+        hooks.pullMergeBase(scenario, props, id, cache === undefined ? undefined : stubOf(cache)),
+      ),
   };
 }
 
 type GatekeeperHandle = Awaited<ReturnType<typeof repoGatekeeper>>;
 
 async function queuePush(
-  gk: GatekeeperHandle, cache: TestGitCache, branch: string, commitId: string,
+  gk: GatekeeperHandle,
+  cache: TestGitCache,
+  branch: string,
+  commitId: string,
 ): Promise<PushActionData> {
   const action = await gk.preparePush(branch, commitId, cache);
   if (action === null) throw new Error("test: expected a push action to queue");
@@ -382,7 +434,8 @@ async function queuePush(
 }
 
 async function queuePullRequest(
-  gk: GatekeeperHandle, options: GitHubCreatePullRequestOptions,
+  gk: GatekeeperHandle,
+  options: GitHubCreatePullRequestOptions,
 ): Promise<CreatePullRequestActionData> {
   const action = await gk.prepareCreatePullRequest(options);
   await gk.submitCreatePullRequest(new TestApprovalQueue(), action);
@@ -422,20 +475,25 @@ describe("provisional pull request over a queued branch-creation push", () => {
     expect(details.head).toMatchObject({ ref: "feature", sha: HEAD1 });
     expect(details.base).toMatchObject({ ref: "main", sha: BASE });
     expect(details.commits).toBe(1);
-    expect(details.additions).toBe(2);   // "there" in hello.txt + "fresh" in new.txt
+    expect(details.additions).toBe(2); // "there" in hello.txt + "fresh" in new.txt
     expect(details.deletions).toBe(0);
     expect(details.changedFiles).toBe(2);
 
     const diff = await gk.pullDiffAll(pr.provisionalId, cache);
     expect(diff.revision).toEqual({ baseSha: BASE, headSha: HEAD1, mergeBaseSha: BASE });
-    expect(diff.files.map(file => [file.path, file.status, file.diffOmitted]))
-      .toEqual([["hello.txt", "modified", false], ["new.txt", "added", false]]);
-    expect(diff.files[0].hunks[0].lines)
-      .toContainEqual({ kind: "added", text: "there", newLineNumber: 2 });
+    expect(diff.files.map((file) => [file.path, file.status, file.diffOmitted])).toEqual([
+      ["hello.txt", "modified", false],
+      ["new.txt", "added", false],
+    ]);
+    expect(diff.files[0].hunks[0].lines).toContainEqual({
+      kind: "added",
+      text: "there",
+      newLineNumber: 2,
+    });
     expect(diff.files[1].hunks[0].header).toBe("@@ -0,0 +1 @@");
 
     const commits = await gk.pullCommitsAll(pr.provisionalId, cache);
-    expect(commits.map(commit => commit.id)).toEqual([HEAD1]);
+    expect(commits.map((commit) => commit.id)).toEqual([HEAD1]);
     expect(commits[0].message).toBe("feat: add new.txt");
     expect(commits[0].parents).toEqual([BASE]);
 
@@ -451,11 +509,15 @@ describe("provisional pull request over a queued branch-creation push", () => {
     const gk = await repoGatekeeper();
     const cache = scenarioCache()
       .withObject(HEAD2, "commit", commitPayload(TREE_2, [HEAD1], "feat: add extra.txt"))
-      .withObject(TREE_2, "tree", treePayload([
-        { mode: "100644", name: "extra.txt", oid: BLOB_EXTRA },
-        { mode: "100644", name: "hello.txt", oid: BLOB_HELLO_V2 },
-        { mode: "100644", name: "new.txt", oid: BLOB_NEW },
-      ]))
+      .withObject(
+        TREE_2,
+        "tree",
+        treePayload([
+          { mode: "100644", name: "extra.txt", oid: BLOB_EXTRA },
+          { mode: "100644", name: "hello.txt", oid: BLOB_HELLO_V2 },
+          { mode: "100644", name: "new.txt", oid: BLOB_NEW },
+        ]),
+      )
       .withObject(BLOB_EXTRA, "blob", encoder.encode("extra\n"))
       .withAncestry(HEAD1, HEAD2);
     const first = await queuePush(gk, cache, "feature", HEAD1);
@@ -468,15 +530,18 @@ describe("provisional pull request over a queued branch-creation push", () => {
     expect(details.head.sha).toBe(HEAD2);
     expect(details.commits).toBe(2);
     expect(details.changedFiles).toBe(3);
-    expect(details.additions).toBe(3);  // "there", "fresh", and "extra"
+    expect(details.additions).toBe(3); // "there", "fresh", and "extra"
 
     const commits = await gk.pullCommitsAll(pr.provisionalId, cache);
-    expect(commits.map(commit => commit.id)).toEqual([HEAD1, HEAD2]);
+    expect(commits.map((commit) => commit.id)).toEqual([HEAD1, HEAD2]);
 
     const diff = await gk.pullDiffAll(pr.provisionalId, cache);
     expect(diff.revision).toEqual({ baseSha: BASE, headSha: HEAD2, mergeBaseSha: BASE });
-    expect(diff.files.map(file => [file.path, file.status]))
-      .toEqual([["extra.txt", "added"], ["hello.txt", "modified"], ["new.txt", "added"]]);
+    expect(diff.files.map((file) => [file.path, file.status])).toEqual([
+      ["extra.txt", "added"],
+      ["hello.txt", "modified"],
+      ["new.txt", "added"],
+    ]);
   });
 
   it("falls back to GitHub's compare once the push has been applied", async () => {
@@ -503,7 +568,7 @@ describe("provisional pull request over a queued branch-creation push", () => {
     expect(details.head.sha).toBe(HEAD1);
     expect(details.commits).toBe(1);
     const commits = await gk.pullCommitsAll(pr.provisionalId, cache);
-    expect(commits.map(commit => commit.id)).toEqual([HEAD1]);
+    expect(commits.map((commit) => commit.id)).toEqual([HEAD1]);
   });
 });
 
@@ -513,10 +578,12 @@ describe("queue-time validation", () => {
     const gk = await repoGatekeeper();
     const cache = scenarioCache();
 
-    await expect(gk.prepareCreatePullRequest({ title: "x", head: "nope", base: "main" }))
-      .rejects.toThrow(/branch does not exist .*Push your commits/s);
-    await expect(gk.prepareCreatePullRequest({ title: "x", head: "main", base: "missing" }))
-      .rejects.toThrow(/base branch does not exist/);
+    await expect(
+      gk.prepareCreatePullRequest({ title: "x", head: "nope", base: "main" }),
+    ).rejects.toThrow(/branch does not exist .*Push your commits/s);
+    await expect(
+      gk.prepareCreatePullRequest({ title: "x", head: "main", base: "missing" }),
+    ).rejects.toThrow(/base branch does not exist/);
 
     // A branch that exists only as a queued push passes.
     await queuePush(gk, cache, "feature", HEAD1);
@@ -535,8 +602,9 @@ describe("approval ordering", () => {
 
     // The PR create is applied first: GitHub 422s (the branch does not exist), which surfaces
     // as ordering guidance; the action stays pending.
-    await expect(gk.applyAction(pr.approvalId, cache))
-      .rejects.toThrow(/Approve the push to "feature" first/);
+    await expect(gk.applyAction(pr.approvalId, cache)).rejects.toThrow(
+      /Approve the push to "feature" first/,
+    );
 
     github.respondToPush("unpack ok", "ok refs/heads/feature");
     await gk.applyAction(push.approvalId, cache);
@@ -544,7 +612,7 @@ describe("approval ordering", () => {
 
     await gk.applyAction(pr.approvalId, cache);
     const details = await gk.openPullRequest(pr.provisionalId, cache);
-    expect(details.id).toBe("7");  // resolved to the real GitHub number
+    expect(details.id).toBe("7"); // resolved to the real GitHub number
     expect(details.head.sha).toBe(HEAD1);
   });
 });
@@ -558,8 +626,9 @@ describe("push rejection cascade", () => {
     const pr = await queuePullRequest(gk, { title: "Add new.txt", head: "feature", base: "main" });
 
     expect(await gk.rejectAction(push.approvalId)).toEqual({ restart: true });
-    await expect(gk.openPullRequest(pr.provisionalId, cache))
-      .rejects.toThrow(/No provisional pull request exists/);
+    await expect(gk.openPullRequest(pr.provisionalId, cache)).rejects.toThrow(
+      /No provisional pull request exists/,
+    );
     await expect(gk.applyAction(pr.approvalId, cache)).rejects.toThrow(/no longer pending/);
   });
 
@@ -583,7 +652,12 @@ describe("existing pull request with queued head pushes", () => {
   it("reads details, diff, and commits at the simulated head", async () => {
     const github = scenarioGitHub();
     github.branches.set("topic", OLD);
-    github.restCommits.set(OLD, { sha: OLD, message: "old head", parents: [BASE], tree: TREE_BASE });
+    github.restCommits.set(OLD, {
+      sha: OLD,
+      message: "old head",
+      parents: [BASE],
+      tree: TREE_BASE,
+    });
     github.pulls.set(7, pullResponse(7, { ref: "topic", sha: OLD }, { ref: "main", sha: BASE }));
     github.compares.set(`main...${OLD}`, {
       base_commit: { sha: BASE },
@@ -602,16 +676,16 @@ describe("existing pull request with queued head pushes", () => {
 
     const details = await gk.openPullRequest("7", cache);
     expect(details.head.sha).toBe(HEAD1);
-    expect(details.commits).toBe(2);  // OLD (from GitHub's compare) + HEAD1 (pending)
+    expect(details.commits).toBe(2); // OLD (from GitHub's compare) + HEAD1 (pending)
     expect(details.changedFiles).toBe(2);
     expect(details.mergeable).toBeUndefined();
 
     const diff = await gk.pullDiffAll("7", cache);
     expect(diff.revision).toEqual({ baseSha: BASE, headSha: HEAD1, mergeBaseSha: BASE });
-    expect(diff.files.map(file => file.path)).toEqual(["hello.txt", "new.txt"]);
+    expect(diff.files.map((file) => file.path)).toEqual(["hello.txt", "new.txt"]);
 
     const commits = await gk.pullCommitsAll("7", cache);
-    expect(commits.map(commit => commit.id)).toEqual([OLD, HEAD1]);
+    expect(commits.map((commit) => commit.id)).toEqual([OLD, HEAD1]);
 
     // The merge base too reads at the simulated head's comparison.
     expect(await gk.pullMergeBase("7", cache)).toBe(BASE);
@@ -683,12 +757,12 @@ describe("repo commit listing on a provisional branch", () => {
     await queuePush(gk, cache, "feature", HEAD1);
 
     const page = await gk.listCommitsFirstPage({ ref: "feature" }, cache);
-    expect(page?.map(commit => commit.id)).toEqual([HEAD1, BASE]);
+    expect(page?.map((commit) => commit.id)).toEqual([HEAD1, BASE]);
 
     // A path filter applies to the pending chain locally (tree diff against the parent); the
     // fake returns no remote matches, so only the matching pending commit is listed.
     const filtered = await gk.listCommitsFirstPage({ ref: "feature", path: "new.txt" }, cache);
-    expect(filtered?.map(commit => commit.id)).toEqual([HEAD1]);
+    expect(filtered?.map((commit) => commit.id)).toEqual([HEAD1]);
     const none = await gk.listCommitsFirstPage({ ref: "feature", path: "unrelated.txt" }, cache);
     expect(none).toBeNull();
   });
@@ -704,7 +778,7 @@ describe("repo commit listing on a provisional branch", () => {
     await queuePush(gk, cache, "main", HEAD1);
 
     const page = await gk.listCommitsFirstPage(undefined, cache);
-    expect(page?.map(commit => commit.id)).toEqual([HEAD1, BASE]);
+    expect(page?.map((commit) => commit.id)).toEqual([HEAD1, BASE]);
   });
 
   it("lists the resolved default branch explicitly when the overlay is a no-op", async () => {
@@ -717,14 +791,14 @@ describe("repo commit listing on a provisional branch", () => {
     const gk = await repoGatekeeper();
     const cache = scenarioCache();
     await queuePush(gk, cache, "main", HEAD1);
-    github.branches.set("main", HEAD1);  // landed out-of-band: the overlay is a no-op
+    github.branches.set("main", HEAD1); // landed out-of-band: the overlay is a no-op
     github.commitListings.set("main", [
       { sha: HEAD1, message: "feat: add new.txt", parents: [BASE] },
       { sha: BASE, message: "base", parents: [] },
     ]);
 
     const page = await gk.listCommitsFirstPage(undefined, cache);
-    expect(page?.map(commit => commit.id)).toEqual([HEAD1, BASE]);
+    expect(page?.map((commit) => commit.id)).toEqual([HEAD1, BASE]);
   });
 
   it("does not simulate a parameterless listing over a push to a non-default branch", async () => {
@@ -736,6 +810,6 @@ describe("repo commit listing on a provisional branch", () => {
     await queuePush(gk, cache, "feature", HEAD1);
 
     const page = await gk.listCommitsFirstPage(undefined, cache);
-    expect(page?.map(commit => commit.id)).toEqual([BASE]);
+    expect(page?.map((commit) => commit.id)).toEqual([BASE]);
   });
 });

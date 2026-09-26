@@ -10,15 +10,23 @@
 // is decided, and `applyAction` succeeds, so the drain's submit -> auto-approve -> apply round
 // trip is the real one.
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type {
-  ActionLogEntry, AuthenticatedApi, Overseer, PublicApi,
+  ActionLogEntry,
+  AuthenticatedApi,
+  Overseer,
+  PublicApi,
 } from "@gadgets/workshop-shared/api";
 import { startTestGatekeeperHarness, TEST_VENDOR_ID, type Harness } from "../src/harness.js";
 import type { TestSession } from "../fixtures/gatekeeper-test/src/test-gatekeeper.js";
 import {
-  connect, listConnectedAccounts, nextUsernames, signUp, waitFor, type ConnectedAccount,
+  connect,
+  listConnectedAccounts,
+  nextUsernames,
+  signUp,
+  waitFor,
+  type ConnectedAccount,
 } from "../src/rpc-client.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 
@@ -55,7 +63,7 @@ async function provisionAccount(api: RpcStub<AuthenticatedApi>): Promise<Connect
   await api.provisionAmbientAccount(TEST_VENDOR_ID);
   return waitFor("the test account to be provisioned", async () => {
     const accounts = await listConnectedAccounts(api);
-    return accounts.find(a => a.vendorId === TEST_VENDOR_ID) ?? null;
+    return accounts.find((a) => a.vendorId === TEST_VENDOR_ID) ?? null;
   });
 }
 
@@ -71,11 +79,13 @@ async function newWorkspace(publicApi: RpcStub<PublicApi>, thingName: string): P
   const account = await provisionAccount(aliceApi);
   const overseer = await aliceApi.newGadget();
   const gatekeeper = await overseer.newGatekeeper(
-      account.id, `https://gadgets-test.example/things/${thingName}`);
+    account.id,
+    `https://gadgets-test.example/things/${thingName}`,
+  );
   if (!gatekeeper) throw new Error("Failed to create the test connection");
   return {
     overseer,
-    session: await gatekeeper.openSession() as RpcStub<TestSession>,
+    session: (await gatekeeper.openSession()) as RpcStub<TestSession>,
     gatekeeperId: await gatekeeper.getId(),
   };
 }
@@ -83,27 +93,30 @@ async function newWorkspace(publicApi: RpcStub<PublicApi>, thingName: string): P
 async function listWrites(ws: Workspace): Promise<Array<ActionLogEntry & { type: "action" }>> {
   // listActions pages newest-first; sort back to creation order, which the tests reason in.
   const { entries } = await ws.overseer.listActions();
-  return entries.filter(
+  return entries
+    .filter(
       (a): a is ActionLogEntry & { type: "action" } =>
-          a.type === "action" && a.gatekeeperId === ws.gatekeeperId)
-      .toSorted((a, b) => a.id - b.id);
+        a.type === "action" && a.gatekeeperId === ws.gatekeeperId,
+    )
+    .toSorted((a, b) => a.id - b.id);
 }
 
 // The drain runs via ctx.waitUntil after submit, so "did not auto-approve" needs a settle window.
 // One further RPC round trip plus a beat is far beyond the drain's synchronous storage work.
 async function settle(ws: Workspace): Promise<void> {
   await ws.overseer.listActions();
-  await new Promise(resolve => setTimeout(resolve, 300));
+  await new Promise((resolve) => setTimeout(resolve, 300));
 }
 
 describe("auto-approval policy", () => {
   it.concurrent("auto-approves a rule-enabled, author-approvable action", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "auto-happy");
       await ws.overseer.setAutoApprovedActionKind(ws.gatekeeperId, SET_VALUE);
       // Resolves once the action is decided -- here, by the drain, with no human involved.
-      await expect(ws.session.writeValue(1, { autoApprovable: true }))
-          .resolves.toEqual(expect.any(Number));
+      await expect(ws.session.writeValue(1, { autoApprovable: true })).resolves.toEqual(
+        expect.any(Number),
+      );
 
       const applied = await waitFor("the write to be auto-approved", async () => {
         const [write] = await listWrites(ws);
@@ -113,9 +126,8 @@ describe("auto-approval policy", () => {
     });
   });
 
-  it.concurrent("a pre-latch auto-approval rule stops firing once the workspace reads sensitive data",
-      async () => {
-    await withSession(async publicApi => {
+  it.concurrent("a pre-latch auto-approval rule stops firing once the workspace reads sensitive data", async () => {
+    await withSession(async (publicApi) => {
       const ws = await newWorkspace(publicApi, "pre-latch");
       // The catalog lists only connections some gadget binds (pure storage writes; no gadget code
       // runs), so bind this one to make its rule visible below. Unshared, so no restart.
@@ -135,7 +147,9 @@ describe("auto-approval policy", () => {
       // revocable in the UI.
       await expect(ws.overseer.listPreApprovableActions()).resolves.toEqual([
         expect.objectContaining({
-          gatekeeperId: ws.gatekeeperId, actionKind: SET_VALUE, alreadyEnabled: true,
+          gatekeeperId: ws.gatekeeperId,
+          actionKind: SET_VALUE,
+          alreadyEnabled: true,
         }),
       ]);
 

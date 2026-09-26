@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { HierarchicalListItem } from "./HierarchicalList";
 import {
   getKeyboardMoveDestination,
@@ -17,17 +17,18 @@ const rowTarget = (
     parent?: HierarchicalListItem | null;
     open?: boolean;
   } = {},
-) => getRowDropTarget({
-  source: options.source ?? source,
-  item,
-  parent: options.parent ?? null,
-  index: 1,
-  depth: 0,
-  open: options.open ?? false,
-  clientY,
-  rowTop: 40,
-  rowHeight: 60,
-});
+) =>
+  getRowDropTarget({
+    source: options.source ?? source,
+    item,
+    parent: options.parent ?? null,
+    index: 1,
+    depth: 0,
+    open: options.open ?? false,
+    clientY,
+    rowTop: 40,
+    rowHeight: 60,
+  });
 
 describe("hierarchical list drag-and-drop targeting", () => {
   it("inserts before or after a row at its midpoint", () => {
@@ -56,7 +57,10 @@ describe("hierarchical list drag-and-drop targeting", () => {
       children: [{ id: "child", name: "Child" }],
     };
 
-    expect(rowTarget(folder, 80, { open: true })?.destination).toEqual({ parent: folder, index: 0 });
+    expect(rowTarget(folder, 80, { open: true })?.destination).toEqual({
+      parent: folder,
+      index: 0,
+    });
   });
 
   it("does not advertise insertion below an expanded non-droppable folder row", () => {
@@ -70,7 +74,12 @@ describe("hierarchical list drag-and-drop targeting", () => {
   });
 
   it("rejects moving a folder into its descendant", () => {
-    const child: HierarchicalListItem = { id: "child", name: "Child", droppable: true, children: [] };
+    const child: HierarchicalListItem = {
+      id: "child",
+      name: "Child",
+      droppable: true,
+      children: [],
+    };
     const folder: HierarchicalListItem = {
       id: "folder",
       name: "Folder",
@@ -104,7 +113,10 @@ describe("hierarchical list drag-and-drop targeting", () => {
 
     expect(getKeyboardMoveDestination(items, source, "up")).toEqual({ parent: null, index: 0 });
     expect(getKeyboardMoveDestination(items, source, "down")).toEqual({ parent: null, index: 3 });
-    expect(getKeyboardMoveDestination(items, source, "right")).toEqual({ parent: folder, index: 0 });
+    expect(getKeyboardMoveDestination(items, source, "right")).toEqual({
+      parent: folder,
+      index: 0,
+    });
   });
 
   it("rejects keyboard unindent into a non-droppable grandparent", () => {

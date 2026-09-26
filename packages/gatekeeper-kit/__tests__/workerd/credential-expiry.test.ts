@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   clearCredentialExpiryLatch,
   notifyCredentialsExpiredOnce,
@@ -60,7 +60,11 @@ describe("notifyCredentialsExpiredOnce", () => {
   it("sets the latch only after the callback resolves", async () => {
     const kv = makeKv();
     const { promise, resolve } = Promise.withResolvers<void>();
-    const notifying = notifyCredentialsExpiredOnce(kv, makeCallback(() => promise), "test");
+    const notifying = notifyCredentialsExpiredOnce(
+      kv,
+      makeCallback(() => promise),
+      "test",
+    );
 
     await Promise.resolve();
     expect(kv.get(EXPIRED_NOTIFIED_KEY)).toBeUndefined();
@@ -90,7 +94,8 @@ describe("notifyCredentialsExpiredOnce", () => {
   it("notifies again for an expiry that arrives after a reconnect re-armed", async () => {
     const kv = makeKv();
     const first = Promise.withResolvers<void>();
-    const credentialsExpired = vi.fn()
+    const credentialsExpired = vi
+      .fn()
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(async () => {});
     const callback = makeCallback(credentialsExpired);
@@ -111,12 +116,19 @@ describe("notifyCredentialsExpiredOnce", () => {
     const logged = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       const broken = {
-        get: () => { throw new Error("storage unavailable"); },
+        get: () => {
+          throw new Error("storage unavailable");
+        },
         put: () => {},
       } as unknown as ExpiryLatchKv;
 
-      await expect(notifyCredentialsExpiredOnce(broken, makeCallback(async () => {}), "test"))
-        .resolves.toBeUndefined();
+      await expect(
+        notifyCredentialsExpiredOnce(
+          broken,
+          makeCallback(async () => {}),
+          "test",
+        ),
+      ).resolves.toBeUndefined();
       expect(logged).toHaveBeenCalledOnce();
     } finally {
       logged.mockRestore();
@@ -125,7 +137,8 @@ describe("notifyCredentialsExpiredOnce", () => {
 
   it("leaves the latch unset when the callback fails, so a later call notifies again", async () => {
     const kv = makeKv();
-    const credentialsExpired = vi.fn()
+    const credentialsExpired = vi
+      .fn()
       .mockRejectedValueOnce(new Error("dropped RPC"))
       .mockResolvedValueOnce(undefined);
     const callback = makeCallback(credentialsExpired);
@@ -185,7 +198,11 @@ describe("notifyCredentialsExpiredOnce", () => {
     const { promise, resolve } = Promise.withResolvers<void>();
 
     // Connection A starts notifying, and is still awaiting its callback.
-    const notifying = notifyCredentialsExpiredOnce(kv, makeCallback(() => promise), "test");
+    const notifying = notifyCredentialsExpiredOnce(
+      kv,
+      makeCallback(() => promise),
+      "test",
+    );
 
     // What revoke() and the self-destruct alarm do, followed by a fresh connection arming again.
     // A counter would restart from zero and hand B exactly the arm A is still holding.
@@ -212,7 +229,11 @@ describe("notifyCredentialsExpiredOnce", () => {
     };
     const { promise, resolve } = Promise.withResolvers<void>();
 
-    const notifying = notifyCredentialsExpiredOnce(kv, makeCallback(() => promise), "test");
+    const notifying = notifyCredentialsExpiredOnce(
+      kv,
+      makeCallback(() => promise),
+      "test",
+    );
     // revoke() during the callback, with nothing reconnecting after it.
     values.clear();
     resolve();

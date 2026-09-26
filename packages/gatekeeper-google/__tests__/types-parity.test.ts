@@ -2,7 +2,7 @@
 
 import { readlinkSync } from "node:fs";
 import { URL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import bigqueryDeclared from "../src/bigquery-types.d.ts?raw";
 import bigqueryShipped from "../src/bigquery-types.txt?raw";
 import calendarDeclared from "../src/calendar-types.d.ts?raw";
@@ -32,14 +32,21 @@ describe("agent-facing TypeScript type modules", () => {
     ["bigquery-types", bigqueryShipped, bigqueryDeclared],
     ["drive-types", driveShipped, driveDeclared],
   ])("keeps %s.txt identical to its .d.ts", (name, shipped, declared) => {
-    expect(shipped, `${name}.txt drifted from ${name}.d.ts; restore the .txt symlink to the .d.ts`)
-      .toBe(declared);
+    expect(
+      shipped,
+      `${name}.txt drifted from ${name}.d.ts; restore the .txt symlink to the .d.ts`,
+    ).toBe(declared);
   });
 
   it.each([
-    "types", "docs-read-types", "docs-types", "sheets-types", "calendar-types",
-    "bigquery-types", "drive-types",
-  ])("ships %s.txt as a symlink to its authoritative declaration", name => {
+    "types",
+    "docs-read-types",
+    "docs-types",
+    "sheets-types",
+    "calendar-types",
+    "bigquery-types",
+    "drive-types",
+  ])("ships %s.txt as a symlink to its authoritative declaration", (name) => {
     expect(readlinkSync(new URL(`../src/${name}.txt`, import.meta.url))).toBe(`${name}.d.ts`);
   });
 });

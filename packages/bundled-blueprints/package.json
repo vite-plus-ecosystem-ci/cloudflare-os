@@ -10,8 +10,8 @@
     "./libraries/*/server": "./libraries/*/server.ts"
   },
   "scripts": {
-    "test:run": "vitest run",
-    "test:watch": "vitest"
+    "test:run": "vp test run",
+    "test:watch": "vp test"
   },
   "dependencies": {
     "yjs": "^13.6.32"
@@ -23,7 +23,6 @@
     "esbuild": "^0.28.1",
     "jsdom": "^26.1.0",
     "typescript": "catalog:",
-    "typescript6": "catalog:",
-    "vitest": "catalog:"
+    "typescript6": "catalog:"
   }
 }

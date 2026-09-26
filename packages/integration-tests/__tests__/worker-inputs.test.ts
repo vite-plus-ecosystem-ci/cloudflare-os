@@ -5,7 +5,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { isWorkerInput, WATCH_PATHS } from "../src/worker-inputs.js";
 
 const WORKSPACE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -25,7 +25,7 @@ it.each([
   "packages/integration-tests/fixtures/gatekeeper-test/wrangler.jsonc",
   "packages/integration-tests/fixtures/gatekeeper-test/src/test-gatekeeper.ts",
   "pnpm-lock.yaml",
-])("treats %s as a Worker input", path => {
+])("treats %s as a Worker input", (path) => {
   expect(isWorkerInput(inWorkspace(path))).toBe(true);
 });
 
@@ -39,7 +39,7 @@ it.each([
   "packages/typed-storage/node_modules/.bin/tsc",
   // Another package's tests reach the Worker through none of this.
   "packages/workshop-frontend/src/main.tsx",
-])("does not treat %s as a Worker input", path => {
+])("does not treat %s as a Worker input", (path) => {
   expect(isWorkerInput(inWorkspace(path))).toBe(false);
 });
 
@@ -47,7 +47,7 @@ it.each([
 // them must sit under a watched path -- otherwise the predicate above accepts events that never
 // arrive.
 const covered = (path: string) =>
-  WATCH_PATHS.some(root => path === root || path.startsWith(`${root}/`));
+  WATCH_PATHS.some((root) => path === root || path.startsWith(`${root}/`));
 
 it("watches a root covering every entry in the table", () => {
   const roots = [
@@ -68,6 +68,6 @@ it("watches a root covering every entry in the table", () => {
     "pnpm-lock.yaml",
   ].map(inWorkspace);
 
-  expect(roots.filter(root => !covered(root))).toEqual([]);
+  expect(roots.filter((root) => !covered(root))).toEqual([]);
   expect(WATCH_PATHS.length).toBe(roots.length);
 });
