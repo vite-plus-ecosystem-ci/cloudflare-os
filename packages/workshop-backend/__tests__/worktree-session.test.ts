@@ -450,7 +450,7 @@ describe("grep", () => {
 
       // A mixed list of directories and files, with overlapping entries deduplicated.
       expect(await session.grep(/answer|hello/, ["src", "src/util.js", "README.md"])).toBe(
-        'src/main.js:1:console.log("hello");\n' + "src/util.js:1:export const answer = 42;",
+        'src/main.js:1:console.log("hello");\nsrc/util.js:1:export const answer = 42;',
       );
 
       // An empty array searches nothing (and fails nothing).
@@ -525,7 +525,7 @@ describe("grep", () => {
     // An array of scopes likewise fills all of its missing blobs in one pull -- the reason the
     // path argument accepts a list.
     expect(await session.grep(/Fixture|run/, ["README.md", "run.sh"])).toBe(
-      "README.md:1:# Fixture\n" + "run.sh:2:echo run",
+      "README.md:1:# Fixture\nrun.sh:2:echo run",
     );
     expect(pulls.length).toBe(2);
     expect(pulls[1].oids.toSorted()).toEqual(
@@ -582,7 +582,7 @@ describe("grep", () => {
     // beside a searchable path it degrades to a skip.
     await expect(session.grep(/x/, "big1.txt")).rejects.toThrow("big1.txt is too large to read");
     expect(await session.grep(/x/, ["big1.txt", "small.txt"])).toBe(
-      "small.txt:1:x marks the spot\n" + "(skipped: big1.txt is too large to read)",
+      "small.txt:1:x marks the spot\n(skipped: big1.txt is too large to read)",
     );
   });
 });
