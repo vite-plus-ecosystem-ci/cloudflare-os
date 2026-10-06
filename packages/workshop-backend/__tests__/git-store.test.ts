@@ -615,7 +615,7 @@ describe("threeWayMerge", () => {
     );
     expect(result.conflictPaths).toEqual(["new.js"]);
     expect(result.files.get("new.js")).toBe(
-      "<<<<<<< ours\n" + "foo\n" + "||||||| base\n" + "=======\n" + "bar\n" + ">>>>>>> theirs\n",
+      "<<<<<<< ours\nfoo\n||||||| base\n=======\nbar\n>>>>>>> theirs\n",
     );
   });
 

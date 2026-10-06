@@ -190,8 +190,8 @@ describe("ActionDescriptionBuilder", () => {
       { label: "Body", kind: "json", value: '"a\\u0000b"' },
     ]);
     for (const field of shown.fields!) {
-      // oxlint-disable-next-line no-control-regex -- asserting none reach a value
       expect((field as { value: string }).value).not.toMatch(
+        // oxlint-disable-next-line no-control-regex -- asserting none reach a value
         /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/,
       );
     }

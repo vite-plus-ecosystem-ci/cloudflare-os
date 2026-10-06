@@ -197,7 +197,7 @@ describe("CodePreviewManager", () => {
     });
 
     it("never emits a delta ending in a lone high surrogate (\\u escapes)", () => {
-      let json = '{"workpiece": "app", "filename": "foo.ts", ' + '"content": "a\\ud83d\\ude00b"}';
+      let json = '{"workpiece": "app", "filename": "foo.ts", "content": "a\\ud83d\\ude00b"}';
       let { events, manager } = makeManager();
       feed(manager, "writeFile", json);
       for (let ev of ofType(events, "editPreviewDelta")) {
