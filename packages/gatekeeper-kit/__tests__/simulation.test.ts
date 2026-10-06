@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   ProvisionalIds,
   createSimulationView,
@@ -25,7 +25,7 @@ describe("createSimulationView", () => {
       record(1, "first", "a", "b"),
       record(2, "second", "b", "b"),
     ];
-    const view = createSimulationView(records, action => action.targets);
+    const view = createSimulationView(records, (action) => action.targets);
 
     expect(view.all().map(({ id }) => id)).toEqual([1, 2, 3]);
     expect(view.forTarget("a").map(({ id }) => id)).toEqual([1, 3]);
@@ -41,7 +41,7 @@ describe("createSimulationView", () => {
     ids.bind("~1", "real-1");
     const view = createSimulationView(
       [record(2, "real", "real-1"), record(1, "provisional", "~1")],
-      action => action.targets.map(target => ids.resolve(target)),
+      (action) => action.targets.map((target) => ids.resolve(target)),
     );
 
     expect(view.forTarget("real-1").map(({ id }) => id)).toEqual([1, 2]);
@@ -54,11 +54,11 @@ describe("createSimulationView", () => {
     const records: Records[] = [{ id: 1, action: { target: "page-123" } }];
 
     // @ts-expect-error - a bare target is not an array of targets.
-    createSimulationView<Records, string>(records, action => action.target);
+    createSimulationView<Records, string>(records, (action) => action.target);
     // @ts-expect-error - nor is a nullable one, the shape `actionPageId` returns.
-    createSimulationView<Records, string>(records, action => action.target || null);
+    createSimulationView<Records, string>(records, (action) => action.target || null);
 
-    const view = createSimulationView<Records, string>(records, action => [action.target]);
+    const view = createSimulationView<Records, string>(records, (action) => [action.target]);
     expect(view.forTarget("page-123").map(({ id }) => id)).toEqual([1]);
   });
 });
@@ -96,11 +96,11 @@ describe("ProvisionalIds", () => {
   it("allocates formatted monotonic IDs durably", () => {
     const kv = makeKv();
     const first = new ProvisionalIds<string>(kv, { namespace: "issues:" });
-    expect(first.allocate(sequence => `ENG-PENDING-${sequence}`)).toBe("ENG-PENDING-1");
-    expect(first.allocate(sequence => `ENG-PENDING-${sequence}`)).toBe("ENG-PENDING-2");
+    expect(first.allocate((sequence) => `ENG-PENDING-${sequence}`)).toBe("ENG-PENDING-1");
+    expect(first.allocate((sequence) => `ENG-PENDING-${sequence}`)).toBe("ENG-PENDING-2");
 
     const restarted = new ProvisionalIds<string>(kv, { namespace: "issues:" });
-    expect(restarted.allocate(sequence => `ENG-PENDING-${sequence}`)).toBe("ENG-PENDING-3");
+    expect(restarted.allocate((sequence) => `ENG-PENDING-${sequence}`)).toBe("ENG-PENDING-3");
   });
 
   it("retains bindings and isolates namespaces", () => {
@@ -118,7 +118,7 @@ describe("ProvisionalIds", () => {
   it("refuses to hand an unapplied provisional ID to the provider", () => {
     const ids = new ProvisionalIds<string>(makeKv(), {
       namespace: "issues:",
-      isProvisional: id => id.startsWith("~"),
+      isProvisional: (id) => id.startsWith("~"),
     });
     ids.bind("~1", "real-1");
 
@@ -132,7 +132,7 @@ describe("ProvisionalIds", () => {
     // already a provider id must not read as unresolved and block its apply.
     const ids = new ProvisionalIds<string>(makeKv(), {
       namespace: "issues:",
-      isProvisional: id => id.startsWith("~"),
+      isProvisional: (id) => id.startsWith("~"),
     });
     ids.bind("~1", "real-1");
 
@@ -148,28 +148,28 @@ describe("ProvisionalIds", () => {
     const ids = new ProvisionalIds<string>(kv, { namespace: "" });
 
     expect(ids.resolve("~6")).toBe("real-6");
-    expect(ids.allocate(sequence => `~${sequence}`)).toBe("~7");
+    expect(ids.allocate((sequence) => `~${sequence}`)).toBe("~7");
   });
 
   it("rejects a formatter whose output is not classifiable as provisional", () => {
     const kv = makeKv();
     const ids = new ProvisionalIds<string>(kv, {
       namespace: "issues:",
-      isProvisional: id => id.startsWith("~"),
+      isProvisional: (id) => id.startsWith("~"),
     });
 
     // Plausible provider IDs. Minted, these are indistinguishable from real ones, and `resolve()`
     // would hand an unbound one straight to the provider as though it were ready.
-    expect(() => ids.allocate(sequence => `${sequence}`)).toThrow(/does not classify/);
-    expect(() => ids.allocate(sequence => `ISSUE-${sequence}`)).toThrow(/does not classify/);
+    expect(() => ids.allocate((sequence) => `${sequence}`)).toThrow(/does not classify/);
+    expect(() => ids.allocate((sequence) => `ISSUE-${sequence}`)).toThrow(/does not classify/);
     // The sequence is not consumed by a rejected allocation.
-    expect(ids.allocate(sequence => `~${sequence}`)).toBe("~1");
+    expect(ids.allocate((sequence) => `~${sequence}`)).toBe("~1");
   });
 
   it("rejects a binding in either wrong direction", () => {
     const ids = new ProvisionalIds<string>(makeKv(), {
       namespace: "issues:",
-      isProvisional: id => id.startsWith("~"),
+      isProvisional: (id) => id.startsWith("~"),
     });
 
     // A real ID as the key shadows that provider ID for every later resolve().
@@ -187,7 +187,7 @@ describe("ProvisionalIds", () => {
     new ProvisionalIds<string>(kv, { namespace: "issues:" }).bind("~1", "~2");
     const ids = new ProvisionalIds<string>(kv, {
       namespace: "issues:",
-      isProvisional: id => id.startsWith("~"),
+      isProvisional: (id) => id.startsWith("~"),
     });
 
     // The documented `isResolvedReference` predicate must not release what requireResolved and
@@ -211,7 +211,7 @@ describe("ProvisionalIds", () => {
   it("skips both checks when no classifier is supplied", () => {
     // A consumer that never calls requireResolved pays nothing for the guards.
     const ids = new ProvisionalIds<string>(makeKv(), { namespace: "issues:" });
-    expect(ids.allocate(sequence => `${sequence}`)).toBe("1");
+    expect(ids.allocate((sequence) => `${sequence}`)).toBe("1");
     expect(() => ids.bind("anything", "else")).not.toThrow();
   });
 
@@ -222,7 +222,7 @@ describe("ProvisionalIds", () => {
 
     const guarded = new ProvisionalIds<string>(kv, {
       namespace: "issues:",
-      isProvisional: id => id.startsWith("~"),
+      isProvisional: (id) => id.startsWith("~"),
     });
     expect(guarded.resolve("~1")).toBe("~2");
     expect(() => guarded.requireResolved("~1")).toThrow(/bound to ~2, which has not been created/);
@@ -235,7 +235,7 @@ describe("ProvisionalIds", () => {
 
     const guarded = new ProvisionalIds<string>(kv, {
       namespace: "issues:",
-      isProvisional: id => id.startsWith("~"),
+      isProvisional: (id) => id.startsWith("~"),
     });
     expect(guarded.resolve("real-1")).toBe("real-1");
     expect(guarded.requireResolved("real-1")).toBe("real-1");
@@ -244,8 +244,8 @@ describe("ProvisionalIds", () => {
   it("persists optional kind tags across instances", () => {
     const kv = makeKv();
     const ids = new ProvisionalIds<string>(kv, { namespace: "issues:" });
-    const page = ids.allocate(sequence => `~${sequence}`, { kind: "page" });
-    const untagged = ids.allocate(sequence => `~${sequence}`);
+    const page = ids.allocate((sequence) => `~${sequence}`, { kind: "page" });
+    const untagged = ids.allocate((sequence) => `~${sequence}`);
 
     expect(ids.kindOf(page)).toBe("page");
     expect(ids.kindOf(untagged)).toBeUndefined();
@@ -255,9 +255,9 @@ describe("ProvisionalIds", () => {
   it("rejects a mismatched kind before checking whether the provisional is bound", () => {
     const ids = new ProvisionalIds<string>(makeKv(), {
       namespace: "issues:",
-      isProvisional: id => id.startsWith("~"),
+      isProvisional: (id) => id.startsWith("~"),
     });
-    const page = ids.allocate(sequence => `~${sequence}`, { kind: "page" });
+    const page = ids.allocate((sequence) => `~${sequence}`, { kind: "page" });
 
     expect(() => ids.requireResolved(page, { expectedKind: "comment" })).toThrow(
       "~1 is a page, not a comment.",
@@ -267,9 +267,9 @@ describe("ProvisionalIds", () => {
   it("resolves matching kinds and passes through real provider IDs without recorded kinds", () => {
     const ids = new ProvisionalIds<string>(makeKv(), {
       namespace: "issues:",
-      isProvisional: id => id.startsWith("~"),
+      isProvisional: (id) => id.startsWith("~"),
     });
-    const comment = ids.allocate(sequence => `~${sequence}`, { kind: "comment" });
+    const comment = ids.allocate((sequence) => `~${sequence}`, { kind: "comment" });
     ids.bind(comment, "real-1");
 
     expect(ids.requireResolved(comment, { expectedKind: "comment" })).toBe("real-1");

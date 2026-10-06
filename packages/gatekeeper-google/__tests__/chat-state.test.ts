@@ -2,10 +2,15 @@
 // These tests pin the cases where getting it wrong would be visible: a queued message that never
 // appears, one that appears twice, or a rejected action that leaves a ghost behind.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  ChatAction, PendingChatAction, overlayMessage, overlayMessageList, overlayReactions,
-  pendingMessageActionId, pendingMessageName,
+  ChatAction,
+  PendingChatAction,
+  overlayMessage,
+  overlayMessageList,
+  overlayReactions,
+  pendingMessageActionId,
+  pendingMessageName,
 } from "../src/chat-state";
 import type { ChatMessageInfo, ChatUser } from "../src/chat-types";
 
@@ -54,45 +59,73 @@ describe("message list overlay", () => {
   it("appends a queued message only once the provider has no more pages", () => {
     const provider = [message("1", "first")];
 
-    expect(overlayMessageList(provider, pending(send), {
-      ...oldestFirst, first: true, exhausted: false,
-    }).map(info => info.text)).toEqual(["first"]);
+    expect(
+      overlayMessageList(provider, pending(send), {
+        ...oldestFirst,
+        first: true,
+        exhausted: false,
+      }).map((info) => info.text),
+    ).toEqual(["first"]);
 
     const complete = overlayMessageList(provider, pending(send), {
-      ...oldestFirst, first: false, exhausted: true,
+      ...oldestFirst,
+      first: false,
+      exhausted: true,
     });
-    expect(complete.map(info => info.text)).toEqual(["first", "queued hello"]);
+    expect(complete.map((info) => info.text)).toEqual(["first", "queued hello"]);
     expect(complete[1]).toMatchObject({ id: pendingMessageName(1), pending: true, sender: SELF });
   });
 
   it("puts a queued message on only the first page when newest comes first", () => {
     const newestFirst = {
-      spaceName: SPACE, self: SELF, options: { order: "newestFirst" as const },
+      spaceName: SPACE,
+      self: SELF,
+      options: { order: "newestFirst" as const },
     };
-    expect(overlayMessageList([message("1", "newest")], pending(send), {
-      ...newestFirst, first: true, exhausted: false,
-    }).map(info => info.text)).toEqual(["queued hello", "newest"]);
-    expect(overlayMessageList([message("2", "older")], pending(send), {
-      ...newestFirst, first: false, exhausted: true,
-    }).map(info => info.text)).toEqual(["older"]);
+    expect(
+      overlayMessageList([message("1", "newest")], pending(send), {
+        ...newestFirst,
+        first: true,
+        exhausted: false,
+      }).map((info) => info.text),
+    ).toEqual(["queued hello", "newest"]);
+    expect(
+      overlayMessageList([message("2", "older")], pending(send), {
+        ...newestFirst,
+        first: false,
+        exhausted: true,
+      }).map((info) => info.text),
+    ).toEqual(["older"]);
   });
 
   it("keeps another conversation's queued message out", () => {
-    expect(overlayMessageList([], pending({ ...send, spaceName: "spaces/OTHER" }), {
-      ...oldestFirst, first: true, exhausted: true,
-    })).toEqual([]);
+    expect(
+      overlayMessageList([], pending({ ...send, spaceName: "spaces/OTHER" }), {
+        ...oldestFirst,
+        first: true,
+        exhausted: true,
+      }),
+    ).toEqual([]);
   });
 
   it("respects the thread and time filters the caller listed with", () => {
     const threaded: ChatAction = { ...send, threadName: `${SPACE}/threads/TTT` };
-    expect(overlayMessageList([], pending(threaded), {
-      ...oldestFirst, threadName: `${SPACE}/threads/OTHER`,
-      first: true, exhausted: true,
-    })).toEqual([]);
-    expect(overlayMessageList([], pending(send), {
-      ...oldestFirst, options: { since: new Date("2024-03-01T00:00:00Z") },
-      first: true, exhausted: true,
-    })).toEqual([]);
+    expect(
+      overlayMessageList([], pending(threaded), {
+        ...oldestFirst,
+        threadName: `${SPACE}/threads/OTHER`,
+        first: true,
+        exhausted: true,
+      }),
+    ).toEqual([]);
+    expect(
+      overlayMessageList([], pending(send), {
+        ...oldestFirst,
+        options: { since: new Date("2024-03-01T00:00:00Z") },
+        first: true,
+        exhausted: true,
+      }),
+    ).toEqual([]);
   });
 
   it("shows a queued edit without changing other messages", () => {
@@ -106,45 +139,64 @@ describe("message list overlay", () => {
     const result = overlayMessageList(
       [message("1", "first"), message("2", "second")],
       pending(edit),
-      { ...oldestFirst, first: true, exhausted: true });
-    expect(result.map(info => info.text)).toEqual(["edited", "second"]);
+      { ...oldestFirst, first: true, exhausted: true },
+    );
+    expect(result.map((info) => info.text)).toEqual(["edited", "second"]);
   });
 });
 
 describe("reaction overlay", () => {
   const target = `${SPACE}/messages/1`;
   const add: ChatAction = {
-    type: "addReaction", messageName: target, emoji: "🎉", submittedAt: Date.now(),
+    type: "addReaction",
+    messageName: target,
+    emoji: "🎉",
+    submittedAt: Date.now(),
   };
   const remove: ChatAction = {
-    type: "removeReaction", messageName: target, emoji: "👍", submittedAt: Date.now(),
+    type: "removeReaction",
+    messageName: target,
+    emoji: "👍",
+    submittedAt: Date.now(),
   };
   const ownThumb = { id: `${target}/reactions/x`, emoji: "👍", user: SELF };
   const otherThumb = { id: `${target}/reactions/y`, emoji: "👍", user: OTHER };
   const emojis = (reactions: { emoji: string; user?: ChatUser }[]) =>
-    reactions.map(reaction => [reaction.emoji, reaction.user?.id]);
+    reactions.map((reaction) => [reaction.emoji, reaction.user?.id]);
 
   it("leaves aggregate counts provider-backed rather than guessing the user's presence", () => {
     const info = overlayMessage(
       message("1", "first", { reactions: [{ emoji: "🎉", count: 1 }] }),
-      pending(add, add, remove));
+      pending(add, add, remove),
+    );
     expect(info.reactions).toEqual([{ emoji: "🎉", count: 1 }]);
   });
 
   it("adds and removes only the connected user's own reactions", () => {
     const result = overlayReactions([ownThumb, otherThumb], pending(add, remove), {
-      messageName: target, self: SELF, exhausted: true,
+      messageName: target,
+      self: SELF,
+      exhausted: true,
     });
-    expect(emojis(result)).toEqual([["👍", "users/other"], ["🎉", "users/me"]]);
+    expect(emojis(result)).toEqual([
+      ["👍", "users/other"],
+      ["🎉", "users/me"],
+    ]);
   });
 
   it("applies removals on every page and additions only after the final page", () => {
     const context = { messageName: target, self: SELF };
-    expect(emojis(overlayReactions([ownThumb, otherThumb], pending(add, remove), {
-      ...context, exhausted: false,
-    }))).toEqual([["👍", "users/other"]]);
-    expect(emojis(overlayReactions([], pending(add, remove), { ...context, exhausted: true })))
-      .toEqual([["🎉", "users/me"]]);
+    expect(
+      emojis(
+        overlayReactions([ownThumb, otherThumb], pending(add, remove), {
+          ...context,
+          exhausted: false,
+        }),
+      ),
+    ).toEqual([["👍", "users/other"]]);
+    expect(
+      emojis(overlayReactions([], pending(add, remove), { ...context, exhausted: true })),
+    ).toEqual([["🎉", "users/me"]]);
   });
 
   // The user may already have reacted in the Chat UI by the time the queued add is listed. Each
@@ -153,9 +205,11 @@ describe("reaction overlay", () => {
   it("shows a queued reaction once even when the provider already has it", () => {
     const ownParty = { id: `${target}/reactions/z`, emoji: "🎉", user: SELF };
     const context = { messageName: target, self: SELF };
-    expect(overlayReactions([ownParty], pending(add), { ...context, exhausted: false }))
-      .toEqual([]);
-    expect(emojis(overlayReactions([ownParty], pending(add), { ...context, exhausted: true })))
-      .toEqual([["🎉", "users/me"]]);
+    expect(overlayReactions([ownParty], pending(add), { ...context, exhausted: false })).toEqual(
+      [],
+    );
+    expect(
+      emojis(overlayReactions([ownParty], pending(add), { ...context, exhausted: true })),
+    ).toEqual([["🎉", "users/me"]]);
   });
 });

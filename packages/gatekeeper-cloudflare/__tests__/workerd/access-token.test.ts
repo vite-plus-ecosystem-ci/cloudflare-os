@@ -7,7 +7,7 @@
 
 import { env, runInDurableObject } from "cloudflare:test";
 import { stageCredentials } from "@gadgets/gatekeeper-kit/credential-stage";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { expiryNotices, type TestExports, type UserAccount } from "../worker.js";
 
 type StoredAccessToken = { token: string; expires: number };
@@ -17,21 +17,28 @@ afterEach(() => vi.unstubAllGlobals());
 let accounts = 0;
 
 /** Runs `test` in a connected account holding `refresh-1`, whose cached `access-1` expires at `expires`. */
-function inAccount<R>(expires: number,
-  test: (account: UserAccount, state: DurableObjectState) => Promise<R>): Promise<R> {
-  return runInDurableObject(env.USER_ACCOUNT.getByName(`account-${accounts++}`), (account, state) => {
-    state.storage.kv.put("refreshToken", "refresh-1");
-    state.storage.kv.put<StoredAccessToken>("accessToken", { token: "access-1", expires });
-    return test(account, state);
-  });
+function inAccount<R>(
+  expires: number,
+  test: (account: UserAccount, state: DurableObjectState) => Promise<R>,
+): Promise<R> {
+  return runInDurableObject(
+    env.USER_ACCOUNT.getByName(`account-${accounts++}`),
+    (account, state) => {
+      state.storage.kv.put("refreshToken", "refresh-1");
+      state.storage.kv.put<StoredAccessToken>("accessToken", { token: "access-1", expires });
+      return test(account, state);
+    },
+  );
 }
 
 /**
  * Stubs the token endpoint, answering with `respond(refreshToken)`; each response waits for
  * `release`, if one is given.
  */
-function tokenEndpoint(respond: (refreshToken: string | null) => Response | Promise<Response>,
-  release?: Promise<void>) {
+function tokenEndpoint(
+  respond: (refreshToken: string | null) => Response | Promise<Response>,
+  release?: Promise<void>,
+) {
   const reached = Promise.withResolvers<void>();
   const fetch = vi.fn(async (_input: string, init: RequestInit) => {
     reached.resolve();
@@ -56,7 +63,7 @@ describe("UserAccount.getAccessToken", () => {
     const { fetch } = tokenEndpoint(() => new Response("unavailable", { status: 503 }));
 
     // Inside the refresh skew, so each read refreshes, but the cached token still works.
-    await inAccount(Date.now() + 30_000, async account => {
+    await inAccount(Date.now() + 30_000, async (account) => {
       expect(await account.getAccessToken()).toBe("access-1");
       // Not expired: the next read tries again rather than giving up on the grant.
       expect(await account.getAccessToken()).toBe("access-1");
@@ -67,7 +74,9 @@ describe("UserAccount.getAccessToken", () => {
   it("surfaces a transient failure once the cached token has expired", async () => {
     tokenEndpoint(() => new Response("unavailable", { status: 503 }));
 
-    const error = await inAccount(Date.now() - 1000, account => rejection(account.getAccessToken()));
+    const error = await inAccount(Date.now() - 1000, (account) =>
+      rejection(account.getAccessToken()),
+    );
 
     expect(error).toMatchObject({ name: "OAuthResponseError", httpStatus: 503 });
   });
@@ -95,9 +104,15 @@ describe("UserAccount.getAccessToken", () => {
 
   it("redeems the refresh token once for concurrent reads", async () => {
     const release = Promise.withResolvers<void>();
-    const { fetch, reached } = tokenEndpoint(() => Response.json({
-      access_token: "access-2", refresh_token: "refresh-2", expires_in: 3600,
-    }), release.promise);
+    const { fetch, reached } = tokenEndpoint(
+      () =>
+        Response.json({
+          access_token: "access-2",
+          refresh_token: "refresh-2",
+          expires_in: 3600,
+        }),
+      release.promise,
+    );
 
     await inAccount(Date.now() - 1000, async (account, { storage }) => {
       const reads = [account.getAccessToken(), account.getAccessToken()];
@@ -113,34 +128,44 @@ describe("UserAccount.getAccessToken", () => {
   it.each([
     ["a new refresh token", "refresh-new"],
     ["the refresh token it overtook", "refresh-1"],
-  ])("keeps a reconnect with %s that lands while a refresh is in flight", async (_, refreshToken) => {
-    const release = Promise.withResolvers<void>();
-    const { reached } = tokenEndpoint(() => Response.json({
-      access_token: "access-stale", refresh_token: "refresh-stale", expires_in: 3600, scope: "account:read",
-    }), release.promise);
-    const grant = {
-      refreshToken,
-      accessToken: { token: "access-new", expires: Date.now() + 3_600_000 },
-      grantedScopes: ["user:read", "offline_access"],
-    };
+  ])(
+    "keeps a reconnect with %s that lands while a refresh is in flight",
+    async (_, refreshToken) => {
+      const release = Promise.withResolvers<void>();
+      const { reached } = tokenEndpoint(
+        () =>
+          Response.json({
+            access_token: "access-stale",
+            refresh_token: "refresh-stale",
+            expires_in: 3600,
+            scope: "account:read",
+          }),
+        release.promise,
+      );
+      const grant = {
+        refreshToken,
+        accessToken: { token: "access-new", expires: Date.now() + 3_600_000 },
+        grantedScopes: ["user:read", "offline_access"],
+      };
 
-    await inAccount(Date.now() - 1000, async (account, { storage }) => {
-      const read = account.getAccessToken();
-      await reached;
-      await account.commitReconnect(stageCredentials(storage.kv, grant, Date.now()));
-      release.resolve();
+      await inAccount(Date.now() - 1000, async (account, { storage }) => {
+        const read = account.getAccessToken();
+        await reached;
+        await account.commitReconnect(stageCredentials(storage.kv, grant, Date.now()));
+        release.resolve();
 
-      expect(await read).toBe("access-new");
-      expect(storage.kv.get("refreshToken")).toBe(refreshToken);
-      expect(storage.kv.get("accessToken")).toEqual(grant.accessToken);
-      expect(storage.kv.get("grantedScopes")).toEqual(grant.grantedScopes);
-    });
-  });
+        expect(await read).toBe("access-new");
+        expect(storage.kv.get("refreshToken")).toBe(refreshToken);
+        expect(storage.kv.get("accessToken")).toEqual(grant.accessToken);
+        expect(storage.kv.get("grantedScopes")).toEqual(grant.grantedScopes);
+      });
+    },
+  );
 
   it("refreshes a reconnected grant in its own flight, not the one it overtook", async () => {
     const oldGrant = Promise.withResolvers<void>();
     const newGrant = Promise.withResolvers<void>();
-    const { fetch, reached } = tokenEndpoint(async refreshToken => {
+    const { fetch, reached } = tokenEndpoint(async (refreshToken) => {
       await (refreshToken === "refresh-1" ? oldGrant : newGrant).promise;
       return Response.json({
         access_token: `access-from-${refreshToken}`,
@@ -153,11 +178,17 @@ describe("UserAccount.getAccessToken", () => {
       const overtaken = account.getAccessToken();
       await reached;
       // Inside the refresh skew, so reads of the reconnected grant have to refresh it.
-      await account.commitReconnect(stageCredentials(storage.kv, {
-        refreshToken: "refresh-new",
-        accessToken: { token: "access-new", expires: Date.now() + 30_000 },
-        grantedScopes: ["user:read", "offline_access"],
-      }, Date.now()));
+      await account.commitReconnect(
+        stageCredentials(
+          storage.kv,
+          {
+            refreshToken: "refresh-new",
+            accessToken: { token: "access-new", expires: Date.now() + 30_000 },
+            grantedScopes: ["user:read", "offline_access"],
+          },
+          Date.now(),
+        ),
+      );
       const read = account.getAccessToken();
 
       oldGrant.resolve();

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { MAX_SITE_LOGO_BYTES, MAX_SITE_LOGO_DIMENSION } from "@gadgets/workshop-shared/api";
 import {
   SITE_LOGO_R2_KEY,
@@ -58,12 +58,21 @@ describe("site logo asset", () => {
     let get = vi.fn().mockResolvedValue(null);
     let bucket = { get } as Pick<R2Bucket, "get">;
     let missing = await serveSiteLogo(
-      new Request(`https://workshop.example/api/site-logo?v=${REVISION}`), bucket);
+      new Request(`https://workshop.example/api/site-logo?v=${REVISION}`),
+      bucket,
+    );
     expect(missing.status).toBe(404);
     expect(missing.headers.get("cache-control")).toBe("no-store");
 
-    expect((await serveSiteLogo(new Request("https://workshop.example/api/site-logo", {
-      method: "POST",
-    }), bucket)).status).toBe(405);
+    expect(
+      (
+        await serveSiteLogo(
+          new Request("https://workshop.example/api/site-logo", {
+            method: "POST",
+          }),
+          bucket,
+        )
+      ).status,
+    ).toBe(405);
   });
 });

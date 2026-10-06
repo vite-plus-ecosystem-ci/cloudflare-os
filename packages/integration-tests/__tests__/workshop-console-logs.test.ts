@@ -1,13 +1,23 @@
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type {
-  ConsoleLogEvent, ConsoleLogSubscriber, GadgetClient, Overseer, WorkpieceId,
+  ConsoleLogEvent,
+  ConsoleLogSubscriber,
+  GadgetClient,
+  Overseer,
+  WorkpieceId,
 } from "@gadgets/workshop-shared/api";
 import { diffFiles, type CodeContent } from "@gadgets/workshop-shared/code-change";
 import { startTestGatekeeperHarness, type Harness } from "../src/harness.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 import {
-  connect, nextUsernames, RpcTarget, signUp, stubFor, waitFor, WorkpieceRecorder,
+  connect,
+  nextUsernames,
+  RpcTarget,
+  signUp,
+  stubFor,
+  waitFor,
+  WorkpieceRecorder,
 } from "../src/rpc-client.js";
 
 const network = new NetworkInterceptor();
@@ -36,8 +46,10 @@ class LogRecorder extends RpcTarget implements ConsoleLogSubscriber {
   }
   /** Wait for the log of the call that greeted `name`. */
   logged(name: string) {
-    return waitFor(`the log greeting ${name}`, async () =>
-      this.logs.find(log => log.message[1] === name) ?? null);
+    return waitFor(
+      `the log greeting ${name}`,
+      async () => this.logs.find((log) => log.message[1] === name) ?? null,
+    );
   }
 }
 
@@ -71,15 +83,23 @@ async function withLoggingGadget<T>(fn: (owner: Owner) => Promise<T>): Promise<T
   await workpieces.loaded;
   using gadget = await ws.createGadget("App", undefined, "APP");
   const gadgetId = await gadget.getId();
-  const headOf = (after?: string) => waitFor(`a new head for gadget ${gadgetId}`, async () => {
-    const summary = workpieces.summaries.get(gadgetId);
-    return summary?.type === "gadget" && summary.commitId !== undefined &&
-        summary.commitId !== after ? summary.commitId : null;
-  });
+  const headOf = (after?: string) =>
+    waitFor(`a new head for gadget ${gadgetId}`, async () => {
+      const summary = workpieces.summaries.get(gadgetId);
+      return summary?.type === "gadget" &&
+        summary.commitId !== undefined &&
+        summary.commitId !== after
+        ? summary.commitId
+        : null;
+    });
   const empty = await headOf();
   const seed = await ws.newChat("Seed", null);
   await ws.submitCodeChange(seed, {
-    generation: 0, revision: 0, clientId: "seed", seq: 1, pins: [{ gadgetId, baseCommit: empty }],
+    generation: 0,
+    revision: 0,
+    clientId: "seed",
+    seq: 1,
+    pins: [{ gadgetId, baseCommit: empty }],
     change: diffFiles(files(gadgetId), files(gadgetId, MAINLINE)),
   });
   expect(await ws.mergeChanges(seed)).toEqual({ outcome: "merged" });
@@ -88,16 +108,19 @@ async function withLoggingGadget<T>(fn: (owner: Owner) => Promise<T>): Promise<T
 
 /** Call the gadget's server, as the mainline or `chatId`'s draft. */
 async function greet(gadget: RpcStub<GadgetClient>, name: string, chatId?: number) {
-  using facet = await gadget.connectToGadget(chatId) as RpcStub<{ greet(name: string): string }>;
+  using facet = (await gadget.connectToGadget(chatId)) as RpcStub<{ greet(name: string): string }>;
   expect(await facet.greet(name)).toBe(name);
 }
 
-it.concurrent("gadget console logs reach subscribers, labelled with their draft or mainline",
-    async () => {
+it.concurrent("gadget console logs reach subscribers, labelled with their draft or mainline", async () => {
   await withLoggingGadget(async ({ ws, gadget, gadgetId, head }) => {
     const draft = await ws.newChat("Draft", null);
     await ws.submitCodeChange(draft, {
-      generation: 0, revision: 0, clientId: "draft", seq: 1, pins: [{ gadgetId, baseCommit: head }],
+      generation: 0,
+      revision: 0,
+      clientId: "draft",
+      seq: 1,
+      pins: [{ gadgetId, baseCommit: head }],
       change: diffFiles(files(gadgetId, MAINLINE), files(gadgetId, server("draft", "warn"))),
     });
     await ws.finalizeChatDraft(draft);
@@ -107,10 +130,16 @@ it.concurrent("gadget console logs reach subscribers, labelled with their draft 
 
     await greet(gadget, "Ada", draft);
     await greet(gadget, "Grace");
-    expect(await recorder.logged("Ada"))
-        .toEqual({ chatId: draft, level: "warn", message: ["draft", "Ada"] });
-    expect(await recorder.logged("Grace"))
-        .toEqual({ chatId: null, level: "log", message: ["mainline", "Grace"] });
+    expect(await recorder.logged("Ada")).toEqual({
+      chatId: draft,
+      level: "warn",
+      message: ["draft", "Ada"],
+    });
+    expect(await recorder.logged("Grace")).toEqual({
+      chatId: null,
+      level: "log",
+      message: ["mainline", "Grace"],
+    });
   });
 });
 
@@ -129,7 +158,7 @@ it.concurrent("disposing a console log subscription stops its logs but not other
     await greet(gadget, "after");
     await live.logged("after");
     // Both subscriptions share one connection, so a log sent to the stopped one is here by now.
-    expect(stopped.logs.map(log => log.message[1])).toEqual(["before"]);
+    expect(stopped.logs.map((log) => log.message[1])).toEqual(["before"]);
   });
 });
 
@@ -138,7 +167,7 @@ it.concurrent("a use collaborator's console log subscription receives nothing", 
     const [viewer] = nextUsernames("logviewer");
     using viewerPublic = connect(harness.url);
     using viewerApi = await signUp(viewerPublic, viewer!);
-    if (!await ws.addCollaborator(viewer!, "use")) {
+    if (!(await ws.addCollaborator(viewer!, "use"))) {
       throw new Error(`Failed to share with ${viewer}`);
     }
     using useWs = await viewerApi.openGadget((await ws.getMetadata()).id);

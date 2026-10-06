@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { ComposerDocument } from "./composerDocument";
 import {
   applyComposerTextEdit,
@@ -161,12 +161,14 @@ describe("composer document transitions", () => {
       formats: [{ start: url.length + 1, length: 8, noun: "Document", icon: "fileText" }],
     };
 
-    expect(replaceComposerUrlWithCapsule(
-      document,
-      { text: url, start: 0, end: url.length },
-      capsule,
-      "Plan",
-    )).toEqual({
+    expect(
+      replaceComposerUrlWithCapsule(
+        document,
+        { text: url, start: 0, end: url.length },
+        capsule,
+        "Plan",
+      ),
+    ).toEqual({
       document: {
         text: "Plan Document",
         capsules: [{ ...capsule, start: 0, length: 4 }],
@@ -178,12 +180,14 @@ describe("composer document transitions", () => {
   });
 
   it("rejects URL replacement when the captured text is stale", () => {
-    expect(replaceComposerUrlWithCapsule(
-      emptyDocument("https://example.com/other"),
-      { text: "https://example.com/plan", start: 0, end: 24 },
-      capsule,
-      "Plan ",
-    )).toBeNull();
+    expect(
+      replaceComposerUrlWithCapsule(
+        emptyDocument("https://example.com/other"),
+        { text: "https://example.com/plan", start: 0, end: 24 },
+        capsule,
+        "Plan ",
+      ),
+    ).toBeNull();
   });
 
   it("refines a URL, shifts ranges, and returns its placeholder selection", () => {
@@ -194,12 +198,12 @@ describe("composer document transitions", () => {
       formats: [{ start: url.length + 1, length: 8, noun: "Document", icon: "fileText" }],
     };
 
-    expect(refineComposerResourceUrl(
-      document,
-      { text: url, start: 0, end: url.length },
-      newUrl,
-      { start: newUrl.indexOf("PROJECT_ID"), end: newUrl.length },
-    )).toEqual({
+    expect(
+      refineComposerResourceUrl(document, { text: url, start: 0, end: url.length }, newUrl, {
+        start: newUrl.indexOf("PROJECT_ID"),
+        end: newUrl.length,
+      }),
+    ).toEqual({
       document: {
         text: `${newUrl} Document`,
         capsules: [],

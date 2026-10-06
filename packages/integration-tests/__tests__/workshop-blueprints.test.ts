@@ -1,27 +1,49 @@
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import { z } from "zod";
 import type {
-  AiChatMetadata, AiChatSubscriber, ChatGadgetPinRecord, GadgetClient, Overseer, PublicApi,
-  TreeNode, WorkpieceId,
+  AiChatMetadata,
+  AiChatSubscriber,
+  ChatGadgetPinRecord,
+  GadgetClient,
+  Overseer,
+  PublicApi,
+  TreeNode,
+  WorkpieceId,
 } from "@gadgets/workshop-shared/api";
 import { diffFiles, type CodeContent } from "@gadgets/workshop-shared/code-change";
 import {
-  buildSnapshotContent, serializeArchive,
+  buildSnapshotContent,
+  serializeArchive,
 } from "../../bundled-blueprints/__tests__/archives.js";
 import type { TestSession } from "../fixtures/gatekeeper-test/src/test-gatekeeper.js";
 import { loadAllChatHistory } from "../src/agent-session.js";
 import {
-  bundleBlueprints, startHarness, startTestGatekeeperHarness, TEST_VENDOR_ID, testActionState,
+  bundleBlueprints,
+  startHarness,
+  startTestGatekeeperHarness,
+  TEST_VENDOR_ID,
+  testActionState,
   type Harness,
 } from "../src/harness.js";
 import {
-  scriptedModelRouter, SCRIPTED_MODEL_ID, type ChatCompletionStep,
+  scriptedModelRouter,
+  SCRIPTED_MODEL_ID,
+  type ChatCompletionStep,
 } from "../src/mock-model.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 import {
-  accountLabel, connect, listConnectedAccounts, logIn, nextUsernames, RpcTarget, signUp, stubFor,
-  waitFor, waitForIdleChat, WorkpieceRecorder,
+  accountLabel,
+  connect,
+  listConnectedAccounts,
+  logIn,
+  nextUsernames,
+  RpcTarget,
+  signUp,
+  stubFor,
+  waitFor,
+  waitForIdleChat,
+  WorkpieceRecorder,
 } from "../src/rpc-client.js";
 
 let harness: Harness | undefined;
@@ -75,32 +97,35 @@ const edit = (gadgetId: number, path: string, before: string | undefined, after:
 const headOf = (workpieces: WorkpieceRecorder, gadgetId: WorkpieceId, after?: string) =>
   waitFor(`a new head for gadget ${gadgetId}`, async () => {
     const summary = workpieces.summaries.get(gadgetId);
-    return summary?.type === "gadget" && summary.commitId !== undefined &&
-        summary.commitId !== after ? summary.commitId : null;
+    return summary?.type === "gadget" &&
+      summary.commitId !== undefined &&
+      summary.commitId !== after
+      ? summary.commitId
+      : null;
   });
 
 const CSV_EXPORT_SERVER =
-    `import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";\n` +
-    `export class Gadget extends DurableObject {}\n` +
-    `export class ExportHandler extends WorkerEntrypoint {\n` +
-    `  async getExportFormats(_gadget) {\n` +
-    `    return [{ id: "csv", label: "CSV", mode: "server", contentType: "text/csv", fileExtension: ".csv" }];\n` +
-    `  }\n` +
-    `  async export(_gadget, id) {\n` +
-    `    if (id !== "csv") throw new Error(\`Unsupported export format: \${id}\`);\n` +
-    `    return new Response("a,b\\n1,2\\n").body;\n` +
-    `  }\n` +
-    `}\n`;
+  `import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";\n` +
+  `export class Gadget extends DurableObject {}\n` +
+  `export class ExportHandler extends WorkerEntrypoint {\n` +
+  `  async getExportFormats(_gadget) {\n` +
+  `    return [{ id: "csv", label: "CSV", mode: "server", contentType: "text/csv", fileExtension: ".csv" }];\n` +
+  `  }\n` +
+  `  async export(_gadget, id) {\n` +
+  `    if (id !== "csv") throw new Error(\`Unsupported export format: \${id}\`);\n` +
+  `    return new Response("a,b\\n1,2\\n").body;\n` +
+  `  }\n` +
+  `}\n`;
 
 const LLM_SERVER =
-    `import { DurableObject } from "cloudflare:workers";\n` +
-    `export class Gadget extends DurableObject {\n` +
-    `  async ask(prompt) { return await this.env.LLM.run({ prompt }); }\n` +
-    `}\n`;
+  `import { DurableObject } from "cloudflare:workers";\n` +
+  `export class Gadget extends DurableObject {\n` +
+  `  async ask(prompt) { return await this.env.LLM.run({ prompt }); }\n` +
+  `}\n`;
 
 /** Ask an `LLM_SERVER` gadget's mainline server. */
 async function ask(gadget: RpcStub<GadgetClient>, prompt: string): Promise<string> {
-  using facet = await gadget.connectToGadget() as RpcStub<{ ask(prompt: string): string }>;
+  using facet = (await gadget.connectToGadget()) as RpcStub<{ ask(prompt: string): string }>;
   return await facet.ask(prompt);
 }
 
@@ -108,13 +133,23 @@ const userPrompt = (content: string) =>
   expect.objectContaining({ messages: [{ role: "user", content }] });
 
 /** Merge a one-file edit into mainline through a human-only chat; returns the new head. */
-async function commitText(ws: RpcStub<Overseer>, workpieces: WorkpieceRecorder,
-                          gadgetId: WorkpieceId, head: string, path: string,
-                          before: string | undefined, after: string): Promise<string> {
+async function commitText(
+  ws: RpcStub<Overseer>,
+  workpieces: WorkpieceRecorder,
+  gadgetId: WorkpieceId,
+  head: string,
+  path: string,
+  before: string | undefined,
+  after: string,
+): Promise<string> {
   const chatId = await ws.newChat("Edit", null);
   await ws.submitCodeChange(chatId, {
-    generation: 0, revision: 0, clientId: "edit", seq: 1,
-    pins: [{ gadgetId, baseCommit: head }], change: edit(gadgetId, path, before, after),
+    generation: 0,
+    revision: 0,
+    clientId: "edit",
+    seq: 1,
+    pins: [{ gadgetId, baseCommit: head }],
+    change: edit(gadgetId, path, before, after),
   });
   expect(await ws.mergeChanges(chatId)).toEqual({ outcome: "merged" });
   return headOf(workpieces, gadgetId, head);
@@ -142,8 +177,9 @@ const NOTES: Code = { "notes.txt": "mine\n" };
 const conflict = (ours: string, base: string, theirs: string) =>
   `<<<<<<< this gadget\n${ours}||||||| base\n${base}=======\n${theirs}>>>>>>> blueprint\n`;
 
-const toolCall = (name: string, args: Record<string, unknown>): ChatCompletionStep =>
-  ({ toolCall: { id: `call-${name}`, name, arguments: args } });
+const toolCall = (name: string, args: Record<string, unknown>): ChatCompletionStep => ({
+  toolCall: { id: `call-${name}`, name, arguments: args },
+});
 
 const CHAT_REQUEST = z.object({
   messages: z.array(z.object({ role: z.string(), content: z.string().nullish() })),
@@ -153,7 +189,9 @@ const CHAT_REQUEST = z.object({
 class ChatRecorder extends RpcTarget implements AiChatSubscriber {
   readonly states: AiChatMetadata[] = [];
   streamGeneration() {}
-  metadata(chat: AiChatMetadata) { this.states.push(chat); }
+  metadata(chat: AiChatMetadata) {
+    this.states.push(chat);
+  }
   deleted() {}
   message() {}
   changeApplied() {}
@@ -187,13 +225,20 @@ const parentsOf = async (ws: RpcStub<Overseer>, commitId: string) =>
   (await ws.getCommitLog(commitId, 1))[0]?.parents;
 
 /** Make `code` the whole of a gadget's committed code, through a human-only chat. */
-async function commitCode(ws: RpcStub<Overseer>, gadgetId: WorkpieceId, code: Code)
-    : Promise<string> {
+async function commitCode(
+  ws: RpcStub<Overseer>,
+  gadgetId: WorkpieceId,
+  code: Code,
+): Promise<string> {
   const content = (of: Code): CodeContent => new Map([[gadgetId, new Map(Object.entries(of))]]);
   const { commitId: head } = await gadgetNow(ws, gadgetId);
   const chatId = await ws.newChat("Edit", null);
   await ws.submitCodeChange(chatId, {
-    generation: 0, revision: 0, clientId: "edit", seq: 1, pins: [{ gadgetId, baseCommit: head }],
+    generation: 0,
+    revision: 0,
+    clientId: "edit",
+    seq: 1,
+    pins: [{ gadgetId, baseCommit: head }],
     change: diffFiles(content(await codeAt(ws, head)), content(code)),
   });
   expect(await ws.mergeChanges(chatId)).toEqual({ outcome: "merged" });
@@ -222,17 +267,24 @@ const releaseOf = (publicApi: RpcStub<PublicApi>, blueprintId: string, after?: s
   });
 
 /** Publish a gadget as a new blueprint: its id, and its first release. */
-async function publish(publicApi: RpcStub<PublicApi>, ws: RpcStub<Overseer>,
-                       gadgetId: WorkpieceId, title: string) {
+async function publish(
+  publicApi: RpcStub<PublicApi>,
+  ws: RpcStub<Overseer>,
+  gadgetId: WorkpieceId,
+  title: string,
+) {
   using gadget = await ws.getGadget(gadgetId);
   const { id } = await gadget.createBlueprint(title, `${title}, for a test`);
   return { blueprintId: id, gadgetId, release: await releaseOf(publicApi, id) };
 }
 
 /** Commit `code` to a published gadget and release it as its blueprint's next version. */
-async function republish(publicApi: RpcStub<PublicApi>, ws: RpcStub<Overseer>,
-                         { blueprintId, gadgetId }: { blueprintId: string; gadgetId: WorkpieceId },
-                         code: Code): Promise<string> {
+async function republish(
+  publicApi: RpcStub<PublicApi>,
+  ws: RpcStub<Overseer>,
+  { blueprintId, gadgetId }: { blueprintId: string; gadgetId: WorkpieceId },
+  code: Code,
+): Promise<string> {
   const previous = await releaseOf(publicApi, blueprintId);
   await commitCode(ws, gadgetId, code);
   await ws.updateBlueprint(blueprintId, { updateCode: true });
@@ -241,15 +293,18 @@ async function republish(publicApi: RpcStub<PublicApi>, ws: RpcStub<Overseer>,
 
 /** Apply a blueprint to a gadget, expecting a proposal: its chat, and the record of it there. */
 async function propose(
-    ws: RpcStub<Overseer>, gadget: RpcStub<GadgetClient>, blueprintId: string,
-    options: { modelId: string | null; allowUnrelated?: boolean } = { modelId: null }) {
+  ws: RpcStub<Overseer>,
+  gadget: RpcStub<GadgetClient>,
+  blueprintId: string,
+  options: { modelId: string | null; allowUnrelated?: boolean } = { modelId: null },
+) {
   const result = await gadget.applyBlueprint(blueprintId, options);
   if (result.outcome !== "proposed") {
     throw new Error(`Applying the blueprint was "${result.outcome}", not proposed`);
   }
   const { chatId } = result;
-  const history = await loadAllChatHistory(before => ws.getChatHistory(chatId, before));
-  const [message] = history.flatMap(entry => entry.type === "changes" ? [entry] : []);
+  const history = await loadAllChatHistory((before) => ws.getChatHistory(chatId, before));
+  const [message] = history.flatMap((entry) => (entry.type === "changes" ? [entry] : []));
   const [merge, ...others] = message?.blueprintMerges ?? [];
   if (message === undefined || merge === undefined || others.length > 0) {
     throw new Error(`Chat ${chatId} does not open with the proposal of one blueprint`);
@@ -261,8 +316,11 @@ async function propose(
  * The merge commit of a proposal, as its message's pin declares it: the chat's content starts
  * there, and `head` is what it merged.
  */
-function mergeCommitOf(message: { pins?: ChatGadgetPinRecord[] }, gadgetId: WorkpieceId,
-                       head: string): string {
+function mergeCommitOf(
+  message: { pins?: ChatGadgetPinRecord[] },
+  gadgetId: WorkpieceId,
+  head: string,
+): string {
   const [pin, ...others] = message.pins ?? [];
   if (pin === undefined || others.length > 0) throw new Error("The proposal declares no one pin");
   expect(pin).toEqual({ gadgetId, baseCommit: expect.any(String), mergedCommit: head });
@@ -282,7 +340,7 @@ it.concurrent("publishes, instantiates, and deletes an owned blueprint", async (
     const offers = await authenticated.listOutputFormats();
     return offers.length > 0 ? offers : null;
   });
-  const document = formats.find(format => format.output.id === "document");
+  const document = formats.find((format) => format.output.id === "document");
   if (document === undefined) throw new Error("Document output format is not installed");
   using sourceWorkspace = await authenticated.newGadgetFromBlueprint(document.blueprintId, {});
   const sourceMetadata = await sourceWorkspace.getMetadata();
@@ -291,24 +349,28 @@ it.concurrent("publishes, instantiates, and deletes an owned blueprint", async (
   using sourceGadget = await sourceWorkspace.getGadget(sourceGadgetId);
 
   const blueprint = await sourceGadget.createBlueprint("Starter", "Deterministic starter");
-  expect(await sourceWorkspace.listBlueprints()).toContainEqual(expect.objectContaining({
-    id: blueprint.id,
-    title: "Starter",
-    description: "Deterministic starter",
-  }));
+  expect(await sourceWorkspace.listBlueprints()).toContainEqual(
+    expect.objectContaining({
+      id: blueprint.id,
+      title: "Starter",
+      description: "Deterministic starter",
+    }),
+  );
 
   const owned = await waitFor("the published blueprint to reach the owner's list", async () => {
     const blueprints = await authenticated.listOwnBlueprints();
-    return blueprints.some(entry => entry.id === blueprint.id) ? blueprints : null;
+    return blueprints.some((entry) => entry.id === blueprint.id) ? blueprints : null;
   });
-  expect(owned).toContainEqual(expect.objectContaining({
-    id: blueprint.id,
-    source: {
-      type: "workspace",
-      workspaceId: sourceMetadata.id,
-      workspaceTitle: sourceMetadata.title,
-    },
-  }));
+  expect(owned).toContainEqual(
+    expect.objectContaining({
+      id: blueprint.id,
+      source: {
+        type: "workspace",
+        workspaceId: sourceMetadata.id,
+        workspaceTitle: sourceMetadata.title,
+      },
+    }),
+  );
   using installedWorkspace = await authenticated.newGadgetFromBlueprint(blueprint.id, {});
   const installedMetadata = await installedWorkspace.getMetadata();
   const installedGadgetId = installedMetadata.defaultGadgetId;
@@ -318,9 +380,10 @@ it.concurrent("publishes, instantiates, and deletes an owned blueprint", async (
 
   await sourceWorkspace.deleteBlueprint(blueprint.id);
   await waitFor("the deleted blueprint to leave the owner's list", async () =>
-    (await authenticated.listOwnBlueprints()).some(entry => entry.id === blueprint.id)
+    (await authenticated.listOwnBlueprints()).some((entry) => entry.id === blueprint.id)
       ? null
-      : true);
+      : true,
+  );
   await installedWorkspace.deleteSelf();
   await sourceWorkspace.deleteSelf();
 });
@@ -332,7 +395,7 @@ it.concurrent("creates and removes an indexed standard output", async () => {
     const offers = await authenticated.listOutputFormats();
     return offers.length > 0 ? offers : null;
   });
-  const document = formats.find(format => format.output.id === "document");
+  const document = formats.find((format) => format.output.id === "document");
   if (document === undefined) throw new Error("Document output format is not installed");
   expect(document.requiresSetup).toBe(false);
 
@@ -343,24 +406,29 @@ it.concurrent("creates and removes an indexed standard output", async () => {
 
   const indexed = await waitFor("the document to appear in the output index", async () => {
     const result = await authenticated.listOutputs();
-    return result.outputs.some(output =>
-      output.workspaceId === metadata.id && output.workpieceId === gadgetId)
+    return result.outputs.some(
+      (output) => output.workspaceId === metadata.id && output.workpieceId === gadgetId,
+    )
       ? result.outputs
       : null;
   });
-  expect(indexed).toContainEqual(expect.objectContaining({
-    workspaceId: metadata.id,
-    workpieceId: gadgetId,
-    output: expect.objectContaining({ id: "document" }),
-  }));
+  expect(indexed).toContainEqual(
+    expect.objectContaining({
+      workspaceId: metadata.id,
+      workpieceId: gadgetId,
+      output: expect.objectContaining({ id: "document" }),
+    }),
+  );
 
   using gadget = await workspace.getGadget(gadgetId);
   await gadget.remove();
   await waitFor("the removed document to leave the output index", async () =>
-    (await authenticated.listOutputs()).outputs.some(output =>
-      output.workspaceId === metadata.id && output.workpieceId === gadgetId)
+    (await authenticated.listOutputs()).outputs.some(
+      (output) => output.workspaceId === metadata.id && output.workpieceId === gadgetId,
+    )
       ? null
-      : true);
+      : true,
+  );
   await workspace.deleteSelf();
 });
 
@@ -375,11 +443,20 @@ it.concurrent("republishing a blueprint changes future installs, not existing on
   using app = source.createGadget("App", undefined, "APP");
   const gadgetId = await app.getId();
   const empty = await headOf(workpieces, gadgetId);
-  const v1Head = await commitText(source, workpieces, gadgetId, empty, "app.txt", undefined, "v1\n");
+  const v1Head = await commitText(
+    source,
+    workpieces,
+    gadgetId,
+    empty,
+    "app.txt",
+    undefined,
+    "v1\n",
+  );
 
   const blueprint = await app.createBlueprint("Republished", "Versioned starter");
-  const { version } = (await waitFor("the published blueprint", () =>
-    publicApi.getBlueprint(blueprint.id))).metadata;
+  const { version } = (
+    await waitFor("the published blueprint", () => publicApi.getBlueprint(blueprint.id))
+  ).metadata;
 
   async function install() {
     const workspace = await authenticated.newGadgetFromBlueprint(blueprint.id, {});
@@ -391,18 +468,27 @@ it.concurrent("republishing a blueprint changes future installs, not existing on
   await commitText(source, workpieces, gadgetId, v1Head, "app.txt", "v1\n", "v2\n");
   expect((await publicApi.getBlueprint(blueprint.id))?.metadata.version).toBe(version);
   const copyA = await install();
-  expect(await committedText(copyA.workspace, copyA.gadgetId, "app.txt"))
-      .toEqual({ kind: "text", text: "v1\n" });
+  expect(await committedText(copyA.workspace, copyA.gadgetId, "app.txt")).toEqual({
+    kind: "text",
+    text: "v1\n",
+  });
 
   await source.updateBlueprint(blueprint.id, { updateCode: true });
-  await waitFor("the republished blueprint version", async () =>
-    (await publicApi.getBlueprint(blueprint.id))?.metadata.version === version + 1 || null);
+  await waitFor(
+    "the republished blueprint version",
+    async () =>
+      (await publicApi.getBlueprint(blueprint.id))?.metadata.version === version + 1 || null,
+  );
 
   const copyB = await install();
-  expect(await committedText(copyB.workspace, copyB.gadgetId, "app.txt"))
-      .toEqual({ kind: "text", text: "v2\n" });
-  expect(await committedText(copyA.workspace, copyA.gadgetId, "app.txt"))
-      .toEqual({ kind: "text", text: "v1\n" });
+  expect(await committedText(copyB.workspace, copyB.gadgetId, "app.txt")).toEqual({
+    kind: "text",
+    text: "v2\n",
+  });
+  expect(await committedText(copyA.workspace, copyA.gadgetId, "app.txt")).toEqual({
+    kind: "text",
+    text: "v1\n",
+  });
 
   for (const { workspace } of [copyA, copyB]) {
     await workspace.deleteSelf();
@@ -418,22 +504,24 @@ it.concurrent("a blueprint archive keeps DATA's annotation, and installs bind th
   using publisherPublic = connect(requireHarness().url);
   using publisherApi = await signUp(publisherPublic, publisher);
   await publisherApi.provisionAmbientAccount(TEST_VENDOR_ID);
-  const publisherAccount = (await listConnectedAccounts(publisherApi))
-      .find(account => account.vendorId === TEST_VENDOR_ID);
+  const publisherAccount = (await listConnectedAccounts(publisherApi)).find(
+    (account) => account.vendorId === TEST_VENDOR_ID,
+  );
   if (!publisherAccount) throw new Error("Publisher's test account was not provisioned");
   const formats = await waitFor("bundled output formats to install", async () => {
     const offers = await publisherApi.listOutputFormats();
     return offers.length > 0 ? offers : null;
   });
-  const document = formats.find(format => format.output.id === "document");
+  const document = formats.find((format) => format.output.id === "document");
   if (!document) throw new Error("Document output format is not installed");
   using sourceWorkspace = await publisherApi.newGadgetFromBlueprint(document.blueprintId, {});
   const sourceWorkpieces = new WorkpieceRecorder();
   using sourceWorkpiecesStub = stubFor(sourceWorkpieces);
   using _sourceWorkpieces = await sourceWorkspace.subscribeToWorkpieces(sourceWorkpiecesStub);
   await sourceWorkpieces.loaded;
-  const sourceGadgets = [...sourceWorkpieces.summaries.values()]
-      .filter(summary => summary.type === "gadget");
+  const sourceGadgets = [...sourceWorkpieces.summaries.values()].filter(
+    (summary) => summary.type === "gadget",
+  );
   expect(sourceGadgets).toHaveLength(1);
   const sourceSummary = sourceGadgets[0];
   if (!sourceSummary || sourceSummary.type !== "gadget" || !sourceSummary.commitId) {
@@ -442,23 +530,29 @@ it.concurrent("a blueprint archive keeps DATA's annotation, and installs bind th
   expect((await sourceWorkspace.getMetadata()).defaultGadgetId).toBe(sourceSummary.id);
   using sourceGadget = await sourceWorkspace.getGadget(sourceSummary.id);
   using decoy = await sourceWorkspace.newGatekeeper(
-      publisherAccount.id, "https://gadgets-test.example/things/decoy");
+    publisherAccount.id,
+    "https://gadgets-test.example/things/decoy",
+  );
   using data = await sourceWorkspace.newGatekeeper(
-      publisherAccount.id, "https://gadgets-test.example/things/source");
+    publisherAccount.id,
+    "https://gadgets-test.example/things/source",
+  );
   if (!decoy || !data) throw new Error("Failed to create the publisher's test connections");
   await sourceGadget.bind("DATA", await data.getId());
   const annotation = {
-    title: "Source data", description: "Connect the source test thing.", suggestValue: true,
+    title: "Source data",
+    description: "Connect the source test thing.",
+    suggestValue: true,
   };
   await sourceGadget.setBlueprintAnnotation("DATA", annotation);
   expect(await sourceGadget.getBlueprintAnnotation("DATA")).toEqual(annotation);
-  const blueprint = await sourceGadget.createBlueprint(
-      "Bound", "Blueprint with a DATA binding");
+  const blueprint = await sourceGadget.createBlueprint("Bound", "Blueprint with a DATA binding");
 
   using installerPublic = connect(requireHarness().url);
   using installerApi = await signUp(installerPublic, installer);
   const importedId = await installerApi.importBlueprint(
-      await publisherPublic.downloadBlueprint(blueprint.id));
+    await publisherPublic.downloadBlueprint(blueprint.id),
+  );
   expect((await installerPublic.getBlueprint(importedId))?.metadata.bindings).toEqual({
     DATA: {
       title: "Source data",
@@ -470,8 +564,9 @@ it.concurrent("a blueprint archive keeps DATA's annotation, and installs bind th
     },
   });
   await installerApi.provisionAmbientAccount(TEST_VENDOR_ID);
-  const installerAccount = (await listConnectedAccounts(installerApi))
-      .find(account => account.vendorId === TEST_VENDOR_ID);
+  const installerAccount = (await listConnectedAccounts(installerApi)).find(
+    (account) => account.vendorId === TEST_VENDOR_ID,
+  );
   if (!installerAccount) throw new Error("Installer's test account was not provisioned");
   using installedWorkspace = await installerApi.newGadgetFromBlueprint(importedId, {
     DATA: {
@@ -482,10 +577,12 @@ it.concurrent("a blueprint archive keeps DATA's annotation, and installs bind th
   });
   const installedWorkpieces = new WorkpieceRecorder();
   using installedWorkpiecesStub = stubFor(installedWorkpieces);
-  using _installedWorkpieces = await installedWorkspace.subscribeToWorkpieces(installedWorkpiecesStub);
+  using _installedWorkpieces =
+    await installedWorkspace.subscribeToWorkpieces(installedWorkpiecesStub);
   await installedWorkpieces.loaded;
-  const installedGadgets = [...installedWorkpieces.summaries.values()]
-      .filter(summary => summary.type === "gadget");
+  const installedGadgets = [...installedWorkpieces.summaries.values()].filter(
+    (summary) => summary.type === "gadget",
+  );
   expect(installedGadgets).toHaveLength(1);
   const installedSummary = installedGadgets[0];
   if (!installedSummary || installedSummary.type !== "gadget" || !installedSummary.commitId) {
@@ -501,7 +598,7 @@ it.concurrent("a blueprint archive keeps DATA's annotation, and installs bind th
     resourceUrl: "https://gadgets-test.example/things/installed",
   });
 
-  using session = await binding.openSession() as RpcStub<TestSession>;
+  using session = (await binding.openSession()) as RpcStub<TestSession>;
   const write = session.writeValue(17);
   const [pending] = await waitFor("the installed connection's action", async () => {
     const { entries } = await installedWorkspace.listActions({ filter: "pending" });
@@ -509,23 +606,28 @@ it.concurrent("a blueprint archive keeps DATA's annotation, and installs bind th
   });
   await installedWorkspace.approveAction(pending.id);
   await write;
-  expect(await testActionState(requireHarness(), accountLabel(installerAccount)))
-      .toEqual({ pending: [], value: 17, applyCount: 1 });
-  expect(await testActionState(requireHarness(), accountLabel(publisherAccount)))
-      .toEqual({ pending: [], applyCount: 0 });
+  expect(await testActionState(requireHarness(), accountLabel(installerAccount))).toEqual({
+    pending: [],
+    value: 17,
+    applyCount: 1,
+  });
+  expect(await testActionState(requireHarness(), accountLabel(publisherAccount))).toEqual({
+    pending: [],
+    applyCount: 0,
+  });
 
   const sourcePaths = treePaths(await sourceWorkspace.listTree(sourceSummary.commitId));
   const installedPaths = treePaths(await installedWorkspace.listTree(installedSummary.commitId));
   expect(installedPaths).toEqual(sourcePaths);
-  expect(await installedWorkspace.readFilesAtCommit(installedSummary.commitId, installedPaths))
-      .toEqual(await sourceWorkspace.readFilesAtCommit(sourceSummary.commitId, sourcePaths));
+  expect(
+    await installedWorkspace.readFilesAtCommit(installedSummary.commitId, installedPaths),
+  ).toEqual(await sourceWorkspace.readFilesAtCommit(sourceSummary.commitId, sourcePaths));
 
   await installedWorkspace.deleteSelf();
   await sourceWorkspace.deleteSelf();
 });
 
-it.concurrent("an update from a gadget's blueprint merges with its own changes, on accept",
-    async () => {
+it.concurrent("an update from a gadget's blueprint merges with its own changes, on accept", async () => {
   using publicApi = connect(requireHarness().url);
   using api = await signUp(publicApi, username("update"));
   using source = await api.newGadget();
@@ -540,14 +642,15 @@ it.concurrent("an update from a gadget's blueprint merges with its own changes, 
   const made = await gadgetNow(ws, gadgetId);
   expect(made.upstream).toEqual({ blueprintId, commitId: r1 });
   expect(await codeAt(ws, made.commitId)).toEqual(V1);
-  const [root, ...merged] = await parentsOf(ws, made.commitId) ?? [];
+  const [root, ...merged] = (await parentsOf(ws, made.commitId)) ?? [];
   expect(merged).toEqual([r1]);
   expect(await ws.getCommitLog(root!, 1)).toEqual([
     expect.objectContaining({ oid: root, parents: [], message: "Create gadget: Updated\n" }),
   ]);
   expect(await ws.listTree(root!)).toEqual([]);
-  expect(await gadget.applyBlueprint(blueprintId, { modelId: null }))
-      .toEqual({ outcome: "upToDate" });
+  expect(await gadget.applyBlueprint(blueprintId, { modelId: null })).toEqual({
+    outcome: "upToDate",
+  });
 
   // Both sides change the same line, and the gadget adds a file of its own.
   const r2 = await republish(publicApi, source, blueprint, V2);
@@ -555,12 +658,19 @@ it.concurrent("an update from a gadget's blueprint merges with its own changes, 
 
   const { chatId, message, merge } = await propose(ws, gadget, blueprintId);
   expect(merge).toEqual({
-    gadgetId, blueprintId, title: "Updated", version: 2, commitId: r2, kind: "merge",
-    baseCommit: r1, conflictPaths: ["client.js"],
+    gadgetId,
+    blueprintId,
+    title: "Updated",
+    version: 2,
+    commitId: r2,
+    kind: "merge",
+    baseCommit: r1,
+    conflictPaths: ["client.js"],
   });
-  const chat = (await ws.listChats()).find(entry => entry.id === chatId);
+  const chat = (await ws.listChats()).find((entry) => entry.id === chatId);
   expect(chat).toMatchObject({
-    title: "Update from blueprint: Updated", proposedChangeWorkpieces: [gadgetId],
+    title: "Update from blueprint: Updated",
+    proposedChangeWorkpieces: [gadgetId],
   });
   expect(chat?.activeAgent).toBeUndefined();
 
@@ -579,24 +689,30 @@ it.concurrent("an update from a gadget's blueprint merges with its own changes, 
 
   const { generation, revision } = chat!.codeBase!;
   await ws.submitCodeChange(chatId, {
-    generation, revision, clientId: "resolve", seq: 1,
+    generation,
+    revision,
+    clientId: "resolve",
+    seq: 1,
     change: edit(gadgetId, "client.js", conflicted, "mine and two\n"),
   });
   // The resolution is committed on the merge, which keeps the release in the gadget's history.
   const updated = await accept(ws, chatId, gadgetId);
   expect(updated.upstream).toEqual({ blueprintId, commitId: r2 });
   expect(await parentsOf(ws, updated.commitId)).toEqual([mergeCommit]);
-  expect(await codeAt(ws, updated.commitId))
-      .toEqual({ ...V2, "client.js": "mine and two\n", ...NOTES });
-  expect(await gadget.applyBlueprint(blueprintId, { modelId: null }))
-      .toEqual({ outcome: "upToDate" });
+  expect(await codeAt(ws, updated.commitId)).toEqual({
+    ...V2,
+    "client.js": "mine and two\n",
+    ...NOTES,
+  });
+  expect(await gadget.applyBlueprint(blueprintId, { modelId: null })).toEqual({
+    outcome: "upToDate",
+  });
 
   await ws.deleteSelf();
   await source.deleteSelf();
 });
 
-it.concurrent("a gadget switches to a blueprint built on an earlier release of the one it follows",
-    async () => {
+it.concurrent("a gadget switches to a blueprint built on an earlier release of the one it follows", async () => {
   const [alice, bob, carol] = nextUsernames("alice", "bob", "carol");
   if (!alice || !bob || !carol) throw new Error("Failed to allocate test usernames");
   const A1: Code = { "client.js": "alice 1\n" };
@@ -622,7 +738,10 @@ it.concurrent("a gadget switches to a blueprint built on an earlier release of t
   const bobsChat = await bobWs.newChat("Add my file", null);
   await bobWs.setChatTitle(bobsChat, "Bob's file");
   await bobWs.submitCodeChange(bobsChat, {
-    generation: 0, revision: 0, clientId: "bob", seq: 1,
+    generation: 0,
+    revision: 0,
+    clientId: "bob",
+    seq: 1,
     pins: [{ gadgetId: bobGadget, baseCommit: bobsStart }],
     change: edit(bobGadget, "bob.js", undefined, "bob 1\n"),
   });
@@ -631,16 +750,17 @@ it.concurrent("a gadget switches to a blueprint built on an earlier release of t
   expect(await bobWs.mergeChanges(bobsChat)).toEqual({ outcome: "merged" });
   const bobsMerge = (await gadgetNow(bobWs, bobGadget)).commitId;
   expect(await codeAt(bobWs, bobsMerge)).toEqual({ ...A2, ...README, "bob.js": "bob 1\n" });
-  const [mainlineSide, chatSide, ...more] = await parentsOf(bobWs, bobsMerge) ?? [];
+  const [mainlineSide, chatSide, ...more] = (await parentsOf(bobWs, bobsMerge)) ?? [];
   expect([mainlineSide, more]).toEqual([bobsMainline, []]);
-  expect(await bobWs.getCommitLog(chatSide!, 1)).toEqual([expect.objectContaining(
-      { parents: [bobsStart], message: "Chat before update: Bob's file\n" })]);
+  expect(await bobWs.getCommitLog(chatSide!, 1)).toEqual([
+    expect.objectContaining({ parents: [bobsStart], message: "Chat before update: Bob's file\n" }),
+  ]);
 
   // He publishes the result as a blueprint of his own. Its first release merges Alice's into a
   // root that is the blueprint's own, and names nothing else: the merge his chat made is his.
   const bobs = await publish(bobPublic, bobWs, bobGadget, "Bob's");
   const b1 = bobs.release;
-  const [b0, ...built] = await parentsOf(bobWs, b1) ?? [];
+  const [b0, ...built] = (await parentsOf(bobWs, b1)) ?? [];
   expect(built).toEqual([a2]);
   expect(await bobWs.getCommitLog(b0!, 1)).toEqual([
     expect.objectContaining({ oid: b0, parents: [], message: "Release 0: Bob's\n" }),
@@ -662,41 +782,60 @@ it.concurrent("a gadget switches to a blueprint built on an earlier release of t
   // Alice's later change is Carol's to keep and Bob's addition is his.
   const switching = await propose(ws, gadget, bobs.blueprintId);
   expect(switching.merge).toEqual({
-    gadgetId, blueprintId: bobs.blueprintId, title: "Bob's", version: 1, commitId: b1,
-    kind: "merge", baseCommit: a2, conflictPaths: [],
+    gadgetId,
+    blueprintId: bobs.blueprintId,
+    title: "Bob's",
+    version: 1,
+    commitId: b1,
+    kind: "merge",
+    baseCommit: a2,
+    conflictPaths: [],
   });
   const switchMerge = mergeCommitOf(switching.message, gadgetId, c1);
   const switched = await accept(ws, switching.chatId, gadgetId);
   expect(switched.upstream).toEqual({ blueprintId: bobs.blueprintId, commitId: b1 });
   expect(switched.commitId).toBe(switchMerge);
   expect(await parentsOf(ws, switched.commitId)).toEqual([c1, b1]);
-  expect(await codeAt(ws, switched.commitId)).toEqual(
-      { ...A3, ...README, "bob.js": "bob 1\n", ...CAROLS });
+  expect(await codeAt(ws, switched.commitId)).toEqual({
+    ...A3,
+    ...README,
+    "bob.js": "bob 1\n",
+    ...CAROLS,
+  });
 
   // Her gadget's history is now its own four commits, the last of them the merge she accepted,
   // and every release of both blueprints, the two that both lines lead to among them. None of
   // Bob's own commits came with his blueprint.
-  const [root] = await parentsOf(ws, made.commitId) ?? [];
-  expect((await ws.getCommitLog(switched.commitId)).map(commit => commit.oid).toSorted()).toEqual(
-      [switched.commitId, c1, made.commitId, root, a3, a2, alices.release, b1, b0].toSorted());
+  const [root] = (await parentsOf(ws, made.commitId)) ?? [];
+  expect((await ws.getCommitLog(switched.commitId)).map((commit) => commit.oid).toSorted()).toEqual(
+    [switched.commitId, c1, made.commitId, root, a3, a2, alices.release, b1, b0].toSorted(),
+  );
 
   // The merge is in her gadget's history, which is where Bob's next release finds its base.
   const b2 = await republish(bobPublic, bobWs, bobs, { ...A2, ...README, "bob.js": "bob 2\n" });
   const updating = await propose(ws, gadget, bobs.blueprintId);
-  expect(updating.merge).toMatchObject(
-      { version: 2, commitId: b2, kind: "merge", baseCommit: b1, conflictPaths: [] });
+  expect(updating.merge).toMatchObject({
+    version: 2,
+    commitId: b2,
+    kind: "merge",
+    baseCommit: b1,
+    conflictPaths: [],
+  });
   const updated = await accept(ws, updating.chatId, gadgetId);
   expect(await parentsOf(ws, updated.commitId)).toEqual([switched.commitId, b2]);
-  expect(await codeAt(ws, updated.commitId)).toEqual(
-      { ...A3, ...README, "bob.js": "bob 2\n", ...CAROLS });
+  expect(await codeAt(ws, updated.commitId)).toEqual({
+    ...A3,
+    ...README,
+    "bob.js": "bob 2\n",
+    ...CAROLS,
+  });
 
   await ws.deleteSelf();
   await bobWs.deleteSelf();
   await aliceWs.deleteSelf();
 });
 
-it.concurrent("a gadget with no lineage takes a blueprint only over a base the caller allows",
-    async () => {
+it.concurrent("a gadget with no lineage takes a blueprint only over a base the caller allows", async () => {
   using publicApi = connect(requireHarness().url);
   using api = await signUp(publicApi, username("unrelated"));
   using source = await api.newGadget();
@@ -714,17 +853,27 @@ it.concurrent("a gadget with no lineage takes a blueprint only over a base the c
   const own = await commitCode(ws, gadgetId, { "client.js": "mine\n", ...NOTES });
 
   const chats = await ws.listChats();
-  expect(await gadget.applyBlueprint(blueprintId, { modelId: null }))
-      .toEqual({ outcome: "unrelated" });
+  expect(await gadget.applyBlueprint(blueprintId, { modelId: null })).toEqual({
+    outcome: "unrelated",
+  });
   expect(await ws.listChats()).toEqual(chats);
 
   // The base is a guess: the first code the gadget had. Its client.js is in that guess, so
   // the blueprint's takes its place with no conflict, which is what the caller has allowed.
-  const { chatId, merge } =
-      await propose(ws, gadget, blueprintId, { modelId: null, allowUnrelated: true });
+  const { chatId, merge } = await propose(ws, gadget, blueprintId, {
+    modelId: null,
+    allowUnrelated: true,
+  });
   expect(merge).toEqual({
-    gadgetId, blueprintId, title: "Unrelated", version: 1, commitId: r1, kind: "merge",
-    baseCommit: first.commitId, conflictPaths: [], unverifiedBase: true,
+    gadgetId,
+    blueprintId,
+    title: "Unrelated",
+    version: 1,
+    commitId: r1,
+    kind: "merge",
+    baseCommit: first.commitId,
+    conflictPaths: [],
+    unverifiedBase: true,
   });
   const related = await accept(ws, chatId, gadgetId);
   expect(related.upstream).toEqual({ blueprintId, commitId: r1 });
@@ -735,16 +884,21 @@ it.concurrent("a gadget with no lineage takes a blueprint only over a base the c
   const r2 = await republish(publicApi, source, blueprint, V2);
   const next = await propose(ws, gadget, blueprintId);
   expect(next.merge).toEqual({
-    gadgetId, blueprintId, title: "Unrelated", version: 2, commitId: r2, kind: "merge",
-    baseCommit: r1, conflictPaths: [],
+    gadgetId,
+    blueprintId,
+    title: "Unrelated",
+    version: 2,
+    commitId: r2,
+    kind: "merge",
+    baseCommit: r1,
+    conflictPaths: [],
   });
 
   await ws.deleteSelf();
   await source.deleteSelf();
 });
 
-it.concurrent("the agent reviews a merge in one turn, and is never called for a fast-forward",
-    async () => {
+it.concurrent("the agent reviews a merge in one turn, and is never called for a fast-forward", async () => {
   const model = models.script([
     toolCall("readFile", { workpiece: "GADGET", filename: "client.js" }),
     toolCall("writeFile", { workpiece: "GADGET", filename: "client.js", content: "both\n" }),
@@ -763,7 +917,9 @@ it.concurrent("the agent reviews a merge in one turn, and is never called for a 
   using chatsStub = stubFor(chats);
   using _chats = await ws.subscribeToChat(chatsStub);
   const agentsOf = (chatId: number) =>
-    chats.states.flatMap(chat => chat.id === chatId && chat.activeAgent ? [chat.activeAgent] : []);
+    chats.states.flatMap((chat) =>
+      chat.id === chatId && chat.activeAgent ? [chat.activeAgent] : [],
+    );
 
   // The gadget has no changes of its own for the next release to disagree with, so there is
   // nothing for an agent to check. The chat is never active: accepting would refuse if it were.
@@ -778,10 +934,15 @@ it.concurrent("the agent reviews a merge in one turn, and is never called for a 
   // Now it has one, to the line that the release after changes. The turn starts with the chat.
   const own = await commitCode(ws, gadgetId, { ...V2, "client.js": "mine\n" });
   const r3 = await republish(publicApi, source, blueprint, V3);
-  const { chatId, message, merge } =
-      await propose(ws, gadget, blueprintId, { modelId: SCRIPTED_MODEL_ID });
-  expect(merge).toMatchObject(
-      { kind: "merge", commitId: r3, baseCommit: r2, conflictPaths: ["client.js"] });
+  const { chatId, message, merge } = await propose(ws, gadget, blueprintId, {
+    modelId: SCRIPTED_MODEL_ID,
+  });
+  expect(merge).toMatchObject({
+    kind: "merge",
+    commitId: r3,
+    baseCommit: r2,
+    conflictPaths: ["client.js"],
+  });
   const merged = mergeCommitOf(message, gadgetId, own);
   await waitForIdleChat(ws, chatId);
   expect(agentsOf(chatId)).toContainEqual(model.userModel.profile);
@@ -789,25 +950,26 @@ it.concurrent("the agent reviews a merge in one turn, and is never called for a 
   // What prompts the turn is the record of the proposal, described: nobody sent a message.
   expect(model.remainingSteps()).toBe(0);
   expect(model.requests).toHaveLength(3);
-  const [first, second] = model.requests.map(request => CHAT_REQUEST.parse(request).messages);
-  const [prompt, ...prompts] = first!.filter(entry => entry.role === "user");
+  const [first, second] = model.requests.map((request) => CHAT_REQUEST.parse(request).messages);
+  const [prompt, ...prompts] = first!.filter((entry) => entry.role === "user");
   expect(prompts).toEqual([]);
   for (const said of [
     'The user applied version 3 of the blueprint "Reviewed" to the gadget `env.GADGET`',
     `* base, the version the two have in common: ${r2}\n` +
-        `* this gadget, before the merge: ${own}\n* blueprint: ${r3}\n`,
+      `* this gadget, before the merge: ${own}\n* blueprint: ${r3}\n`,
     'Files with conflicts:\n* "client.js"\n',
   ]) {
     expect(prompt?.content).toContain(said);
   }
-  expect(second!.find(entry => entry.role === "tool")?.content)
-      .toContain(conflict("mine\n", "two\n", "three\n"));
+  expect(second!.find((entry) => entry.role === "tool")?.content).toContain(
+    conflict("mine\n", "two\n", "three\n"),
+  );
 
   // One model step is one message from the agent, and nobody else has said anything.
-  const history = await loadAllChatHistory(before => ws.getChatHistory(chatId, before));
-  expect(history.filter(entry => entry.type === "error")).toEqual([]);
-  const messages = history.flatMap(entry => entry.type === "message" ? [entry] : []);
-  expect(messages.map(entry => entry.author.type)).toEqual(["agent", "agent", "agent"]);
+  const history = await loadAllChatHistory((before) => ws.getChatHistory(chatId, before));
+  expect(history.filter((entry) => entry.type === "error")).toEqual([]);
+  const messages = history.flatMap((entry) => (entry.type === "message" ? [entry] : []));
+  expect(messages.map((entry) => entry.author.type)).toEqual(["agent", "agent", "agent"]);
   expect(messages.at(-1)?.message).toBe("I kept both changes to client.js.");
   expect(await gadget.getUiBundle(chatId)).toEqual({ jsCode: "both\n" });
 
@@ -822,8 +984,7 @@ it.concurrent("the agent reviews a merge in one turn, and is never called for a 
   await source.deleteSelf();
 });
 
-it.concurrent("a bundled blueprint reinstalled with new files updates a gadget made from the old",
-    async () => {
+it.concurrent("a bundled blueprint reinstalled with new files updates a gadget made from the old", async () => {
   const blueprintId = "bundled.fixture";
   const bundled = (version: number, code: Code) =>
     bundleBlueprints([{ blueprintId, title: "Bundled", version, files: code }]);
@@ -841,7 +1002,9 @@ it.concurrent("a bundled blueprint reinstalled with new files updates a gadget m
       const id = await defaultGadget(ws);
       expect((await gadgetNow(ws, id)).upstream).toEqual({ blueprintId, commitId: release });
       return {
-        workspaceId: (await ws.getMetadata()).id, gadgetId: id, r1: release,
+        workspaceId: (await ws.getMetadata()).id,
+        gadgetId: id,
+        r1: release,
         own: await commitCode(ws, id, { ...V1, ...NOTES }),
       };
     })();
@@ -853,16 +1016,24 @@ it.concurrent("a bundled blueprint reinstalled with new files updates a gadget m
     const r2 = await releaseOf(publicApi, blueprintId, r1);
     using ws = await api.openGadget(workspaceId);
     using gadget = await ws.getGadget(gadgetId);
-    expect(await gadgetNow(ws, gadgetId))
-        .toMatchObject({ commitId: own, upstream: { blueprintId, commitId: r1 } });
+    expect(await gadgetNow(ws, gadgetId)).toMatchObject({
+      commitId: own,
+      upstream: { blueprintId, commitId: r1 },
+    });
 
     // Nothing in the two releases connects them: each is a commit of its files and no more. They
     // are versions of one blueprint because they were installed under the id the gadget follows,
     // so the one it took is the base, and the caller is asked to allow nothing.
     const { chatId, merge } = await propose(ws, gadget, blueprintId);
     expect(merge).toEqual({
-      gadgetId, blueprintId, title: "Bundled", version: 2, commitId: r2, kind: "merge",
-      baseCommit: r1, conflictPaths: [],
+      gadgetId,
+      blueprintId,
+      title: "Bundled",
+      version: 2,
+      commitId: r2,
+      kind: "merge",
+      baseCommit: r1,
+      conflictPaths: [],
     });
     expect(await parentsOf(ws, r1)).toEqual([]);
     expect(await parentsOf(ws, r2)).toEqual([]);
@@ -871,8 +1042,9 @@ it.concurrent("a bundled blueprint reinstalled with new files updates a gadget m
     expect(updated.upstream).toEqual({ blueprintId, commitId: r2 });
     expect(await parentsOf(ws, updated.commitId)).toEqual([own, r2]);
     expect(await codeAt(ws, updated.commitId)).toEqual({ ...V2, ...NOTES });
-    expect(await gadget.applyBlueprint(blueprintId, { modelId: null }))
-        .toEqual({ outcome: "upToDate" });
+    expect(await gadget.applyBlueprint(blueprintId, { modelId: null })).toEqual({
+      outcome: "upToDate",
+    });
   } finally {
     await deployment.server.close();
   }
@@ -894,11 +1066,23 @@ it.concurrent("an archive of either version imports and instantiates", async () 
   // Version 1 is what a blueprint was exported as before its releases were commits: a snapshot
   // of its files. It is stored as it came, and downloads as what is stored.
   const exported = new Date(0).toISOString();
-  const legacyId = await api.importBlueprint(streamOf(serializeArchive(1, {
-    title: "Legacy", description: "Exported long ago",
-    author: { type: "user", id: "legacy@gadgets-test.example", name: "Legacy" },
-    created: exported, version: 3, lastUpdated: exported, bindings: {},
-  }, buildSnapshotContent(new Map(Object.entries(V1))))));
+  const legacyId = await api.importBlueprint(
+    streamOf(
+      serializeArchive(
+        1,
+        {
+          title: "Legacy",
+          description: "Exported long ago",
+          author: { type: "user", id: "legacy@gadgets-test.example", name: "Legacy" },
+          created: exported,
+          version: 3,
+          lastUpdated: exported,
+          bindings: {},
+        },
+        buildSnapshotContent(new Map(Object.entries(V1))),
+      ),
+    ),
+  );
   const legacy = (await publicApi.getBlueprint(legacyId))?.metadata;
   expect(legacy).toMatchObject({ title: "Legacy", version: 3 });
   expect(legacy?.commitId).toBeUndefined();
@@ -923,8 +1107,11 @@ it.concurrent("an archive of either version imports and instantiates", async () 
   expect(archiveVersion(archive)).toBe(2);
   const copyId = await api.importBlueprint(streamOf(archive));
   expect(copyId).not.toBe(original.blueprintId);
-  expect((await publicApi.getBlueprint(copyId))?.metadata)
-      .toMatchObject({ title: "Exported", version: 1, commitId: original.release });
+  expect((await publicApi.getBlueprint(copyId))?.metadata).toMatchObject({
+    title: "Exported",
+    version: 1,
+    commitId: original.release,
+  });
 
   using fromCopy = await api.newGadgetFromBlueprint(copyId, {});
   const copied = await gadgetNow(fromCopy, await defaultGadget(fromCopy));
@@ -940,15 +1127,23 @@ it.concurrent("an archive of either version imports and instantiates", async () 
   const before = await gadgetNow(ws, gadgetId);
   const { chatId, message, merge } = await propose(ws, gadget, copyId);
   expect(merge).toEqual({
-    gadgetId, blueprintId: copyId, title: "Exported", version: 1, commitId: original.release,
-    kind: "follow", conflictPaths: [],
+    gadgetId,
+    blueprintId: copyId,
+    title: "Exported",
+    version: 1,
+    commitId: original.release,
+    kind: "follow",
+    conflictPaths: [],
   });
   expect(message.change).toBeUndefined();
   expect(message.pins).toBeUndefined();
-  expect((await ws.listChats()).find(chat => chat.id === chatId)?.proposedChangeWorkpieces ?? [])
-      .toEqual([]);
-  expect(await accept(ws, chatId, gadgetId))
-      .toEqual({ ...before, upstream: { blueprintId: copyId, commitId: original.release } });
+  expect(
+    (await ws.listChats()).find((chat) => chat.id === chatId)?.proposedChangeWorkpieces ?? [],
+  ).toEqual([]);
+  expect(await accept(ws, chatId, gadgetId)).toEqual({
+    ...before,
+    upstream: { blueprintId: copyId, commitId: original.release },
+  });
   expect(await gadget.applyBlueprint(copyId, { modelId: null })).toEqual({ outcome: "upToDate" });
 
   for (const workspace of [ws, fromCopy, source, fromLegacy]) await workspace.deleteSelf();
@@ -960,8 +1155,12 @@ it.concurrent("only a gadget's builders are told which blueprint it follows", as
   using ownerPublic = connect(requireHarness().url);
   using ownerApi = await signUp(ownerPublic, owner);
   using source = await ownerApi.newGadget();
-  const { blueprintId, release } =
-      await publish(ownerPublic, source, await createApp(source, V1), "Followed");
+  const { blueprintId, release } = await publish(
+    ownerPublic,
+    source,
+    await createApp(source, V1),
+    "Followed",
+  );
   using ws = await ownerApi.newGadgetFromBlueprint(blueprintId, {});
   const gadgetId = await defaultGadget(ws);
   const built = await gadgetNow(ws, gadgetId);
@@ -971,7 +1170,7 @@ it.concurrent("only a gadget's builders are told which blueprint it follows", as
   // otherwise read.
   using viewerPublic = connect(requireHarness().url);
   using viewerApi = await signUp(viewerPublic, viewer);
-  if (!await ws.addCollaborator(viewer, "use")) throw new Error(`Failed to share with ${viewer}`);
+  if (!(await ws.addCollaborator(viewer, "use"))) throw new Error(`Failed to share with ${viewer}`);
   using useWs = await viewerApi.openGadget((await ws.getMetadata()).id);
   const { upstream: _upstream, ...used } = built;
   expect(await gadgetNow(useWs, gadgetId)).toEqual(used);
@@ -992,8 +1191,15 @@ it.concurrent("a gadget's ExportHandler lists and streams its format", async () 
   await workpieces.loaded;
   using app = ws.createGadget("App", undefined, "APP");
   const gadgetId = await app.getId();
-  await commitText(ws, workpieces, gadgetId, await headOf(workpieces, gadgetId),
-      "server.js", undefined, CSV_EXPORT_SERVER);
+  await commitText(
+    ws,
+    workpieces,
+    gadgetId,
+    await headOf(workpieces, gadgetId),
+    "server.js",
+    undefined,
+    CSV_EXPORT_SERVER,
+  );
 
   expect(await app.getExportFormats()).toEqual([
     { id: "csv", label: "CSV", mode: "server", contentType: "text/csv", fileExtension: ".csv" },
@@ -1005,8 +1211,7 @@ it.concurrent("a gadget's ExportHandler lists and streams its format", async () 
 
 // Both users register the same model ID, backed by different scripted accounts, so only the
 // installer's own configuration can produce the installer's reply.
-it.concurrent("a gadget's LLM binding runs on its bound model, and an install uses the installer's",
-    async () => {
+it.concurrent("a gadget's LLM binding runs on its bound model, and an install uses the installer's", async () => {
   const [publisher, installer] = nextUsernames("llmpublisher", "llminstaller");
   if (!publisher || !installer) throw new Error("Failed to allocate test usernames");
   const publisherModel = models.script([{ text: "Publisher's summary." }]);
@@ -1022,8 +1227,15 @@ it.concurrent("a gadget's LLM binding runs on its bound model, and an install us
   await workpieces.loaded;
   using app = source.createGadget("Summarizer", undefined, "APP");
   const gadgetId = await app.getId();
-  await commitText(source, workpieces, gadgetId, await headOf(workpieces, gadgetId),
-      "server.js", undefined, LLM_SERVER);
+  await commitText(
+    source,
+    workpieces,
+    gadgetId,
+    await headOf(workpieces, gadgetId),
+    "server.js",
+    undefined,
+    LLM_SERVER,
+  );
   using llm = await source.newAiModelGatekeeper(publisherModel.userModel.profile.id);
   await app.bind("LLM", await llm.getId());
 

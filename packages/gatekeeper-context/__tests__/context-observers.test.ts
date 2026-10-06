@@ -1,7 +1,5 @@
-import { describe, expect, it } from "vitest";
-import {
-  ContextObserverTracker, type ContextVerifierApi,
-} from "../src/context-observers.js";
+import { describe, expect, it } from "vite-plus/test";
+import { ContextObserverTracker, type ContextVerifierApi } from "../src/context-observers.js";
 
 type TrackerKv = ConstructorParameters<typeof ContextObserverTracker>[0];
 
@@ -65,7 +63,7 @@ describe("ContextObserverTracker", () => {
     tracker.removeObserver("limited");
     tracker.removeObserver("limited");
     expect(await observe(tracker, ["third"])).toBeUndefined();
-    expect(limited.calls.map(call => call.collectionId)).toEqual(["first", "second"]);
+    expect(limited.calls.map((call) => call.collectionId)).toEqual(["first", "second"]);
   });
 
   it("keeps blocked collections pending and rechecks them on retry", async () => {
@@ -85,16 +83,21 @@ describe("ContextObserverTracker", () => {
     expect(allowedRetry.excludeObservers).toBeUndefined();
     allowedRetry.commit();
     expect(kv.get("observedCollection:private")).toBe("observed");
-    expect(limited.calls.map(call => call.collectionId)).toEqual(["private", "private"]);
+    expect(limited.calls.map((call) => call.collectionId)).toEqual(["private", "private"]);
   });
 
   it("checks pending collections when admitting a concurrent observer", async () => {
     let kv = makeKv();
     let tracker = new ContextObserverTracker(kv, "workshop.example");
     let release!: () => void;
-    let waiting = new Promise<void>(resolve => { release = resolve; });
+    let waiting = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     let current = {
-      async hasCollectionAccess() { await waiting; return true; },
+      async hasCollectionAccess() {
+        await waiting;
+        return true;
+      },
     } as unknown as Fetcher<ContextVerifierApi>;
     await tracker.addObserver("current", current);
 
@@ -104,14 +107,16 @@ describe("ContextObserverTracker", () => {
     await expect(tracker.addObserver("new", denied.api)).rejects.toThrow(/does not have access/);
     release();
     (await preparing).commit();
-    expect(denied.calls.map(call => call.collectionId)).toEqual(["new"]);
+    expect(denied.calls.map((call) => call.collectionId)).toEqual(["new"]);
   });
 
   it("rechecks collections added while observer admission is awaiting", async () => {
     let tracker = new ContextObserverTracker(makeKv(), "workshop.example");
     await observe(tracker, ["old"]);
     let release!: () => void;
-    let waiting = new Promise<void>(resolve => { release = resolve; });
+    let waiting = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     let calls: string[] = [];
     let candidate = {
       async hasCollectionAccess(_domain: string, collectionId: string) {
@@ -144,7 +149,8 @@ describe("ContextObserverTracker", () => {
     expect(mixed.pendingCollections).toEqual(["pending", "new"]);
     expect(mixed.excludeObservers).toEqual(["limited"]);
     mixed.commit();
-    expect((await tracker.prepareObservation(["legacy", "pending", "new"]))
-      .pendingCollections).toEqual([]);
+    expect(
+      (await tracker.prepareObservation(["legacy", "pending", "new"])).pendingCollections,
+    ).toEqual([]);
   });
 });

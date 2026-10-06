@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type { AuthenticatedApi } from "@gadgets/workshop-shared/api";
 import {
@@ -23,7 +23,9 @@ const RESOLVED_FLAGS = {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => { resolve = next; });
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
   return { promise, resolve };
 }
 
@@ -60,17 +62,33 @@ describe("FeatureFlagsProvider", () => {
     document.body.append(container);
     root = createRoot(container);
 
-    await act(async () => root!.render(<FeatureFlagsProvider><Probe /></FeatureFlagsProvider>));
+    await act(async () =>
+      root!.render(
+        <FeatureFlagsProvider>
+          <Probe />
+        </FeatureFlagsProvider>,
+      ),
+    );
     expect(current).toEqual({ flags: DEFAULT_UI_FEATURE_FLAGS, loading: true });
 
     currentApi = api(() => second.promise);
-    await act(async () => root!.render(<FeatureFlagsProvider><Probe /></FeatureFlagsProvider>));
+    await act(async () =>
+      root!.render(
+        <FeatureFlagsProvider>
+          <Probe />
+        </FeatureFlagsProvider>,
+      ),
+    );
     expect(current).toEqual({ flags: DEFAULT_UI_FEATURE_FLAGS, loading: true });
 
-    await act(async () => { first.resolve(RESOLVED_FLAGS); });
+    await act(async () => {
+      first.resolve(RESOLVED_FLAGS);
+    });
     expect(current).toEqual({ flags: DEFAULT_UI_FEATURE_FLAGS, loading: true });
 
-    await act(async () => { second.resolve(RESOLVED_FLAGS); });
+    await act(async () => {
+      second.resolve(RESOLVED_FLAGS);
+    });
     expect(current).toEqual({
       flags: { ...DEFAULT_UI_FEATURE_FLAGS, ...RESOLVED_FLAGS },
       loading: false,

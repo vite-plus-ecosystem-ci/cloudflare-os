@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { ApprovalQueue, GitCache } from "@gadgets/workshop-shared/gatekeeper";
 import type { RpcStub } from "cloudflare:workers";
 import {
@@ -88,7 +88,7 @@ describe("ActionJournal", () => {
 
   it("remembers retired ids within the prunable allowance, and forgets the oldest past it", () => {
     const journal = new ActionJournal<Sql>(makeKv(), { namespace: "pending", maxPending: 1 });
-    const ids = ["a", "b", "c"].map(sql => {
+    const ids = ["a", "b", "c"].map((sql) => {
       const id = journal.allocate({ sql });
       journal.markSubmitted(id);
       journal.retire(id);
@@ -96,7 +96,7 @@ describe("ActionJournal", () => {
     });
 
     expect(journal.get(ids[2]!)).toBeUndefined();
-    expect(ids.map(id => journal.wasApplied(id))).toEqual([false, true, true]);
+    expect(ids.map((id) => journal.wasApplied(id))).toEqual([false, true, true]);
   });
 
   it("resolves a staged record, and keeps its id counter out of the record keyspace", () => {
@@ -123,11 +123,14 @@ describe("ActionJournal", () => {
     journal.retain(retained, { sql: "applied", rows: 3 });
 
     expect(journal.listPending()).toEqual([{ id: pending, action: { sql: "waiting" } }]);
-    expect(journal.get(retained)).toEqual({ state: "applied", action: { sql: "applied", rows: 3 } });
+    expect(journal.get(retained)).toEqual({
+      state: "applied",
+      action: { sql: "applied", rows: 3 },
+    });
     expect(journal.isRetained(retained)).toBe(true);
     expect(journal.isRetained(pending)).toBe(false);
     // The record left the scanned prefix entirely, so pending scans stay bounded.
-    expect(kv.keys().filter(key => key.startsWith("pending:action:"))).toEqual([
+    expect(kv.keys().filter((key) => key.startsWith("pending:action:"))).toEqual([
       `pending:action:${pending}`,
     ]);
 
@@ -139,22 +142,24 @@ describe("ActionJournal", () => {
     const kv = makeKv();
     const scan = vi.spyOn(kv, "list");
     const journal = new ActionJournal<Sql>(kv, { namespace: "pending" });
-    const ids = ["one", "two", "three"].map(sql => {
+    const ids = ["one", "two", "three"].map((sql) => {
       const id = journal.allocate({ sql });
       journal.retain(id);
       return id;
     });
     // A malformed/non-applied row still consumes storage's limit. The cursor must advance past it
     // rather than claiming this sparse page exhausted the retained tier.
-    kv.put(`retained:pending:action:${ids[1]}`,
-      { v: 2, state: "pending", action: { sql: "not retained" } });
+    kv.put(`retained:pending:action:${ids[1]}`, {
+      v: 2,
+      state: "pending",
+      action: { sql: "not retained" },
+    });
     scan.mockClear();
 
     const first = journal.listRetained({ limit: 2 });
     expect(first.entries).toEqual([{ id: ids[0], action: { sql: "one" } }]);
     expect(first.nextCursor).toBe(`retained:pending:action:${ids[1]}`);
-    expect(scan).toHaveBeenNthCalledWith(1,
-      { prefix: "retained:pending:action:", limit: 2 });
+    expect(scan).toHaveBeenNthCalledWith(1, { prefix: "retained:pending:action:", limit: 2 });
 
     expect(journal.listRetained({ limit: 2, cursor: first.nextCursor })).toEqual({
       entries: [{ id: ids[2], action: { sql: "three" } }],
@@ -173,10 +178,15 @@ describe("ActionJournal", () => {
     const journal = new ActionJournal<Sql>(kv, { namespace: "pending" });
     const id = journal.allocate({ sql: "one" });
     journal.retain(id);
-    const failing = new ActionJournal<Sql>({
-      ...kv,
-      delete: key => { if (key.startsWith("retained:")) throw new Error("storage unavailable"); },
-    }, { namespace: "pending" });
+    const failing = new ActionJournal<Sql>(
+      {
+        ...kv,
+        delete: (key) => {
+          if (key.startsWith("retained:")) throw new Error("storage unavailable");
+        },
+      },
+      { namespace: "pending" },
+    );
 
     expect(() => failing.retire(id)).toThrow("storage unavailable");
 
@@ -195,7 +205,7 @@ describe("ActionJournal", () => {
     kv.put("legacy:rec:7", { v: 1, sql: "the port's own schema" });
     const journal = new ActionJournal<Sql>(kv, {
       legacyKeys: { nextIdKey: "legacy:next", recordPrefix: "legacy:rec:" },
-      upgradeRecord: raw => ({ sql: (raw as { sql: string }).sql }),
+      upgradeRecord: (raw) => ({ sql: (raw as { sql: string }).sql }),
     });
 
     expect(journal.get(7)).toEqual({ state: "pending", action: { sql: "the port's own schema" } });
@@ -208,7 +218,9 @@ describe("ActionJournal", () => {
     const kv = makeKv();
     const failing: ActionJournalKv = {
       ...kv,
-      delete: key => { throw new Error(`storage unavailable: ${key}`); },
+      delete: (key) => {
+        throw new Error(`storage unavailable: ${key}`);
+      },
     };
     const journal = new ActionJournal<Sql>(failing, { namespace: "pending" });
     const id = journal.allocate({ sql: "applied" });
@@ -253,11 +265,19 @@ describe("ActionJournal", () => {
     const kv = makeKv();
     const failing: ActionJournalKv = {
       ...kv,
-      delete: key => { throw new Error(`storage unavailable: ${key}`); },
+      delete: (key) => {
+        throw new Error(`storage unavailable: ${key}`);
+      },
     };
-    const id = new ActionJournal<Sql>(failing, { namespace: "pending" }).allocate({ sql: "applied" });
-    expect(() => new ActionJournal<Sql>(failing, { namespace: "pending" }).retain(id, { sql: "applied", rows: 3 }))
-      .toThrow("storage unavailable");
+    const id = new ActionJournal<Sql>(failing, { namespace: "pending" }).allocate({
+      sql: "applied",
+    });
+    expect(() =>
+      new ActionJournal<Sql>(failing, { namespace: "pending" }).retain(id, {
+        sql: "applied",
+        rows: 3,
+      }),
+    ).toThrow("storage unavailable");
 
     // Enough staged records to force pruning; the retained one must not be among the casualties.
     const journal = new ActionJournal<Sql>(kv, { namespace: "pending", maxPending: 1 });
@@ -276,7 +296,9 @@ describe("ActionJournal", () => {
     const journal = new ActionJournal<Sql>(kv, {
       namespace: "pending",
       // The shape this gatekeeper wrote before it had a journal; unvalidatable by construction.
-      upgradeRecord: raw => ({ sql: (raw as { action: { statement: string } }).action.statement }),
+      upgradeRecord: (raw) => ({
+        sql: (raw as { action: { statement: string } }).action.statement,
+      }),
     });
 
     expect(journal.get(7)).toEqual({ state: "pending", action: { sql: "legacy" } });
@@ -297,12 +319,13 @@ describe("ActionJournal", () => {
   });
 
   it("refuses overlapping keyspaces a port could pass by hand", () => {
-    const legacy = (nextIdKey: string, recordPrefix: string) =>
-      () => new ActionJournal(makeKv(), { legacyKeys: { nextIdKey, recordPrefix } });
+    const legacy = (nextIdKey: string, recordPrefix: string) => () =>
+      new ActionJournal(makeKv(), { legacyKeys: { nextIdKey, recordPrefix } });
     expect(legacy("pending:nextActionId", "")).toThrow(/must not be empty/);
     expect(legacy("action:1", "action:")).toThrow(/overlaps a record prefix/);
-    expect(legacy("retained:pending:action:1", "pending:action:"))
-      .toThrow(/overlaps a record prefix/);
+    expect(legacy("retained:pending:action:1", "pending:action:")).toThrow(
+      /overlaps a record prefix/,
+    );
     expect(legacy("pending:nextActionId", "retained:")).toThrow(/its own retained tier/);
   });
 
@@ -310,18 +333,23 @@ describe("ActionJournal", () => {
     // A derived key is `<namespace>:action:<id>`; a separator in the namespace itself would let
     // one journal's records fall inside another's prefix scan.
     for (const namespace of ["", "has space", "has:colon", "retained:pending"]) {
-      expect(() => new ActionJournal(makeKv(), { namespace }))
-        .toThrow(/must match/);
+      expect(() => new ActionJournal(makeKv(), { namespace })).toThrow(/must match/);
     }
   });
 
   it("refuses a namespace that lands its records inside observer storage", () => {
     // `observer:action:1` comes back from the observer scan as a stored verifier, and
     // `observer-withhold-fence:action:1` reads as an owner-only read nothing will ever settle.
-    for (const namespace of ["observer", "observer-attempt", "observer-nonce",
-      "observer-withhold-fence", "observer-withhold-latch"]) {
-      expect(() => new ActionJournal(makeKv(), { namespace }))
-        .toThrow(/overlap the reserved observer prefix/);
+    for (const namespace of [
+      "observer",
+      "observer-attempt",
+      "observer-nonce",
+      "observer-withhold-fence",
+      "observer-withhold-latch",
+    ]) {
+      expect(() => new ActionJournal(makeKv(), { namespace })).toThrow(
+        /overlap the reserved observer prefix/,
+      );
     }
     expect(() => new ActionJournal(makeKv(), { namespace: "observations" })).not.toThrow();
   });
@@ -342,22 +370,24 @@ describe("ActionJournal", () => {
     // `NaN` fails every comparison the cap appears in, so it silently removes the bound; zero and
     // below refuse the first allocation instead of the last.
     for (const maxPending of [Number.NaN, Infinity, 0, -1, 1.5]) {
-      expect(() => new ActionJournal(makeKv(), { namespace: "pending", maxPending }))
-        .toThrow(/maxPending must be a positive safe integer/);
+      expect(() => new ActionJournal(makeKv(), { namespace: "pending", maxPending })).toThrow(
+        /maxPending must be a positive safe integer/,
+      );
     }
   });
 
   it("refuses a retained-page limit that would disable its storage bound", () => {
     const journal = new ActionJournal(makeKv(), { namespace: "pending" });
     for (const limit of [Number.NaN, Infinity, 0, -1, 1.5]) {
-      expect(() => journal.listRetained({ limit }))
-        .toThrow(/limit must be a positive safe integer/);
+      expect(() => journal.listRetained({ limit })).toThrow(
+        /limit must be a positive safe integer/,
+      );
     }
   });
 
   it("projects a claimed record but stops projecting a failed one", () => {
     const journal = new ActionJournal<Sql>(makeKv(), { namespace: "pending" });
-    const [pending, claimed, failed] = [1, 2, 3].map(n => journal.allocate({ sql: `q${n}` }));
+    const [pending, claimed, failed] = [1, 2, 3].map((n) => journal.allocate({ sql: `q${n}` }));
     for (const id of [pending, claimed, failed]) journal.markSubmitted(id);
 
     journal.markClaimed(claimed);
@@ -402,8 +432,11 @@ describe("ActionJournal", () => {
 
     expect(journal.get(applied)).toEqual({ state: "applied", action: { sql: "applied" } });
     // The stored answer is the one the user was already shown, not whatever arrived later.
-    expect(journal.get(failed))
-      .toEqual({ state: "failed", action: { sql: "failed" }, error: "first answer" });
+    expect(journal.get(failed)).toEqual({
+      state: "failed",
+      action: { sql: "failed" },
+      error: "first answer",
+    });
     expect(journal.get(404)).toBeUndefined();
   });
 
@@ -417,8 +450,11 @@ describe("ActionJournal", () => {
 
     expect(() => journal.allocate({ sql: "three" })).toThrow(/Too many pending actions/);
     // Nothing was written, so the refused allocation did not consume an id either.
-    expect(kv.keys()).toEqual([`pending:action:${first}`, `pending:action:${second}`,
-      "pending:nextActionId"]);
+    expect(kv.keys()).toEqual([
+      `pending:action:${first}`,
+      `pending:action:${second}`,
+      "pending:nextActionId",
+    ]);
 
     // A failed record does not count: rejecting it is how it is cleared, so counting it would
     // wedge the queue for a user with nothing left to approve.
@@ -444,9 +480,13 @@ describe("ActionJournal", () => {
 
     expect(journal.allocate({ sql: "six" })).toBe(6);
     // Bounded like the failures, since they share the scanned prefix: the oldest is dropped.
-    expect(kv.keys().filter(key => key.startsWith("pending:action:")))
-      .toEqual(["pending:action:2", "pending:action:3", "pending:action:4",
-        "pending:action:5", "pending:action:6"]);
+    expect(kv.keys().filter((key) => key.startsWith("pending:action:"))).toEqual([
+      "pending:action:2",
+      "pending:action:3",
+      "pending:action:4",
+      "pending:action:5",
+      "pending:action:6",
+    ]);
   });
 
   it("never lets terminal failures block a new action", () => {
@@ -470,9 +510,13 @@ describe("ActionJournal", () => {
     }
 
     // The newest survive: the oldest is the one the user is least likely to still be looking at.
-    expect(kv.keys().filter(key => key.startsWith("pending:action:")))
-      .toEqual(["pending:action:16", "pending:action:17", "pending:action:18",
-        "pending:action:19", "pending:action:20"]);
+    expect(kv.keys().filter((key) => key.startsWith("pending:action:"))).toEqual([
+      "pending:action:16",
+      "pending:action:17",
+      "pending:action:18",
+      "pending:action:19",
+      "pending:action:20",
+    ]);
     expect(journal.get(20)?.error).toBe("terminal");
     expect(journal.get(15)).toBeUndefined();
   });
@@ -487,8 +531,9 @@ describe("ActionJournal", () => {
     }
     journal.allocate({ sql: "the allocation that scans all seven" });
 
-    expect([1, 2, 3, 4, 5, 6, 7].map(id => journal.get(id)?.error))
-      .toEqual(Array.from({ length: 7 }, () => "terminal"));
+    expect([1, 2, 3, 4, 5, 6, 7].map((id) => journal.get(id)?.error)).toEqual(
+      Array.from({ length: 7 }, () => "terminal"),
+    );
   });
 
   it("drops a stranded staged record before a failure that explains itself", () => {
@@ -560,7 +605,9 @@ describe("ActionJournal", () => {
 
     expect(journal.isRetained(id)).toBe(false);
     expect(journal.get(id)).toEqual({
-      state: "failed", action: { sql: "one" }, error: "the provider refused",
+      state: "failed",
+      action: { sql: "one" },
+      error: "the provider refused",
     });
   });
 
@@ -593,8 +640,9 @@ describe("stageAction", () => {
       throw new Error("queue unavailable");
     });
 
-    await expect(stageAction(journal, fakeQueue(submitAction), { sql: "one" }, presentation))
-      .rejects.toThrow("queue unavailable");
+    await expect(
+      stageAction(journal, fakeQueue(submitAction), { sql: "one" }, presentation),
+    ).rejects.toThrow("queue unavailable");
     expect(journal.get(1)).toBeUndefined();
     expect(journal.listPending()).toEqual([]);
   });
@@ -602,7 +650,7 @@ describe("stageAction", () => {
   it("reports success when only the reply to an auto-approved submission was lost", async () => {
     // The overseer applied and retained the action inside submitAction, then the RPC rejected.
     const journal = new ActionJournal<Sql>(makeKv(), { namespace: "pending" });
-    const submitAction = vi.fn<ApprovalQueue["submitAction"]>(async submitted => {
+    const submitAction = vi.fn<ApprovalQueue["submitAction"]>(async (submitted) => {
       journal.retain(submitted);
       throw new Error("session torn down");
     });
@@ -613,7 +661,7 @@ describe("stageAction", () => {
 
   it("reports success when a non-retaining auto-approval consumed the record mid-submission", async () => {
     const journal = new ActionJournal<Sql>(makeKv(), { namespace: "pending" });
-    const submitAction = vi.fn<ApprovalQueue["submitAction"]>(async submitted => {
+    const submitAction = vi.fn<ApprovalQueue["submitAction"]>(async (submitted) => {
       journal.remove(submitted);
       throw new Error("session torn down");
     });
@@ -632,15 +680,16 @@ describe("stageAction", () => {
     const queue = fakeQueue(submitAction);
 
     const results = await Promise.allSettled(
-      ["a", "b", "c", "d"].map(sql => stageAction(journal, queue, { sql }, presentation)));
+      ["a", "b", "c", "d"].map((sql) => stageAction(journal, queue, { sql }, presentation)),
+    );
 
     // One staged and submitted; the rest refused at capacity. Nothing reported success for a
     // record that no longer exists.
-    const staged = results.filter(result => result.status === "fulfilled");
+    const staged = results.filter((result) => result.status === "fulfilled");
     expect(staged).toHaveLength(1);
     for (const result of staged) expect(journal.get(result.value)).toBeDefined();
     expect(submitAction).toHaveBeenCalledTimes(1);
-    for (const result of results.filter(result => result.status === "rejected")) {
+    for (const result of results.filter((result) => result.status === "rejected")) {
       expect(String(result.reason)).toMatch(/Too many pending/);
     }
   });
@@ -650,47 +699,56 @@ describe("defineActions", () => {
   type Actions = { execute: Sql; publish: { page: string } };
   type Host = { ran: string[] };
 
-  function bind(overrides: {
-    apply?: (payload: Sql, host: Host, ctx: ActionContext) => Promise<void | { action?: Sql }>;
-    reject?: (payload: Sql, host: Host, ctx: ActionContext) => Promise<void>;
-    describe?: (payload: Sql, host: Host) => ActionPresentation;
-    retainApplied?: boolean;
-    afterResolve?: (host: Host, outcome: ResolveOutcome) => void | Promise<void>;
-    claimBeforeApply?: boolean;
-    fence?: FencePolicy;
-    maxPending?: number;
-    /** Share one journal between two binds, which is how a dead activation is simulated. */
-    journal?: ActionJournal<TaggedAction<Actions>>;
-  } = {}) {
+  function bind(
+    overrides: {
+      apply?: (payload: Sql, host: Host, ctx: ActionContext) => Promise<void | { action?: Sql }>;
+      reject?: (payload: Sql, host: Host, ctx: ActionContext) => Promise<void>;
+      describe?: (payload: Sql, host: Host) => ActionPresentation;
+      retainApplied?: boolean;
+      afterResolve?: (host: Host, outcome: ResolveOutcome) => void | Promise<void>;
+      claimBeforeApply?: boolean;
+      fence?: FencePolicy;
+      maxPending?: number;
+      /** Share one journal between two binds, which is how a dead activation is simulated. */
+      journal?: ActionJournal<TaggedAction<Actions>>;
+    } = {},
+  ) {
     const host: Host = { ran: [] };
     const outcomes: ResolveOutcome[] = [];
-    const journal = overrides.journal
-      ?? new ActionJournal<TaggedAction<Actions>>(makeKv(), { namespace: "pending", maxPending: overrides.maxPending });
-    const set = defineActions<Host, Actions>({
-      execute: {
-        kind: { tag: "sql", label: "Run SQL" },
-        autoApprovable: true,
-        delivery: "continue-with-simulation",
-        claimBeforeApply: overrides.claimBeforeApply,
-        describe: overrides.describe ?? (() => presentation),
-        apply: overrides.apply ?? (async (payload, target) => void target.ran.push(payload.sql)),
-        reject: overrides.reject
-          ?? (async (payload, target) => void target.ran.push(`rejected ${payload.sql}`)),
+    const journal =
+      overrides.journal ??
+      new ActionJournal<TaggedAction<Actions>>(makeKv(), {
+        namespace: "pending",
+        maxPending: overrides.maxPending,
+      });
+    const set = defineActions<Host, Actions>(
+      {
+        execute: {
+          kind: { tag: "sql", label: "Run SQL" },
+          autoApprovable: true,
+          delivery: "continue-with-simulation",
+          claimBeforeApply: overrides.claimBeforeApply,
+          describe: overrides.describe ?? (() => presentation),
+          apply: overrides.apply ?? (async (payload, target) => void target.ran.push(payload.sql)),
+          reject:
+            overrides.reject ??
+            (async (payload, target) => void target.ran.push(`rejected ${payload.sql}`)),
+        },
+        publish: {
+          // Same tag as `execute`, so necessarily the same label: one tag is one approval group.
+          kind: { tag: "sql", label: "Run SQL" },
+          delivery: "await-decision",
+          describe: () => presentation,
+          apply: async (payload, target) => void target.ran.push(payload.page),
+        },
       },
-      publish: {
-        // Same tag as `execute`, so necessarily the same label: one tag is one approval group.
-        kind: { tag: "sql", label: "Run SQL" },
-        delivery: "await-decision",
-        describe: () => presentation,
-        apply: async (payload, target) => void target.ran.push(payload.page),
+      {
+        // Most tests here stage unfenced actions; the fence suite opts its own set into pinning.
+        fence: overrides.fence ?? "none",
+        retainApplied: overrides.retainApplied,
+        afterResolve: overrides.afterResolve ?? ((_host, outcome) => void outcomes.push(outcome)),
       },
-    }, {
-      // Most tests here stage unfenced actions; the fence suite opts its own set into pinning.
-      fence: overrides.fence ?? "none",
-      retainApplied: overrides.retainApplied,
-      afterResolve: overrides.afterResolve
-        ?? ((_host, outcome) => void outcomes.push(outcome)),
-    });
+    );
     return { host, journal, outcomes, actions: set.bind(journal, host) };
   }
 
@@ -714,7 +772,7 @@ describe("defineActions", () => {
     // What the approver reads and what apply receives must be the same payload, so submit snapshots
     // it before its first await -- the caller's reference is live until the KV put otherwise.
     const { actions, journal } = bind({
-      describe: payload => ({ ...presentation, description: payload.sql }),
+      describe: (payload) => ({ ...presentation, description: payload.sql }),
     });
     const submitAction = submitSpy();
 
@@ -724,7 +782,9 @@ describe("defineActions", () => {
     const id = await submitting;
 
     expect(submitAction).toHaveBeenCalledWith(
-      id, expect.objectContaining({ description: "SELECT 1" }));
+      id,
+      expect.objectContaining({ description: "SELECT 1" }),
+    );
     expect(journal.get(id)?.action).toEqual({ kind: "execute", payload: { sql: "SELECT 1" } });
   });
 
@@ -733,16 +793,20 @@ describe("defineActions", () => {
     // of receipt: it promotes the staged record, so a retryable failure leaves it pending -- and
     // the lost-reply rollback cannot take a record the overseer still holds.
     const { actions, journal } = bind({
-      apply: async () => { throw new Error("provider unreachable"); },
+      apply: async () => {
+        throw new Error("provider unreachable");
+      },
     });
-    const queue = fakeQueue(vi.fn<ApprovalQueue["submitAction"]>(async submitted => {
-      await actions.apply(submitted).catch(() => {});
-      throw new Error("session torn down");
-    }));
+    const queue = fakeQueue(
+      vi.fn<ApprovalQueue["submitAction"]>(async (submitted) => {
+        await actions.apply(submitted).catch(() => {});
+        throw new Error("session torn down");
+      }),
+    );
 
     const id = await actions.submit(queue, "execute", { sql: "one" });
     expect(journal.get(id)?.state).toBe("pending");
-    expect(journal.listPending().map(entry => entry.id)).toEqual([id]);
+    expect(journal.listPending().map((entry) => entry.id)).toEqual([id]);
   });
 
   it("never prunes a record whose own submission is still in flight", async () => {
@@ -751,9 +815,12 @@ describe("defineActions", () => {
     // `maxPending: 4` bounds that tier at 8, so the tenth concurrent stage is the first to prune.
     const { actions, journal } = bind({ maxPending: 4 });
 
-    const settled = await Promise.allSettled(Array.from({ length: 12 }, (_, n) =>
-      actions.submit(fakeQueue(), "execute", { sql: `q${n}` })));
-    const accepted = settled.flatMap(r => (r.status === "fulfilled" ? [r.value] : []));
+    const settled = await Promise.allSettled(
+      Array.from({ length: 12 }, (_, n) =>
+        actions.submit(fakeQueue(), "execute", { sql: `q${n}` }),
+      ),
+    );
+    const accepted = settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
 
     expect(accepted.length).toBeGreaterThan(0);
     // A pruned record resolves as "Unknown pending action" despite the queue holding it.
@@ -762,7 +829,7 @@ describe("defineActions", () => {
 
   it("describes the payload the journal stores, so the text cannot drift from it", async () => {
     const { actions, journal } = bind({
-      describe: payload => ({ ...presentation, description: `runs ${payload.sql}` }),
+      describe: (payload) => ({ ...presentation, description: `runs ${payload.sql}` }),
     });
     const submitAction = submitSpy();
 
@@ -777,7 +844,7 @@ describe("defineActions", () => {
     // A port reusing a fully typed `ActionDescription` here has to cast, and used to carry its
     // `awaitDecision` past `execute`'s declared `continue-with-simulation`.
     const { actions } = bind({
-      describe: () => ({ ...presentation, awaitDecision: true, autoApprovable: false } as never),
+      describe: () => ({ ...presentation, awaitDecision: true, autoApprovable: false }) as never,
     });
     const submitAction = submitSpy();
 
@@ -813,7 +880,9 @@ describe("defineActions", () => {
     const commits = ["abc"];
     const { actions } = bind({ describe: () => ({ ...presentation, pushedCommits: commits }) });
     const blocking = Promise.withResolvers<void>();
-    const submitAction = vi.fn<ApprovalQueue["submitAction"]>(async () => { await blocking.promise; });
+    const submitAction = vi.fn<ApprovalQueue["submitAction"]>(async () => {
+      await blocking.promise;
+    });
 
     const queue = fakeQueue(submitAction);
     const first = actions.submit(queue, "execute", { sql: "one" });
@@ -843,8 +912,10 @@ describe("defineActions", () => {
 
     // Absent, not `false`: the overseer reads presence as the gatekeeper vouching for the text,
     // so a hook that omits the claim and one that denies it must look the same on the wire.
-    for (const describe of [() => presentation,
-                            () => ({ ...presentation, descriptionIsComplete: false })]) {
+    for (const describe of [
+      () => presentation,
+      () => ({ ...presentation, descriptionIsComplete: false }),
+    ]) {
       const { actions } = bind({ describe });
       const spy = submitSpy();
       await actions.submit(fakeQueue(spy), "execute", { sql: "one" });
@@ -924,14 +995,19 @@ describe("defineActions", () => {
   });
 
   it("refuses a definition that claims auto-approval without declaring a kind", () => {
-    expect(() => defineActions<Host, { execute: Sql }>({
-      execute: {
-        autoApprovable: true,
-        delivery: "continue-with-simulation",
-        describe: () => presentation,
-        apply: async () => {},
-      },
-    }, { fence: "none" })).toThrow(/autoApprovable without a kind/);
+    expect(() =>
+      defineActions<Host, { execute: Sql }>(
+        {
+          execute: {
+            autoApprovable: true,
+            delivery: "continue-with-simulation",
+            describe: () => presentation,
+            apply: async () => {},
+          },
+        },
+        { fence: "none" },
+      ),
+    ).toThrow(/autoApprovable without a kind/);
   });
 
   it("refuses a set that declares dependsOn with no way to resolve the reference", () => {
@@ -946,27 +1022,37 @@ describe("defineActions", () => {
       },
     };
 
-    expect(() => defineActions<Host, { execute: Sql }>(definitions, { fence: "none" }))
-      .toThrow(/declares dependsOn, so the set needs isResolvedReference/);
-    expect(() => defineActions<Host, { execute: Sql }>(
-      definitions, { fence: "none", isResolvedReference: () => true })).not.toThrow();
+    expect(() => defineActions<Host, { execute: Sql }>(definitions, { fence: "none" })).toThrow(
+      /declares dependsOn, so the set needs isResolvedReference/,
+    );
+    expect(() =>
+      defineActions<Host, { execute: Sql }>(definitions, {
+        fence: "none",
+        isResolvedReference: () => true,
+      }),
+    ).not.toThrow();
   });
 
   it("refuses a tag whose siblings disagree about the label shown for it", () => {
-    expect(() => defineActions<Host, { execute: Sql; publish: { page: string } }>({
-      execute: {
-        kind: { tag: "sql", label: "Run SQL" },
-        delivery: "continue-with-simulation",
-        describe: () => presentation,
-        apply: async () => {},
-      },
-      publish: {
-        kind: { tag: "sql", label: "Publish" },
-        delivery: "continue-with-simulation",
-        describe: () => presentation,
-        apply: async () => {},
-      },
-    }, { fence: "none" })).toThrow(/tag "sql" is declared with two labels, "Run SQL" and "Publish"/);
+    expect(() =>
+      defineActions<Host, { execute: Sql; publish: { page: string } }>(
+        {
+          execute: {
+            kind: { tag: "sql", label: "Run SQL" },
+            delivery: "continue-with-simulation",
+            describe: () => presentation,
+            apply: async () => {},
+          },
+          publish: {
+            kind: { tag: "sql", label: "Publish" },
+            delivery: "continue-with-simulation",
+            describe: () => presentation,
+            apply: async () => {},
+          },
+        },
+        { fence: "none" },
+      ),
+    ).toThrow(/tag "sql" is declared with two labels, "Run SQL" and "Publish"/);
   });
 
   it("auto-approves only the kinds that declared it, not their tag siblings", async () => {
@@ -984,7 +1070,9 @@ describe("defineActions", () => {
 
   it("throws on an unknown id, and retains a record whose apply failed", async () => {
     const { actions, journal, outcomes } = bind({
-      apply: async () => { throw new Error("syntax error"); },
+      apply: async () => {
+        throw new Error("syntax error");
+      },
     });
     await expect(actions.apply(99)).rejects.toThrow("Unknown pending action: 99");
 
@@ -1005,7 +1093,7 @@ describe("defineActions", () => {
   it("retains the applied record carrying the artifacts the handler returned", async () => {
     const { actions, journal } = bind({
       retainApplied: true,
-      apply: async payload => ({ action: { ...payload, rows: 7 } }),
+      apply: async (payload) => ({ action: { ...payload, rows: 7 } }),
     });
     const id = journal.allocate({ kind: "execute", payload: { sql: "one" } });
 
@@ -1030,7 +1118,7 @@ describe("defineActions", () => {
     const applied: string[] = [];
     const { actions, journal, host, outcomes } = bind({
       retainApplied: true,
-      apply: async payload => void applied.push(payload.sql),
+      apply: async (payload) => void applied.push(payload.sql),
     });
     const id = journal.allocate({ kind: "execute", payload: { sql: "one" } });
     await actions.apply(id);
@@ -1067,7 +1155,9 @@ describe("defineActions", () => {
 
   it("reports a failed rejection for invalidation, keeping the record", async () => {
     const { actions, journal, outcomes } = bind({
-      reject: async () => { throw new Error("cascade failed"); },
+      reject: async () => {
+        throw new Error("cascade failed");
+      },
     });
     const id = journal.allocate({ kind: "execute", payload: { sql: "one" } });
 
@@ -1084,7 +1174,11 @@ describe("defineActions", () => {
   it("never lets a failing invalidation hook mask or manufacture a result", async () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      const failing = { afterResolve: async () => { throw new Error("cache unreachable"); } };
+      const failing = {
+        afterResolve: async () => {
+          throw new Error("cache unreachable");
+        },
+      };
 
       // A completed action stays completed: the hook cannot report success as failure.
       const applied = bind(failing);
@@ -1094,14 +1188,21 @@ describe("defineActions", () => {
       expect(applied.journal.get(first)).toBeUndefined();
 
       // A failed apply still reports the provider's own error, not the hook's.
-      const failed = bind({ ...failing, apply: async () => { throw new Error("syntax error"); } });
+      const failed = bind({
+        ...failing,
+        apply: async () => {
+          throw new Error("syntax error");
+        },
+      });
       const second = failed.journal.allocate({ kind: "execute", payload: { sql: "bad" } });
       await expect(failed.actions.apply(second)).rejects.toThrow("syntax error");
       expect(failed.journal.get(second)).toBeDefined();
 
       // Dropped, but never silently: each failure is reported for someone to act on.
-      expect(logged.mock.calls.map(([entry]) => (entry as { outcome: string }).outcome))
-        .toEqual(["applied", "failed"]);
+      expect(logged.mock.calls.map(([entry]) => (entry as { outcome: string }).outcome)).toEqual([
+        "applied",
+        "failed",
+      ]);
     } finally {
       logged.mockRestore();
     }
@@ -1312,10 +1413,15 @@ describe("defineActions", () => {
     // provider already ran, so restoring `pending` would offer the user a second irreversible
     // apply. No invalidation hook fires either — the write that would have justified one failed.
     const kv = makeKv();
-    const journal = new ActionJournal<TaggedAction<Actions>>({
-      ...kv,
-      delete: key => { throw new Error(`storage unavailable: ${key}`); },
-    }, { namespace: "pending" });
+    const journal = new ActionJournal<TaggedAction<Actions>>(
+      {
+        ...kv,
+        delete: (key) => {
+          throw new Error(`storage unavailable: ${key}`);
+        },
+      },
+      { namespace: "pending" },
+    );
     const { actions, host, outcomes } = bind({ journal, claimBeforeApply: true });
     const id = journal.allocate({ kind: "execute", payload: { sql: "one" } });
     journal.markSubmitted(id);
@@ -1348,13 +1454,16 @@ describe("defineActions", () => {
   it("heals an interrupted retire on the next apply, leaving no record behind", async () => {
     const kv = makeKv();
     let failDelete = true;
-    const journal = new ActionJournal<TaggedAction<Actions>>({
-      ...kv,
-      delete: key => {
-        if (failDelete) throw new Error(`storage unavailable: ${key}`);
-        kv.delete(key);
+    const journal = new ActionJournal<TaggedAction<Actions>>(
+      {
+        ...kv,
+        delete: (key) => {
+          if (failDelete) throw new Error(`storage unavailable: ${key}`);
+          kv.delete(key);
+        },
       },
-    }, { namespace: "pending" });
+      { namespace: "pending" },
+    );
     const { actions, host } = bind({ journal });
     const id = journal.allocate({ kind: "execute", payload: { sql: "one" } });
     journal.markSubmitted(id);
@@ -1375,8 +1484,9 @@ describe("defineActions", () => {
     await actions.submit(queue, "execute", { sql: "one" });
     await actions.submit(queue, "execute", { sql: "two" });
 
-    await expect(actions.submit(queue, "execute", { sql: "three" }))
-      .rejects.toThrow(/Too many pending actions/);
+    await expect(actions.submit(queue, "execute", { sql: "three" })).rejects.toThrow(
+      /Too many pending actions/,
+    );
     expect(submitAction).toHaveBeenCalledTimes(2);
     expect(journal.listPending().map(({ id }) => id)).toEqual([1, 2]);
   });
@@ -1417,26 +1527,31 @@ describe("defineActions", () => {
   // `Function.prototype.apply`: it returns a truthy `{}`, so the record would be removed as applied
   // with no provider call.
   it.each(["constructor", "toString", "valueOf", "hasOwnProperty"])(
-    "treats the inherited name %s as a dropped kind, not a handler", async name => {
+    "treats the inherited name %s as a dropped kind, not a handler",
+    async (name) => {
       const { id, actions, journal, host } = staleKind(name);
 
       await expect(actions.apply(id)).rejects.toThrow(/no longer supports/);
       expect(journal.get(id)?.state).toBe("failed");
       expect(host.ran).toEqual([]);
-    });
+    },
+  );
 
   it("dispatches a numeric kind, which the declaration stringified", async () => {
     // `submit` reaches its definition by property access, which coerces `7` to `"7"`; a Map lookup
     // does not. Uncoerced, the set reports a kind unsupported that it had just accepted.
     const host: Host = { ran: [] };
     const journal = new ActionJournal<TaggedAction<{ 7: Sql }>>(makeKv(), { namespace: "pending" });
-    const actions = defineActions<Host, { 7: Sql }>({
-      7: {
-        delivery: "await-decision",
-        describe: () => presentation,
-        apply: async (payload, target) => void target.ran.push(payload.sql),
+    const actions = defineActions<Host, { 7: Sql }>(
+      {
+        7: {
+          delivery: "await-decision",
+          describe: () => presentation,
+          apply: async (payload, target) => void target.ran.push(payload.sql),
+        },
       },
-    }, { fence: "none" }).bind(journal, host);
+      { fence: "none" },
+    ).bind(journal, host);
 
     const id = journal.allocate({ kind: 7, payload: { sql: "one" } });
     journal.markSubmitted(id);
@@ -1447,14 +1562,19 @@ describe("defineActions", () => {
 
   it("rebinds a journal to the first bound set, so a per-call bind still shares one queue", () => {
     const host: Host = { ran: [] };
-    const journal = new ActionJournal<TaggedAction<{ execute: Sql }>>(makeKv(), { namespace: "pending" });
-    const set = defineActions<Host, { execute: Sql }>({
-      execute: {
-        delivery: "await-decision",
-        describe: () => presentation,
-        apply: async (payload, target) => void target.ran.push(payload.sql),
+    const journal = new ActionJournal<TaggedAction<{ execute: Sql }>>(makeKv(), {
+      namespace: "pending",
+    });
+    const set = defineActions<Host, { execute: Sql }>(
+      {
+        execute: {
+          delivery: "await-decision",
+          describe: () => presentation,
+          apply: async (payload, target) => void target.ran.push(payload.sql),
+        },
       },
-    }, { fence: "none" });
+      { fence: "none" },
+    );
 
     const actions = set.bind(journal, host);
     expect(set.bind(journal, host)).toBe(actions);
@@ -1483,18 +1603,24 @@ describe("defineActions", () => {
   it("terminally fails a fenced action whose connection was replaced", async () => {
     const { actions, journal, host, outcomes } = bind({ fence: "authority" });
     const id = await actions.submit(
-      fakeQueue(), "execute", { sql: "one" }, { fence: { generation: "gen-a" } });
+      fakeQueue(),
+      "execute",
+      { sql: "one" },
+      { fence: { generation: "gen-a" } },
+    );
 
-    await expect(actions.apply(id, { generation: "gen-b" }))
-      .rejects.toThrow(/connection that has since been replaced/);
+    await expect(actions.apply(id, { generation: "gen-b" })).rejects.toThrow(
+      /connection that has since been replaced/,
+    );
     expect(host.ran).toEqual([]);
     expect(journal.get(id)?.state).toBe("failed");
     expect(outcomes).toEqual(["failed"]);
 
     // Terminal: every later attempt answers with the same message and no provider call, leaving
     // the user the move the message names.
-    await expect(actions.apply(id, { generation: "gen-b" }))
-      .rejects.toThrow(/connection that has since been replaced/);
+    await expect(actions.apply(id, { generation: "gen-b" })).rejects.toThrow(
+      /connection that has since been replaced/,
+    );
     expect(host.ran).toEqual([]);
   });
 
@@ -1512,8 +1638,9 @@ describe("defineActions", () => {
     const { actions, journal, host } = bind({ fence: "authority" });
     const id = journal.allocate({ kind: "execute", payload: { sql: "ported" } });
 
-    await expect(actions.apply(id, { generation: "gen-a" }))
-      .rejects.toThrow(/before this gatekeeper pinned actions to an account/);
+    await expect(actions.apply(id, { generation: "gen-a" })).rejects.toThrow(
+      /before this gatekeeper pinned actions to an account/,
+    );
 
     expect(host.ran).toEqual([]);
     expect(journal.get(id)).toMatchObject({ state: "failed", undispatched: true });
@@ -1523,28 +1650,37 @@ describe("defineActions", () => {
     // `fenceOverrides.toString` on a plain object is `Object.prototype.toString` -- truthy, so a
     // raw lookup would skip the set's own policy and read as neither "authority" nor "none",
     // silently staging the action unfenced.
-    const set = defineActions<{ ran: string[] }, { toString: Sql }>({
-      toString: {
-        delivery: "await-decision",
-        describe: () => presentation,
-        apply: async () => {},
+    const set = defineActions<{ ran: string[] }, { toString: Sql }>(
+      {
+        toString: {
+          delivery: "await-decision",
+          describe: () => presentation,
+          apply: async () => {},
+        },
       },
-    }, { fence: "authority", fenceOverrides: {} });
-    const journal = new ActionJournal<TaggedAction<{ toString: Sql }>>(
-      makeKv(), { namespace: "pending" });
+      { fence: "authority", fenceOverrides: {} },
+    );
+    const journal = new ActionJournal<TaggedAction<{ toString: Sql }>>(makeKv(), {
+      namespace: "pending",
+    });
 
-    await expect(set.bind(journal, { ran: [] })
-      .submit(fakeQueue(), "toString", { sql: "one" }))
-      .rejects.toThrow(/is authority-fenced/);
+    await expect(
+      set.bind(journal, { ran: [] }).submit(fakeQueue(), "toString", { sql: "one" }),
+    ).rejects.toThrow(/is authority-fenced/);
   });
 
   it("releases a mismatched action's staging artifacts when the user rejects it", async () => {
     const { actions, journal, host, outcomes } = bind({ fence: "authority" });
     const id = await actions.submit(
-      fakeQueue(), "execute", { sql: "one" }, { fence: { generation: "gen-a" } });
+      fakeQueue(),
+      "execute",
+      { sql: "one" },
+      { fence: { generation: "gen-a" } },
+    );
 
-    await expect(actions.apply(id, { generation: "gen-b" }))
-      .rejects.toThrow(/connection that has since been replaced/);
+    await expect(actions.apply(id, { generation: "gen-b" })).rejects.toThrow(
+      /connection that has since been replaced/,
+    );
     // The handler never ran, so the rejection the message asks for still owes its cleanup.
     await actions.reject(id);
     expect(host.ran).toEqual(["rejected one"]);
@@ -1556,7 +1692,9 @@ describe("defineActions", () => {
     const { actions, journal, host } = bind({
       // `ActionApplyError` means the effect is known absent, so the handler had already undone
       // whatever it started -- it owns that cleanup, and reject only clears the record.
-      apply: async () => { throw new ActionApplyError("rolled back at the provider") },
+      apply: async () => {
+        throw new ActionApplyError("rolled back at the provider");
+      },
     });
     const id = await actions.submit(fakeQueue(), "execute", { sql: "one" });
 
@@ -1569,7 +1707,11 @@ describe("defineActions", () => {
   it("refuses a fenced action with no generation to compare, leaving it pending", async () => {
     const { actions, journal, host } = bind({ fence: "authority" });
     const id = await actions.submit(
-      fakeQueue(), "execute", { sql: "one" }, { fence: { generation: "gen-a" } });
+      fakeQueue(),
+      "execute",
+      { sql: "one" },
+      { fence: { generation: "gen-a" } },
+    );
 
     // A wiring bug, not a decision: the record must survive to be applied once apply() passes one.
     await expect(actions.apply(id)).rejects.toThrow(/pass the current generation/);
@@ -1596,8 +1738,9 @@ describe("defineActions", () => {
     // provider account applies cleanly under the next one.
     const { actions, journal } = bind({ fence: "authority" });
 
-    await expect(actions.submit(fakeQueue(), "execute", { sql: "one" }))
-      .rejects.toThrow(/authority-fenced; stage it with/);
+    await expect(actions.submit(fakeQueue(), "execute", { sql: "one" })).rejects.toThrow(
+      /authority-fenced; stage it with/,
+    );
     // Nothing staged, so no record is left behind for a later approval to find.
     expect(journal.listPending()).toEqual([]);
   });
@@ -1606,31 +1749,35 @@ describe("defineActions", () => {
     // Pinning an action nothing needed pinned makes it fail after an unrelated reconnect.
     const { actions } = bind({ fence: "none" });
 
-    await expect(actions.submit(
-      fakeQueue(), "execute", { sql: "one" }, { fence: { generation: "gen-a" } }))
-      .rejects.toThrow(/declared authority-independent/);
+    await expect(
+      actions.submit(fakeQueue(), "execute", { sql: "one" }, { fence: { generation: "gen-a" } }),
+    ).rejects.toThrow(/declared authority-independent/);
   });
 
   it("lets one kind opt out of the set's policy, and holds every other to it", async () => {
     const host: Host = { ran: [] };
     const journal = new ActionJournal<TaggedAction<Actions>>(makeKv(), { namespace: "pending" });
-    const actions = defineActions<Host, Actions>({
-      execute: {
-        delivery: "continue-with-simulation",
-        describe: () => presentation,
-        apply: async (payload, target) => void target.ran.push(payload.sql),
+    const actions = defineActions<Host, Actions>(
+      {
+        execute: {
+          delivery: "continue-with-simulation",
+          describe: () => presentation,
+          apply: async (payload, target) => void target.ran.push(payload.sql),
+        },
+        publish: {
+          delivery: "await-decision",
+          describe: () => presentation,
+          apply: async (payload, target) => void target.ran.push(payload.page),
+        },
       },
-      publish: {
-        delivery: "await-decision",
-        describe: () => presentation,
-        apply: async (payload, target) => void target.ran.push(payload.page),
-      },
-    }, { fence: "authority", fenceOverrides: { publish: "none" } }).bind(journal, host);
+      { fence: "authority", fenceOverrides: { publish: "none" } },
+    ).bind(journal, host);
 
     // The override is named one kind at a time, so opting out is always a visible decision.
     await expect(actions.submit(fakeQueue(), "publish", { page: "p" })).resolves.toBeGreaterThan(0);
-    await expect(actions.submit(fakeQueue(), "execute", { sql: "one" }))
-      .rejects.toThrow(/authority-fenced/);
+    await expect(actions.submit(fakeQueue(), "execute", { sql: "one" })).rejects.toThrow(
+      /authority-fenced/,
+    );
   });
 
   it("fences on whatever authority the provider chose, not just a connection", async () => {
@@ -1639,7 +1786,11 @@ describe("defineActions", () => {
     // connection generation this action would have died at the re-auth.
     const { actions, host } = bind({ fence: "authority" });
     const id = await actions.submit(
-      fakeQueue(), "execute", { sql: "one" }, { fence: { generation: "account-42" } });
+      fakeQueue(),
+      "execute",
+      { sql: "one" },
+      { fence: { generation: "account-42" } },
+    );
 
     await actions.apply(id, { generation: "account-42" });
     expect(host.ran).toEqual(["one"]);
@@ -1648,41 +1799,49 @@ describe("defineActions", () => {
   it("refuses that same action once the account itself changes", async () => {
     const { actions, journal } = bind({ fence: "authority" });
     const id = await actions.submit(
-      fakeQueue(), "execute", { sql: "one" }, { fence: { generation: "account-42" } });
+      fakeQueue(),
+      "execute",
+      { sql: "one" },
+      { fence: { generation: "account-42" } },
+    );
 
-    await expect(actions.apply(id, { generation: "account-99" }))
-      .rejects.toThrow(/has since been replaced/);
+    await expect(actions.apply(id, { generation: "account-99" })).rejects.toThrow(
+      /has since been replaced/,
+    );
     expect(journal.get(id)?.state).toBe("failed");
   });
 
-  it("records an unknown outcome from an unclaimed definition, and says the guarantee was not held",
-    async () => {
-      // Non-replay rests on the pre-dispatch claim. Without one the record is still pending when
-      // the handler throws, so a dying activation leaves it replayable -- record the outcome, but
-      // do not let the gap pass silently.
-      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
-      try {
-        const { actions, journal } = bind({
-          claimBeforeApply: false,
-          apply: async () => { throw new ActionOutcomeUnknownError("the request timed out"); },
-        });
-        const id = await actions.submit(fakeQueue(), "execute", { sql: "one" });
+  it("records an unknown outcome from an unclaimed definition, and says the guarantee was not held", async () => {
+    // Non-replay rests on the pre-dispatch claim. Without one the record is still pending when
+    // the handler throws, so a dying activation leaves it replayable -- record the outcome, but
+    // do not let the gap pass silently.
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { actions, journal } = bind({
+        claimBeforeApply: false,
+        apply: async () => {
+          throw new ActionOutcomeUnknownError("the request timed out");
+        },
+      });
+      const id = await actions.submit(fakeQueue(), "execute", { sql: "one" });
 
-        await expect(actions.apply(id)).rejects.toThrow("the request timed out");
+      await expect(actions.apply(id)).rejects.toThrow("the request timed out");
 
-        expect(journal.get(id)).toMatchObject({ state: "failed", outcome: "unknown" });
-        expect(logged).toHaveBeenCalled();
-      } finally {
-        logged.mockRestore();
-      }
-    });
+      expect(journal.get(id)).toMatchObject({ state: "failed", outcome: "unknown" });
+      expect(logged).toHaveBeenCalled();
+    } finally {
+      logged.mockRestore();
+    }
+  });
 
   it("stays quiet when the definition claimed before dispatch", async () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const { actions } = bind({
         claimBeforeApply: true,
-        apply: async () => { throw new ActionOutcomeUnknownError("the request timed out"); },
+        apply: async () => {
+          throw new ActionOutcomeUnknownError("the request timed out");
+        },
       });
       const id = await actions.submit(fakeQueue(), "execute", { sql: "one" });
 
@@ -1698,30 +1857,35 @@ describe("dependent actions", () => {
   type Actions = { create: { ref: string }; edit: { target: string } };
   type Host = { ran: string[] };
 
-  function bind(overrides: {
-    apply?: () => Promise<void>;
-    isResolvedReference?: (host: Host, ref: string) => boolean;
-  } = {}) {
+  function bind(
+    overrides: {
+      apply?: () => Promise<void>;
+      isResolvedReference?: (host: Host, ref: string) => boolean;
+    } = {},
+  ) {
     const host: Host = { ran: [] };
     const journal = new ActionJournal<TaggedAction<Actions>>(makeKv(), { namespace: "pending" });
-    const set = defineActions<Host, Actions>({
-      create: {
-        delivery: "continue-with-simulation",
-        describe: () => presentation,
-        // A creation both stands for the entity it will make and may target an earlier one.
-        provides: payload => [payload.ref],
-        dependsOn: payload => (payload.ref.startsWith("child-") ? [payload.ref.slice(6)] : []),
-        apply: overrides.apply ?? (async () => {}),
-        reject: async payload => void host.ran.push(`released ${payload.ref}`),
+    const set = defineActions<Host, Actions>(
+      {
+        create: {
+          delivery: "continue-with-simulation",
+          describe: () => presentation,
+          // A creation both stands for the entity it will make and may target an earlier one.
+          provides: (payload) => [payload.ref],
+          dependsOn: (payload) => (payload.ref.startsWith("child-") ? [payload.ref.slice(6)] : []),
+          apply: overrides.apply ?? (async () => {}),
+          reject: async (payload) => void host.ran.push(`released ${payload.ref}`),
+        },
+        edit: {
+          delivery: "continue-with-simulation",
+          describe: () => presentation,
+          dependsOn: (payload) => [payload.target],
+          apply: overrides.apply ?? (async () => {}),
+          reject: async (payload) => void host.ran.push(`released edit ${payload.target}`),
+        },
       },
-      edit: {
-        delivery: "continue-with-simulation",
-        describe: () => presentation,
-        dependsOn: payload => [payload.target],
-        apply: overrides.apply ?? (async () => {}),
-        reject: async payload => void host.ran.push(`released edit ${payload.target}`),
-      },
-    }, { fence: "none", isResolvedReference: overrides.isResolvedReference ?? (() => false) });
+      { fence: "none", isResolvedReference: overrides.isResolvedReference ?? (() => false) },
+    );
     return { host, journal, actions: set.bind(journal, host) };
   }
 
@@ -1762,8 +1926,9 @@ describe("dependent actions", () => {
     // Each stranded record answers with a reason rather than vanishing, and stops projecting.
     for (const id of [child, grandchild, edit]) {
       expect(journal.get(id)?.state).toBe("failed");
-      expect(journal.get(id)?.error)
-        .toBe(`This action needed action ${create}, which did not complete.`);
+      expect(journal.get(id)?.error).toBe(
+        `This action needed action ${create}, which did not complete.`,
+      );
     }
     expect(journal.listPending().map(({ id }) => id)).toEqual([unrelated]);
   });
@@ -1785,7 +1950,9 @@ describe("dependent actions", () => {
 
   it("retires them for a terminal failure too, which no provider effect can resolve", async () => {
     const { actions, journal } = bind({
-      apply: async () => { throw new ActionApplyError("the provider refused"); },
+      apply: async () => {
+        throw new ActionApplyError("the provider refused");
+      },
     });
     const create = queued(journal, { kind: "create", payload: { ref: "~1" } });
     const edit = queued(journal, { kind: "edit", payload: { target: "~1" } });
@@ -1832,7 +1999,9 @@ describe("dependent actions", () => {
   it("strands only the references a terminal failure left unbound", async () => {
     const { actions, journal } = bind({
       isResolvedReference: () => false,
-      apply: async () => { throw new ActionApplyError("the provider refused"); },
+      apply: async () => {
+        throw new ActionApplyError("the provider refused");
+      },
     });
     const create = queued(journal, { kind: "create", payload: { ref: "~1" } });
     const edit = queued(journal, { kind: "edit", payload: { target: "~1" } });
@@ -1844,7 +2013,9 @@ describe("dependent actions", () => {
 
   it("keeps every dependent when the handler reports an unknown outcome", async () => {
     const { actions, journal } = bind({
-      apply: async () => { throw new ActionOutcomeUnknownError("the request timed out"); },
+      apply: async () => {
+        throw new ActionOutcomeUnknownError("the request timed out");
+      },
     });
     const create = queued(journal, { kind: "create", payload: { ref: "~1" } });
     const edit = queued(journal, { kind: "edit", payload: { target: "~1" } });
@@ -1875,7 +2046,9 @@ describe("dependent actions", () => {
     // The handler ran and owns whatever it did at the provider, so the reject hook must not fire
     // as it does for a record that never reached one. Rejecting is how the user clears the slot.
     const { actions, journal, host } = bind({
-      apply: async () => { throw new ActionOutcomeUnknownError("the request timed out"); },
+      apply: async () => {
+        throw new ActionOutcomeUnknownError("the request timed out");
+      },
     });
     const create = queued(journal, { kind: "create", payload: { ref: "~1" } });
     await expect(actions.apply(create)).rejects.toThrow("the request timed out");
@@ -1887,7 +2060,9 @@ describe("dependent actions", () => {
 
   it("leaves dependents alone while the creation can still be retried", async () => {
     const { actions, journal } = bind({
-      apply: async () => { throw new Error("provider unreachable"); },
+      apply: async () => {
+        throw new Error("provider unreachable");
+      },
     });
     const create = queued(journal, { kind: "create", payload: { ref: "~1" } });
     const edit = queued(journal, { kind: "edit", payload: { target: "~1" } });
@@ -1910,12 +2085,12 @@ describe("dependent actions", () => {
     // it compiled and cascaded over characters, stranding actions that shared one.
     type Refs = ActionDefinition<{ ref: string }, Host>;
     // @ts-expect-error - a bare string is not an array of references.
-    const provides: Refs["provides"] = payload => payload.ref;
+    const provides: Refs["provides"] = (payload) => payload.ref;
     // @ts-expect-error - and neither is a nullable one, the shape `actionPageId` returns.
-    const dependsOn: Refs["dependsOn"] = payload => payload.ref || null;
+    const dependsOn: Refs["dependsOn"] = (payload) => payload.ref || null;
 
-    const ok: Refs["provides"] = payload => [payload.ref];
+    const ok: Refs["provides"] = (payload) => [payload.ref];
     expect(ok?.({ ref: "issue-12" })).toEqual(["issue-12"]);
-    expect([provides, dependsOn].every(fn => typeof fn === "function")).toBe(true);
+    expect([provides, dependsOn].every((fn) => typeof fn === "function")).toBe(true);
   });
 });

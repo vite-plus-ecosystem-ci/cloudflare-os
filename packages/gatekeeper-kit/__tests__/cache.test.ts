@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { KvTtlCache, type AuthoritySource, type CacheKv } from "../src/cache";
 import { CredentialsExpiredError, CredentialSource } from "../src/credentials";
 import { fakeKv } from "./fake-kv";
@@ -19,7 +19,7 @@ function connectedSource() {
   });
   const source = new CredentialSource<{ token: string }>({
     account: () => ({ getCredentials, reportCredentialsRejected: async () => "expired" as const }),
-    isAuthError: error => error instanceof Error && error.message === "401",
+    isAuthError: (error) => error instanceof Error && error.message === "401",
     expiredMessage: "Reconnect.",
   });
   return { source, account, getCredentials };
@@ -49,11 +49,15 @@ describe("KvTtlCache", () => {
     vi.useFakeTimers();
     const fence = Promise.withResolvers<void>();
     let reads = 0;
-    const cache = new KvTtlCache(makeKv(), async () => {
-      // The entry read runs first; only the one after `load()` is parked.
-      if (++reads === 2) await fence.promise;
-      return "authority";
-    }, { legacyUnnamed: true });
+    const cache = new KvTtlCache(
+      makeKv(),
+      async () => {
+        // The entry read runs first; only the one after `load()` is parked.
+        if (++reads === 2) await fence.promise;
+        return "authority";
+      },
+      { legacyUnnamed: true },
+    );
 
     const loading = cache.cached("project", 60_000, async () => "loaded");
     // The load has resolved and the fence read is parked; the clock runs while it waits.
@@ -89,10 +93,12 @@ describe("KvTtlCache", () => {
     const issues = new KvTtlCache(kv, () => "authority", { name: "issues" });
 
     // Concurrent, so a load key missing the cache's own prefix would collapse them into one.
-    expect(await Promise.all([
-      projects.cached("a", 60_000, async () => "from projects"),
-      issues.cached("a", 60_000, async () => "from issues"),
-    ])).toEqual(["from projects", "from issues"]);
+    expect(
+      await Promise.all([
+        projects.cached("a", 60_000, async () => "from projects"),
+        issues.cached("a", 60_000, async () => "from issues"),
+      ]),
+    ).toEqual(["from projects", "from issues"]);
   });
 
   it("reloads every entry after invalidating all", async () => {
@@ -135,10 +141,12 @@ describe("KvTtlCache", () => {
 
     authority = undefined;
     // A stored entry is not served, and every caller loads for itself.
-    expect(await cache.cached("project", 60_000, async () => "unpartitioned 1"))
-      .toBe("unpartitioned 1");
-    expect(await cache.cached("project", 60_000, async () => "unpartitioned 2"))
-      .toBe("unpartitioned 2");
+    expect(await cache.cached("project", 60_000, async () => "unpartitioned 1")).toBe(
+      "unpartitioned 1",
+    );
+    expect(await cache.cached("project", 60_000, async () => "unpartitioned 2")).toBe(
+      "unpartitioned 2",
+    );
 
     // Nothing was stored either: back under a known authority, its own entry still stands.
     authority = "a";
@@ -196,7 +204,8 @@ describe("KvTtlCache", () => {
 
     expect(await ported.cached("home", 60_000, async () => "legacy")).toBe("legacy");
     expect(await ported.cached("generation", 60_000, async () => "counter-shaped")).toBe(
-      "counter-shaped");
+      "counter-shaped",
+    );
     expect(await named.cached("home", 60_000, async () => "named")).toBe("named");
     named.invalidateAll();
 
@@ -307,7 +316,11 @@ describe("KvTtlCache.partitionedBy", () => {
   it("returns a load whose fence moved during it, without caching the value", async () => {
     let generation = "gen-a";
     const kv = fakeKv();
-    const cache = KvTtlCache.partitionedBy(kv, { cacheAuthority: async () => generation }, { legacyUnnamed: true });
+    const cache = KvTtlCache.partitionedBy(
+      kv,
+      { cacheAuthority: async () => generation },
+      { legacyUnnamed: true },
+    );
     const { promise, resolve } = Promise.withResolvers<string>();
 
     const loading = cache.cached("project", 60_000, () => promise);
@@ -324,12 +337,16 @@ describe("KvTtlCache.partitionedBy", () => {
     const kv = fakeKv();
     const parked = Promise.withResolvers<void>();
     let reads = 0;
-    const cache = KvTtlCache.partitionedBy(kv, {
-      cacheAuthority: async () => {
-        if (++reads === 2) await parked.promise;
-        return "gen-a";
+    const cache = KvTtlCache.partitionedBy(
+      kv,
+      {
+        cacheAuthority: async () => {
+          if (++reads === 2) await parked.promise;
+          return "gen-a";
+        },
       },
-    }, { legacyUnnamed: true });
+      { legacyUnnamed: true },
+    );
 
     const loading = cache.cached("project", 60_000, async () => "loaded");
     await vi.waitFor(() => expect(reads).toBe(2));
@@ -362,10 +379,12 @@ describe("KvTtlCache.partitionedBy", () => {
     getCredentials.mockClear();
     const load = vi.fn(async () => "reloaded");
 
-    expect(await Promise.all([
-      cache.cached("project", 60_000, load),
-      cache.cached("project", 60_000, load),
-    ])).toEqual(["from a", "from a"]);
+    expect(
+      await Promise.all([
+        cache.cached("project", 60_000, load),
+        cache.cached("project", 60_000, load),
+      ]),
+    ).toEqual(["from a", "from a"]);
     expect(getCredentials).toHaveBeenCalledOnce();
     expect(load).not.toHaveBeenCalled();
   });
@@ -377,8 +396,11 @@ describe("KvTtlCache.partitionedBy", () => {
 
     // The account may keep serving a dead grant until reconnect. The source already knows that
     // identity is dead, so a cache hit must not hide the outage for the rest of the entry's TTL.
-    await expect(source.run(async () => { throw new Error("401"); }))
-      .rejects.toThrow(CredentialsExpiredError);
+    await expect(
+      source.run(async () => {
+        throw new Error("401");
+      }),
+    ).rejects.toThrow(CredentialsExpiredError);
     const load = vi.fn(async () => "reloaded");
     expect(await cache.cached("project", 60_000, load)).toBe("reloaded");
     expect(load).toHaveBeenCalledOnce();

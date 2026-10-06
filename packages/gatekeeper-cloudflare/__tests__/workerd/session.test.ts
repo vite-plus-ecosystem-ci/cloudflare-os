@@ -4,7 +4,7 @@
 
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import type { ApprovalQueue } from "@gadgets/workshop-shared/gatekeeper";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { CloudflareObservabilityApi } from "../../src/observability-api";
 import {
   CloudflareObservabilitySessionImpl,
@@ -49,23 +49,39 @@ function stubProvider() {
     if (body.view === "events") result.events = { count: 1, events: [event("e1")] };
     if (body.view === "invocations") result.invocations = { "req-1": [event("e1")] };
     if (body.view === "traces") {
-      result.traces = [{
-        traceId: "trace-1", traceStartMs: 1, traceEndMs: 2, traceDurationMs: 1,
-        rootSpanName: "fetch", rootTransactionName: "GET /", service: ["api-worker"], spans: 1,
-      }];
+      result.traces = [
+        {
+          traceId: "trace-1",
+          traceStartMs: 1,
+          traceEndMs: 2,
+          traceDurationMs: 1,
+          rootSpanName: "fetch",
+          rootTransactionName: "GET /",
+          service: ["api-worker"],
+          spans: 1,
+        },
+      ];
     }
     if (body.view === "calculations") {
-      result.calculations = [{
-        calculation: "count",
-        aggregates: [{ value: 1, count: 1, interval: 1, sampleInterval: 1 }],
-        series: [],
-      }];
+      result.calculations = [
+        {
+          calculation: "count",
+          aggregates: [{ value: 1, count: 1, interval: 1, sampleInterval: 1 }],
+          series: [],
+        },
+      ];
     }
     if (body.key !== undefined) {
-      return Response.json({ success: true, result: [{ key: body.key, type: "string", value: "x", dataset: "cloudflare-workers" }] });
+      return Response.json({
+        success: true,
+        result: [{ key: body.key, type: "string", value: "x", dataset: "cloudflare-workers" }],
+      });
     }
     if (body.view === undefined) {
-      return Response.json({ success: true, result: [{ key: "$metadata.level", type: "string", lastSeenAt: 1 }] });
+      return Response.json({
+        success: true,
+        result: [{ key: "$metadata.level", type: "string", lastSeenAt: 1 }],
+      });
     }
     return Response.json({ success: true, result });
   });
@@ -77,7 +93,8 @@ function newSession(workerName?: string) {
   const queue = new TestApprovalQueue();
   const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, workerName);
   const session = new CloudflareObservabilitySessionImpl(
-    api, new RpcStub(queue) as unknown as RpcStub<ApprovalQueue>,
+    api,
+    new RpcStub(queue) as unknown as RpcStub<ApprovalQueue>,
     workerName ? `Worker ${workerName}` : `Cloudflare account ${ACCOUNT_ID}`,
   );
   return { queue, session };
@@ -96,15 +113,16 @@ afterEach(() => {
 describe("observation authorization", () => {
   // Parameterized so a method added later without an `#observe` wrapper is a visible omission here
   // rather than a silent gap.
-  const reads: Array<[string, (session: CloudflareObservabilitySessionImpl) => Promise<unknown>]> = [
-    ["listKeys", session => session.listKeys()],
-    ["listValues", session => session.listValues("$metadata.level", "string")],
-    ["listEvents", session => session.listEvents()],
-    ["listInvocations", session => session.listInvocations()],
-    ["listTraces", session => session.listTraces()],
-    ["getTrace", session => session.getTrace("trace-1")],
-    ["calculate", session => session.calculate({ calculations: [{ operator: "count" }] })],
-  ];
+  const reads: Array<[string, (session: CloudflareObservabilitySessionImpl) => Promise<unknown>]> =
+    [
+      ["listKeys", (session) => session.listKeys()],
+      ["listValues", (session) => session.listValues("$metadata.level", "string")],
+      ["listEvents", (session) => session.listEvents()],
+      ["listInvocations", (session) => session.listInvocations()],
+      ["listTraces", (session) => session.listTraces()],
+      ["getTrace", (session) => session.getTrace("trace-1")],
+      ["calculate", (session) => session.calculate({ calculations: [{ operator: "count" }] })],
+    ];
 
   it.each(reads)("%s records exactly one observation", async (_name, read) => {
     stubProvider();
@@ -118,8 +136,15 @@ describe("observation authorization", () => {
   });
 
   it("records the observation even when the read returned nothing", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () =>
-      Response.json({ success: true, result: { statistics: STATISTICS, events: { count: 0, events: [] } } })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: { statistics: STATISTICS, events: { count: 0, events: [] } },
+        }),
+      ),
+    );
     const { queue, session } = newSession();
 
     await session.listEvents();
@@ -129,8 +154,12 @@ describe("observation authorization", () => {
   });
 
   it("does not record an observation when the read failed", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () =>
-      Response.json({ success: false, errors: [{ message: "nope" }] }, { status: 403 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ success: false, errors: [{ message: "nope" }] }, { status: 403 }),
+      ),
+    );
     const { queue, session } = newSession();
 
     await expect(session.listEvents()).rejects.toThrow(/403|nope/);
@@ -176,8 +205,20 @@ describe("approval descriptions", () => {
       kind: "group",
       filterCombination: "and",
       filters: [
-        { kind: "filter", key: "$metadata.level", operation: "eq", type: "string", value: "secret-value" },
-        { kind: "filter", key: "$metadata.statusCode", operation: "gte", type: "number", value: 500 },
+        {
+          kind: "filter",
+          key: "$metadata.level",
+          operation: "eq",
+          type: "string",
+          value: "secret-value",
+        },
+        {
+          kind: "filter",
+          key: "$metadata.statusCode",
+          operation: "gte",
+          type: "number",
+          value: 500,
+        },
       ],
     };
 
@@ -188,14 +229,16 @@ describe("approval descriptions", () => {
   });
 
   it("marks an OR combination so the entry is not read as a conjunction", () => {
-    expect(summarizeFilter({
-      kind: "group",
-      filterCombination: "or",
-      filters: [
-        { kind: "filter", key: "a", operation: "exists", type: "string" },
-        { kind: "filter", key: "b", operation: "exists", type: "string" },
-      ],
-    })).toBe("a exists or b exists");
+    expect(
+      summarizeFilter({
+        kind: "group",
+        filterCombination: "or",
+        filters: [
+          { kind: "filter", key: "a", operation: "exists", type: "string" },
+          { kind: "filter", key: "b", operation: "exists", type: "string" },
+        ],
+      }),
+    ).toBe("a exists or b exists");
   });
 
   it("bounds a large filter rather than pasting it into the queue", () => {

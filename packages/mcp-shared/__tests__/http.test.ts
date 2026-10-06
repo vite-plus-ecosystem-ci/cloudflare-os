@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { handleMcpHttpRequest } from "../src/http.js";
 
@@ -17,18 +17,15 @@ describe("handleMcpHttpRequest", () => {
     [`/gatekeeper/mcp/${DO_ID}/short`, 404],
     [`/gatekeeper/mcp/${"x".repeat(64)}/${NONCE}`, 400],
   ])("returns the expected status for %s", async (path, status) => {
-    const response = await handleMcpHttpRequest(
-      new Request(`https://workshop.example${path}`),
-      {
-        baseUrl: "https://workshop.example/gatekeeper/mcp",
-        accountForId(id) {
-          if (id !== DO_ID) throw new Error("invalid id");
-          return { acceptAuthCode: async () => HANDOFF };
-        },
-        log,
-        connect: async () => new Response("connected"),
+    const response = await handleMcpHttpRequest(new Request(`https://workshop.example${path}`), {
+      baseUrl: "https://workshop.example/gatekeeper/mcp",
+      accountForId(id) {
+        if (id !== DO_ID) throw new Error("invalid id");
+        return { acceptAuthCode: async () => HANDOFF };
       },
-    );
+      log,
+      connect: async () => new Response("connected"),
+    });
 
     expect(response.status).toBe(status);
   });

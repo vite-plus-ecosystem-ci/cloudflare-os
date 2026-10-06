@@ -2,19 +2,30 @@
 // the workspace, observed in the requests the scripted model receives.
 
 import { z } from "zod";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type {
-  AiChatMessage, CapsuleSpecifier, GatekeeperClient, Overseer,
+  AiChatMessage,
+  CapsuleSpecifier,
+  GatekeeperClient,
+  Overseer,
 } from "@gadgets/workshop-shared/api";
 import { loadAllChatHistory } from "../src/agent-session.js";
 import { startTestGatekeeperHarness, TEST_VENDOR_ID, type Harness } from "../src/harness.js";
 import {
-  SCRIPTED_MODEL_ID, scriptedModelRouter, systemPromptOf, type RoutedScriptedModel,
+  SCRIPTED_MODEL_ID,
+  scriptedModelRouter,
+  systemPromptOf,
+  type RoutedScriptedModel,
 } from "../src/mock-model.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 import {
-  connect, listConnectedAccounts, nextUsernames, signUp, waitFor, waitForIdleChat,
+  connect,
+  listConnectedAccounts,
+  nextUsernames,
+  signUp,
+  waitFor,
+  waitForIdleChat,
 } from "../src/rpc-client.js";
 
 let harness: Harness;
@@ -46,14 +57,20 @@ async function newWorkspace(model: RoutedScriptedModel, usernamePrefix: string) 
   await api.addModel(model.userModel.profile, model.userModel.config);
   await api.setQuickModel(null);
   await api.provisionAmbientAccount(TEST_VENDOR_ID);
-  const account = await waitFor("the test account to be provisioned", async () =>
-    (await listConnectedAccounts(api)).find(entry => entry.vendorId === TEST_VENDOR_ID) ?? null);
+  const account = await waitFor(
+    "the test account to be provisioned",
+    async () =>
+      (await listConnectedAccounts(api)).find((entry) => entry.vendorId === TEST_VENDOR_ID) ?? null,
+  );
   const ws = stack.use(await api.newGadget());
   return Object.assign(stack.move(), { api, account, ws });
 }
 
-async function newConnection(ws: RpcStub<Overseer>, accountId: number, name: string)
-    : Promise<RpcStub<GatekeeperClient<any>>> {
+async function newConnection(
+  ws: RpcStub<Overseer>,
+  accountId: number,
+  name: string,
+): Promise<RpcStub<GatekeeperClient<any>>> {
   const connection = await ws.newGatekeeper(accountId, `${THINGS}/${name}`);
   if (!connection) throw new Error(`Failed to create the ${name} connection`);
   return connection;
@@ -61,19 +78,24 @@ async function newConnection(ws: RpcStub<Overseer>, accountId: number, name: str
 
 /** Wait until the model has received `requests` agent requests in all and the chat is idle. */
 async function settle(
-    ws: RpcStub<Overseer>, model: RoutedScriptedModel, chatId: number, requests: number) {
+  ws: RpcStub<Overseer>,
+  model: RoutedScriptedModel,
+  chatId: number,
+  requests: number,
+) {
   await waitFor(`model request ${requests}`, async () => model.requests.length >= requests || null);
   await waitForIdleChat(ws, chatId);
   expect(model.requests).toHaveLength(requests);
 }
 
 const history = (ws: RpcStub<Overseer>, chatId: number) =>
-  loadAllChatHistory(before => ws.getChatHistory(chatId, before));
+  loadAllChatHistory((before) => ws.getChatHistory(chatId, before));
 
 // The output of every executeCode call the agent made, in order.
-const codeOutputs = (messages: AiChatMessage[]) => messages.flatMap(message =>
-  message.type === "message" ? message.toolCalls ?? [] : []).flatMap(call =>
-    call.toolName === "executeCode" ? [call.output] : []);
+const codeOutputs = (messages: AiChatMessage[]) =>
+  messages
+    .flatMap((message) => (message.type === "message" ? (message.toolCalls ?? []) : []))
+    .flatMap((call) => (call.toolName === "executeCode" ? [call.output] : []));
 
 it.concurrent("the agent's prompt follows the workspace's gadgets and bindings", async () => {
   const model = models.script([{ text: "First." }, { text: "Second." }, { text: "Third." }]);
@@ -120,16 +142,30 @@ it.concurrent("the agent's prompt follows the workspace's gadgets and bindings",
 
 it.concurrent("a pasted link becomes a binding for that chat only", async () => {
   const model = models.script([
-    { toolCall: { id: "read-pasted", name: "executeCode", arguments: {
-      code: "export default async function(self, env) { " +
-        "console.log(await env.TEST_THING.readValue()); }",
-    } } },
+    {
+      toolCall: {
+        id: "read-pasted",
+        name: "executeCode",
+        arguments: {
+          code:
+            "export default async function(self, env) { " +
+            "console.log(await env.TEST_THING.readValue()); }",
+        },
+      },
+    },
     { text: "It is 42." },
     { text: "Same thing again." },
-    { toolCall: { id: "list-env", name: "executeCode", arguments: {
-      code: "export default async function(self, env) { " +
-        "console.log(Object.keys(env).join(' ')); }",
-    } } },
+    {
+      toolCall: {
+        id: "list-env",
+        name: "executeCode",
+        arguments: {
+          code:
+            "export default async function(self, env) { " +
+            "console.log(Object.keys(env).join(' ')); }",
+        },
+      },
+    },
     { text: "That is everything." },
   ]);
   using owner = await newWorkspace(model, "pastedlink");
@@ -139,10 +175,15 @@ it.concurrent("a pasted link becomes a binding for that chat only", async () => 
   const pastedId = await pasted.getId();
   const description = await pasted.describe();
   // The user's message carries a placeholder where the link was pasted.
-  const pasting = (message: string): CapsuleSpecifier[] => [{
-    position: message.indexOf("[0]"), length: "[0]".length, gatekeeperId: pastedId, description,
-    vendorId: TEST_VENDOR_ID,
-  }];
+  const pasting = (message: string): CapsuleSpecifier[] => [
+    {
+      position: message.indexOf("[0]"),
+      length: "[0]".length,
+      gatekeeperId: pastedId,
+      description,
+      vendorId: TEST_VENDOR_ID,
+    },
+  ];
 
   const firstMessage = "Read [0] for me.";
   const chatId = await ws.newChat(firstMessage, SCRIPTED_MODEL_ID, pasting(firstMessage));
@@ -156,8 +197,9 @@ it.concurrent("a pasted link becomes a binding for that chat only", async () => 
   const againMessage = "And [0] once more.";
   await ws.sendChatMessage(chatId, againMessage, SCRIPTED_MODEL_ID, pasting(againMessage));
   await settle(ws, model, chatId, 3);
-  const capsules = (await history(ws, chatId)).flatMap(message =>
-    message.type === "message" && message.author.type === "user" ? [message.capsules] : []);
+  const capsules = (await history(ws, chatId)).flatMap((message) =>
+    message.type === "message" && message.author.type === "user" ? [message.capsules] : [],
+  );
   expect(capsules).toEqual([
     [expect.objectContaining({ gatekeeperId: pastedId, bindingName: "TEST_THING" })],
     [expect.objectContaining({ gatekeeperId: pastedId, bindingName: "TEST_THING" })],
@@ -175,18 +217,23 @@ it.concurrent("a pasted link becomes a binding for that chat only", async () => 
 });
 
 const MODEL_REQUEST = z.object({
-  messages: z.array(z.object({
-    role: z.string(),
-    content: z.union([z.string(), z.array(z.object({ text: z.string().optional() }))]).nullish(),
-  })),
+  messages: z.array(
+    z.object({
+      role: z.string(),
+      content: z.union([z.string(), z.array(z.object({ text: z.string().optional() }))]).nullish(),
+    }),
+  ),
 });
 
 // The text of each user message in one agent request, its content parts joined.
-const userTexts = (request: unknown) => MODEL_REQUEST.parse(request).messages
-    .filter(message => message.role === "user")
-    .map(({ content }) => typeof content === "string"
-      ? content
-      : (content ?? []).map(part => part.text ?? "").join(""));
+const userTexts = (request: unknown) =>
+  MODEL_REQUEST.parse(request)
+    .messages.filter((message) => message.role === "user")
+    .map(({ content }) =>
+      typeof content === "string"
+        ? content
+        : (content ?? []).map((part) => part.text ?? "").join(""),
+    );
 
 it.concurrent("an attachment reaches the model in its turn and stays in later turns", async () => {
   const notes = "Agenda: ship the attachment test before Friday.";
@@ -194,8 +241,9 @@ it.concurrent("an attachment reaches the model in its turn and stays in later tu
   using owner = await newWorkspace(model, "attachment");
   const { ws } = owner;
   const upload = await ws.uploadChatAttachment(
-      { mimeType: "text/plain", content: new TextEncoder().encode(notes), name: "agenda.txt" },
-      SCRIPTED_MODEL_ID);
+    { mimeType: "text/plain", content: new TextEncoder().encode(notes), name: "agenda.txt" },
+    SCRIPTED_MODEL_ID,
+  );
 
   const chatId = await ws.newChat("Read the agenda.", SCRIPTED_MODEL_ID, undefined, [upload]);
   await settle(ws, model, chatId, 1);

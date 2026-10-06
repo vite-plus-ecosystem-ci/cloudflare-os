@@ -1,21 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { describeAction, findWorkspaceParentPage, type NotionStore } from "../src/notion-actions";
 
-const databaseRow = (titlePropertyName?: string) => describeAction({
-  type: "createPage",
-  provisionalId: "~1",
-  parent: { kind: "database", databaseId: "db-1" },
-  title: "Row title",
-  titlePropertyName,
-});
+const databaseRow = (titlePropertyName?: string) =>
+  describeAction({
+    type: "createPage",
+    provisionalId: "~1",
+    parent: { kind: "database", databaseId: "db-1" },
+    title: "Row title",
+    titlePropertyName,
+  });
 
 const inline = (label: string, value: string) => ({ label, kind: "inline", value });
-const labels = (fields: { label: string }[] | undefined) => fields?.map(field => field.label) ?? [];
+const labels = (fields: { label: string }[] | undefined) =>
+  fields?.map((field) => field.label) ?? [];
 
 describe("describeAction", () => {
   it("names the page an edit targets", () => {
-    const { description, fields, descriptionIsComplete } =
-      describeAction({ type: "appendContent", pageId: "page-1", markdown: "Hello" });
+    const { description, fields, descriptionIsComplete } = describeAction({
+      type: "appendContent",
+      pageId: "page-1",
+      markdown: "Hello",
+    });
 
     expect(descriptionIsComplete).toBe(true);
     expect(fields).toContainEqual(inline("Page ID", "page-1"));
@@ -23,7 +28,11 @@ describe("describeAction", () => {
   });
 
   it("says a provisional page ID names a page created in this workspace", () => {
-    const { description, fields } = describeAction({ type: "addComment", pageId: "~3", text: "Hi" });
+    const { description, fields } = describeAction({
+      type: "addComment",
+      pageId: "~3",
+      text: "Hi",
+    });
 
     expect(fields).toContainEqual(inline("Page ID", "~3"));
     expect(description).toContain("created by an earlier action in this workspace");
@@ -55,23 +64,35 @@ describe("describeAction", () => {
   });
 
   it("names no title column for a sub-page or a row titled by its properties", () => {
-    expect(labels(describeAction({
-      type: "createPage", provisionalId: "~1", parent: { kind: "page", pageId: "parent-1" },
-      title: "Sub-page",
-    }).fields)).not.toContain("Title property");
-    expect(labels(describeAction({
-      type: "createPage",
-      provisionalId: "~1",
-      parent: { kind: "database", databaseId: "db-1" },
-      title: "Ignored",
-      titlePropertyName: "Name",
-      properties: { Task: { type: "title", text: "Real title" } },
-    }).fields)).not.toContain("Title property");
+    expect(
+      labels(
+        describeAction({
+          type: "createPage",
+          provisionalId: "~1",
+          parent: { kind: "page", pageId: "parent-1" },
+          title: "Sub-page",
+        }).fields,
+      ),
+    ).not.toContain("Title property");
+    expect(
+      labels(
+        describeAction({
+          type: "createPage",
+          provisionalId: "~1",
+          parent: { kind: "database", databaseId: "db-1" },
+          title: "Ignored",
+          titlePropertyName: "Name",
+          properties: { Task: { type: "title", text: "Real title" } },
+        }).fields,
+      ),
+    ).not.toContain("Title property");
   });
 
   it("shows an empty title when neither a title nor a title property is set", () => {
     const { fields } = describeAction({
-      type: "createPage", provisionalId: "~1", parent: { kind: "page", pageId: "parent-1" },
+      type: "createPage",
+      provisionalId: "~1",
+      parent: { kind: "page", pageId: "parent-1" },
     });
 
     expect(fields).toContainEqual(inline("Parent page ID", "parent-1"));
@@ -88,12 +109,14 @@ describe("describeAction", () => {
 
     expect(descriptionIsComplete).toBe(true);
     expect(description).toContain("chosen now");
-    expect(fields).toEqual(expect.arrayContaining([
-      inline("Parent page ID", "recent-page"),
-      inline("Parent page title", "Team notes"),
-      inline("Provisional ID", "~1"),
-      inline("Title", "New page"),
-    ]));
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        inline("Parent page ID", "recent-page"),
+        inline("Parent page title", "Team notes"),
+        inline("Provisional ID", "~1"),
+        inline("Title", "New page"),
+      ]),
+    );
   });
 });
 
@@ -105,21 +128,31 @@ describe("findWorkspaceParentPage", () => {
         search: async (body: unknown) => {
           searches.push(body);
           return {
-            results: [{
-              object: "page", id: "recent-page", url: "https://notion.so/recent-page",
-              created_time: "2026-01-01T00:00:00Z", last_edited_time: "2026-01-02T00:00:00Z",
-              properties: { title: { type: "title", title: [{ plain_text: "Team notes" }] } },
-            }],
+            results: [
+              {
+                object: "page",
+                id: "recent-page",
+                url: "https://notion.so/recent-page",
+                created_time: "2026-01-01T00:00:00Z",
+                last_edited_time: "2026-01-02T00:00:00Z",
+                properties: { title: { type: "title", title: [{ plain_text: "Team notes" }] } },
+              },
+            ],
           };
         },
       },
     } as unknown as NotionStore;
 
-    await expect(findWorkspaceParentPage(store)).resolves.toEqual({ id: "recent-page", title: "Team notes" });
-    expect(searches).toEqual([{
-      filter: { property: "object", value: "page" },
-      sort: { direction: "descending", timestamp: "last_edited_time" },
-      page_size: 1,
-    }]);
+    await expect(findWorkspaceParentPage(store)).resolves.toEqual({
+      id: "recent-page",
+      title: "Team notes",
+    });
+    expect(searches).toEqual([
+      {
+        filter: { property: "object", value: "page" },
+        sort: { direction: "descending", timestamp: "last_edited_time" },
+        page_size: 1,
+      },
+    ]);
   });
 });

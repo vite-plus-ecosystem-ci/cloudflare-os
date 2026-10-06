@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { isBlockedHost, validateCustomEndpoint } from "../src/endpoint.js";
 import type { InsecureEnv } from "../src/fetch.js";
 
@@ -19,16 +19,27 @@ describe("validateCustomEndpoint", () => {
 
   it("requires https unless insecure mode is explicitly enabled", () => {
     expect(validateCustomEndpoint(env(), "http://mcp.example.com/mcp").ok).toBe(false);
-    expect(validateCustomEndpoint(
-      env({ MCP_ALLOW_INSECURE: "true" }), "http://localhost:1234/mcp").ok).toBe(true);
+    expect(
+      validateCustomEndpoint(env({ MCP_ALLOW_INSECURE: "true" }), "http://localhost:1234/mcp").ok,
+    ).toBe(true);
   });
 
   it("blocks loopback, private, link-local, IPv6, and metadata hosts", () => {
     for (const host of [
-      "localhost", "app.localhost", "127.0.0.1", "0.0.0.0", "10.1.2.3", "192.168.0.5", "172.16.9.9",
-      "169.254.169.254", "metadata.google.internal", "thing.internal",
+      "localhost",
+      "app.localhost",
+      "127.0.0.1",
+      "0.0.0.0",
+      "10.1.2.3",
+      "192.168.0.5",
+      "172.16.9.9",
+      "169.254.169.254",
+      "metadata.google.internal",
+      "thing.internal",
       // IPv6 loopback and unique-local, which a URL renders bracketed.
-      "[::1]", "[fd00::1]", "[fc00::1]",
+      "[::1]",
+      "[fd00::1]",
+      "[fc00::1]",
     ]) {
       expect(validateCustomEndpoint(env(), `https://${host}/mcp`).ok, host).toBe(false);
     }
@@ -43,7 +54,12 @@ describe("validateCustomEndpoint", () => {
   });
 
   it("does not mistake ordinary hosts for encoded addresses", () => {
-    for (const host of ["mcp.example.com", "8x8.com", "0x.example.com", "mcp.internal.example.com"]) {
+    for (const host of [
+      "mcp.example.com",
+      "8x8.com",
+      "0x.example.com",
+      "mcp.internal.example.com",
+    ]) {
       expect(isBlockedHost(host), host).toBe(false);
     }
   });

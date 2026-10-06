@@ -1,12 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import {
-  LOGIN_PENDING_LIFETIME_MS, type LoginConnectCallbackImpl, type PendingLogin,
+  LOGIN_PENDING_LIFETIME_MS,
+  type LoginConnectCallbackImpl,
+  type PendingLogin,
 } from "../src/auth/login-flow.js";
 import type { UserDurableObject } from "../src/user.js";
 import {
-  hashPresentedSecret, hashSecret, newSecretToken, PENDING_HANDOFF_LIFETIME_MS,
+  hashPresentedSecret,
+  hashSecret,
+  newSecretToken,
+  PENDING_HANDOFF_LIFETIME_MS,
 } from "../src/connect-handoff.js";
 import type { FakeGatekeeperAccount } from "./test-worker.js";
 
@@ -20,15 +25,19 @@ declare module "cloudflare:workers" {
 // What a test reaches into the user DO for: the collections behind the callback's effects.
 type UserInternals = UserDurableObject & {
   storage: {
-    connectedAccounts: { get(id: number): Record<string, unknown> | undefined; put(record: unknown): void };
+    connectedAccounts: {
+      get(id: number): Record<string, unknown> | undefined;
+      put(record: unknown): void;
+    };
     pendingHandoffs: { list(): Iterable<Record<string, unknown>> };
     nextAccountId: { put(n: number): void };
   };
   ctx: DurableObjectState & {
     exports: {
       FakeGatekeeperAccount(options: { props: { name: string } }): Fetcher<FakeGatekeeperAccount>;
-      TestLoginCallback(options: { props: { pendingId: string; vendorId: string } })
-        : Fetcher<LoginConnectCallbackImpl>;
+      TestLoginCallback(options: {
+        props: { pendingId: string; vendorId: string };
+      }): Fetcher<LoginConnectCallbackImpl>;
     };
   };
 };
@@ -72,7 +81,10 @@ const EXPIRED = "error:This sign-in attempt has expired. Please try again.";
 // Age the stored result without running the alarm; the result is the DO's only entry here.
 const age = (stub: DurableObjectStub<PendingLogin>) =>
   runInDurableObject(stub, async (instance: PendingLogin) => {
-    const [[key, stored]] = [...instance.ctx.storage.kv.list()] as [string, { expiresAt: number }][];
+    const [[key, stored]] = [...instance.ctx.storage.kv.list()] as [
+      string,
+      { expiresAt: number },
+    ][];
     expect(stored.expiresAt).toBeGreaterThan(Date.now());
     instance.ctx.storage.kv.put(key, { ...stored, expiresAt: Date.now() - 1 });
   });
@@ -88,7 +100,8 @@ describe("PendingLogin", () => {
     await runInDurableObject(stub, async (instance: PendingLogin) => {
       expect(await instance.ctx.storage.getAlarm()).toBeGreaterThan(Date.now());
       expect(await instance.ctx.storage.getAlarm()).toBeLessThanOrEqual(
-        Date.now() + PENDING_HANDOFF_LIFETIME_MS);
+        Date.now() + PENDING_HANDOFF_LIFETIME_MS,
+      );
     });
     // Holding the attempt is not enough: the token stays parked until the popup confirms it.
     expect(await receive(stub)).toBe("null");
@@ -126,9 +139,11 @@ describe("PendingLogin", () => {
     await runInDurableObject(stub, async (instance: PendingLogin) => {
       // The wait for the gatekeeper outlives a delivered result, which has the shorter lifetime.
       expect(await instance.ctx.storage.getAlarm()).toBeGreaterThan(
-        Date.now() + PENDING_HANDOFF_LIFETIME_MS);
+        Date.now() + PENDING_HANDOFF_LIFETIME_MS,
+      );
       expect(await instance.ctx.storage.getAlarm()).toBeLessThanOrEqual(
-        Date.now() + LOGIN_PENDING_LIFETIME_MS);
+        Date.now() + LOGIN_PENDING_LIFETIME_MS,
+      );
     });
     expect(await confirm(stub, (await newSecretToken()).secret.toHex())).toBe(EXPIRED);
     expect(await confirm(stub, "not-a-ticket")).toBe(EXPIRED);
@@ -216,11 +231,12 @@ describe("PendingLogin", () => {
     const { secret, hash } = await newSecretToken();
     await stub.deliver("alice@example.com:session", hash);
 
-    const atRest = () => runInDurableObject(stub, async (instance: PendingLogin) => {
-      const stored = JSON.stringify([...instance.ctx.storage.kv.list()]);
-      expect(stored).not.toContain(secret.toHex());
-      expect(stored).toContain(await hashSecret(secret));
-    });
+    const atRest = () =>
+      runInDurableObject(stub, async (instance: PendingLogin) => {
+        const stored = JSON.stringify([...instance.ctx.storage.kv.list()]);
+        expect(stored).not.toContain(secret.toHex());
+        expect(stored).toContain(await hashSecret(secret));
+      });
     await atRest();
     expect(await confirm(stub, secret.toHex())).toBe("ok");
     await atRest();
@@ -258,8 +274,10 @@ describe("LoginConnectCallbackImpl", () => {
       const user = instance as UserInternals;
       user.storage.nextAccountId.put(1);
       user.storage.connectedAccounts.put({
-        id: 0, account: user.ctx.exports.FakeGatekeeperAccount({ props: { name: "cf" } }),
-        vendorId: "cloudflare", description: { displayName: "cf" },
+        id: 0,
+        account: user.ctx.exports.FakeGatekeeperAccount({ props: { name: "cf" } }),
+        vendorId: "cloudflare",
+        description: { displayName: "cf" },
       });
       const callback = callbackFor(user, pendingId);
 
@@ -274,7 +292,8 @@ describe("LoginConnectCallbackImpl", () => {
       expect(user.storage.connectedAccounts.get(0)?.credentialsExpired).toBe(true);
       await callback.credentialsRestored(new Date("2027-02-01"));
       expect(user.storage.connectedAccounts.get(0)).toMatchObject({
-        credentialsExpired: false, credentialExpiresAt: new Date("2027-02-01"),
+        credentialsExpired: false,
+        credentialExpiresAt: new Date("2027-02-01"),
       });
     });
   });

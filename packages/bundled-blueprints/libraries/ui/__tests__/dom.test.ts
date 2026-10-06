@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { el, icon } from "../src/dom.ts";
 
@@ -12,7 +12,11 @@ describe("el", () => {
   });
 
   it("treats class, html and a style object as conveniences", () => {
-    const node = el("div", { class: "a b", html: "<b>x</b>", style: { color: "red", display: "flex" } });
+    const node = el("div", {
+      class: "a b",
+      html: "<b>x</b>",
+      style: { color: "red", display: "flex" },
+    });
     expect(node.className).toBe("a b");
     expect(node.innerHTML).toBe("<b>x</b>");
     expect(node.style.color).toBe("red");

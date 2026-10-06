@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { serverIdFromEndpoint } from "../src/server-id.js";
 
@@ -19,7 +19,7 @@ describe("serverIdFromEndpoint", () => {
   });
 
   it("ignores the path, port, and query", () => {
-      expect(serverIdFromEndpoint("https://linear.app:8443/a/b?x=1#tool=a")).toBe("linear");
+    expect(serverIdFromEndpoint("https://linear.app:8443/a/b?x=1#tool=a")).toBe("linear");
   });
 
   it("normalizes case and stray characters into a slug", () => {
@@ -36,7 +36,8 @@ describe("serverIdFromEndpoint", () => {
   it("collapses hosts that a tag must keep apart, which is why tags use the endpoint", () => {
     // Both collapse to "acme" -- documented in `ConnectedServer.serverId` and the reason `scopeTag`
     // exists. If this ever stops being true, the comment there is wrong.
-    expect(serverIdFromEndpoint("https://mcp.acme.com/mcp"))
-      .toBe(serverIdFromEndpoint("https://mcp.acme.io/mcp"));
+    expect(serverIdFromEndpoint("https://mcp.acme.com/mcp")).toBe(
+      serverIdFromEndpoint("https://mcp.acme.io/mcp"),
+    );
   });
 });

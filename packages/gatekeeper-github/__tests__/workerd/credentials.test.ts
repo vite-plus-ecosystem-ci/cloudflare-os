@@ -8,7 +8,7 @@ import { env, runInDurableObject } from "cloudflare:test";
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import { isCredentialsExpired } from "@gadgets/gatekeeper-kit/credentials";
 import type { GatekeeperConnectCallback } from "@gadgets/workshop-shared/gatekeeper";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { connectCallbackEvents } from "./worker";
 
 const TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -19,7 +19,8 @@ const EIGHT_HOURS = 8 * 60 * 60;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
-    status, headers: { "content-type": "application/json" },
+    status,
+    headers: { "content-type": "application/json" },
   });
 }
 
@@ -45,23 +46,24 @@ class FakeGitHub {
   /** Access tokens revoked through `DELETE /applications/{client_id}/token`, in order. */
   readonly revoked: string[] = [];
   onRevoke: (token: string) => void | Promise<void> = () => {};
-  respondToken: (params: Record<string, string>) => Response | Promise<Response> =
-    () => json({ error: "unexpected_token_request" }, 500);
-  respondApi: (token: string, path: string) => Response | Promise<Response> =
-    () => json({ login: "octocat", name: "Octo Cat", avatar_url: "https://avatars.example/1" });
-  respondPost: (path: string) => Response | Promise<Response> =
-    () => json({ message: "unexpected POST" }, 500);
+  respondToken: (params: Record<string, string>) => Response | Promise<Response> = () =>
+    json({ error: "unexpected_token_request" }, 500);
+  respondApi: (token: string, path: string) => Response | Promise<Response> = () =>
+    json({ login: "octocat", name: "Octo Cat", avatar_url: "https://avatars.example/1" });
+  respondPost: (path: string) => Response | Promise<Response> = () =>
+    json({ message: "unexpected POST" }, 500);
 
   constructor() {
     vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) =>
-      this.#handle(new Request(input, init)));
+      this.#handle(new Request(input, init)),
+    );
   }
 
   /** Token-endpoint requests that redeemed a refresh token. */
   refreshes(): string[] {
     return this.tokenRequests
-      .filter(params => params.grant_type === "refresh_token")
-      .map(params => params.refresh_token);
+      .filter((params) => params.grant_type === "refresh_token")
+      .map((params) => params.refresh_token);
   }
 
   async #handle(request: Request): Promise<Response> {
@@ -106,7 +108,9 @@ async function connect(github: FakeGitHub, exchange: Record<string, unknown>) {
   const account = env.USER_ACCOUNT.get(id);
   await runInDurableObject(account, async (instance, state) => {
     await instance.setCallback(
-      exportsOf(state).TestConnectCallback({ props: { name } }), "initiation-nonce");
+      exportsOf(state).TestConnectCallback({ props: { name } }),
+      "initiation-nonce",
+    );
   });
   github.respondToken = () => json(exchange);
   const begun = await account.beginOAuthFlow("initiation-nonce");
@@ -117,14 +121,18 @@ async function connect(github: FakeGitHub, exchange: Record<string, unknown>) {
 
 /** `GatekeeperUser.describe()`, the account's own GitHub call, as plain data. */
 async function describeAccount(userObjectId: string) {
-  return await env.TEST_HOOKS.get(env.TEST_HOOKS.idFromName("credentials"))
-    .describeAccount(userObjectId);
+  return await env.TEST_HOOKS.get(env.TEST_HOOKS.idFromName("credentials")).describeAccount(
+    userObjectId,
+  );
 }
 
 /** `GitHubVerifier.hasRepoAccess()` as the account, as plain data. */
 async function hasRepoAccess(userObjectId: string, owner: string, repo: string) {
-  return await env.TEST_HOOKS.get(env.TEST_HOOKS.idFromName("credentials"))
-    .hasRepoAccess(userObjectId, owner, repo);
+  return await env.TEST_HOOKS.get(env.TEST_HOOKS.idFromName("credentials")).hasRepoAccess(
+    userObjectId,
+    owner,
+    repo,
+  );
 }
 
 /** Stands in for the overseer's approval queue, which a submit must reach. */
@@ -145,17 +153,32 @@ async function queueReview(userObjectId: string) {
   const hooks = env.TEST_HOOKS.get(env.TEST_HOOKS.idFromName("credentials"));
   // The caller keeps ownership of a stub it passes as a param (see capnweb's README).
   using queue = new RpcStub(new TestApprovalQueue());
-  const submitted = await hooks.submitReview(facet, props, queue, {
-    type: "postReview", approvalId: 1, submittedAt: 0, owner: "octo", repo: "repo",
-    pullId: "7", provisionalReviewId: "~r1",
-    review: {
-      revision: { baseSha: "a".repeat(40), headSha: "b".repeat(40) },
-      decision: "comment",
-      diffComments: [{
-        provisionalCommentId: "~c1", bodyMarkdown: "nit", target: { path: "a.ts", line: 3, side: "new" },
-      }],
+  const submitted = await hooks.submitReview(
+    facet,
+    props,
+    queue,
+    {
+      type: "postReview",
+      approvalId: 1,
+      submittedAt: 0,
+      owner: "octo",
+      repo: "repo",
+      pullId: "7",
+      provisionalReviewId: "~r1",
+      review: {
+        revision: { baseSha: "a".repeat(40), headSha: "b".repeat(40) },
+        decision: "comment",
+        diffComments: [
+          {
+            provisionalCommentId: "~c1",
+            bodyMarkdown: "nit",
+            target: { path: "a.ts", line: 3, side: "new" },
+          },
+        ],
+      },
     },
-  }, { title: "review", description: "test review", implementsRevert: false });
+    { title: "review", description: "test review", implementsRevert: false },
+  );
   expect(submitted).not.toHaveProperty("error");
   return async () => {
     using cache = new RpcStub(new UnusedGitCache());
@@ -189,7 +212,9 @@ describe("UserAccount with an expiring grant", () => {
 
     expect(github.refreshes()).toEqual(["ghr_1", "ghr_2"]);
     expect(github.tokenRequests[0]).toMatchObject({
-      grant_type: "refresh_token", client_id: "test-client", client_secret: "test-secret",
+      grant_type: "refresh_token",
+      client_id: "test-client",
+      client_secret: "test-secret",
     });
     expect(await account.getScopes()).toEqual(["repo", "read:user", "user:email"]);
     expect(events()).toEqual(["complete"]);
@@ -216,10 +241,11 @@ describe("UserAccount with an expiring grant", () => {
     const github = new FakeGitHub();
     const { account, events } = await connect(github, tokens(1, NEARLY_EXPIRED));
     // GitHub's answer for an expired, revoked, or already-used refresh token.
-    github.respondToken = () => json({
-      error: "bad_refresh_token",
-      error_description: "The refresh token passed is incorrect or expired.",
-    });
+    github.respondToken = () =>
+      json({
+        error: "bad_refresh_token",
+        error_description: "The refresh token passed is incorrect or expired.",
+      });
 
     expect(isCredentialsExpired(await rejection(account.getAccessToken()))).toBe(true);
     expect(isCredentialsExpired(await rejection(account.getAccessToken()))).toBe(true);
@@ -241,34 +267,34 @@ describe("UserAccount with an expiring grant", () => {
     expect(events()).toEqual(["complete"]);
   });
 
-  it("fails a request whose token a refresh replaced in flight as retryable, not expired",
-    async () => {
-      const github = new FakeGitHub();
-      const { account, id, events } = await connect(github, tokens(1, NEARLY_EXPIRED));
-      const issued = [tokens(2, NEARLY_EXPIRED), tokens(3)];
-      github.respondToken = () => json(issued.shift());
-      const release = Promise.withResolvers<void>();
-      github.respondApi = async () => {
-        await release.promise;
-        return json({ message: "Bad credentials" }, 401);
-      };
+  it("fails a request whose token a refresh replaced in flight as retryable, not expired", async () => {
+    const github = new FakeGitHub();
+    const { account, id, events } = await connect(github, tokens(1, NEARLY_EXPIRED));
+    const issued = [tokens(2, NEARLY_EXPIRED), tokens(3)];
+    github.respondToken = () => json(issued.shift());
+    const release = Promise.withResolvers<void>();
+    github.respondApi = async () => {
+      await release.promise;
+      return json({ message: "Bad credentials" }, 401);
+    };
 
-      const described = describeAccount(id.toString());
-      await vi.waitUntil(() => github.apiTokens.length > 0);
-      // A concurrent read refreshes while the request is in flight, which makes GitHub reject the
-      // token the request presented.
-      expect(await account.getAccessToken()).toBe("gho_3");
-      release.resolve();
+    const described = describeAccount(id.toString());
+    await vi.waitUntil(() => github.apiTokens.length > 0);
+    // A concurrent read refreshes while the request is in flight, which makes GitHub reject the
+    // token the request presented.
+    expect(await account.getAccessToken()).toBe("gho_3");
+    release.resolve();
 
-      expect(await described)
-        .toEqual({ error: "GitHub credentials were renewed during this request. Please retry it." });
-      expect(github.apiTokens).toEqual(["gho_2"]);
-      expect(github.refreshes()).toEqual(["ghr_1", "ghr_2"]);
-      expect(events()).toEqual(["complete"]);
-
-      github.respondApi = () => json({ login: "octocat", avatar_url: "https://avatars.example/1" });
-      expect(await describeAccount(id.toString())).toMatchObject({ ok: { uniqueName: "octocat" } });
+    expect(await described).toEqual({
+      error: "GitHub credentials were renewed during this request. Please retry it.",
     });
+    expect(github.apiTokens).toEqual(["gho_2"]);
+    expect(github.refreshes()).toEqual(["ghr_1", "ghr_2"]);
+    expect(events()).toEqual(["complete"]);
+
+    github.respondApi = () => json({ login: "octocat", avatar_url: "https://avatars.example/1" });
+    expect(await describeAccount(id.toString())).toMatchObject({ ok: { uniqueName: "octocat" } });
+  });
 
   it("replays an observer check whose token a refresh replaced in flight", async () => {
     const github = new FakeGitHub();
@@ -276,7 +302,7 @@ describe("UserAccount with an expiring grant", () => {
     const issued = [tokens(2, NEARLY_EXPIRED), tokens(3)];
     github.respondToken = () => json(issued.shift());
     const release = Promise.withResolvers<void>();
-    github.respondApi = async token => {
+    github.respondApi = async (token) => {
       if (token === "gho_3") return json({ full_name: "octo/repo" });
       await release.promise;
       return json({ message: "Bad credentials" }, 401);
@@ -292,7 +318,7 @@ describe("UserAccount with an expiring grant", () => {
     expect(events()).toEqual(["complete"]);
   });
 
-  it.each([403, 404])("still reads an observer check's %i as no access", async status => {
+  it.each([403, 404])("still reads an observer check's %i as no access", async (status) => {
     const github = new FakeGitHub();
     const { id, events } = await connect(github, tokens(1));
     github.respondApi = () => json({ message: "Not Found" }, status);
@@ -307,7 +333,7 @@ describe("UserAccount with an expiring grant", () => {
     github.respondToken = () => json(tokens(2));
     github.respondPost = () => json({ id: 99 });
     const release = Promise.withResolvers<void>();
-    github.respondApi = async token => {
+    github.respondApi = async (token) => {
       if (token === "gho_2") return json([]);
       await release.promise;
       return json({ message: "Bad credentials" }, 401);
@@ -348,7 +374,7 @@ describe("UserAccount with an expiring grant", () => {
     };
     const read = rejection(account.getAccessToken());
     // The refresh lands while the disconnect waits on GitHub to revoke the old token.
-    github.onRevoke = async token => {
+    github.onRevoke = async (token) => {
       if (token !== "gho_1") return;
       release.resolve();
       await read.catch(() => undefined);
@@ -366,7 +392,9 @@ describe("UserAccount with a non-expiring grant", () => {
   it("serves the token without refreshing", async () => {
     const github = new FakeGitHub();
     const { account } = await connect(github, {
-      access_token: "gho_1", scope: "repo, read:user", token_type: "bearer",
+      access_token: "gho_1",
+      scope: "repo, read:user",
+      token_type: "bearer",
     });
 
     expect(await account.getAccessToken()).toBe("gho_1");
@@ -393,28 +421,34 @@ describe("UserAccount with a non-expiring grant", () => {
     const github = new FakeGitHub();
     const id = env.USER_ACCOUNT.newUniqueId();
     await runInDurableObject(env.USER_ACCOUNT.get(id), async (_instance, state) => {
-      state.storage.kv.put("callback",
-        exportsOf(state).TestConnectCallback({ props: { name: "latched-legacy" } }));
+      state.storage.kv.put(
+        "callback",
+        exportsOf(state).TestConnectCallback({ props: { name: "latched-legacy" } }),
+      );
       state.storage.kv.put("accessToken", "gho_legacy");
       state.storage.kv.put("scopes", ["repo"]);
       state.storage.kv.put("expiredNotified", true);
     });
     github.respondApi = () => json({ message: "Bad credentials" }, 401);
 
-    expect(await describeAccount(id.toString())).toEqual(
-      { error: "GitHub credentials have expired or been revoked. Please reconnect the account." });
+    expect(await describeAccount(id.toString())).toEqual({
+      error: "GitHub credentials have expired or been revoked. Please reconnect the account.",
+    });
     expect(connectCallbackEvents.get("latched-legacy")).toEqual(["credentialsExpired"]);
   });
 
   it("reports a rejected token to the Workshop as expired, once", async () => {
     const github = new FakeGitHub();
     const { id, events } = await connect(github, {
-      access_token: "gho_1", scope: "repo", token_type: "bearer",
+      access_token: "gho_1",
+      scope: "repo",
+      token_type: "bearer",
     });
     github.respondApi = () => json({ message: "Bad credentials" }, 401);
 
-    const expired =
-      { error: "GitHub credentials have expired or been revoked. Please reconnect the account." };
+    const expired = {
+      error: "GitHub credentials have expired or been revoked. Please reconnect the account.",
+    };
     expect(await describeAccount(id.toString())).toEqual(expired);
     expect(await describeAccount(id.toString())).toEqual(expired);
 

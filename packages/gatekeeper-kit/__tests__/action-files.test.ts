@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   ACTION_FILE_CHUNK_BYTES,
   ActionFileStore,
@@ -8,9 +8,11 @@ import {
 import { fakeKv, type FakeKv } from "./fake-kv";
 
 // This suite runs in Node, while the package intentionally excludes Node globals from its types.
-const nodeBuffer = (globalThis as typeof globalThis & {
-  Buffer: { from(value: Uint8Array): Uint8Array };
-}).Buffer;
+const nodeBuffer = (
+  globalThis as typeof globalThis & {
+    Buffer: { from(value: Uint8Array): Uint8Array };
+  }
+).Buffer;
 
 const OPTIONS: ActionFileStoreOptions = {
   filePrefix: "test:file:",
@@ -24,12 +26,17 @@ function actionFiles(overrides: Partial<ActionFileStoreOptions> = {}): {
   kv: FakeKv;
 } {
   const kv = fakeKv();
-  const storage = { kv, transactionSync<T>(callback: () => T): T { return callback(); } };
+  const storage = {
+    kv,
+    transactionSync<T>(callback: () => T): T {
+      return callback();
+    },
+  };
   return { store: new ActionFileStore(storage, { ...OPTIONS, ...overrides }), kv };
 }
 
 function chunkKeys(kv: FakeKv, file: ActionFileReference): string[] {
-  return kv.keys().filter(key => key.includes(`${file.handle}:chunk:`));
+  return kv.keys().filter((key) => key.includes(`${file.handle}:chunk:`));
 }
 
 function bytes(length: number): Uint8Array {
@@ -72,7 +79,7 @@ describe("ActionFileStore", () => {
 
   it.each(["missing", "extra", "truncated", "wrong type", "corrupted"])(
     "rejects %s chunks before returning bytes",
-    async corruption => {
+    async (corruption) => {
       const { store, kv } = actionFiles();
       const file = await store.capture(bytes(ACTION_FILE_CHUNK_BYTES + 17));
       const keys = chunkKeys(kv, file);
@@ -97,15 +104,17 @@ describe("ActionFileStore", () => {
     const { store } = actionFiles();
     const file = await store.capture(bytes(3));
 
-    await expect(store.read({ ...file, digest: "0".repeat(64) }))
-      .rejects.toThrow(/incomplete or corrupted/);
+    await expect(store.read({ ...file, digest: "0".repeat(64) })).rejects.toThrow(
+      /incomplete or corrupted/,
+    );
   });
 
   it("fails obsolete references closed with resubmission guidance", async () => {
     const { store } = actionFiles();
 
-    await expect(store.read({ size: 1, digest: "0".repeat(64) } as ActionFileReference))
-      .rejects.toThrow(/reject and resubmit/i);
+    await expect(
+      store.read({ size: 1, digest: "0".repeat(64) } as ActionFileReference),
+    ).rejects.toThrow(/reject and resubmit/i);
   });
 
   it("enforces per-file and aggregate byte limits without partial writes", async () => {
@@ -121,17 +130,20 @@ describe("ActionFileStore", () => {
     expect(kv.keys()).toEqual(keysAtLimit);
   });
 
-  it.each(["invalid", -1])("fails closed when aggregate accounting is %j, even after a delete", async total => {
-    const { store, kv } = actionFiles();
-    const file = await store.capture(bytes(1));
-    kv.put("test:allocation:totalBytes", total);
+  it.each(["invalid", -1])(
+    "fails closed when aggregate accounting is %j, even after a delete",
+    async (total) => {
+      const { store, kv } = actionFiles();
+      const file = await store.capture(bytes(1));
+      kv.put("test:allocation:totalBytes", total);
 
-    store.delete(file);
+      store.delete(file);
 
-    expect(kv.get("test:allocation:totalBytes")).toBe(total);
-    await expect(store.capture(bytes(1))).rejects.toThrow(/accounting is invalid/);
-    expect(kv.keys()).toEqual(["test:allocation:totalBytes"]);
-  });
+      expect(kv.get("test:allocation:totalBytes")).toBe(total);
+      await expect(store.capture(bytes(1))).rejects.toThrow(/accounting is invalid/);
+      expect(kv.keys()).toEqual(["test:allocation:totalBytes"]);
+    },
+  );
 
   it("deletes every chunk idempotently and releases its allocation", async () => {
     const { store, kv } = actionFiles();
@@ -140,7 +152,7 @@ describe("ActionFileStore", () => {
     store.delete(file);
     store.delete(file);
 
-    expect(kv.keys().some(key => key.includes(file.handle))).toBe(false);
+    expect(kv.keys().some((key) => key.includes(file.handle))).toBe(false);
     expect(kv.get("test:allocation:totalBytes")).toBe(0);
     await expect(store.read(file)).rejects.toThrow(/incomplete or corrupted/);
   });
@@ -152,7 +164,7 @@ describe("ActionFileStore", () => {
 
     store.delete(file);
 
-    expect(kv.keys().some(key => key.includes(file.handle))).toBe(false);
+    expect(kv.keys().some((key) => key.includes(file.handle))).toBe(false);
     expect(kv.get("test:allocation:totalBytes")).toBe(0);
   });
 
@@ -169,7 +181,7 @@ describe("ActionFileStore", () => {
 
     await expect(store.read(retained)).resolves.toEqual(bytes(1));
     await expect(store.read(young)).resolves.toEqual(bytes(3));
-    expect(kv.keys().some(key => key.includes(orphaned.handle))).toBe(false);
+    expect(kv.keys().some((key) => key.includes(orphaned.handle))).toBe(false);
     expect(kv.get("test:allocation:totalBytes")).toBe(4);
   });
 
@@ -202,7 +214,10 @@ describe("ActionFileStore", () => {
     kv.put(`gmail:forwardSnapshot:${file.handle}:manifest`, { ...file, version: 1, chunks: 1 });
     kv.put(`gmail:forwardSnapshot:${file.handle}:chunk:0000`, Uint8Array.from([1, 2, 3]));
     kv.put(`gmail:forwardSnapshotAllocation:${file.handle}`, {
-      version: 1, size: 3, chunks: 1, createdAt: 1,
+      version: 1,
+      size: 3,
+      chunks: 1,
+      createdAt: 1,
     });
     kv.put("gmail:forwardSnapshotAllocation:totalBytes", 3);
 

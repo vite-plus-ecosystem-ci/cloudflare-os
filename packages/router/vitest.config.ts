@@ -1,6 +1,6 @@
-import { defineConfig } from 'vitest/config'
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers'
-import { COMPATIBILITY_DATE } from '@gadgets/scripts/worker-config'
+import { defineConfig } from "vite-plus";
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import { COMPATIBILITY_DATE } from "@gadgets/scripts/worker-config";
 
 /**
  * Tests run inside workerd (via vitest-pool-workers) so they exercise the same runtime APIs as
@@ -12,14 +12,19 @@ export default defineConfig({
     cloudflareTest({
       miniflare: {
         compatibilityDate: COMPATIBILITY_DATE,
-        compatibilityFlags: ['nodejs_compat'],
+        compatibilityFlags: ["nodejs_compat"],
       },
     }),
   ],
   test: {
-    include: ['__tests__/*.test.ts'],
+    // Vitest v4 compatibility: preserve mock call history.
+    // Remove after tests no longer rely on calls from setup or earlier tests.
+    // https://release-v1-1-0-viteplus-dev.voidzero-docs.workers.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
+    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+    clearMocks: false,
+    include: ["__tests__/*.test.ts"],
     // Nothing here imports `cloudflare:test`, so a pool that failed to start would leave this suite
     // green while running under Node. The guard makes that fail loudly instead.
-    setupFiles: ['@gadgets/scripts/assert-workerd'],
+    setupFiles: ["@gadgets/scripts/assert-workerd"],
   },
-})
+});

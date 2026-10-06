@@ -1,9 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  combineGmailQueries, MAX_GMAIL_ADDRESS_BYTES, MAX_GMAIL_BODY_BYTES, MAX_GMAIL_LABEL_BYTES,
-  MAX_GMAIL_QUERY_BYTES, MAX_GMAIL_RECIPIENTS, MAX_GMAIL_SUBJECT_BYTES, validateGmailAddress,
-  validateGmailBody, validateGmailBodyAlternatives, validateGmailLabelName, validateGmailQueryForGrouping,
-  validateGmailRecipientCount, validateOutboundInput,
+  combineGmailQueries,
+  MAX_GMAIL_ADDRESS_BYTES,
+  MAX_GMAIL_BODY_BYTES,
+  MAX_GMAIL_LABEL_BYTES,
+  MAX_GMAIL_QUERY_BYTES,
+  MAX_GMAIL_RECIPIENTS,
+  MAX_GMAIL_SUBJECT_BYTES,
+  validateGmailAddress,
+  validateGmailBody,
+  validateGmailBodyAlternatives,
+  validateGmailLabelName,
+  validateGmailQueryForGrouping,
+  validateGmailRecipientCount,
+  validateOutboundInput,
 } from "../src/gmail-validate";
 
 // Multi-byte, so a byte limit and a length limit can be told apart.
@@ -57,13 +67,13 @@ describe("validateGmailQueryForGrouping", () => {
 
 describe("combineGmailQueries", () => {
   it("places both validated queries in explicit AND groups", () => {
-    expect(combineGmailQueries("label:receipts", "from:shop@example.com"))
-      .toBe("(label:receipts) AND (from:shop@example.com)");
+    expect(combineGmailQueries("label:receipts", "from:shop@example.com")).toBe(
+      "(label:receipts) AND (from:shop@example.com)",
+    );
   });
 
   it("rejects a leading boolean operator", () => {
-    expect(() => combineGmailQueries("label:receipts", "OR in:anywhere"))
-      .toThrow(/cannot start/);
+    expect(() => combineGmailQueries("label:receipts", "OR in:anywhere")).toThrow(/cannot start/);
   });
 
   it("validates the final effective query length, including wrappers", () => {
@@ -78,10 +88,12 @@ describe("validateGmailLabelName", () => {
     expect(() => validateGmailLabelName(wide(MAX_GMAIL_LABEL_BYTES))).not.toThrow();
   });
 
-  it.each([["empty", ""], ["over the limit", wide(MAX_GMAIL_LABEL_BYTES + 2)]])(
-    "rejects %s", (_name, label) => {
-      expect(() => validateGmailLabelName(label)).toThrow(/between 1 and/);
-    });
+  it.each([
+    ["empty", ""],
+    ["over the limit", wide(MAX_GMAIL_LABEL_BYTES + 2)],
+  ])("rejects %s", (_name, label) => {
+    expect(() => validateGmailLabelName(label)).toThrow(/between 1 and/);
+  });
 });
 
 describe("validateGmailAddress", () => {
@@ -89,10 +101,12 @@ describe("validateGmailAddress", () => {
     expect(() => validateGmailAddress(wide(MAX_GMAIL_ADDRESS_BYTES))).not.toThrow();
   });
 
-  it.each([["empty", ""], ["over the limit", wide(MAX_GMAIL_ADDRESS_BYTES + 2)]])(
-    "rejects %s", (_name, address) => {
-      expect(() => validateGmailAddress(address)).toThrow();
-    });
+  it.each([
+    ["empty", ""],
+    ["over the limit", wide(MAX_GMAIL_ADDRESS_BYTES + 2)],
+  ])("rejects %s", (_name, address) => {
+    expect(() => validateGmailAddress(address)).toThrow();
+  });
 });
 
 describe("validateGmailBody", () => {
@@ -106,27 +120,37 @@ describe("validateGmailBody", () => {
   });
 
   it("bounds the combined plain-text and HTML staged value", () => {
-    expect(() => validateGmailBodyAlternatives(
-      "a".repeat(MAX_GMAIL_BODY_BYTES / 2), "b".repeat(MAX_GMAIL_BODY_BYTES / 2)))
-      .not.toThrow();
-    expect(() => validateGmailBodyAlternatives(
-      "a".repeat(MAX_GMAIL_BODY_BYTES / 2 + 1), "b".repeat(MAX_GMAIL_BODY_BYTES / 2)))
-      .toThrow(/total/);
+    expect(() =>
+      validateGmailBodyAlternatives(
+        "a".repeat(MAX_GMAIL_BODY_BYTES / 2),
+        "b".repeat(MAX_GMAIL_BODY_BYTES / 2),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateGmailBodyAlternatives(
+        "a".repeat(MAX_GMAIL_BODY_BYTES / 2 + 1),
+        "b".repeat(MAX_GMAIL_BODY_BYTES / 2),
+      ),
+    ).toThrow(/total/);
   });
 });
 
 describe("validateGmailRecipientCount", () => {
   it("accepts 1 and the maximum", () => {
     expect(() => validateGmailRecipientCount(["a@b.com"])).not.toThrow();
-    expect(() => validateGmailRecipientCount(Array(MAX_GMAIL_RECIPIENTS).fill("a@b.com")))
-      .not.toThrow();
+    expect(() =>
+      validateGmailRecipientCount(Array(MAX_GMAIL_RECIPIENTS).fill("a@b.com")),
+    ).not.toThrow();
   });
 
-  it.each([["none", 0], ["one over the maximum", MAX_GMAIL_RECIPIENTS + 1]])(
-    "rejects %s", (_name, count) => {
-      expect(() => validateGmailRecipientCount(Array(count).fill("a@b.com")))
-        .toThrow(/between 1 and/);
-    });
+  it.each([
+    ["none", 0],
+    ["one over the maximum", MAX_GMAIL_RECIPIENTS + 1],
+  ])("rejects %s", (_name, count) => {
+    expect(() => validateGmailRecipientCount(Array(count).fill("a@b.com"))).toThrow(
+      /between 1 and/,
+    );
+  });
 });
 
 describe("validateOutboundInput", () => {
@@ -139,9 +163,11 @@ describe("validateOutboundInput", () => {
   });
 
   it("applies the subject limit in bytes", () => {
-    expect(() => validateOutboundInput(["a@b.com"], wide(MAX_GMAIL_SUBJECT_BYTES), "b"))
-      .not.toThrow();
-    expect(() => validateOutboundInput(["a@b.com"], wide(MAX_GMAIL_SUBJECT_BYTES + 2), "b"))
-      .toThrow(/subject/);
+    expect(() =>
+      validateOutboundInput(["a@b.com"], wide(MAX_GMAIL_SUBJECT_BYTES), "b"),
+    ).not.toThrow();
+    expect(() =>
+      validateOutboundInput(["a@b.com"], wide(MAX_GMAIL_SUBJECT_BYTES + 2), "b"),
+    ).toThrow(/subject/);
   });
 });

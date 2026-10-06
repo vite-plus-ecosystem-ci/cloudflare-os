@@ -1,16 +1,27 @@
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { AiChatMetadata, AiChatSubscriber } from "@gadgets/workshop-shared/api";
 import { diffFiles, type CodeContent } from "@gadgets/workshop-shared/code-change";
 import type { TestSession } from "../fixtures/gatekeeper-test/src/test-gatekeeper.js";
 import {
-  hookServer, startTestGatekeeperHarness, TEST_VENDOR_ID, testControl, type Harness,
+  hookServer,
+  startTestGatekeeperHarness,
+  TEST_VENDOR_ID,
+  testControl,
+  type Harness,
 } from "../src/harness.js";
 import { SCRIPTED_MODEL_ID, scriptedModelRouter } from "../src/mock-model.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 import {
-  connect, listConnectedAccounts, nextUsernames, RpcTarget, signUp, stubFor, waitFor,
-  waitForIdleChat, WorkpieceRecorder,
+  connect,
+  listConnectedAccounts,
+  nextUsernames,
+  RpcTarget,
+  signUp,
+  stubFor,
+  waitFor,
+  waitForIdleChat,
+  WorkpieceRecorder,
 } from "../src/rpc-client.js";
 
 let harness: Harness;
@@ -42,7 +53,9 @@ const CLIENT_DRAFT = `document.body.textContent = "draft";\n`;
 class ChatMetadataRecorder extends RpcTarget implements AiChatSubscriber {
   readonly metadataEvents: AiChatMetadata[] = [];
   streamGeneration(): void {}
-  metadata(metadata: AiChatMetadata): void { this.metadataEvents.push(metadata); }
+  metadata(metadata: AiChatMetadata): void {
+    this.metadataEvents.push(metadata);
+  }
   deleted(): void {}
   message(): void {}
   changeApplied(): void {}
@@ -51,7 +64,8 @@ class ChatMetadataRecorder extends RpcTarget implements AiChatSubscriber {
 
 /** The client.js edit from `before` to `after` in gadget `gadgetId`. */
 const clientEdit = (gadgetId: number, before: string, after: string) => {
-  const content = (text: string): CodeContent => new Map([[gadgetId, new Map([["client.js", text]])]]);
+  const content = (text: string): CodeContent =>
+    new Map([[gadgetId, new Map([["client.js", text]])]]);
   return diffFiles(content(before), content(after));
 };
 
@@ -61,11 +75,19 @@ it.concurrent("removing a gadget tears down its hook and draft proposals but spa
   const model = models.script([
     {
       toolCalls: [
-        { id: "create", name: "createGadget", arguments: { title: "Removal target", bindingName: "HOOKED" } },
+        {
+          id: "create",
+          name: "createGadget",
+          arguments: { title: "Removal target", bindingName: "HOOKED" },
+        },
         {
           id: "server",
           name: "writeFile",
-          arguments: { workpiece: "HOOKED", filename: "server.js", content: hookServer("TEST_AMBIENT") },
+          arguments: {
+            workpiece: "HOOKED",
+            filename: "server.js",
+            content: hookServer("TEST_AMBIENT"),
+          },
         },
         {
           id: "client",
@@ -88,8 +110,11 @@ it.concurrent("removing a gadget tears down its hook and draft proposals but spa
   using api = await signUp(publicApi, username);
   await api.addModel(model.userModel.profile, model.userModel.config);
   await api.provisionAmbientAccount(TEST_VENDOR_ID);
-  const account = await waitFor("the ambient account", async () =>
-    (await listConnectedAccounts(api)).find(a => a.vendorId === TEST_VENDOR_ID) ?? null);
+  const account = await waitFor(
+    "the ambient account",
+    async () =>
+      (await listConnectedAccounts(api)).find((a) => a.vendorId === TEST_VENDOR_ID) ?? null,
+  );
   using ws = await api.newGadget();
 
   const workpieces = new WorkpieceRecorder();
@@ -109,22 +134,29 @@ it.concurrent("removing a gadget tears down its hook and draft proposals but spa
   await waitFor("the watch turn", async () => model.requests.length === 4 || null);
   await waitForIdleChat(ws, buildChat);
 
-  const { id: targetId, commitId: targetHead } = await waitFor("the committed removal target", async () => {
-    const summary = [...workpieces.summaries.values()].find(summary =>
-      summary.type === "gadget" && summary.title === "Removal target");
-    return summary?.type === "gadget" && summary.commitId !== undefined
-      ? { id: summary.id, commitId: summary.commitId } : null;
-  });
+  const { id: targetId, commitId: targetHead } = await waitFor(
+    "the committed removal target",
+    async () => {
+      const summary = [...workpieces.summaries.values()].find(
+        (summary) => summary.type === "gadget" && summary.title === "Removal target",
+      );
+      return summary?.type === "gadget" && summary.commitId !== undefined
+        ? { id: summary.id, commitId: summary.commitId }
+        : null;
+    },
+  );
   using removed = await ws.getGadget(targetId);
 
   // Dependents: an enabled hook, another gadget sharing its connection, a published blueprint,
   // and an open draft editing its client.js.
-  const hook = (await ws.listHooks()).find(h => h.description.title === `Test hook ${hookKey}`);
+  const hook = (await ws.listHooks()).find((h) => h.description.title === `Test hook ${hookKey}`);
   if (!hook) throw new Error(`No hook listed for ${hookKey}`);
   await ws.enableHook(hook.id);
 
   using gatekeeper = await ws.newGatekeeper(
-      account.id, "https://gadgets-test.example/things/removal-source");
+    account.id,
+    "https://gadgets-test.example/things/removal-source",
+  );
   if (!gatekeeper) throw new Error("The test connection was not created");
   const gatekeeperId = await gatekeeper.getId();
   using survivor = await ws.createGadget("Survivor", undefined, "SURVIVOR");
@@ -134,45 +166,65 @@ it.concurrent("removing a gadget tears down its hook and draft proposals but spa
   const blueprint = await removed.createBlueprint("Removed source", "Source removal regression");
 
   const draftChat = await ws.newChat("Draft", null);
-  expect(await ws.submitCodeChange(draftChat, {
-    generation: 0, revision: 0, clientId: "draft", seq: 1,
-    pins: [{ gadgetId: targetId, baseCommit: targetHead }],
-    change: clientEdit(targetId, CLIENT_V1, CLIENT_DRAFT),
-  })).toEqual({ generation: 0, revision: 1 });
-  expect((await ws.listChats()).find(chat => chat.id === draftChat)?.proposedChangeWorkpieces)
-      .toEqual([targetId]);
+  expect(
+    await ws.submitCodeChange(draftChat, {
+      generation: 0,
+      revision: 0,
+      clientId: "draft",
+      seq: 1,
+      pins: [{ gadgetId: targetId, baseCommit: targetHead }],
+      change: clientEdit(targetId, CLIENT_V1, CLIENT_DRAFT),
+    }),
+  ).toEqual({ generation: 0, revision: 1 });
+  expect(
+    (await ws.listChats()).find((chat) => chat.id === draftChat)?.proposedChangeWorkpieces,
+  ).toEqual([targetId]);
 
   const eventsBefore = chatMetadata.metadataEvents.length;
   await removed.remove();
 
   // The survivor keeps the shared connection.
   expect(await survivor.listBindings()).toContainEqual(
-      expect.objectContaining({ name: "DATA", target: gatekeeperId }));
+    expect.objectContaining({ name: "DATA", target: gatekeeperId }),
+  );
   using binding = await survivor.getBinding("DATA");
   if (!binding) throw new Error("The survivor lost its DATA binding");
-  using session = await binding.openSession() as RpcStub<TestSession>;
+  using session = (await binding.openSession()) as RpcStub<TestSession>;
   expect(await session.readValue()).toBe(42);
 
   // The hook is deleted, the gatekeeper is told, and a fire is refused.
   expect(await ws.listHooks()).toEqual([]);
-  expect(await testControl(harness, "hook-state", { key: hookKey }))
-      .toMatchObject({ disableCount: 1 });
-  expect(await testControl(harness, "fire-hook", { key: hookKey, value: 101 }))
-      .toEqual({ error: "Hook has been deleted or disabled." });
+  expect(await testControl(harness, "hook-state", { key: hookKey })).toMatchObject({
+    disableCount: 1,
+  });
+  expect(await testControl(harness, "fire-hook", { key: hookKey, value: 101 })).toEqual({
+    error: "Hook has been deleted or disabled.",
+  });
 
   // The draft stops proposing the removed gadget, and subscribers are told so.
-  await waitFor("the draft's post-removal metadata", async () =>
-    chatMetadata.metadataEvents.slice(eventsBefore).find(meta =>
-      meta.id === draftChat && meta.proposedChangeWorkpieces === undefined) ?? null);
-  expect((await ws.listChats()).find(chat => chat.id === draftChat)?.proposedChangeWorkpieces)
-      .toBeUndefined();
+  await waitFor(
+    "the draft's post-removal metadata",
+    async () =>
+      chatMetadata.metadataEvents
+        .slice(eventsBefore)
+        .find((meta) => meta.id === draftChat && meta.proposedChangeWorkpieces === undefined) ??
+      null,
+  );
+  expect(
+    (await ws.listChats()).find((chat) => chat.id === draftChat)?.proposedChangeWorkpieces,
+  ).toBeUndefined();
 
   // A reopened gadget, or a still-open editor's next edit, fails cleanly.
   await expect(ws.getGadget(targetId)).rejects.toThrow(`No such gadget: ${targetId}`);
-  await expect(ws.submitCodeChange(draftChat, {
-    generation: 0, revision: 1, clientId: "draft", seq: 2,
-    change: clientEdit(targetId, CLIENT_DRAFT, CLIENT_V1),
-  })).rejects.toThrow(`Code change touches a nonexistent gadget: ${targetId}`);
+  await expect(
+    ws.submitCodeChange(draftChat, {
+      generation: 0,
+      revision: 1,
+      clientId: "draft",
+      seq: 2,
+      change: clientEdit(targetId, CLIENT_DRAFT, CLIENT_V1),
+    }),
+  ).rejects.toThrow(`Code change touches a nonexistent gadget: ${targetId}`);
 
   // A published blueprint is a snapshot: it outlives its source but can't be refreshed from it.
   expect(await ws.listBlueprints()).toContainEqual(expect.objectContaining({ id: blueprint.id }));
@@ -181,7 +233,8 @@ it.concurrent("removing a gadget tears down its hook and draft proposals but spa
   if (defaultGadgetId === undefined) throw new Error("The installed blueprint has no gadget");
   using installedGadget = await installed.getGadget(defaultGadgetId);
   expect(await installedGadget.getUiBundle()).toEqual({ jsCode: CLIENT_V1 });
-  await expect(ws.updateBlueprint(blueprint.id, { updateCode: true }))
-      .rejects.toThrow(`No such gadget: ${targetId}`);
+  await expect(ws.updateBlueprint(blueprint.id, { updateCode: true })).rejects.toThrow(
+    `No such gadget: ${targetId}`,
+  );
   await installed.deleteSelf();
 });

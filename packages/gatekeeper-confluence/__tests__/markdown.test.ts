@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { markdownToStorage, storageToMarkdown } from "../src/confluence-markdown";
 
 describe("storageToMarkdown", () => {
@@ -7,13 +7,15 @@ describe("storageToMarkdown", () => {
   });
 
   it("converts paragraphs with inline emphasis", () => {
-    expect(storageToMarkdown("<p>Hello <strong>bold</strong> and <em>italic</em>.</p>"))
-      .toBe("Hello **bold** and *italic*.");
+    expect(storageToMarkdown("<p>Hello <strong>bold</strong> and <em>italic</em>.</p>")).toBe(
+      "Hello **bold** and *italic*.",
+    );
   });
 
   it("converts inline code and links", () => {
-    expect(storageToMarkdown('<p>Run <code>npm i</code> see <a href="https://x.com">site</a>.</p>'))
-      .toBe("Run `npm i` see [site](https://x.com).");
+    expect(
+      storageToMarkdown('<p>Run <code>npm i</code> see <a href="https://x.com">site</a>.</p>'),
+    ).toBe("Run `npm i` see [site](https://x.com).");
   });
 
   it("converts bullet and numbered lists", () => {
@@ -55,8 +57,9 @@ describe("markdownToStorage", () => {
   });
 
   it("converts paragraphs with inline emphasis", () => {
-    expect(markdownToStorage("Hello **bold** and *italic*."))
-      .toBe("<p>Hello <strong>bold</strong> and <em>italic</em>.</p>");
+    expect(markdownToStorage("Hello **bold** and *italic*.")).toBe(
+      "<p>Hello <strong>bold</strong> and <em>italic</em>.</p>",
+    );
   });
 
   it("escapes HTML-special characters in text", () => {
@@ -64,13 +67,15 @@ describe("markdownToStorage", () => {
   });
 
   it("converts inline code and links", () => {
-    expect(markdownToStorage("Run `npm i` see [site](https://x.com)."))
-      .toBe('<p>Run <code>npm i</code> see <a href="https://x.com">site</a>.</p>');
+    expect(markdownToStorage("Run `npm i` see [site](https://x.com).")).toBe(
+      '<p>Run <code>npm i</code> see <a href="https://x.com">site</a>.</p>',
+    );
   });
 
   it("escapes a double quote in a link href (attribute-injection guard)", () => {
-    expect(markdownToStorage('[x](https://a.com/"onmouseover="evil)'))
-      .toBe('<p><a href="https://a.com/&quot;onmouseover=&quot;evil">x</a></p>');
+    expect(markdownToStorage('[x](https://a.com/"onmouseover="evil)')).toBe(
+      '<p><a href="https://a.com/&quot;onmouseover=&quot;evil">x</a></p>',
+    );
   });
 
   it("converts bullet and numbered lists", () => {
@@ -100,7 +105,9 @@ describe("markdownToStorage", () => {
   });
 
   it("neutralizes a ]]> sequence inside a code block (CDATA injection)", () => {
-    const out = markdownToStorage("```\nfoo ]]></ac:plain-text-body></ac:structured-macro><h1>x</h1>\n```");
+    const out = markdownToStorage(
+      "```\nfoo ]]></ac:plain-text-body></ac:structured-macro><h1>x</h1>\n```",
+    );
     // The injected markup must not be able to break out of the CDATA section.
     expect(out).not.toContain("]]></ac:plain-text-body></ac:structured-macro><h1>");
     expect(out).toContain("]]]]><![CDATA[>");

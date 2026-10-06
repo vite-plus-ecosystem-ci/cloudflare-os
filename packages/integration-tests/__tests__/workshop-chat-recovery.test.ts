@@ -1,16 +1,32 @@
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { AiChatMessage, AiChatSubscriber } from "@gadgets/workshop-shared/api";
 import { loadAllChatHistory, openAgentSession } from "../src/agent-session.js";
 import {
-  settleRestart, startTestGatekeeperHarness, TEST_VENDOR_ID, testActionState, type Harness,
+  settleRestart,
+  startTestGatekeeperHarness,
+  TEST_VENDOR_ID,
+  testActionState,
+  type Harness,
 } from "../src/harness.js";
 import {
-  SCRIPTED_MODEL_ID, scriptedModelRouter, type RoutedScriptedModel,
+  SCRIPTED_MODEL_ID,
+  scriptedModelRouter,
+  type RoutedScriptedModel,
 } from "../src/mock-model.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 import {
-  accountLabel, connect, logIn, nextUsernames, restartWorkspace, RpcTarget, signUp, stubFor,
-  waitFor, waitForIdleChat, withOwnerWorkspace, WorkpieceRecorder,
+  accountLabel,
+  connect,
+  logIn,
+  nextUsernames,
+  restartWorkspace,
+  RpcTarget,
+  signUp,
+  stubFor,
+  waitFor,
+  waitForIdleChat,
+  withOwnerWorkspace,
+  WorkpieceRecorder,
 } from "../src/rpc-client.js";
 
 let harness: Harness;
@@ -35,8 +51,12 @@ class ChatRecorder extends RpcTarget implements AiChatSubscriber {
   readonly generations: number[] = [];
   readonly messages: AiChatMessage[] = [];
 
-  streamGeneration(generation: number): void { this.generations.push(generation); }
-  message(message: AiChatMessage): void { this.messages.push(message); }
+  streamGeneration(generation: number): void {
+    this.generations.push(generation);
+  }
+  message(message: AiChatMessage): void {
+    this.messages.push(message);
+  }
   metadata(): void {}
   deleted(): void {}
   changeApplied(): void {}
@@ -56,10 +76,16 @@ async function recordFirstTurn(username: string, model: RoutedScriptedModel) {
   const chatId = await ws.newChat("First", SCRIPTED_MODEL_ID);
   await waitFor("the first model request", async () => model.requests.length === 1 || null);
   await waitForIdleChat(ws, chatId);
-  await waitFor("the first reply on the original subscription", async () =>
-    recorder.messages.some(message =>
-      message.type === "message" && message.author.type === "agent" &&
-      message.message === "First reply.") || null);
+  await waitFor(
+    "the first reply on the original subscription",
+    async () =>
+      recorder.messages.some(
+        (message) =>
+          message.type === "message" &&
+          message.author.type === "agent" &&
+          message.message === "First reply.",
+      ) || null,
+  );
 
   const seen = [...recorder.messages];
   const lastSeen = seen.at(-1)?.timestamp;
@@ -70,9 +96,7 @@ async function recordFirstTurn(username: string, model: RoutedScriptedModel) {
   return { chatId, generation, lastSeen, seen, workspaceId };
 }
 
-it.concurrent(
-    "a provider failure leaves the chat idle, retry answers once, and a busy chat refuses messages",
-    async () => {
+it.concurrent("a provider failure leaves the chat idle, retry answers once, and a busy chat refuses messages", async () => {
   const model = models.script([
     { error: { status: 500, message: "scripted provider outage" } },
     { text: "Retry succeeded." },
@@ -87,56 +111,83 @@ it.concurrent(
   const chatId = await ws.newChat("Prompt once", SCRIPTED_MODEL_ID);
   await waitFor("the failed model request", async () => model.requests.length === 1 || null);
   await waitForIdleChat(ws, chatId);
-  let history = await loadAllChatHistory(before => ws.getChatHistory(chatId, before));
-  expect(history.filter(message =>
-    message.type === "message" && message.author.type === "user" &&
-    message.message === "Prompt once")).toHaveLength(1);
-  expect(history.filter(message =>
-    message.type === "error" && message.message.includes("scripted provider outage")))
-    .toHaveLength(1);
+  let history = await loadAllChatHistory((before) => ws.getChatHistory(chatId, before));
+  expect(
+    history.filter(
+      (message) =>
+        message.type === "message" &&
+        message.author.type === "user" &&
+        message.message === "Prompt once",
+    ),
+  ).toHaveLength(1);
+  expect(
+    history.filter(
+      (message) => message.type === "error" && message.message.includes("scripted provider outage"),
+    ),
+  ).toHaveLength(1);
 
   await ws.retryAgent(chatId, SCRIPTED_MODEL_ID);
   await waitFor("the retry model request", async () => model.requests.length === 2 || null);
   await waitForIdleChat(ws, chatId);
-  history = await loadAllChatHistory(before => ws.getChatHistory(chatId, before));
-  expect(history.filter(message =>
-    message.type === "message" && message.author.type === "user" &&
-    message.message === "Prompt once")).toHaveLength(1);
-  expect(history.filter(message =>
-    message.type === "message" && message.author.type === "agent" &&
-    message.message === "Retry succeeded.")).toHaveLength(1);
-  expect(history).toContainEqual(expect.objectContaining({
-    type: "error",
-    message: expect.stringContaining("scripted provider outage"),
-  }));
+  history = await loadAllChatHistory((before) => ws.getChatHistory(chatId, before));
+  expect(
+    history.filter(
+      (message) =>
+        message.type === "message" &&
+        message.author.type === "user" &&
+        message.message === "Prompt once",
+    ),
+  ).toHaveLength(1);
+  expect(
+    history.filter(
+      (message) =>
+        message.type === "message" &&
+        message.author.type === "agent" &&
+        message.message === "Retry succeeded.",
+    ),
+  ).toHaveLength(1);
+  expect(history).toContainEqual(
+    expect.objectContaining({
+      type: "error",
+      message: expect.stringContaining("scripted provider outage"),
+    }),
+  );
   expect(JSON.stringify(model.requests[1])).toContain("Prompt once");
 
   try {
     await ws.sendChatMessage(chatId, "Hold open", SCRIPTED_MODEL_ID);
     await waitFor("the pending model request", async () => model.requests.length === 3 || null);
-    await expect(ws.sendChatMessage(chatId, "Rejected", SCRIPTED_MODEL_ID))
-      .rejects.toThrow("Agent is running, wait for it to finish.");
-    history = await loadAllChatHistory(before => ws.getChatHistory(chatId, before));
-    expect(history).not.toContainEqual(expect.objectContaining({
-      type: "message",
-      message: "Rejected",
-    }));
+    await expect(ws.sendChatMessage(chatId, "Rejected", SCRIPTED_MODEL_ID)).rejects.toThrow(
+      "Agent is running, wait for it to finish.",
+    );
+    history = await loadAllChatHistory((before) => ws.getChatHistory(chatId, before));
+    expect(history).not.toContainEqual(
+      expect.objectContaining({
+        type: "message",
+        message: "Rejected",
+      }),
+    );
   } finally {
     await ws.stopAgent(chatId);
   }
 });
 
-it.concurrent("stopping a running agent keeps its completed steps and leaves the chat usable",
-    async () => {
+it.concurrent("stopping a running agent keeps its completed steps and leaves the chat usable", async () => {
   const model = models.script([
-    { toolCall: {
-      id: "create", name: "createGadget", arguments: { title: "Notes", bindingName: "NOTES" },
-    } },
-    { toolCall: {
-      id: "write",
-      name: "writeFile",
-      arguments: { workpiece: "NOTES", filename: "notes.txt", content: "kept\n" },
-    } },
+    {
+      toolCall: {
+        id: "create",
+        name: "createGadget",
+        arguments: { title: "Notes", bindingName: "NOTES" },
+      },
+    },
+    {
+      toolCall: {
+        id: "write",
+        name: "writeFile",
+        arguments: { workpiece: "NOTES", filename: "notes.txt", content: "kept\n" },
+      },
+    },
     { pending: true },
     { text: "I can continue." },
   ]);
@@ -156,36 +207,45 @@ it.concurrent("stopping a running agent keeps its completed steps and leaves the
   await ws.stopAgent(chatId);
   await waitForIdleChat(ws, chatId);
 
-  const history = await loadAllChatHistory(before => ws.getChatHistory(chatId, before));
-  const gadgetId = history.flatMap(message =>
-    message.type === "changes" ? message.createdGadgets ?? [] : [])[0]?.gadgetId;
+  const history = await loadAllChatHistory((before) => ws.getChatHistory(chatId, before));
+  const gadgetId = history.flatMap((message) =>
+    message.type === "changes" ? (message.createdGadgets ?? []) : [],
+  )[0]?.gadgetId;
   if (gadgetId === undefined) throw new Error("The stopped turn recorded no created gadget");
   expect(await ws.mergeChanges(chatId)).toEqual({ outcome: "merged" });
   const commitId = await waitFor("the merged gadget head", async () => {
     const summary = workpieces.summaries.get(gadgetId);
     return summary?.type === "gadget" && summary.commitId !== undefined ? summary.commitId : null;
   });
-  expect(await ws.readFilesAtCommit(commitId, ["notes.txt"]))
-    .toEqual([["notes.txt", { kind: "text", text: "kept\n" }]]);
+  expect(await ws.readFilesAtCommit(commitId, ["notes.txt"])).toEqual([
+    ["notes.txt", { kind: "text", text: "kept\n" }],
+  ]);
 
   await ws.sendChatMessage(chatId, "Continue.", SCRIPTED_MODEL_ID);
   await waitFor("the continued model request", async () => model.requests.length === 4 || null);
   await waitForIdleChat(ws, chatId);
-  const continued = await loadAllChatHistory(before => ws.getChatHistory(chatId, before));
-  expect(continued.filter(message =>
-    message.type === "message" && message.author.type === "agent" &&
-    message.message === "I can continue.")).toHaveLength(1);
+  const continued = await loadAllChatHistory((before) => ws.getChatHistory(chatId, before));
+  expect(
+    continued.filter(
+      (message) =>
+        message.type === "message" &&
+        message.author.type === "agent" &&
+        message.message === "I can continue.",
+    ),
+  ).toHaveLength(1);
   expect(model.remainingSteps()).toBe(0);
 });
 
 it.concurrent("resubscribing during a running turn replays exactly what history lacks", async () => {
   const model = models.script([
     { text: "First reply." },
-    { toolCall: {
-      id: "working",
-      name: "executeCode",
-      arguments: { code: "export default async function() { console.log('working'); }" },
-    } },
+    {
+      toolCall: {
+        id: "working",
+        name: "executeCode",
+        arguments: { code: "export default async function() { console.log('working'); }" },
+      },
+    },
     { pending: true },
   ]);
   const [owner] = nextUsernames("droprecoveryowner");
@@ -204,13 +264,16 @@ it.concurrent("resubscribing during a running turn replays exactly what history 
     const replay = new ChatRecorder();
     using replayStub = stubFor(replay);
     using _replaySubscription = await replayWs.subscribeToChat(replayStub, first.lastSeen);
-    const canonical = await loadAllChatHistory(
-        before => replayWs.getChatHistory(first.chatId, before));
-    await waitFor("the missing chat messages to replay", async () =>
-      first.seen.length + replay.messages.length >= canonical.length || null);
+    const canonical = await loadAllChatHistory((before) =>
+      replayWs.getChatHistory(first.chatId, before),
+    );
+    await waitFor(
+      "the missing chat messages to replay",
+      async () => first.seen.length + replay.messages.length >= canonical.length || null,
+    );
 
-    const sequences = [...first.seen, ...replay.messages].map(message => message.sequence);
-    expect(sequences).toEqual(canonical.map(message => message.sequence));
+    const sequences = [...first.seen, ...replay.messages].map((message) => message.sequence);
+    expect(sequences).toEqual(canonical.map((message) => message.sequence));
     expect(new Set(sequences).size).toBe(sequences.length);
   } finally {
     await ws.stopAgent(first.chatId);
@@ -218,10 +281,7 @@ it.concurrent("resubscribing during a running turn replays exactly what history 
 });
 
 it.concurrent("resubscribing after a workspace restart replays exactly what history lacks", async () => {
-  const model = models.script([
-    { text: "First reply." },
-    { text: "Second reply." },
-  ]);
+  const model = models.script([{ text: "First reply." }, { text: "Second reply." }]);
   const [owner] = nextUsernames("restartrecoveryowner");
   const first = await recordFirstTurn(owner!, model);
 
@@ -242,27 +302,31 @@ it.concurrent("resubscribing after a workspace restart replays exactly what hist
   const replay = new ChatRecorder();
   using replayStub = stubFor(replay);
   using _replaySubscription = await ws.subscribeToChat(replayStub, first.lastSeen);
-  const canonical = await loadAllChatHistory(before => ws.getChatHistory(first.chatId, before));
-  await waitFor("the post-restart chat messages to replay", async () =>
-    first.seen.length + replay.messages.length >= canonical.length || null);
+  const canonical = await loadAllChatHistory((before) => ws.getChatHistory(first.chatId, before));
+  await waitFor(
+    "the post-restart chat messages to replay",
+    async () => first.seen.length + replay.messages.length >= canonical.length || null,
+  );
 
-  const sequences = [...first.seen, ...replay.messages].map(message => message.sequence);
-  expect(sequences).toEqual(canonical.map(message => message.sequence));
+  const sequences = [...first.seen, ...replay.messages].map((message) => message.sequence);
+  expect(sequences).toEqual(canonical.map((message) => message.sequence));
   expect(new Set(sequences).size).toBe(sequences.length);
   expect(replay.generations[0]).toEqual(expect.any(Number));
   expect(replay.generations[0]).not.toBe(first.generation);
 });
 
 const messageTexts = (messages: AiChatMessage[]) =>
-  messages.flatMap(message => message.type === "message" ? [message.message] : []);
+  messages.flatMap((message) => (message.type === "message" ? [message.message] : []));
 
-it.concurrent("a chat over its context budget compacts, and history pages across the checkpoint",
-    async () => {
+it.concurrent("a chat over its context budget compacts, and history pages across the checkpoint", async () => {
   // Long enough to fill the retained tail alone, so the compaction cut lands exactly on it.
   const secondPrompt = "Second question. " + "Keep this turn verbatim. ".repeat(80);
   const model = models.script([
     // Over 85% of the scripted model's 229,376-token input budget, so turn 2 compacts first.
-    { text: "First reply.", usage: { prompt_tokens: 195_000, completion_tokens: 1, total_tokens: 195_001 } },
+    {
+      text: "First reply.",
+      usage: { prompt_tokens: 195_000, completion_tokens: 1, total_tokens: 195_001 },
+    },
     { text: "Summary of the first turn." },
     { text: "Second reply." },
   ]);
@@ -276,11 +340,14 @@ it.concurrent("a chat over its context budget compacts, and history pages across
   await waitFor("the first model request", async () => model.requests.length === 1 || null);
   await waitForIdleChat(ws, chatId);
   await ws.sendChatMessage(chatId, secondPrompt, SCRIPTED_MODEL_ID);
-  await waitFor("the summary and resumed requests", async () => model.requests.length === 3 || null);
+  await waitFor(
+    "the summary and resumed requests",
+    async () => model.requests.length === 3 || null,
+  );
   await waitForIdleChat(ws, chatId);
   expect(model.remainingSteps()).toBe(0);
 
-  const [, summary, resumed] = model.requests.map(request => JSON.stringify(request));
+  const [, summary, resumed] = model.requests.map((request) => JSON.stringify(request));
   expect(summary).toContain("Create the context handoff now. Do not continue the conversation.");
   expect(summary).toContain("First question");
   expect(summary).toContain("First reply.");
@@ -296,19 +363,22 @@ it.concurrent("a chat over its context budget compacts, and history pages across
   const older = await ws.getChatHistory(chatId, boundary);
   expect(older.compacted).toBeUndefined();
   expect(messageTexts(older.messages)).toEqual(["First question", "First reply."]);
-  expect(older.messages.every(message => message.sequence < boundary)).toBe(true);
-  expect(tail.messages.every(message => message.sequence >= boundary)).toBe(true);
-  expect(messageTexts(await loadAllChatHistory(before => ws.getChatHistory(chatId, before))))
-    .toEqual(["First question", "First reply.", secondPrompt, "Second reply."]);
+  expect(older.messages.every((message) => message.sequence < boundary)).toBe(true);
+  expect(tail.messages.every((message) => message.sequence >= boundary)).toBe(true);
+  expect(
+    messageTexts(await loadAllChatHistory((before) => ws.getChatHistory(chatId, before))),
+  ).toEqual(["First question", "First reply.", secondPrompt, "Second reply."]);
 });
 
-it.concurrent("switching models keeps history, refuses a deleted model, and recovers with another",
-    async () => {
+it.concurrent("switching models keeps history, refuses a deleted model, and recovers with another", async () => {
   const modelA = models.script([
     { text: "A's first reply." },
     { error: { status: 500, message: "scripted provider outage" } },
   ]);
-  const modelB = models.script([{ text: "B saw model A's history." }, { text: "B retried the chat." }]);
+  const modelB = models.script([
+    { text: "B saw model A's history." },
+    { text: "B retried the chat." },
+  ]);
   // Every script shares SCRIPTED_MODEL_ID; B keeps its routed accountId under its own model id.
   const MODEL_B_ID = "scripted-model-b";
   const [owner] = nextUsernames("modellifecycleowner");
@@ -316,8 +386,9 @@ it.concurrent("switching models keeps history, refuses a deleted model, and reco
   using api = await signUp(publicApi, owner!);
   await api.addModel(modelA.userModel.profile, modelA.userModel.config);
   await api.addModel(
-      { ...modelB.userModel.profile, id: MODEL_B_ID, name: "Scripted model B" },
-      { ...modelB.userModel.config, model: MODEL_B_ID });
+    { ...modelB.userModel.profile, id: MODEL_B_ID, name: "Scripted model B" },
+    { ...modelB.userModel.config, model: MODEL_B_ID },
+  );
   using ws = await api.newGadget();
   await api.setQuickModel(SCRIPTED_MODEL_ID);
   expect(await api.getQuickModel()).toBe(SCRIPTED_MODEL_ID);
@@ -325,7 +396,7 @@ it.concurrent("switching models keeps history, refuses a deleted model, and reco
   expect(await api.getPreferredModel()).toBe(SCRIPTED_MODEL_ID);
 
   const chatId = await ws.newChat("Ask model A.", SCRIPTED_MODEL_ID);
-  const history = () => loadAllChatHistory(before => ws.getChatHistory(chatId, before));
+  const history = () => loadAllChatHistory((before) => ws.getChatHistory(chatId, before));
   const settled = async (model: RoutedScriptedModel, requests: number) => {
     await waitFor(`request ${requests}`, async () => model.requests.length === requests || null);
     await waitForIdleChat(ws, chatId);
@@ -345,8 +416,9 @@ it.concurrent("switching models keeps history, refuses a deleted model, and reco
   expect(await api.getQuickModel()).toBeNull();
 
   const beforeRefused = await history();
-  await expect(ws.sendChatMessage(chatId, "This must not be saved.", SCRIPTED_MODEL_ID))
-    .rejects.toThrow(`No such model: ${SCRIPTED_MODEL_ID}`);
+  await expect(
+    ws.sendChatMessage(chatId, "This must not be saved.", SCRIPTED_MODEL_ID),
+  ).rejects.toThrow(`No such model: ${SCRIPTED_MODEL_ID}`);
   expect(await history()).toEqual(beforeRefused);
   expect(modelA.requests).toHaveLength(2);
 
@@ -354,21 +426,26 @@ it.concurrent("switching models keeps history, refuses a deleted model, and reco
   await ws.retryAgent(chatId, MODEL_B_ID);
   await settled(modelB, 2);
   expect(messageTexts(await history())).toEqual([
-    "Ask model A.", "A's first reply.", "Ask model B.", "B saw model A's history.",
-    "Ask model A again.", "B retried the chat.",
+    "Ask model A.",
+    "A's first reply.",
+    "Ask model B.",
+    "B saw model A's history.",
+    "Ask model A again.",
+    "B retried the chat.",
   ]);
 });
 
-it.concurrent("approving after the waiting chat's model was deleted applies once without resuming",
-    async () => {
+it.concurrent("approving after the waiting chat's model was deleted applies once without resuming", async () => {
   const model = models.script([
-    { toolCall: {
-      id: "write-test-value",
-      name: "executeCode",
-      arguments: {
-        code: "export default async function(self, env) { console.log(await env.TEST_AMBIENT.writeValue(13)); }",
+    {
+      toolCall: {
+        id: "write-test-value",
+        name: "executeCode",
+        arguments: {
+          code: "export default async function(self, env) { console.log(await env.TEST_AMBIENT.writeValue(13)); }",
+        },
       },
-    } },
+    },
     { text: "This must not run." },
   ]);
   await using session = await openAgentSession(harness.url, {
@@ -379,8 +456,9 @@ it.concurrent("approving after the waiting chat's model was deleted applies once
   });
   const label = accountLabel(session.connectedAccount(TEST_VENDOR_ID));
 
-  expect((await session.runTurn("Set the test value to 13.")).outcome)
-    .toEqual({ status: "completed" });
+  expect((await session.runTurn("Set the test value to 13.")).outcome).toEqual({
+    status: "completed",
+  });
   const [action] = await waitFor("the test write to await approval", async () => {
     const { entries } = await session.listActions({ filter: "pending" });
     return entries.length === 1 ? entries : null;
@@ -392,14 +470,15 @@ it.concurrent("approving after the waiting chat's model was deleted applies once
     await api.deleteModel(SCRIPTED_MODEL_ID);
   }
 
-  await withOwnerWorkspace(harness.url, session.username, async ws => {
+  await withOwnerWorkspace(harness.url, session.username, async (ws) => {
     // What the approval call should then report is undecided, so only its effects are asserted.
     await Promise.allSettled([ws.approveAction(action!.id)]);
     const [chat] = await ws.listChats();
     await waitForIdleChat(ws, chat!.id);
   });
-  expect((await session.listActions({ filter: "action" })).entries)
-    .toContainEqual(expect.objectContaining({ id: action!.id, state: "approved" }));
+  expect((await session.listActions({ filter: "action" })).entries).toContainEqual(
+    expect.objectContaining({ id: action!.id, state: "approved" }),
+  );
   expect(await testActionState(harness, label)).toEqual({ pending: [], value: 13, applyCount: 1 });
   expect(model.requests).toHaveLength(1);
   expect(model.remainingSteps()).toBe(1);

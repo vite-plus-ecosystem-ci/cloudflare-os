@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { SerialTaskQueue } from "../../src/serial-queue";
 
 /**
@@ -20,8 +20,14 @@ describe("SerialTaskQueue in workerd", () => {
         order.push("first");
         throw new Error("apply failed");
       }),
-      queue.run(async () => { order.push("second"); throw new Error("reject failed"); }),
-      queue.run(async () => { order.push("third"); return "done"; }),
+      queue.run(async () => {
+        order.push("second");
+        throw new Error("reject failed");
+      }),
+      queue.run(async () => {
+        order.push("third");
+        return "done";
+      }),
     ]);
 
     gate.resolve();
@@ -35,7 +41,11 @@ describe("SerialTaskQueue in workerd", () => {
 
   it("keeps running later operations after one throws synchronously", async () => {
     const queue = new SerialTaskQueue();
-    await expect(queue.run(() => { throw new Error("sync throw"); })).rejects.toThrow("sync throw");
+    await expect(
+      queue.run(() => {
+        throw new Error("sync throw");
+      }),
+    ).rejects.toThrow("sync throw");
     expect(await queue.run(() => 1)).toBe(1);
   });
 });

@@ -1,9 +1,13 @@
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import type {
-  ActionDescription, ApprovalQueue, GitCache, HookController, HookDescription,
+  ActionDescription,
+  ApprovalQueue,
+  GitCache,
+  HookController,
+  HookDescription,
   ObservationDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { GoogleDocsApi } from "../../src/docs-api";
 import { DriveApi } from "../../src/drive-api";
 import { GoogleDriveSessionImpl } from "../../src/google";
@@ -40,7 +44,8 @@ class TestApprovalQueue extends RpcTarget implements ApprovalQueue {
   }
 
   async bindHook<Hook extends RpcTarget>(
-    _controller: Fetcher<HookController<Hook>>, _callback: RpcStub<Hook>,
+    _controller: Fetcher<HookController<Hook>>,
+    _callback: RpcStub<Hook>,
     _description: HookDescription,
   ): Promise<void> {
     throw new Error("Unexpected hook binding");
@@ -65,18 +70,24 @@ function docTab(tabId: string, title: string, text: string, childTabs: unknown[]
       body: {
         content: [
           { startIndex: 0, endIndex: 1, sectionBreak: {} },
-          ...text ? [{
-            startIndex: 1,
-            endIndex: paragraph.length + 1,
-            paragraph: {
-              elements: [{
-                startIndex: 1,
-                endIndex: paragraph.length + 1,
-                textRun: { content: paragraph, textStyle: {} },
-              }],
-              paragraphStyle: { namedStyleType: "NORMAL_TEXT" },
-            },
-          }] : [],
+          ...(text
+            ? [
+                {
+                  startIndex: 1,
+                  endIndex: paragraph.length + 1,
+                  paragraph: {
+                    elements: [
+                      {
+                        startIndex: 1,
+                        endIndex: paragraph.length + 1,
+                        textRun: { content: paragraph, textStyle: {} },
+                      },
+                    ],
+                    paragraphStyle: { namedStyleType: "NORMAL_TEXT" },
+                  },
+                },
+              ]
+            : []),
         ],
       },
       lists: {},
@@ -89,7 +100,12 @@ function docTab(tabId: string, title: string, text: string, childTabs: unknown[]
 function tableDocTab() {
   let tab = buildTab([
     { runs: ["Before\n"] },
-    { table: [["Owner\n", "Status\n"], ["Alice\n", "Ready\n"]] },
+    {
+      table: [
+        ["Owner\n", "Status\n"],
+        ["Alice\n", "Ready\n"],
+      ],
+    },
     { runs: ["After\n"] },
   ]);
   return {
@@ -102,9 +118,7 @@ function tableDocTab() {
 /** Two roots, a child and a grandchild — the shape `listTabs()` must flatten in preorder. */
 const NESTED_TABS = [
   docTab("overview", "Overview", "Overview body", [
-    docTab("details", "Details", "Details body", [
-      docTab("metrics", "Metrics", "Metrics body"),
-    ]),
+    docTab("details", "Details", "Details body", [docTab("metrics", "Metrics", "Metrics body")]),
   ]),
   docTab("appendix", "Appendix", "Appendix body"),
 ];
@@ -113,33 +127,36 @@ function installProvider(tabs: unknown[] = [docTab("solo", "Solo", "")]) {
   const urls: string[] = [];
   providerTabs = tabs;
   providerRevision = "revision-1";
-  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-    const url = new URL(input instanceof Request ? input.url : input.toString());
-    urls.push(url.toString());
-    if (url.hostname === "www.googleapis.com" && url.pathname.endsWith("/drive/v3/files")) {
-      return Response.json({ files: [providerFile("doc-1", DOC_MIME)] });
-    }
-    if (url.hostname === "www.googleapis.com" && url.pathname.includes("/drive/v3/files/")) {
-      const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
-      const mimeType = id === "doc-1" ? DOC_MIME : SHEET_MIME;
-      return Response.json(providerFile(id, mimeType));
-    }
-    if (url.hostname === "docs.googleapis.com") {
-      return Response.json({
-        documentId: "doc-1",
-        title: "Quarterly plan",
-        ...providerRevision === undefined ? {} : { revisionId: providerRevision },
-        tabs: providerTabs,
-      });
-    }
-    throw new Error(`Unexpected provider request: ${url.origin}${url.pathname}`);
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString());
+      urls.push(url.toString());
+      if (url.hostname === "www.googleapis.com" && url.pathname.endsWith("/drive/v3/files")) {
+        return Response.json({ files: [providerFile("doc-1", DOC_MIME)] });
+      }
+      if (url.hostname === "www.googleapis.com" && url.pathname.includes("/drive/v3/files/")) {
+        const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
+        const mimeType = id === "doc-1" ? DOC_MIME : SHEET_MIME;
+        return Response.json(providerFile(id, mimeType));
+      }
+      if (url.hostname === "docs.googleapis.com") {
+        return Response.json({
+          documentId: "doc-1",
+          title: "Quarterly plan",
+          ...(providerRevision === undefined ? {} : { revisionId: providerRevision }),
+          tabs: providerTabs,
+        });
+      }
+      throw new Error(`Unexpected provider request: ${url.origin}${url.pathname}`);
+    }),
+  );
   return urls;
 }
 
 /** Full `documents.get` calls, excluding the lightweight revision check. */
 function docFetches(): number {
-  return providerUrls.filter(url => {
+  return providerUrls.filter((url) => {
     const { hostname, searchParams } = new URL(url);
     return hostname === "docs.googleapis.com" && !searchParams.has("fields");
   }).length;
@@ -150,15 +167,17 @@ function newSession() {
   const queueStub: RpcStub<ApprovalQueue> = new RpcStub(queue);
   return {
     queue,
-    session: new RpcStub(new GoogleDriveSessionImpl(
-      new DriveApi(getAccessToken),
-      new GoogleDocsApi(getAccessToken),
-      new GoogleSheetsApi(getAccessToken),
-      { kind: "account" },
-      queueStub,
-      async fileIds => ({ pendingSets: fileIds, commit() {} }),
-      () => ({ pendingSets: [], commit() {} }),
-    )),
+    session: new RpcStub(
+      new GoogleDriveSessionImpl(
+        new DriveApi(getAccessToken),
+        new GoogleDocsApi(getAccessToken),
+        new GoogleSheetsApi(getAccessToken),
+        { kind: "account" },
+        queueStub,
+        async (fileIds) => ({ pendingSets: fileIds, commit() {} }),
+        () => ({ pendingSets: [], commit() {} }),
+      ),
+    ),
   };
 }
 
@@ -199,10 +218,12 @@ describe("Drive nested native sessions", () => {
     using session = newSession().session;
     using sheet = await session.openGoogleSheet("sheet-1");
 
-    await expect(Promise.resolve(sheet.readRange("A:A")))
-      .rejects.toThrow(/Invalid or unbounded A1 range/);
-    expect(providerUrls.some(url => new URL(url).hostname === "sheets.googleapis.com"))
-      .toBe(false);
+    await expect(Promise.resolve(sheet.readRange("A:A"))).rejects.toThrow(
+      /Invalid or unbounded A1 range/,
+    );
+    expect(providerUrls.some((url) => new URL(url).hostname === "sheets.googleapis.com")).toBe(
+      false,
+    );
   });
 
   it("gives each child an independently disposable approval-queue stub", async () => {
@@ -211,9 +232,11 @@ describe("Drive nested native sessions", () => {
     using doc = await session.openGoogleDoc("doc-1");
 
     session[Symbol.dispose]();
-    await expect(doc.getMetadata()).resolves.toEqual(expect.objectContaining({
-      title: "Quarterly plan",
-    }));
+    await expect(doc.getMetadata()).resolves.toEqual(
+      expect.objectContaining({
+        title: "Quarterly plan",
+      }),
+    );
     expect(resources.queue.observations).toHaveLength(2);
 
     doc[Symbol.dispose]();
@@ -259,8 +282,10 @@ describe("Drive Doc tab selection", () => {
 
     expect(docFetches()).toBe(1);
     expect(queue.observations.map(({ title }) => title)).toEqual([
-      "Open Google Doc from Google Drive", "List Google Doc tabs",
-      "Read Google Doc content", "Read Google Doc content",
+      "Open Google Doc from Google Drive",
+      "List Google Doc tabs",
+      "Read Google Doc content",
+      "Read Google Doc content",
     ]);
     expect(queue.observations.at(-1)?.description).toContain('tab "Appendix" (appendix)');
   });
@@ -306,8 +331,9 @@ describe("Drive Doc tab selection", () => {
 
     expect(await doc.getContent("metrics")).toBe("Metrics body\n");
     expect(docFetches()).toBe(1);
-    expect(providerUrls.some(url => new URL(url).searchParams.get("fields") === "revisionId"))
-      .toBe(true);
+    expect(
+      providerUrls.some((url) => new URL(url).searchParams.get("fields") === "revisionId"),
+    ).toBe(true);
   });
 
   // Google omits revisionId unless the caller can edit, which is the normal case for a Doc
@@ -325,8 +351,9 @@ describe("Drive Doc tab selection", () => {
     expect(await doc.listTabs()).toHaveLength(5);
     expect(docFetches()).toBe(2);
     // Nothing to compare, so the revision probe is not worth a request.
-    expect(providerUrls.some(url => new URL(url).searchParams.get("fields") === "revisionId"))
-      .toBe(false);
+    expect(
+      providerUrls.some((url) => new URL(url).searchParams.get("fields") === "revisionId"),
+    ).toBe(false);
   });
 
   it("pipelines a tab read before its session stub resolves", async () => {
@@ -342,10 +369,16 @@ describe("Drive Doc tab selection", () => {
   });
 
   it.each([
-    [undefined, "getContent: tabId is required for documents with multiple tabs. " +
-      "Call listTabs() to choose a tab."],
-    ["ghost", 'getContent: no tab with ID "ghost" exists in this document. ' +
-      "Call listTabs() to refresh the tab list."],
+    [
+      undefined,
+      "getContent: tabId is required for documents with multiple tabs. " +
+        "Call listTabs() to choose a tab.",
+    ],
+    [
+      "ghost",
+      'getContent: no tab with ID "ghost" exists in this document. ' +
+        "Call listTabs() to refresh the tab list.",
+    ],
   ] as const)("fails closed on selector %s", async (tabId, message) => {
     const { queue, session } = newSession();
     using owned = session;
@@ -378,8 +411,16 @@ describe("folder-scoped native sessions", () => {
   /** The subtree the provider answers from. Tests move files by rewriting `parents` here. */
   function subtree(): Map<string, Node> {
     return new Map<string, Node>([
-      [ROOT, { id: ROOT, mimeType: FOLDER_MIME, parents: ["above"], trashed: false,
-        capabilities: { canListChildren: true } }],
+      [
+        ROOT,
+        {
+          id: ROOT,
+          mimeType: FOLDER_MIME,
+          parents: ["above"],
+          trashed: false,
+          capabilities: { canListChildren: true },
+        },
+      ],
       ["doc-1", { id: "doc-1", mimeType: DOC_MIME, parents: [ROOT], trashed: false }],
       ["sheet-1", { id: "sheet-1", mimeType: SHEET_MIME, parents: [ROOT], trashed: false }],
     ]);
@@ -388,8 +429,9 @@ describe("folder-scoped native sessions", () => {
   /** One multipart `files.get` batch response, echoing each requested ID by Content-ID position. */
   function batchResponse(body: string, nodes: Map<string, Node>): Response {
     const boundary = "folder_batch";
-    const ids = [...body.matchAll(/GET \/drive\/v3\/files\/([^?]+)\?/g)]
-      .map(match => decodeURIComponent(match[1]));
+    const ids = [...body.matchAll(/GET \/drive\/v3\/files\/([^?]+)\?/g)].map((match) =>
+      decodeURIComponent(match[1]),
+    );
     const parts = ids.map((id, index) => {
       const node = nodes.get(id);
       return [
@@ -410,47 +452,58 @@ describe("folder-scoped native sessions", () => {
 
   function installFolderProvider(nodes: Map<string, Node>, onNativeRead?: () => void) {
     const nativeCalls: string[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : input.toString());
-      if (url.pathname === "/batch/drive/v3") {
-        return batchResponse(String(init?.body ?? ""), nodes);
-      }
-      if (url.pathname === "/drive/v3/files") {
-        const parents = [...(url.searchParams.get("q") ?? "").matchAll(/'([^']+)' in parents/g)]
-          .map(match => match[1]);
-        const files = [...nodes.values()].filter(
-          node => node.mimeType !== FOLDER_MIME && parents.includes(node.parents?.[0] ?? ""));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(input instanceof Request ? input.url : input.toString());
+        if (url.pathname === "/batch/drive/v3") {
+          return batchResponse(String(init?.body ?? ""), nodes);
+        }
+        if (url.pathname === "/drive/v3/files") {
+          const parents = [
+            ...(url.searchParams.get("q") ?? "").matchAll(/'([^']+)' in parents/g),
+          ].map((match) => match[1]);
+          const files = [...nodes.values()].filter(
+            (node) => node.mimeType !== FOLDER_MIME && parents.includes(node.parents?.[0] ?? ""),
+          );
+          return Response.json({
+            files: files.map((node) => ({
+              ...node,
+              name: node.id,
+              modifiedTime: "2026-08-20T12:00:00Z",
+            })),
+          });
+        }
+        if (url.pathname.includes("/drive/v3/files/")) {
+          const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
+          const node = nodes.get(id);
+          if (!node) return Response.json({}, { status: 404 });
+          return Response.json({ ...node, name: id, modifiedTime: "2026-08-20T12:00:00Z" });
+        }
+        nativeCalls.push(url.hostname);
+        onNativeRead?.();
+        if (url.hostname === "docs.googleapis.com") {
+          return Response.json({
+            documentId: decodeURIComponent(url.pathname.split("/").at(-1)!),
+            title: "Quarterly plan",
+            revisionId: "revision-1",
+            tabs: [docTab("solo", "Solo", "")],
+          });
+        }
+        if (url.pathname.endsWith("/values:batchGet")) {
+          return Response.json({
+            valueRanges: url.searchParams
+              .getAll("ranges")
+              .map((range) => ({ range, values: [["x"]] })),
+          });
+        }
         return Response.json({
-          files: files.map(node => ({ ...node, name: node.id, modifiedTime: "2026-08-20T12:00:00Z" })),
+          spreadsheetId: "sheet-1",
+          properties: { title: "Forecast" },
+          sheets: [{ properties: { sheetId: 0, title: "Sheet1", index: 0 } }],
         });
-      }
-      if (url.pathname.includes("/drive/v3/files/")) {
-        const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
-        const node = nodes.get(id);
-        if (!node) return Response.json({}, { status: 404 });
-        return Response.json({ ...node, name: id, modifiedTime: "2026-08-20T12:00:00Z" });
-      }
-      nativeCalls.push(url.hostname);
-      onNativeRead?.();
-      if (url.hostname === "docs.googleapis.com") {
-        return Response.json({
-          documentId: decodeURIComponent(url.pathname.split("/").at(-1)!),
-          title: "Quarterly plan",
-          revisionId: "revision-1",
-          tabs: [docTab("solo", "Solo", "")],
-        });
-      }
-      if (url.pathname.endsWith("/values:batchGet")) {
-        return Response.json({
-          valueRanges: url.searchParams.getAll("ranges").map(range => ({ range, values: [["x"]] })),
-        });
-      }
-      return Response.json({
-        spreadsheetId: "sheet-1",
-        properties: { title: "Forecast" },
-        sheets: [{ properties: { sheetId: 0, title: "Sheet1", index: 0 } }],
-      });
-    }));
+      }),
+    );
     return nativeCalls;
   }
 
@@ -458,15 +511,17 @@ describe("folder-scoped native sessions", () => {
     const queue = new TestApprovalQueue();
     return {
       queue,
-      session: new RpcStub(new GoogleDriveSessionImpl(
-        new DriveApi(getAccessToken),
-        new GoogleDocsApi(getAccessToken),
-        new GoogleSheetsApi(getAccessToken),
-        { kind: "folder", folderId: ROOT },
-        new RpcStub(queue),
-        async fileIds => ({ pendingSets: fileIds, commit() {} }),
-        () => ({ pendingSets: [], commit() {} }),
-      )),
+      session: new RpcStub(
+        new GoogleDriveSessionImpl(
+          new DriveApi(getAccessToken),
+          new GoogleDocsApi(getAccessToken),
+          new GoogleSheetsApi(getAccessToken),
+          { kind: "folder", folderId: ROOT },
+          new RpcStub(queue),
+          async (fileIds) => ({ pendingSets: fileIds, commit() {} }),
+          () => ({ pendingSets: [], commit() {} }),
+        ),
+      ),
     };
   }
 
@@ -484,8 +539,10 @@ describe("folder-scoped native sessions", () => {
     using sheet = await session.openGoogleSheet("sheet-1");
     expect((await sheet.getSpreadsheet()).title).toBe("Forecast");
     expect((await sheet.readRange("A1:A1")).values).toEqual([["x"]]);
-    expect((await sheet.readRanges(["A1:A1", "B1:B1"])).map(r => r.range))
-      .toEqual(["A1:A1", "B1:B1"]);
+    expect((await sheet.readRanges(["A1:A1", "B1:B1"])).map((r) => r.range)).toEqual([
+      "A1:A1",
+      "B1:B1",
+    ]);
   });
 
   // The capability was minted while the file was inside; the move is what revokes it, and it has to
@@ -527,7 +584,12 @@ describe("folder-scoped native sessions", () => {
   it("discards content when the move lands during the provider read", async () => {
     const nodes = subtree();
     installFolderProvider(nodes, () => {
-      nodes.set("doc-1", { id: "doc-1", mimeType: DOC_MIME, parents: ["elsewhere"], trashed: false });
+      nodes.set("doc-1", {
+        id: "doc-1",
+        mimeType: DOC_MIME,
+        parents: ["elsewhere"],
+        trashed: false,
+      });
     });
     const { queue, session } = folderSession(nodes);
     using scoped = session;
@@ -543,17 +605,27 @@ describe("folder-scoped native sessions", () => {
   // wire and that a malformed one is refused there rather than deep in a query builder.
   it("searches named child folders across the RPC boundary", async () => {
     const nodes = subtree();
-    nodes.set("sub-a", { id: "sub-a", mimeType: FOLDER_MIME, parents: [ROOT], trashed: false,
-      capabilities: { canListChildren: true } });
-    nodes.set("sub-b", { id: "sub-b", mimeType: FOLDER_MIME, parents: [ROOT], trashed: false,
-      capabilities: { canListChildren: true } });
+    nodes.set("sub-a", {
+      id: "sub-a",
+      mimeType: FOLDER_MIME,
+      parents: [ROOT],
+      trashed: false,
+      capabilities: { canListChildren: true },
+    });
+    nodes.set("sub-b", {
+      id: "sub-b",
+      mimeType: FOLDER_MIME,
+      parents: [ROOT],
+      trashed: false,
+      capabilities: { canListChildren: true },
+    });
     nodes.set("doc-a", { id: "doc-a", mimeType: DOC_MIME, parents: ["sub-a"], trashed: false });
     nodes.set("doc-b", { id: "doc-b", mimeType: DOC_MIME, parents: ["sub-b"], trashed: false });
     installFolderProvider(nodes);
     using session = folderSession(nodes).session;
 
     using cursor = await session.search({ namePrefix: "doc", childFolderIds: ["sub-a", "sub-b"] });
-    expect((await cursor.next())?.map(entry => entry.id)).toEqual(["doc-a", "doc-b"]);
+    expect((await cursor.next())?.map((entry) => entry.id)).toEqual(["doc-a", "doc-b"]);
   });
 
   it("refuses a malformed child folder set at the RPC boundary", async () => {
@@ -561,9 +633,14 @@ describe("folder-scoped native sessions", () => {
     installFolderProvider(nodes);
     using session = folderSession(nodes).session;
 
-    await expect(Promise.resolve(session.search(
-      { namePrefix: "doc", childFolderIds: [7] } as unknown as DriveSessionSearchQuery,
-    ))).rejects.toThrow(/childFolderIds/);
+    await expect(
+      Promise.resolve(
+        session.search({
+          namePrefix: "doc",
+          childFolderIds: [7],
+        } as unknown as DriveSessionSearchQuery),
+      ),
+    ).rejects.toThrow(/childFolderIds/);
   });
 
   // That refused read captured a revision while the document sat outside the subtree. Serving it
@@ -575,8 +652,12 @@ describe("folder-scoped native sessions", () => {
     const nativeCalls = installFolderProvider(nodes, () => {
       if (!pendingMoveOut) return;
       pendingMoveOut = false;
-      nodes.set("doc-1",
-        { id: "doc-1", mimeType: DOC_MIME, parents: ["elsewhere"], trashed: false });
+      nodes.set("doc-1", {
+        id: "doc-1",
+        mimeType: DOC_MIME,
+        parents: ["elsewhere"],
+        trashed: false,
+      });
     });
     using session = folderSession(nodes).session;
     using doc = await session.openGoogleDoc("doc-1");
@@ -597,15 +678,21 @@ describe("folder-scoped native sessions", () => {
     const nativeCalls = installFolderProvider(nodes, () => {
       if (!pendingMoveOut) return;
       pendingMoveOut = false;
-      nodes.set("doc-1",
-        { id: "doc-1", mimeType: DOC_MIME, parents: ["elsewhere"], trashed: false });
+      nodes.set("doc-1", {
+        id: "doc-1",
+        mimeType: DOC_MIME,
+        parents: ["elsewhere"],
+        trashed: false,
+      });
     });
     using session = folderSession(nodes).session;
     using doc = await session.openGoogleDoc("doc-1");
 
-    const settled = await Promise.allSettled(
-      [Promise.resolve(doc.listTabs()), Promise.resolve(doc.getContent())]);
-    expect(settled.map(result => result.status)).toEqual(["rejected", "rejected"]);
+    const settled = await Promise.allSettled([
+      Promise.resolve(doc.listTabs()),
+      Promise.resolve(doc.getContent()),
+    ]);
+    expect(settled.map((result) => result.status)).toEqual(["rejected", "rejected"]);
 
     nodes.set("doc-1", { id: "doc-1", mimeType: DOC_MIME, parents: [ROOT], trashed: false });
     nativeCalls.length = 0;
@@ -617,11 +704,17 @@ describe("folder-scoped native sessions", () => {
   it("keeps child-folder and native capabilities alive after their parents are disposed", async () => {
     const nodes = subtree();
     nodes.set("nested", {
-      id: "nested", mimeType: FOLDER_MIME, parents: [ROOT], trashed: false,
+      id: "nested",
+      mimeType: FOLDER_MIME,
+      parents: [ROOT],
+      trashed: false,
       capabilities: { canListChildren: true },
     });
     nodes.set("nested-doc", {
-      id: "nested-doc", mimeType: DOC_MIME, parents: ["nested"], trashed: false,
+      id: "nested-doc",
+      mimeType: DOC_MIME,
+      parents: ["nested"],
+      trashed: false,
     });
     installFolderProvider(nodes);
     const parent = folderSession(nodes).session;
@@ -640,7 +733,6 @@ describe("folder-scoped native sessions", () => {
     installFolderProvider(nodes);
     using session = folderSession(nodes).session;
 
-    await expect(Promise.resolve(session.openGoogleDoc("doc-1")))
-      .rejects.toThrow(OUTSIDE);
+    await expect(Promise.resolve(session.openGoogleDoc("doc-1"))).rejects.toThrow(OUTSIDE);
   });
 });

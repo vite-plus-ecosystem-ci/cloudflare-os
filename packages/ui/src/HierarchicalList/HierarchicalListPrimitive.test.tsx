@@ -2,7 +2,7 @@
 
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { HierarchicalListDropDestination } from "./HierarchicalListDragAndDrop";
 import {
   HierarchicalListPrimitive,
@@ -13,11 +13,13 @@ import type { HierarchicalListItem } from "./HierarchicalList.types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const items: HierarchicalListItem[] = [{
-  id: "folder",
-  name: "Folder",
-  children: [{ id: "document", name: "Document" }],
-}];
+const items: HierarchicalListItem[] = [
+  {
+    id: "folder",
+    name: "Folder",
+    children: [{ id: "document", name: "Document" }],
+  },
+];
 
 const disclosureRow = (
   rowProps: HierarchicalListPrimitiveRowProps,
@@ -60,10 +62,7 @@ describe("HierarchicalListPrimitive", () => {
         label="Custom resources"
         selectedId="folder"
         renderRow={(rowProps, { item, depth, selected, expanded }) => (
-          <article
-            {...rowProps}
-            data-render-depth={depth}
-          >
+          <article {...rowProps} data-render-depth={depth}>
             {item.name}:{selected ? "selected" : "idle"}:{expanded ? "open" : "closed"}
           </article>
         )}
@@ -78,32 +77,38 @@ describe("HierarchicalListPrimitive", () => {
     expect(row.closest("ul")?.getAttribute("role")).toBe("list");
     expect(row.closest("ul")?.getAttribute("aria-label")).toBe("Custom resources");
     expect(row.textContent).toBe("Folder:selected:closed");
-    expect(container!.querySelector("[data-item-id='folder']")?.getAttribute("data-depth")).toBe("0");
+    expect(container!.querySelector("[data-item-id='folder']")?.getAttribute("data-depth")).toBe(
+      "0",
+    );
     expect(container!.textContent).not.toContain("Document");
   });
 
   it("owns uncontrolled expansion and reports controlled expansion", () => {
     const onExpandedChange = vi.fn<(ids: ReadonlySet<string>) => void>();
-    render(
-      <HierarchicalListPrimitive
-        items={items}
-        label="Resources"
-        renderRow={disclosureRow}
-      />,
+    render(<HierarchicalListPrimitive items={items} label="Resources" renderRow={disclosureRow} />);
+    act(() =>
+      container!
+        .querySelector<HTMLElement>("[data-item-id='folder'] [data-hierarchical-list-row]")!
+        .click(),
     );
-    act(() => container!.querySelector<HTMLElement>("[data-item-id='folder'] [data-hierarchical-list-row]")!.click());
     expect(container!.textContent).toContain("Document");
 
-    act(() => root!.render(
-      <HierarchicalListPrimitive
-        items={items}
-        label="Resources"
-        expandedIds={new Set()}
-        onExpandedChange={onExpandedChange}
-        renderRow={disclosureRow}
-      />,
-    ));
-    act(() => container!.querySelector<HTMLElement>("[data-item-id='folder'] [data-hierarchical-list-row]")!.click());
+    act(() =>
+      root!.render(
+        <HierarchicalListPrimitive
+          items={items}
+          label="Resources"
+          expandedIds={new Set()}
+          onExpandedChange={onExpandedChange}
+          renderRow={disclosureRow}
+        />,
+      ),
+    );
+    act(() =>
+      container!
+        .querySelector<HTMLElement>("[data-item-id='folder'] [data-hierarchical-list-row]")!
+        .click(),
+    );
     expect(onExpandedChange).toHaveBeenCalledOnce();
     expect([...onExpandedChange.mock.calls[0][0]]).toEqual(["folder"]);
     expect(container!.textContent).not.toContain("Document");
@@ -137,8 +142,11 @@ describe("HierarchicalListPrimitive", () => {
       />,
     );
 
-    act(() => container!.querySelector("button")
-      ?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true })));
+    act(() =>
+      container!
+        .querySelector("button")
+        ?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true })),
+    );
     expect(onSelectionClear).not.toHaveBeenCalled();
 
     act(() => document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true })));
@@ -174,9 +182,11 @@ describe("HierarchicalListPrimitive", () => {
     expect(container!.textContent).toContain("Document");
     act(() => container!.querySelector<HTMLElement>("[data-item-id='folder'] button")!.click());
 
-    act(() => root!.render(
-      <HierarchicalListPrimitive items={items} label="Resources" renderRow={disclosureRow} />,
-    ));
+    act(() =>
+      root!.render(
+        <HierarchicalListPrimitive items={items} label="Resources" renderRow={disclosureRow} />,
+      ),
+    );
     expect(container!.textContent).not.toContain("Document");
   });
 
@@ -185,10 +195,8 @@ describe("HierarchicalListPrimitive", () => {
       { id: "source", name: "Source", draggable: true },
       { id: "target", name: "Target" },
     ];
-    const onMove = vi.fn<(
-      item: HierarchicalListItem,
-      destination: HierarchicalListDropDestination,
-    ) => void>();
+    const onMove =
+      vi.fn<(item: HierarchicalListItem, destination: HierarchicalListDropDestination) => void>();
     render(
       <HierarchicalListPrimitive
         items={movableItems}
@@ -200,8 +208,9 @@ describe("HierarchicalListPrimitive", () => {
 
     const [source, target] = Array.from(container!.querySelectorAll("button"));
     expect(source.style.touchAction).not.toBe("none");
-    expect(source.getAttribute("aria-keyshortcuts"))
-      .toBe("Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight");
+    expect(source.getAttribute("aria-keyshortcuts")).toBe(
+      "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight",
+    );
     expect(source.getAttribute("aria-description")).toBe("Move with Alt plus an arrow key.");
     expect(target.hasAttribute("aria-keyshortcuts")).toBe(false);
     expect(target.hasAttribute("aria-description")).toBe(false);
@@ -255,15 +264,20 @@ describe("HierarchicalListPrimitive", () => {
     };
     render(<Example />);
 
-    const movableRow = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Movable")!;
+    const movableRow = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Movable",
+    )!;
     act(() => movableRow.focus());
-    act(() => movableRow.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowRight",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      movableRow.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
 
     expect(document.activeElement?.textContent).toBe("Movable");
     expect(document.activeElement?.closest("[data-item-id='folder']")).not.toBeNull();
@@ -299,15 +313,20 @@ describe("HierarchicalListPrimitive", () => {
     };
     render(<Example />);
 
-    const movableRow = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Movable")!;
+    const movableRow = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Movable",
+    )!;
     act(() => movableRow.focus());
-    act(() => movableRow.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowRight",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      movableRow.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
 
     expect(container!.querySelector("[data-item-id='movable']")).toBeNull();
     expect(document.activeElement?.textContent).toBe("Folder");
@@ -344,15 +363,20 @@ describe("HierarchicalListPrimitive", () => {
     };
     render(<Example />);
 
-    const movableRow = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Movable")!;
+    const movableRow = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Movable",
+    )!;
     act(() => movableRow.focus());
-    act(() => movableRow.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowRight",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      movableRow.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
     expect(document.activeElement).toBe(movableRow);
 
     act(() => vi.advanceTimersByTime(0));
@@ -391,23 +415,33 @@ describe("HierarchicalListPrimitive", () => {
       );
     };
     render(<Example />);
-    const movableRow = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Movable")!;
-    const outside = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Outside")!;
+    const movableRow = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Movable",
+    )!;
+    const outside = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Outside",
+    )!;
     act(() => movableRow.focus());
-    act(() => movableRow.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowRight",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      movableRow.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
 
-    act(() => movableRow.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "Tab",
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      movableRow.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Tab",
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
     act(() => outside.focus());
     act(() => vi.advanceTimersByTime(0));
 
@@ -432,15 +466,20 @@ describe("HierarchicalListPrimitive", () => {
       />
     );
     render(renderList([folder, movable]));
-    const movableRow = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Movable")!;
+    const movableRow = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Movable",
+    )!;
     act(() => movableRow.focus());
-    act(() => movableRow.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowRight",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      movableRow.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
     await act(() => Promise.resolve());
 
     expect(container!.querySelector('[role="status"]')?.textContent).toBe("");
@@ -466,14 +505,19 @@ describe("HierarchicalListPrimitive", () => {
         renderRow={(rowProps, { item }) => <button {...rowProps}>{item.name}</button>}
       />,
     );
-    const source = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Source")!;
-    act(() => source.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowDown",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
+    const source = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Source",
+    )!;
+    act(() =>
+      source.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowDown",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
     expect(container!.querySelector('[role="status"]')?.textContent).toBe("");
 
     await act(async () => {
@@ -503,35 +547,50 @@ describe("HierarchicalListPrimitive", () => {
       />,
     );
     const [first, second] = container!.querySelectorAll("button");
-    act(() => first.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowDown",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
-    act(() => second.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowUp",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      first.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowDown",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    act(() =>
+      second.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowUp",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
 
     await act(async () => resolvers.get("second")?.());
-    expect([...container!.querySelectorAll('[role="status"]')]
-      .map((status) => status.textContent).join(""))
-      .toBe("Second moved to position 1 in Resources.");
+    expect(
+      [...container!.querySelectorAll('[role="status"]')]
+        .map((status) => status.textContent)
+        .join(""),
+    ).toBe("Second moved to position 1 in Resources.");
 
     await act(async () => resolvers.get("first")?.());
-    expect([...container!.querySelectorAll('[role="status"]')]
-      .map((status) => status.textContent).join(""))
-      .toBe("Second moved to position 1 in Resources.");
+    expect(
+      [...container!.querySelectorAll('[role="status"]')]
+        .map((status) => status.textContent)
+        .join(""),
+    ).toBe("Second moved to position 1 in Resources.");
   });
 
   it("announces an older move when every newer move fails", async () => {
-    const controls = new Map<string, {
-      resolve: () => void;
-      reject: () => void;
-    }>();
+    const controls = new Map<
+      string,
+      {
+        resolve: () => void;
+        reject: () => void;
+      }
+    >();
     render(
       <HierarchicalListPrimitive
         items={[
@@ -540,34 +599,47 @@ describe("HierarchicalListPrimitive", () => {
         ]}
         label="Resources"
         dragAndDrop={{
-          onMove: (item) => new Promise<void>((resolve, reject) => controls.set(item.id, {
-            resolve,
-            reject: () => reject(new Error("Move failed")),
-          })),
+          onMove: (item) =>
+            new Promise<void>((resolve, reject) =>
+              controls.set(item.id, {
+                resolve,
+                reject: () => reject(new Error("Move failed")),
+              }),
+            ),
         }}
         renderRow={(rowProps, { item }) => <button {...rowProps}>{item.name}</button>}
       />,
     );
     const [first, second] = container!.querySelectorAll("button");
-    act(() => first.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowDown",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
-    act(() => second.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowUp",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      first.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowDown",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    act(() =>
+      second.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowUp",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
 
     await act(async () => controls.get("second")?.reject());
     await act(async () => controls.get("first")?.resolve());
 
-    expect([...container!.querySelectorAll('[role="status"]')]
-      .map((status) => status.textContent).join(""))
-      .toBe("First moved to position 2 in Resources.");
+    expect(
+      [...container!.querySelectorAll('[role="status"]')]
+        .map((status) => status.textContent)
+        .join(""),
+    ).toBe("First moved to position 2 in Resources.");
   });
 
   it("mutates a live region for identical consecutive move announcements", () => {
@@ -580,19 +652,24 @@ describe("HierarchicalListPrimitive", () => {
         renderRow={(rowProps, { item }) => <button {...rowProps}>{item.name}</button>}
       />,
     );
-    const sourceRow = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Source")!;
-    const moveDown = () => sourceRow.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowDown",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    }));
+    const sourceRow = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Source",
+    )!;
+    const moveDown = () =>
+      sourceRow.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowDown",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
 
     act(moveDown);
     const announcements = container!.querySelectorAll('[role="status"]');
-    expect([...announcements].map((status) => status.textContent).join(""))
-      .toBe("Source moved to position 2 in Resources.");
+    expect([...announcements].map((status) => status.textContent).join("")).toBe(
+      "Source moved to position 2 in Resources.",
+    );
     const observer = new MutationObserver(() => {});
     for (const announcement of announcements) {
       observer.observe(announcement, { childList: true, characterData: true, subtree: true });
@@ -601,8 +678,9 @@ describe("HierarchicalListPrimitive", () => {
     act(moveDown);
 
     expect(observer.takeRecords().length).toBeGreaterThan(0);
-    expect([...announcements].map((status) => status.textContent).join(""))
-      .toBe("Source moved to position 2 in Resources.");
+    expect([...announcements].map((status) => status.textContent).join("")).toBe(
+      "Source moved to position 2 in Resources.",
+    );
     observer.disconnect();
   });
 
@@ -624,15 +702,20 @@ describe("HierarchicalListPrimitive", () => {
       />
     );
     render(renderList([folder, movable]));
-    const movableRow = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Movable")!;
+    const movableRow = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Movable",
+    )!;
     act(() => movableRow.focus());
-    act(() => movableRow.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowRight",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      movableRow.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
 
     act(() => root!.render(renderList([folder])));
     act(() => root!.render(renderList([{ ...folder, children: [movable] }])));
@@ -641,10 +724,8 @@ describe("HierarchicalListPrimitive", () => {
   });
 
   it("prevents browser shortcuts when an Alt+Arrow move is unavailable", () => {
-    const onMove = vi.fn<(
-      item: HierarchicalListItem,
-      destination: HierarchicalListDropDestination,
-    ) => void>();
+    const onMove =
+      vi.fn<(item: HierarchicalListItem, destination: HierarchicalListDropDestination) => void>();
     render(
       <HierarchicalListPrimitive
         items={[{ id: "item", name: "Item", draggable: true }]}
@@ -669,10 +750,8 @@ describe("HierarchicalListPrimitive", () => {
   });
 
   it("leaves modified navigation and screen-reader arrow chords alone", () => {
-    const onMove = vi.fn<(
-      item: HierarchicalListItem,
-      destination: HierarchicalListDropDestination,
-    ) => void>();
+    const onMove =
+      vi.fn<(item: HierarchicalListItem, destination: HierarchicalListDropDestination) => void>();
     render(
       <HierarchicalListPrimitive
         items={[
@@ -684,8 +763,9 @@ describe("HierarchicalListPrimitive", () => {
         renderRow={(rowProps, { item }) => <button {...rowProps}>{item.name}</button>}
       />,
     );
-    const source = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Source")!;
+    const source = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Source",
+    )!;
     act(() => source.focus());
     for (const modifiers of [{ metaKey: true }, { altKey: true, ctrlKey: true }]) {
       const event = new KeyboardEvent("keydown", {
@@ -722,10 +802,12 @@ describe("HierarchicalListPrimitive", () => {
         )}
       />,
     );
-    const sourceRow = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Source")!;
-    const childRow = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Child")!;
+    const sourceRow = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Source",
+    )!;
+    const childRow = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Child",
+    )!;
     sourceRow.getBoundingClientRect = () => DOMRect.fromRect({ width: 300, height: 40 });
     childRow.getBoundingClientRect = () => DOMRect.fromRect({ y: 40, width: 300, height: 40 });
     const transfer = {
@@ -757,10 +839,8 @@ describe("HierarchicalListPrimitive", () => {
       droppable: true,
       children: [],
     };
-    const onMove = vi.fn<(
-      item: HierarchicalListItem,
-      destination: HierarchicalListDropDestination,
-    ) => void>();
+    const onMove =
+      vi.fn<(item: HierarchicalListItem, destination: HierarchicalListDropDestination) => void>();
     render(
       <HierarchicalListPrimitive
         items={[source, folder]}
@@ -770,8 +850,9 @@ describe("HierarchicalListPrimitive", () => {
         renderRow={(rowProps, { item }) => <button {...rowProps}>{item.name}</button>}
       />,
     );
-    const sourceRow = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Source")!;
+    const sourceRow = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Source",
+    )!;
     const transfer = {
       effectAllowed: "none",
       dropEffect: "none",
@@ -792,11 +873,13 @@ describe("HierarchicalListPrimitive", () => {
   });
 
   it("keeps native mouse dragging on devices with a coarse primary pointer", () => {
-    const matchMedia = vi.fn<(query: string) => {
-      matches: boolean;
-      addEventListener: () => void;
-      removeEventListener: () => void;
-    }>((query) => ({
+    const matchMedia = vi.fn<
+      (query: string) => {
+        matches: boolean;
+        addEventListener: () => void;
+        removeEventListener: () => void;
+      }
+    >((query) => ({
       matches: query === "(pointer: coarse)",
       addEventListener: vi.fn<() => void>(),
       removeEventListener: vi.fn<() => void>(),
@@ -813,10 +896,7 @@ describe("HierarchicalListPrimitive", () => {
         label="Resources"
         dragAndDrop={{ onMove: () => {} }}
         renderRow={(rowProps, state) => (
-          <button
-            {...rowProps}
-            data-coarse-pointer={state.coarsePointer ? "" : undefined}
-          >
+          <button {...rowProps} data-coarse-pointer={state.coarsePointer ? "" : undefined}>
             {state.item.name}
           </button>
         )}
@@ -840,11 +920,14 @@ describe("HierarchicalListPrimitive", () => {
 
   it("handles touch gestures when the primary pointer is fine", () => {
     vi.useFakeTimers();
-    vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
-      matches: query === "(any-pointer: coarse)",
-      addEventListener: vi.fn<() => void>(),
-      removeEventListener: vi.fn<() => void>(),
-    })));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query === "(any-pointer: coarse)",
+        addEventListener: vi.fn<() => void>(),
+        removeEventListener: vi.fn<() => void>(),
+      })),
+    );
     const item: HierarchicalListItem = {
       id: "hybrid-item",
       name: "Hybrid item",
@@ -858,9 +941,7 @@ describe("HierarchicalListPrimitive", () => {
         dragAndDrop={{ onMove: () => {} }}
         hasLongPressAction={() => true}
         onItemLongPress={onItemLongPress}
-        renderRow={(rowProps, { item: rowItem }) => (
-          <button {...rowProps}>{rowItem.name}</button>
-        )}
+        renderRow={(rowProps, { item: rowItem }) => <button {...rowProps}>{rowItem.name}</button>}
       />,
     );
     const row = container!.querySelector("button")!;
@@ -890,9 +971,7 @@ describe("HierarchicalListPrimitive", () => {
         label="Resources"
         hasLongPressAction={() => hasAction}
         onItemLongPress={onItemLongPress}
-        renderRow={(rowProps, { item: rowItem }) => (
-          <button {...rowProps}>{rowItem.name}</button>
-        )}
+        renderRow={(rowProps, { item: rowItem }) => <button {...rowProps}>{rowItem.name}</button>}
       />
     );
     render(renderList(true));
@@ -966,10 +1045,8 @@ describe("HierarchicalListPrimitive", () => {
       children: [{ id: "child", name: "Child" }],
     };
     const onItemClick = vi.fn<(item: HierarchicalListItem) => void>();
-    const onMove = vi.fn<(
-      item: HierarchicalListItem,
-      destination: HierarchicalListDropDestination,
-    ) => void>();
+    const onMove =
+      vi.fn<(item: HierarchicalListItem, destination: HierarchicalListDropDestination) => void>();
     const onClick = vi.fn<(event: React.MouseEvent<HTMLElement>) => void>((event) => {
       event.preventDefault();
     });
@@ -1000,15 +1077,20 @@ describe("HierarchicalListPrimitive", () => {
       />,
     );
 
-    const row = [...container!.querySelectorAll("button")]
-      .find((button) => button.textContent === "Folder")!;
+    const row = [...container!.querySelectorAll("button")].find(
+      (button) => button.textContent === "Folder",
+    )!;
     act(() => row.click());
-    act(() => row.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowDown",
-      altKey: true,
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      row.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowDown",
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
 
     expect(onClick).toHaveBeenCalledOnce();
     expect(onKeyDown).toHaveBeenCalledOnce();
@@ -1018,10 +1100,8 @@ describe("HierarchicalListPrimitive", () => {
   });
 
   it("ignores row keyboard shortcuts from interactive descendants", () => {
-    const onMove = vi.fn<(
-      item: HierarchicalListItem,
-      destination: HierarchicalListDropDestination,
-    ) => void>();
+    const onMove =
+      vi.fn<(item: HierarchicalListItem, destination: HierarchicalListDropDestination) => void>();
     render(
       <HierarchicalListPrimitive
         items={[
@@ -1112,17 +1192,21 @@ describe("HierarchicalListPrimitive", () => {
     expect(row.closest("[data-hierarchical-list-item]")?.getAttribute("data-dragging")).toBe("");
     act(() => root!.render(renderList(false)));
 
-    expect(container!.querySelector("[data-hierarchical-list-item]")
-      ?.hasAttribute("data-dragging")).toBe(false);
+    expect(
+      container!.querySelector("[data-hierarchical-list-item]")?.hasAttribute("data-dragging"),
+    ).toBe(false);
   });
 
   it("consumes a prevented compatibility click after a long press", () => {
     vi.useFakeTimers();
-    vi.stubGlobal("matchMedia", vi.fn(() => ({
-      matches: true,
-      addEventListener: vi.fn<() => void>(),
-      removeEventListener: vi.fn<() => void>(),
-    })));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: true,
+        addEventListener: vi.fn<() => void>(),
+        removeEventListener: vi.fn<() => void>(),
+      })),
+    );
     const item: HierarchicalListItem = { id: "touch-item", name: "Touch item" };
     const onItemClick = vi.fn<(clickedItem: HierarchicalListItem) => void>();
     let preventNextClick = true;
@@ -1171,11 +1255,14 @@ describe("HierarchicalListPrimitive", () => {
 
   it("does not suppress a new click after a long press is cancelled", () => {
     vi.useFakeTimers();
-    vi.stubGlobal("matchMedia", vi.fn(() => ({
-      matches: true,
-      addEventListener: vi.fn<() => void>(),
-      removeEventListener: vi.fn<() => void>(),
-    })));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: true,
+        addEventListener: vi.fn<() => void>(),
+        removeEventListener: vi.fn<() => void>(),
+      })),
+    );
     const item: HierarchicalListItem = { id: "touch-item", name: "Touch item" };
     const onItemClick = vi.fn<(clickedItem: HierarchicalListItem) => void>();
     render(
@@ -1185,9 +1272,7 @@ describe("HierarchicalListPrimitive", () => {
         hasLongPressAction={() => true}
         onItemLongPress={() => {}}
         onItemClick={onItemClick}
-        renderRow={(rowProps, { item: rowItem }) => (
-          <button {...rowProps}>{rowItem.name}</button>
-        )}
+        renderRow={(rowProps, { item: rowItem }) => <button {...rowProps}>{rowItem.name}</button>}
       />,
     );
     const row = container!.querySelector("button")!;
@@ -1207,9 +1292,10 @@ describe("HierarchicalListPrimitive", () => {
 
   it("auto-scrolls in both directions from desktop row drag events", () => {
     const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal("requestAnimationFrame", vi.fn<(callback: FrameRequestCallback) => number>(
-      (callback) => frames.push(callback),
-    ));
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn<(callback: FrameRequestCallback) => number>((callback) => frames.push(callback)),
+    );
     vi.stubGlobal("cancelAnimationFrame", vi.fn<(id: number) => void>());
     const scrollContainer = document.createElement("div");
     scrollContainer.style.overflowY = "auto";
@@ -1231,14 +1317,16 @@ describe("HierarchicalListPrimitive", () => {
       name: "Source",
       draggable: true,
     };
-    act(() => root?.render(
-      <HierarchicalListPrimitive
-        items={[draggableItem]}
-        label="Resources"
-        dragAndDrop={{ onMove: () => {}, autoScroll: true }}
-        renderRow={(rowProps, { item }) => <button {...rowProps}>{item.name}</button>}
-      />,
-    ));
+    act(() =>
+      root?.render(
+        <HierarchicalListPrimitive
+          items={[draggableItem]}
+          label="Resources"
+          dragAndDrop={{ onMove: () => {}, autoScroll: true }}
+          renderRow={(rowProps, { item }) => <button {...rowProps}>{item.name}</button>}
+        />,
+      ),
+    );
     const row = container.querySelector("button")!;
     const transfer = {
       effectAllowed: "none",
@@ -1271,9 +1359,10 @@ describe("HierarchicalListPrimitive", () => {
 
   it("auto-scrolls at viewport and clipping-ancestor edges", () => {
     const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal("requestAnimationFrame", vi.fn<(callback: FrameRequestCallback) => number>(
-      (callback) => frames.push(callback),
-    ));
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn<(callback: FrameRequestCallback) => number>((callback) => frames.push(callback)),
+    );
     vi.stubGlobal("cancelAnimationFrame", vi.fn<(id: number) => void>());
     const clippingAncestor = document.createElement("div");
     clippingAncestor.style.overflowY = "hidden";
@@ -1293,14 +1382,16 @@ describe("HierarchicalListPrimitive", () => {
     });
     scrollContainer.getBoundingClientRect = () => DOMRect.fromRect({ width: 300, height: 1000 });
     clippingAncestor.getBoundingClientRect = () => DOMRect.fromRect({ width: 300, height: 400 });
-    act(() => root?.render(
-      <HierarchicalListPrimitive
-        items={[{ id: "source", name: "Source", draggable: true }]}
-        label="Resources"
-        dragAndDrop={{ onMove: () => {}, autoScroll: true }}
-        renderRow={(rowProps, { item }) => <button {...rowProps}>{item.name}</button>}
-      />,
-    ));
+    act(() =>
+      root?.render(
+        <HierarchicalListPrimitive
+          items={[{ id: "source", name: "Source", draggable: true }]}
+          label="Resources"
+          dragAndDrop={{ onMove: () => {}, autoScroll: true }}
+          renderRow={(rowProps, { item }) => <button {...rowProps}>{item.name}</button>}
+        />,
+      ),
+    );
     const row = container.querySelector("button")!;
     const transfer = {
       effectAllowed: "none",

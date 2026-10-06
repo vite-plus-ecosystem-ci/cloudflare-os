@@ -3,7 +3,7 @@
 import { DropdownMenu } from "@cloudflare/kumo";
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   HierarchicalList,
   type HierarchicalListDropDestination,
@@ -44,8 +44,10 @@ describe("HierarchicalList", () => {
     act(() => root?.render(element));
   };
 
-  const buttonFor = (name: string) => Array.from(container!.querySelectorAll("button"))
-    .find((button) => button.textContent?.includes(name));
+  const buttonFor = (name: string) =>
+    Array.from(container!.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes(name),
+    );
 
   const rowFor = (name: string) => buttonFor(name);
 
@@ -68,7 +70,12 @@ describe("HierarchicalList", () => {
 
   const setRect = (
     element: Element,
-    { top, left = 0, width = 400, height = 40 }: {
+    {
+      top,
+      left = 0,
+      width = 400,
+      height = 40,
+    }: {
       top: number;
       left?: number;
       width?: number;
@@ -118,17 +125,25 @@ describe("HierarchicalList", () => {
     expect(skillButton?.hasAttribute("aria-expanded")).toBe(false);
     expect(rowFor("Review code")?.draggable).toBe(false);
     act(() => skillButton?.focus());
-    act(() => skillButton?.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowDown",
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      skillButton?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowDown",
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
     expect(document.activeElement).toBe(buttonFor("Deploy service"));
-    act(() => document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "ArrowUp",
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowUp",
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
     expect(document.activeElement).toBe(skillButton);
     act(() => skillButton?.click());
     expect(onItemClick).toHaveBeenCalledWith(items[0].children?.[0]);
@@ -146,15 +161,16 @@ describe("HierarchicalList", () => {
   });
 
   it("scrolls from draggable rows and reorders from their touch handles", () => {
-    vi.stubGlobal("matchMedia", vi.fn(() => ({
-      matches: true,
-      addEventListener: vi.fn<() => void>(),
-      removeEventListener: vi.fn<() => void>(),
-    })));
-    const onMove = vi.fn<(
-      item: HierarchicalListItem,
-      destination: HierarchicalListDropDestination,
-    ) => void>();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: true,
+        addEventListener: vi.fn<() => void>(),
+        removeEventListener: vi.fn<() => void>(),
+      })),
+    );
+    const onMove =
+      vi.fn<(item: HierarchicalListItem, destination: HierarchicalListDropDestination) => void>();
     const onItemClick = vi.fn<(item: HierarchicalListItem) => void>();
     const touchItems: HierarchicalListItem[] = [
       { id: "source", name: "Source", draggable: true },
@@ -170,9 +186,7 @@ describe("HierarchicalList", () => {
       />,
     );
     const source = rowFor("Source")!;
-    const handle = source.querySelector<HTMLElement>(
-      "[data-hierarchical-list-touch-drag-handle]",
-    )!;
+    const handle = source.querySelector<HTMLElement>("[data-hierarchical-list-touch-drag-handle]")!;
     const target = rowFor("Target")!;
     setRect(container!.firstElementChild!, { top: 0 });
     setRect(source, { top: 0 });
@@ -207,8 +221,10 @@ describe("HierarchicalList", () => {
     expect(container!.querySelector("[data-touch-drag-preview]")).toBeNull();
     dispatchTouchPointer(handle, "pointermove", 30, 30);
     expect(container!.querySelector("[data-touch-drag-preview]")?.textContent).toContain("Source");
-    expect(container!.querySelector<HTMLElement>("[data-touch-drag-preview]")?.parentElement
-      ?.style.pointerEvents).toBe("none");
+    expect(
+      container!.querySelector<HTMLElement>("[data-touch-drag-preview]")?.parentElement?.style
+        .pointerEvents,
+    ).toBe("none");
     dispatchTouchPointer(handle, "pointercancel", 30, 30);
     expect(container!.querySelector("[data-touch-drag-preview]")).toBeNull();
     expect(onMove).not.toHaveBeenCalled();
@@ -228,11 +244,14 @@ describe("HierarchicalList", () => {
   });
 
   it("starts native mouse dragging from a visible touch handle on hybrid devices", () => {
-    vi.stubGlobal("matchMedia", vi.fn(() => ({
-      matches: true,
-      addEventListener: vi.fn<() => void>(),
-      removeEventListener: vi.fn<() => void>(),
-    })));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: true,
+        addEventListener: vi.fn<() => void>(),
+        removeEventListener: vi.fn<() => void>(),
+      })),
+    );
     render(
       <HierarchicalList
         items={[{ id: "source", name: "Source", draggable: true }]}
@@ -241,9 +260,7 @@ describe("HierarchicalList", () => {
       />,
     );
     const source = rowFor("Source")!;
-    const handle = source.querySelector<HTMLElement>(
-      "[data-hierarchical-list-touch-drag-handle]",
-    )!;
+    const handle = source.querySelector<HTMLElement>("[data-hierarchical-list-touch-drag-handle]")!;
     const transfer = dataTransfer();
 
     dispatchDrag(handle, "dragstart", transfer);
@@ -252,10 +269,8 @@ describe("HierarchicalList", () => {
   });
 
   it("does not dispatch touch drops outside the originating list", () => {
-    const onMove = vi.fn<(
-      item: HierarchicalListItem,
-      destination: HierarchicalListDropDestination,
-    ) => void>();
+    const onMove =
+      vi.fn<(item: HierarchicalListItem, destination: HierarchicalListDropDestination) => void>();
     render(
       <HierarchicalList
         items={[
@@ -268,9 +283,7 @@ describe("HierarchicalList", () => {
       />,
     );
     const source = rowFor("Source")!;
-    const handle = source.querySelector<HTMLElement>(
-      "[data-hierarchical-list-touch-drag-handle]",
-    )!;
+    const handle = source.querySelector<HTMLElement>("[data-hierarchical-list-touch-drag-handle]")!;
     const target = rowFor("Target")!;
     setRect(source, { top: 0 });
     setRect(target, { top: 40 });
@@ -305,9 +318,7 @@ describe("HierarchicalList", () => {
     );
     render(renderList([{ id: "source", name: "Source", draggable: true }]));
     const source = rowFor("Source")!;
-    const handle = source.querySelector<HTMLElement>(
-      "[data-hierarchical-list-touch-drag-handle]",
-    )!;
+    const handle = source.querySelector<HTMLElement>("[data-hierarchical-list-touch-drag-handle]")!;
     Object.defineProperty(document, "elementFromPoint", {
       configurable: true,
       value: vi.fn<(x: number, y: number) => Element | null>(() => source),
@@ -331,10 +342,14 @@ describe("HierarchicalList", () => {
     );
 
     const row = rowFor("Review code")!;
-    act(() => row.dispatchEvent(new MouseEvent("contextmenu", {
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      row.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
 
     expect(document.body.textContent).toContain("Delete");
     expect(container?.querySelectorAll("button")).toHaveLength(1);
@@ -342,11 +357,14 @@ describe("HierarchicalList", () => {
 
   it("opens an item's action drawer from a long press on touch devices", () => {
     vi.useFakeTimers();
-    vi.stubGlobal("matchMedia", vi.fn(() => ({
-      matches: true,
-      addEventListener: vi.fn<() => void>(),
-      removeEventListener: vi.fn<() => void>(),
-    })));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: true,
+        addEventListener: vi.fn<() => void>(),
+        removeEventListener: vi.fn<() => void>(),
+      })),
+    );
     render(
       <HierarchicalList
         items={[{ id: "skill", name: "Review code" }]}
@@ -372,11 +390,14 @@ describe("HierarchicalList", () => {
 
   it("does not cancel a long press when a different touch ends", () => {
     vi.useFakeTimers();
-    vi.stubGlobal("matchMedia", vi.fn(() => ({
-      matches: true,
-      addEventListener: vi.fn<() => void>(),
-      removeEventListener: vi.fn<() => void>(),
-    })));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: true,
+        addEventListener: vi.fn<() => void>(),
+        removeEventListener: vi.fn<() => void>(),
+      })),
+    );
     render(
       <HierarchicalList
         items={[{ id: "skill", name: "Review code" }]}
@@ -394,11 +415,14 @@ describe("HierarchicalList", () => {
   });
 
   it("opens an item's action drawer from a context-menu event on narrow layouts", () => {
-    vi.stubGlobal("matchMedia", vi.fn(() => ({
-      matches: true,
-      addEventListener: vi.fn<() => void>(),
-      removeEventListener: vi.fn<() => void>(),
-    })));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: true,
+        addEventListener: vi.fn<() => void>(),
+        removeEventListener: vi.fn<() => void>(),
+      })),
+    );
     render(
       <HierarchicalList
         items={[{ id: "skill", name: "Review code" }]}
@@ -421,22 +445,29 @@ describe("HierarchicalList", () => {
     const label = document.getElementById(menu.getAttribute("aria-labelledby")!);
     expect(label?.textContent).toBe("Review code");
     const menuItem = document.querySelector<HTMLElement>('[role="menuitem"]')!;
-    act(() => menuItem.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "Escape",
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      menuItem.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
 
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(document.activeElement).toBe(row);
   });
 
   it("does not restore drawer focus over an action's destination", () => {
-    vi.stubGlobal("matchMedia", vi.fn(() => ({
-      matches: true,
-      addEventListener: vi.fn<() => void>(),
-      removeEventListener: vi.fn<() => void>(),
-    })));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: true,
+        addEventListener: vi.fn<() => void>(),
+        removeEventListener: vi.fn<() => void>(),
+      })),
+    );
     const destination = document.createElement("button");
     destination.textContent = "Dialog control";
     document.body.append(destination);
@@ -450,17 +481,25 @@ describe("HierarchicalList", () => {
       />,
     );
     const row = rowFor("Review code")!;
-    act(() => row.dispatchEvent(new MouseEvent("contextmenu", {
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      row.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
     const menuItem = document.querySelector<HTMLElement>('[role="menuitem"]')!;
 
     for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
-      act(() => menuItem.dispatchEvent(new MouseEvent(type, {
-        bubbles: true,
-        cancelable: true,
-      })));
+      act(() =>
+        menuItem.dispatchEvent(
+          new MouseEvent(type, {
+            bubbles: true,
+            cancelable: true,
+          }),
+        ),
+      );
     }
 
     expect(document.querySelector('[role="dialog"]')).toBeNull();
@@ -493,11 +532,14 @@ describe("HierarchicalList", () => {
 
   it("does not suppress clicks when an item has no context actions", () => {
     vi.useFakeTimers();
-    vi.stubGlobal("matchMedia", vi.fn(() => ({
-      matches: true,
-      addEventListener: vi.fn<() => void>(),
-      removeEventListener: vi.fn<() => void>(),
-    })));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: true,
+        addEventListener: vi.fn<() => void>(),
+        removeEventListener: vi.fn<() => void>(),
+      })),
+    );
     const item: HierarchicalListItem = { id: "skill", name: "Review code" };
     const onItemClick = vi.fn<(item: HierarchicalListItem) => void>();
     render(

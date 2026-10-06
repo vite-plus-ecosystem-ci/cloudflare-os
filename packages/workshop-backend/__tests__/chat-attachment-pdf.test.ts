@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { bridgePdfAttachments } from "../src/chat-attachment-pdf.js";
 
 // Request-level coverage (real pi adapters emitting real payloads, then bridged) lives in
@@ -67,25 +67,42 @@ describe("bridgePdfAttachments", () => {
   });
 
   it("leaves payloads without PDF parts unchanged", () => {
-    expect(bridgePdfAttachments("anthropic-messages", {
-      messages: [
-        { role: "user", content: "plain text" },
-        {
-          role: "user",
-          content: [{ type: "image", source: { type: "base64", media_type: "image/png", data: "x" } }],
-        },
-      ],
-    })).toBeUndefined();
+    expect(
+      bridgePdfAttachments("anthropic-messages", {
+        messages: [
+          { role: "user", content: "plain text" },
+          {
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: "image/png", data: "x" } },
+            ],
+          },
+        ],
+      }),
+    ).toBeUndefined();
 
-    expect(bridgePdfAttachments("openai-responses", {
-      input: [{ role: "user", content: [{ type: "input_text", text: "hi" }] }],
-    })).toBeUndefined();
+    expect(
+      bridgePdfAttachments("openai-responses", {
+        input: [{ role: "user", content: [{ type: "input_text", text: "hi" }] }],
+      }),
+    ).toBeUndefined();
   });
 
   it("does not touch APIs that take PDFs natively or not at all", () => {
-    const google = { contents: [{ role: "user", parts: [{ inlineData: { mimeType: "application/pdf", data: "x" } }] }] };
+    const google = {
+      contents: [
+        { role: "user", parts: [{ inlineData: { mimeType: "application/pdf", data: "x" } }] },
+      ],
+    };
     expect(bridgePdfAttachments("google-generative-ai", google)).toBeUndefined();
-    const completions = { messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "data:application/pdf;base64,x" } }] }] };
+    const completions = {
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "image_url", image_url: { url: "data:application/pdf;base64,x" } }],
+        },
+      ],
+    };
     expect(bridgePdfAttachments("openai-completions", completions)).toBeUndefined();
   });
 });

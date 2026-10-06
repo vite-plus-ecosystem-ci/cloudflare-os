@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { UserDurableObject } from "../src/user.js";
@@ -20,19 +20,19 @@ function freshUser() {
 describe("UserDurableObject.setOwnCommitEmail", () => {
   it("sets and clears the profile's commit email", async () => {
     const inDo = freshUser();
-    await inDo(u => u.setOwnCommitEmail("me@example.com"));
-    expect((await inDo(u => u.whoami())).commitEmail).toBe("me@example.com");
+    await inDo((u) => u.setOwnCommitEmail("me@example.com"));
+    expect((await inDo((u) => u.whoami())).commitEmail).toBe("me@example.com");
 
-    await inDo(u => u.setOwnCommitEmail(null));
-    expect(await inDo(u => u.whoami())).not.toHaveProperty("commitEmail");
+    await inDo((u) => u.setOwnCommitEmail(null));
+    expect(await inDo((u) => u.whoami())).not.toHaveProperty("commitEmail");
   });
 
   it("rejects addresses that could break out of a commit header", async () => {
     const inDo = freshUser();
-    await inDo(u => u.setOwnCommitEmail("me@example.com"));
+    await inDo((u) => u.setOwnCommitEmail("me@example.com"));
     for (const bad of ["me@example.com>\ncommitter x", "a <b@c>", "no-at-sign", "", "x@"]) {
-      await expect(inDo(u => u.setOwnCommitEmail(bad))).rejects.toThrow(/Invalid commit email/);
+      await expect(inDo((u) => u.setOwnCommitEmail(bad))).rejects.toThrow(/Invalid commit email/);
     }
-    expect((await inDo(u => u.whoami())).commitEmail).toBe("me@example.com");
+    expect((await inDo((u) => u.whoami())).commitEmail).toBe("me@example.com");
   });
 });

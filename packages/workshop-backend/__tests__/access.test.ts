@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { accessRateLimitKey, verifyCfAccessJwt } from "../src/access.js";
 
 const joseMocks = vi.hoisted(() => ({
@@ -29,10 +29,12 @@ describe("verifyCfAccessJwt", () => {
 
     expect(joseMocks.createRemoteJWKSet).toHaveBeenCalledTimes(2);
     expect(joseMocks.createRemoteJWKSet).toHaveBeenNthCalledWith(
-      1, new URL("https://team.cloudflareaccess.com/cdn-cgi/access/certs"),
+      1,
+      new URL("https://team.cloudflareaccess.com/cdn-cgi/access/certs"),
     );
     expect(joseMocks.createRemoteJWKSet).toHaveBeenNthCalledWith(
-      2, new URL("https://other-team.cloudflareaccess.com/cdn-cgi/access/certs"),
+      2,
+      new URL("https://other-team.cloudflareaccess.com/cdn-cgi/access/certs"),
     );
   });
 
@@ -56,19 +58,22 @@ describe("verifyCfAccessJwt", () => {
       headers: { "cf-access-jwt-assertion": "signed-token" },
     });
     const verifier = vi.fn().mockResolvedValue({
-      sub: "user-1", email: "person@example.com",
+      sub: "user-1",
+      email: "person@example.com",
     });
 
     await expect(verifyCfAccessJwt(request, accessEnv, verifier)).resolves.toEqual({
-      sub: "user-1", email: "person@example.com",
+      sub: "user-1",
+      email: "person@example.com",
     });
   });
 });
 
 describe("accessRateLimitKey", () => {
   it("uses the verified subject and hashes email only as a fallback", async () => {
-    await expect(accessRateLimitKey({ sub: "user-1", email: "person@example.com" }))
-      .resolves.toBe("access-sub:user-1");
+    await expect(accessRateLimitKey({ sub: "user-1", email: "person@example.com" })).resolves.toBe(
+      "access-sub:user-1",
+    );
     const emailKey = await accessRateLimitKey({ email: "person@example.com" });
     expect(emailKey).toMatch(/^access-email:[0-9a-f]{64}$/);
     expect(emailKey).not.toContain("person@example.com");

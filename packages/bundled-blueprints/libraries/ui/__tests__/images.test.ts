@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
   DEFAULT_IMAGE_LIMITS,
@@ -35,12 +35,20 @@ function stubDecoding({ webp = true }: { webp?: boolean } = {}) {
   }
   vi.stubGlobal("Image", FakeImage);
   const drawImage = vi.fn();
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => ({ drawImage }) as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+    () => ({ drawImage }) as unknown as CanvasRenderingContext2D,
+  );
   const encodings: Array<{ type: string; quality: number; width: number; height: number }> = [];
-  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(function (this: HTMLCanvasElement, type = "image/png", quality = 0.92) {
+  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(function (
+    this: HTMLCanvasElement,
+    type = "image/png",
+    quality = 0.92,
+  ) {
     encodings.push({ type, quality, width: this.width, height: this.height });
     const mime = type === "image/webp" && !webp ? "image/png" : type;
-    return `data:${mime};base64,` + "A".repeat(Math.round((this.width * this.height * quality) / 100));
+    return (
+      `data:${mime};base64,` + "A".repeat(Math.round((this.width * this.height * quality) / 100))
+    );
   });
   return { drawImage, encodings };
 }
@@ -57,7 +65,12 @@ afterEach(() => {
 
 describe("isImageFile and IMAGE_TYPES", () => {
   it("accepts the raster types and nothing else", () => {
-    expect([...IMAGE_TYPES].toSorted()).toEqual(["image/gif", "image/jpeg", "image/png", "image/webp"]);
+    expect([...IMAGE_TYPES].toSorted()).toEqual([
+      "image/gif",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ]);
     expect(isImageFile(new File([""], "a.png", { type: "image/png" }))).toBe(true);
     expect(isImageFile(new File([""], "a.svg", { type: "image/svg+xml" }))).toBe(false);
     expect(isImageFile(new File([""], "a.txt", { type: "text/plain" }))).toBe(false);
@@ -120,7 +133,9 @@ describe("loadImage", () => {
 
   it("rejects what the browser cannot decode", async () => {
     stubDecoding();
-    await expect(loadImage(`data:image/png;base64,${btoa("garbage")}`)).rejects.toThrow(/not an image/);
+    await expect(loadImage(`data:image/png;base64,${btoa("garbage")}`)).rejects.toThrow(
+      /not an image/,
+    );
   });
 });
 
@@ -144,16 +159,22 @@ describe("prepareImage", () => {
   it("steps down quality, then size, until the data URL fits, and rejects when nothing does", async () => {
     const { encodings } = stubDecoding();
     // 1000x1000 at 0.86 is 8600 characters plus the prefix; 0.5 is 5000.
-    const prepared = await prepareImage(imageFile("big.png", "image/png", "1000x1000"), { maxDataUrlLength: 5100 });
+    const prepared = await prepareImage(imageFile("big.png", "image/png", "1000x1000"), {
+      maxDataUrlLength: 5100,
+    });
     expect(encodings.map((encoding) => encoding.quality)).toEqual([0.86, 0.74, 0.62, 0.5]);
     expect(prepared.width).toBe(1000);
 
     encodings.length = 0;
-    const smaller = await prepareImage(imageFile("big.png", "image/png", "1000x1000"), { maxDataUrlLength: 3000 });
+    const smaller = await prepareImage(imageFile("big.png", "image/png", "1000x1000"), {
+      maxDataUrlLength: 3000,
+    });
     expect(smaller.width).toBe(700);
     expect(encodings.at(-1)).toMatchObject({ width: 700, height: 700 });
 
-    await expect(prepareImage(imageFile("big.png", "image/png", "1000x1000"), { maxDataUrlLength: 100 })).rejects.toThrow(/too large/);
+    await expect(
+      prepareImage(imageFile("big.png", "image/png", "1000x1000"), { maxDataUrlLength: 100 }),
+    ).rejects.toThrow(/too large/);
   });
 
   it("falls back to JPEG where WebP is not encodable", async () => {
@@ -174,49 +195,74 @@ describe("prepareImage", () => {
     expect(shrunk.src.startsWith("data:image/webp;base64,")).toBe(true);
     expect(shrunk.width).toBe(1600);
 
-    const heavy = await prepareImage(imageFile("heavy.gif", "image/gif", "200x100", 400), { maxGifDataUrlLength: 300 });
+    const heavy = await prepareImage(imageFile("heavy.gif", "image/gif", "200x100", 400), {
+      maxGifDataUrlLength: 300,
+    });
     expect(heavy.src.startsWith("data:image/webp;base64,")).toBe(true);
   });
 
   it("gives a GIF its own byte budget, wider than a re-encodable image's", async () => {
     const { encodings } = stubDecoding();
     // Over the general budget but within the GIF one: kept animated.
-    const kept = await prepareImage(imageFile("anim.gif", "image/gif", "200x100", 400), { maxDataUrlLength: 300, maxGifDataUrlLength: 700 });
+    const kept = await prepareImage(imageFile("anim.gif", "image/gif", "200x100", 400), {
+      maxDataUrlLength: 300,
+      maxGifDataUrlLength: 700,
+    });
     expect(kept.src.startsWith("data:image/gif;base64,")).toBe(true);
     expect(encodings).toEqual([]);
 
     // A PNG of the same weight is over its budget, and re-encoded.
-    const png = await prepareImage(imageFile("still.png", "image/png", "200x100", 400), { maxDataUrlLength: 300, maxGifDataUrlLength: 700 });
+    const png = await prepareImage(imageFile("still.png", "image/png", "200x100", 400), {
+      maxDataUrlLength: 300,
+      maxGifDataUrlLength: 700,
+    });
     expect(png.src.startsWith("data:image/webp;base64,")).toBe(true);
 
     // Passed as undefined, the GIF budget keeps its default.
-    const defaulted = await prepareImage(imageFile("anim.gif", "image/gif", "200x100", 400), { maxDataUrlLength: 300, maxGifDataUrlLength: undefined });
+    const defaulted = await prepareImage(imageFile("anim.gif", "image/gif", "200x100", 400), {
+      maxDataUrlLength: 300,
+      maxGifDataUrlLength: undefined,
+    });
     expect(defaulted.src.startsWith("data:image/gif;base64,")).toBe(true);
   });
 
   it("takes the alt text and limits from its options", async () => {
     stubDecoding();
-    const prepared = await prepareImage(imageFile("a.png", "image/png", "800x800"), { alt: "a.png", maxDimension: 400 });
+    const prepared = await prepareImage(imageFile("a.png", "image/png", "800x800"), {
+      alt: "a.png",
+      maxDimension: 400,
+    });
     expect(prepared.alt).toBe("a.png");
     expect(prepared.width).toBe(400);
-    expect(DEFAULT_IMAGE_LIMITS).toEqual({ maxDimension: 1600, maxDataUrlLength: 1_400_000, maxGifDataUrlLength: 2_700_000 });
+    expect(DEFAULT_IMAGE_LIMITS).toEqual({
+      maxDimension: 1600,
+      maxDataUrlLength: 1_400_000,
+      maxGifDataUrlLength: 2_700_000,
+    });
   });
 
   it("keeps a default for a limit passed as undefined", async () => {
     stubDecoding();
-    const prepared = await prepareImage(imageFile("wide.png", "image/png", "4000x1000"), { maxDimension: undefined, maxDataUrlLength: undefined });
+    const prepared = await prepareImage(imageFile("wide.png", "image/png", "4000x1000"), {
+      maxDimension: undefined,
+      maxDataUrlLength: undefined,
+    });
     expect(prepared.width).toBe(1600);
     expect(prepared.src.startsWith("data:image/webp;base64,")).toBe(true);
   });
 
   it("rejects a file the browser cannot decode", async () => {
     stubDecoding();
-    await expect(prepareImage(imageFile("a.png", "image/png", "garbage"))).rejects.toThrow(/not an image/);
+    await expect(prepareImage(imageFile("a.png", "image/png", "garbage"))).rejects.toThrow(
+      /not an image/,
+    );
   });
 
   it("rejects when the canvas has no 2d context", async () => {
     stubDecoding();
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => null);
-    await expect(prepareImage(imageFile("a.png", "image/png", "10x10"))).rejects.toThrow(/cannot process/);
+    await expect(prepareImage(imageFile("a.png", "image/png", "10x10"))).rejects.toThrow(
+      /cannot process/,
+    );
   });
 });

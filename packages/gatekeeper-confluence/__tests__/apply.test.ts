@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   ConfluenceStore,
   applyStoredAction,
@@ -18,12 +18,13 @@ function makeStorage(): Storage {
   const kv = {
     get: <T>(k: string) => {
       const value = map.get(k);
-      return value === undefined ? undefined : structuredClone(value) as T;
+      return value === undefined ? undefined : (structuredClone(value) as T);
     },
     put: (k: string, v: unknown) => void map.set(k, structuredClone(v)),
     delete: (k: string) => void map.delete(k),
     list: <T>({ prefix }: { prefix: string }) =>
-      [...map.entries()].filter(([k]) => k.startsWith(prefix))
+      [...map.entries()]
+        .filter(([k]) => k.startsWith(prefix))
         .map(([key, value]) => [key, structuredClone(value)] as [string, T]),
   };
   return {
@@ -44,11 +45,18 @@ function makeApi(contentType: "page" | "blogpost" = "page", status: string = "cu
   const calls: Recorded = { addComment: [], updateContent: [], uploadAttachment: [] };
   const api = {
     getContentById: async (id: string) => ({
-      id, type: contentType, status, title: "Title", version: { number: 3 },
+      id,
+      type: contentType,
+      status,
+      title: "Title",
+      version: { number: 3 },
       body: { storage: { value: "<p>body</p>" } },
       _links: { webui: "/spaces/ENG/pages/" + id },
     }),
-    updateContent: async (b: { title: string; status?: string }) => { calls.updateContent.push(b); return {}; },
+    updateContent: async (b: { title: string; status?: string }) => {
+      calls.updateContent.push(b);
+      return {};
+    },
     addComment: async (id: string, _storage: string, type: string) => {
       calls.addComment.push({ id, type });
       return { id: "comment-1" };
@@ -57,9 +65,9 @@ function makeApi(contentType: "page" | "blogpost" = "page", status: string = "cu
     restoreContent: async () => {},
     deleteComment: async () => {},
     deleteAttachment: async () => {},
-    uploadAttachment: async (id: string, file: {filename: string; data: Uint8Array}) => {
-      calls.uploadAttachment.push({id, filename: file.filename, data: file.data.slice()});
-      return {id: "attachment-1"};
+    uploadAttachment: async (id: string, file: { filename: string; data: Uint8Array }) => {
+      calls.uploadAttachment.push({ id, filename: file.filename, data: file.data.slice() });
+      return { id: "attachment-1" };
     },
   } as unknown as ConfluenceApi;
   return { api, calls };
@@ -76,11 +84,16 @@ function stage(store: ConfluenceStore, action: ConfluenceAction): number {
 }
 
 async function uploadAction(
-  store: ConfluenceStore, data: Uint8Array, contentId = "123",
+  store: ConfluenceStore,
+  data: Uint8Array,
+  contentId = "123",
 ): Promise<UploadAttachmentAction> {
   return {
-    type: "uploadAttachment", contentId, filename: "example.bin",
-    mediaType: "application/octet-stream", file: await store.captureAttachment(data),
+    type: "uploadAttachment",
+    contentId,
+    filename: "example.bin",
+    mediaType: "application/octet-stream",
+    file: await store.captureAttachment(data),
   };
 }
 
@@ -88,7 +101,12 @@ describe("applyStoredAction", () => {
   it("marks the action applied so reads stop overlaying it", async () => {
     const { api } = makeApi();
     const store = storeWith(api);
-    const id = stage(store, { type: "setTitle", contentId: "123", title: "New", previousTitle: "Title" });
+    const id = stage(store, {
+      type: "setTitle",
+      contentId: "123",
+      title: "New",
+      previousTitle: "Title",
+    });
 
     await applyStoredAction(store, id);
 
@@ -120,7 +138,12 @@ describe("applyStoredAction", () => {
   it("keeps a draft page a draft when editing its content (does not publish it)", async () => {
     const { api, calls } = makeApi("page", "draft");
     const store = storeWith(api);
-    const id = stage(store, { type: "setContent", contentId: "123", markdown: "new", previousMarkdown: "old" });
+    const id = stage(store, {
+      type: "setContent",
+      contentId: "123",
+      markdown: "new",
+      previousMarkdown: "old",
+    });
 
     await applyStoredAction(store, id);
 
@@ -131,7 +154,12 @@ describe("applyStoredAction", () => {
   it("publishes edits to a current page as current", async () => {
     const { api, calls } = makeApi("page", "current");
     const store = storeWith(api);
-    const id = stage(store, { type: "setContent", contentId: "123", markdown: "new", previousMarkdown: "old" });
+    const id = stage(store, {
+      type: "setContent",
+      contentId: "123",
+      markdown: "new",
+      previousMarkdown: "old",
+    });
 
     await applyStoredAction(store, id);
 
@@ -149,13 +177,18 @@ describe("applyStoredAction", () => {
     await applyStoredAction(store, id);
 
     expect(calls.uploadAttachment).toEqual([{ id: "123", filename: "example.bin", data }]);
-    expect(store.getAction(id)).toMatchObject({ state: "applied", createdAttachmentId: "attachment-1" });
+    expect(store.getAction(id)).toMatchObject({
+      state: "applied",
+      createdAttachmentId: "attachment-1",
+    });
     await expect(store.readAttachment(action)).rejects.toThrow(/incomplete or corrupted/);
   });
 
   it("retains attachment bytes after a retryable upload failure", async () => {
     const { api } = makeApi();
-    api.uploadAttachment = async () => { throw new Error("temporary failure"); };
+    api.uploadAttachment = async () => {
+      throw new Error("temporary failure");
+    };
     const store = storeWith(api);
     const data = Uint8Array.from([1, 2, 3]);
     const action = await uploadAction(store, data);
@@ -172,8 +205,11 @@ describe("applyStoredAction", () => {
     const store = storeWith(api);
     const data = Uint8Array.from([4, 5, 6]);
     const id = stage(store, {
-      type: "uploadAttachment", contentId: "123", filename: "legacy.bin",
-      mediaType: "application/octet-stream", data,
+      type: "uploadAttachment",
+      contentId: "123",
+      filename: "legacy.bin",
+      mediaType: "application/octet-stream",
+      data,
     } as unknown as ConfluenceAction);
 
     await applyStoredAction(store, id);
@@ -188,7 +224,11 @@ describe("attachment files", () => {
     const { api } = makeApi();
     const store = storeWith(api);
     const action = await uploadAction(store, Uint8Array.from([1, 2, 3]));
-    const queue = { submitAction: async () => { throw new Error("submission failed"); } };
+    const queue = {
+      submitAction: async () => {
+        throw new Error("submission failed");
+      },
+    };
 
     await expect(stageAction(store, queue as never, action)).rejects.toThrow("submission failed");
 
@@ -203,8 +243,12 @@ describe("attachment files", () => {
     rejectStoredAction(store, stage(store, direct));
 
     const createId = stage(store, {
-      type: "createContent", provisionalId: "~parent", kind: "page",
-      parent: { type: "space", spaceKey: "ENG" }, title: "Parent", status: "current",
+      type: "createContent",
+      provisionalId: "~parent",
+      kind: "page",
+      parent: { type: "space", spaceKey: "ENG" },
+      title: "Parent",
+      status: "current",
     });
     const cascaded = await uploadAction(store, Uint8Array.from([2]), "~parent");
     stage(store, cascaded);
@@ -221,7 +265,9 @@ describe("attachment files", () => {
     const referenced = await uploadAction(store, Uint8Array.from([1]));
     stage(store, referenced);
     const orphan = await uploadAction(store, Uint8Array.from([2]));
-    for (const [key, value] of storage.kv.list<{ createdAt: number }>({ prefix: "confluence:actionFileAllocation:" })) {
+    for (const [key, value] of storage.kv.list<{ createdAt: number }>({
+      prefix: "confluence:actionFileAllocation:",
+    })) {
       if (typeof value === "object") storage.kv.put(key, { ...value, createdAt: 0 });
     }
 
@@ -236,7 +282,12 @@ describe("revertStoredAction", () => {
   it("marks the action reverted on success", async () => {
     const { api } = makeApi();
     const store = storeWith(api);
-    const id = stage(store, { type: "setTitle", contentId: "123", title: "New", previousTitle: "Old" });
+    const id = stage(store, {
+      type: "setTitle",
+      contentId: "123",
+      title: "New",
+      previousTitle: "Old",
+    });
     await applyStoredAction(store, id);
 
     await revertStoredAction(store, id);

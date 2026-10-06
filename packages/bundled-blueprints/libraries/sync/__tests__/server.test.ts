@@ -4,9 +4,16 @@
 // imports nothing from the runtime, so nothing is mocked; the stubs are the shape the RPC layer
 // delivers.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
-import { MutationQueue, type PresenceEvent, SubscriberRegistry, type SubscriberStub, applyVersioned, normalizeCollaborator } from "../server.ts";
+import {
+  MutationQueue,
+  type PresenceEvent,
+  SubscriberRegistry,
+  type SubscriberStub,
+  applyVersioned,
+  normalizeCollaborator,
+} from "../server.ts";
 
 interface Block {
   id: string;
@@ -24,7 +31,10 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 /** The smallest gadget: blocks under versions, everyone told about each accepted batch and each other. */
 class Gadget {
   readonly #queue = new MutationQueue();
-  readonly #subscribers = new SubscriberRegistry<Callbacks, { clientId: string; name: string; color: string }>({
+  readonly #subscribers = new SubscriberRegistry<
+    Callbacks,
+    { clientId: string; name: string; color: string }
+  >({
     join: (subscriber, who) => subscriber.presence({ type: "join", ...who }),
     leave: (subscriber, who) => subscriber.presence({ type: "leave", clientId: who.clientId }),
   });
@@ -34,10 +44,24 @@ class Gadget {
     return this.#queue.run(async () => {
       await tick();
       const outcome = applyVersioned(this.#stored.blocks, { upserts });
-      if (!outcome.changed) return { status: outcome.status, revision: this.#stored.revision, conflicts: outcome.conflicts };
-      this.#stored = { revision: this.#stored.revision + 1, blocks: Array.from(outcome.items.values()) };
-      await this.#subscribers.broadcast((subscriber) => subscriber.operation({ revision: this.#stored.revision, upserts: outcome.accepted }));
-      return { status: outcome.status, revision: this.#stored.revision, conflicts: outcome.conflicts };
+      if (!outcome.changed)
+        return {
+          status: outcome.status,
+          revision: this.#stored.revision,
+          conflicts: outcome.conflicts,
+        };
+      this.#stored = {
+        revision: this.#stored.revision + 1,
+        blocks: Array.from(outcome.items.values()),
+      };
+      await this.#subscribers.broadcast((subscriber) =>
+        subscriber.operation({ revision: this.#stored.revision, upserts: outcome.accepted }),
+      );
+      return {
+        status: outcome.status,
+        revision: this.#stored.revision,
+        conflicts: outcome.conflicts,
+      };
     });
   }
 
@@ -55,9 +79,15 @@ function fakeStub() {
   const received: unknown[] = [];
   const stub = {
     received,
-    async operation(event: unknown) { received.push(event); },
-    async presence(event: unknown) { received.push(event); },
-    dup() { return this; },
+    async operation(event: unknown) {
+      received.push(event);
+    },
+    async presence(event: unknown) {
+      received.push(event);
+    },
+    dup() {
+      return this;
+    },
     onRpcBroken() {},
     [Symbol.dispose]() {},
   };
@@ -85,8 +115,12 @@ describe("sync/server", () => {
     ]);
     expect(first).toMatchObject({ status: "applied", revision: 1, conflicts: [] });
     expect(second).toMatchObject({ status: "conflict", revision: 1 });
-    expect(second.conflicts).toEqual([{ id: "a", reason: "stale", current: { id: "a", html: "<p>one</p>", version: 1 } }]);
-    expect(ada.received).toEqual([{ revision: 1, upserts: [{ id: "a", html: "<p>one</p>", version: 1 }] }]);
+    expect(second.conflicts).toEqual([
+      { id: "a", reason: "stale", current: { id: "a", html: "<p>one</p>", version: 1 } },
+    ]);
+    expect(ada.received).toEqual([
+      { revision: 1, upserts: [{ id: "a", html: "<p>one</p>", version: 1 }] },
+    ]);
     expect(bob.received).toEqual(ada.received);
     expect(gadget.size).toBe(2);
   });

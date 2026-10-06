@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import {
-  SUGGESTED_MODELS, type GatewayModel, type GatewayModelCapabilities,
+  SUGGESTED_MODELS,
+  type GatewayModel,
+  type GatewayModelCapabilities,
 } from "@gadgets/workshop-shared/api";
 import { parseAdminConfig } from "../src/admin-config.js";
 import type { AdminConfig } from "../src/storage-schema/admin-settings-storage.js";
@@ -22,8 +24,12 @@ const GATEWAY = {
   CF_AI_GATEWAY_PROVIDERS: "anthropic,cloudflare",
 };
 const NOT_GATEWAY = "This deployment does not provide models through AI Gateway.";
-const ADDED: GatewayModel =
-    { provider: "anthropic", id: "claude-test", name: "Claude Test", contextWindow: 500000 };
+const ADDED: GatewayModel = {
+  provider: "anthropic",
+  id: "claude-test",
+  name: "Claude Test",
+  contextWindow: 500000,
+};
 
 let counter = 0;
 
@@ -41,24 +47,28 @@ function adminSettings(vars: object = GATEWAY) {
   });
   const settingsEnv = { ...vars, BLUEPRINTS: { put, get: async () => null } };
   // Calls run inside the Durable Object, where its storage is reachable.
-  const inDo = <T>(f: (admin: AdminSettings) => T | Promise<T>) => runInDurableObject(
-      stub, (_host, state) => f(new AdminSettings(state, settingsEnv as unknown as Cloudflare.Env)));
+  const inDo = <T>(f: (admin: AdminSettings) => T | Promise<T>) =>
+    runInDurableObject(stub, (_host, state) =>
+      f(new AdminSettings(state, settingsEnv as unknown as Cloudflare.Env)),
+    );
   const stored = (): Promise<Pick<AdminConfig, "modelModes" | "addedModels">> =>
-      inDo(admin => {
-        let { modelModes, addedModels } = admin.getAdminConfig();
-        return { modelModes, addedModels };
-      });
+    inDo((admin) => {
+      let { modelModes, addedModels } = admin.getAdminConfig();
+      return { modelModes, addedModels };
+    });
   const settings = (): Promise<AdminConfig["modelSettings"]> =>
-      inDo(admin => admin.getAdminConfig().modelSettings);
+    inDo((admin) => admin.getAdminConfig().modelSettings);
   return { inDo, stored, settings, put, mirror };
 }
 
 describe("AdminSettings gateway model modes", () => {
   it("stores an override, and mirrors it to KV", async () => {
     const { inDo, stored, put, mirror } = adminSettings();
-    await inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "disabled"));
-    expect(await stored()).toEqual(
-        { modelModes: { "claude-fable-5-1": "disabled" }, addedModels: [] });
+    await inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "disabled"));
+    expect(await stored()).toEqual({
+      modelModes: { "claude-fable-5-1": "disabled" },
+      addedModels: [],
+    });
     expect(put).toHaveBeenCalledTimes(1);
     expect(put.mock.calls[0]![0]).toBe(".adminConfig");
     expect(parseAdminConfig(mirror.current).modelModes).toEqual({ "claude-fable-5-1": "disabled" });
@@ -67,26 +77,27 @@ describe("AdminSettings gateway model modes", () => {
   it("forgets the override when a model is set to its default mode", async () => {
     const { inDo, stored } = adminSettings();
     // Enabled by default.
-    await inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "hidden"));
-    await inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "enabled"));
+    await inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "hidden"));
+    await inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "enabled"));
     expect((await stored()).modelModes).toEqual({});
 
     // Hidden by default: enabling it is the override, and hiding it again is not one.
-    await inDo(admin => admin.setGatewayModelMode("claude-opus-5", "enabled"));
+    await inDo((admin) => admin.setGatewayModelMode("claude-opus-5", "enabled"));
     expect((await stored()).modelModes).toEqual({ "claude-opus-5": "enabled" });
-    await inDo(admin => admin.setGatewayModelMode("claude-opus-5", "hidden"));
+    await inDo((admin) => admin.setGatewayModelMode("claude-opus-5", "hidden"));
     expect((await stored()).modelModes).toEqual({});
   });
 
   it("refuses an ID that is not a gateway model, leaving storage and the mirror alone", async () => {
     const { inDo, stored, put } = adminSettings();
-    await inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "hidden"));
+    await inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "hidden"));
     put.mockClear();
 
     // The second is a suggested model of a provider this gateway does not enable.
     for (let id of ["claude-fable-9", "gpt-6-luna", "constructor"]) {
-      await expect(inDo(admin => admin.setGatewayModelMode(id, "disabled")))
-          .rejects.toThrow(`No such model: ${id}`);
+      await expect(inDo((admin) => admin.setGatewayModelMode(id, "disabled"))).rejects.toThrow(
+        `No such model: ${id}`,
+      );
     }
     expect((await stored()).modelModes).toEqual({ "claude-fable-5-1": "hidden" });
     expect(put).not.toHaveBeenCalled();
@@ -94,18 +105,20 @@ describe("AdminSettings gateway model modes", () => {
 
   it("gives a model whose ID is __proto__ a mode of its own", async () => {
     const { inDo, stored, mirror } = adminSettings();
-    await inDo(admin => admin.addGatewayModel({ ...ADDED, id: "__proto__" }));
-    await inDo(admin => admin.setGatewayModelMode("__proto__", "disabled"));
+    await inDo((admin) => admin.addGatewayModel({ ...ADDED, id: "__proto__" }));
+    await inDo((admin) => admin.setGatewayModelMode("__proto__", "disabled"));
 
     const { modelModes } = await stored();
     expect(Object.entries(modelModes)).toEqual([["__proto__", "disabled"]]);
-    expect(Object.entries(parseAdminConfig(mirror.current).modelModes))
-        .toEqual([["__proto__", "disabled"]]);
-    const view = await inDo(admin => admin.getSettings("admin"));
-    expect(view.gatewayModels!.models.find(model => model.id === "__proto__")?.mode)
-        .toBe("disabled");
+    expect(Object.entries(parseAdminConfig(mirror.current).modelModes)).toEqual([
+      ["__proto__", "disabled"],
+    ]);
+    const view = await inDo((admin) => admin.getSettings("admin"));
+    expect(view.gatewayModels!.models.find((model) => model.id === "__proto__")?.mode).toBe(
+      "disabled",
+    );
 
-    await inDo(admin => admin.setGatewayModelMode("__proto__", "enabled"));
+    await inDo((admin) => admin.setGatewayModelMode("__proto__", "enabled"));
     expect(Object.entries((await stored()).modelModes)).toEqual([]);
   });
 });
@@ -113,14 +126,25 @@ describe("AdminSettings gateway model modes", () => {
 describe("AdminSettings added gateway models", () => {
   it("stores a well-formed model from its own fields, trimmed", async () => {
     const { inDo, stored, mirror } = adminSettings();
-    await inDo(admin => admin.addGatewayModel({
-      provider: "cloudflare", id: " @cf/test/added ", name: " Added ", contextWindow: 100000,
-      outputLimit: 8000, apiToken: "smuggled",
-    } as GatewayModel));
-    const clean = [{
-      provider: "cloudflare", id: "@cf/test/added", name: "Added", contextWindow: 100000,
-      outputLimit: 8000,
-    }];
+    await inDo((admin) =>
+      admin.addGatewayModel({
+        provider: "cloudflare",
+        id: " @cf/test/added ",
+        name: " Added ",
+        contextWindow: 100000,
+        outputLimit: 8000,
+        apiToken: "smuggled",
+      } as GatewayModel),
+    );
+    const clean = [
+      {
+        provider: "cloudflare",
+        id: "@cf/test/added",
+        name: "Added",
+        contextWindow: 100000,
+        outputLimit: 8000,
+      },
+    ];
     expect((await stored()).addedModels).toStrictEqual(clean);
     // Reading the config back sanitizes it again, so only the raw write shows what was stored.
     expect(JSON.parse(mirror.current!).addedModels).toStrictEqual(clean);
@@ -129,11 +153,16 @@ describe("AdminSettings added gateway models", () => {
   // A mode outlives its model when the catalog drops a model an admin had changed.
   it("starts a model in its default mode whatever mode its ID was left in", async () => {
     const { inDo, stored } = adminSettings();
-    await inDo(admin => admin.updateAdminConfig(
-        { modelModes: { "claude-test": "disabled", "claude-fable-5-1": "hidden" } }));
-    await inDo(admin => admin.addGatewayModel(ADDED));
-    expect(await stored()).toEqual(
-        { modelModes: { "claude-fable-5-1": "hidden" }, addedModels: [ADDED] });
+    await inDo((admin) =>
+      admin.updateAdminConfig({
+        modelModes: { "claude-test": "disabled", "claude-fable-5-1": "hidden" },
+      }),
+    );
+    await inDo((admin) => admin.addGatewayModel(ADDED));
+    expect(await stored()).toEqual({
+      modelModes: { "claude-fable-5-1": "hidden" },
+      addedModels: [ADDED],
+    });
   });
 
   it.each([
@@ -144,44 +173,65 @@ describe("AdminSettings added gateway models", () => {
     ["an unknown provider", { ...ADDED, provider: "mistral" }],
   ])("refuses %s as malformed", async (_, model) => {
     const { inDo, stored, put } = adminSettings();
-    await expect(inDo(admin => admin.addGatewayModel(model as GatewayModel)))
-        .rejects.toThrow("Invalid model:");
+    await expect(inDo((admin) => admin.addGatewayModel(model as GatewayModel))).rejects.toThrow(
+      "Invalid model:",
+    );
     expect((await stored()).addedModels).toEqual([]);
     expect(put).not.toHaveBeenCalled();
   });
 
   it.each([
-    ["a provider AI Gateway does not serve", { ...ADDED, provider: "ollama" as const },
-      'Provider "ollama" is not served through AI Gateway.'],
-    ["a provider this gateway does not enable", { ...ADDED, provider: "openai" as const },
-      'Provider "openai" is not enabled on this deployment.'],
-    ["a suggested model's ID", { ...ADDED, id: "claude-opus-5-5" },
-      '"claude-opus-5-5" is already a suggested model.'],
-    ["the ID of a suggested model on a provider that is not enabled",
-      { ...ADDED, id: "gpt-6-luna" }, '"gpt-6-luna" is already a suggested model.'],
+    [
+      "a provider AI Gateway does not serve",
+      { ...ADDED, provider: "ollama" as const },
+      'Provider "ollama" is not served through AI Gateway.',
+    ],
+    [
+      "a provider this gateway does not enable",
+      { ...ADDED, provider: "openai" as const },
+      'Provider "openai" is not enabled on this deployment.',
+    ],
+    [
+      "a suggested model's ID",
+      { ...ADDED, id: "claude-opus-5-5" },
+      '"claude-opus-5-5" is already a suggested model.',
+    ],
+    [
+      "the ID of a suggested model on a provider that is not enabled",
+      { ...ADDED, id: "gpt-6-luna" },
+      '"gpt-6-luna" is already a suggested model.',
+    ],
   ])("refuses %s", async (_, model, message) => {
     const { inDo, stored, put } = adminSettings();
-    await expect(inDo(admin => admin.addGatewayModel(model))).rejects.toThrow(message);
+    await expect(inDo((admin) => admin.addGatewayModel(model))).rejects.toThrow(message);
     expect((await stored()).addedModels).toEqual([]);
     expect(put).not.toHaveBeenCalled();
   });
 
   // A response is reserved out of the window: the model's output limit, or the 32,768 tokens of
   // Workers AI for a Cloudflare model that gives none.
-  const TINY: GatewayModel =
-      { provider: "cloudflare", id: "@cf/test/tiny", name: "Tiny", contextWindow: 32768 };
+  const TINY: GatewayModel = {
+    provider: "cloudflare",
+    id: "@cf/test/tiny",
+    name: "Tiny",
+    contextWindow: 32768,
+  };
 
   it.each<[string, GatewayModel, number]>([
-    ["an output limit that fills its window", { ...ADDED, contextWindow: 8000, outputLimit: 8000 },
-      8000],
+    [
+      "an output limit that fills its window",
+      { ...ADDED, contextWindow: 8000, outputLimit: 8000 },
+      8000,
+    ],
     ["an output limit over its window", { ...ADDED, contextWindow: 8000, outputLimit: 9000 }, 9000],
     ["a window that the Workers AI reservation fills", TINY, 32768],
   ])("refuses a model with %s, which leaves a prompt no room", async (_, model, reserved) => {
     const { inDo, stored, put } = adminSettings();
-    await expect(inDo(admin => admin.addGatewayModel(model))).rejects.toThrow(
-        `The "${model.name}" model's context window leaves no room for a prompt: ${reserved} ` +
+    await expect(inDo((admin) => admin.addGatewayModel(model))).rejects.toThrow(
+      `The "${model.name}" model's context window leaves no room for a prompt: ${reserved} ` +
         "tokens of it are reserved for the response. Give the model an output limit under its " +
-        "context window.");
+        "context window.",
+    );
     expect((await stored()).addedModels).toEqual([]);
     expect(put).not.toHaveBeenCalled();
   });
@@ -192,16 +242,17 @@ describe("AdminSettings added gateway models", () => {
       { ...ADDED, contextWindow: 8000, outputLimit: 7999 },
       { ...TINY, outputLimit: 32767 },
     ];
-    for (let model of models) await inDo(admin => admin.addGatewayModel(model));
+    for (let model of models) await inDo((admin) => admin.addGatewayModel(model));
     expect((await stored()).addedModels).toEqual(models);
   });
 
   it("refuses an ID that an added model already has, under any provider", async () => {
     const { inDo, stored } = adminSettings();
-    await inDo(admin => admin.addGatewayModel(ADDED));
+    await inDo((admin) => admin.addGatewayModel(ADDED));
     for (let model of [ADDED, { ...ADDED, provider: "cloudflare" as const, id: " claude-test " }]) {
-      await expect(inDo(admin => admin.addGatewayModel(model)))
-          .rejects.toThrow('"claude-test" is already an added model.');
+      await expect(inDo((admin) => admin.addGatewayModel(model))).rejects.toThrow(
+        '"claude-test" is already an added model.',
+      );
     }
     expect((await stored()).addedModels).toEqual([ADDED]);
   });
@@ -211,12 +262,13 @@ describe("AdminSettings added gateway models", () => {
   it("refuses the ID of an added model whose provider is not enabled", async () => {
     const { inDo, stored } = adminSettings();
     const parked = { ...ADDED, provider: "openai" as const };
-    await inDo(admin => admin.updateAdminConfig({ addedModels: [parked] }));
-    const view = await inDo(admin => admin.getSettings("admin"));
-    expect(view.gatewayModels!.models.map(model => model.id)).not.toContain("claude-test");
+    await inDo((admin) => admin.updateAdminConfig({ addedModels: [parked] }));
+    const view = await inDo((admin) => admin.getSettings("admin"));
+    expect(view.gatewayModels!.models.map((model) => model.id)).not.toContain("claude-test");
 
-    await expect(inDo(admin => admin.addGatewayModel(ADDED)))
-        .rejects.toThrow('"claude-test" is already an added model.');
+    await expect(inDo((admin) => admin.addGatewayModel(ADDED))).rejects.toThrow(
+      '"claude-test" is already an added model.',
+    );
     expect((await stored()).addedModels).toEqual([parked]);
   });
 
@@ -224,58 +276,68 @@ describe("AdminSettings added gateway models", () => {
   // mutation would pass for both.
   it("adds a model once when two calls race", async () => {
     const { inDo, stored } = adminSettings();
-    const results = await inDo(admin => Promise.allSettled(
-        [admin.addGatewayModel(ADDED), admin.addGatewayModel({ ...ADDED, name: "Second" })]));
-    expect(results.map(result => result.status)).toEqual(["fulfilled", "rejected"]);
+    const results = await inDo((admin) =>
+      Promise.allSettled([
+        admin.addGatewayModel(ADDED),
+        admin.addGatewayModel({ ...ADDED, name: "Second" }),
+      ]),
+    );
+    expect(results.map((result) => result.status)).toEqual(["fulfilled", "rejected"]);
     expect((await stored()).addedModels).toEqual([ADDED]);
   });
 
   it("keeps the model out of storage when the mirror write fails", async () => {
     const { inDo, stored, mirror } = adminSettings();
     mirror.fail = true;
-    await expect(inDo(admin => admin.addGatewayModel(ADDED))).rejects.toThrow("KV unavailable");
+    await expect(inDo((admin) => admin.addGatewayModel(ADDED))).rejects.toThrow("KV unavailable");
     expect((await stored()).addedModels).toEqual([]);
   });
 
   it("removes an added model along with its mode", async () => {
     const { inDo, stored } = adminSettings();
-    await inDo(admin => admin.addGatewayModel(ADDED));
-    await inDo(admin => admin.addGatewayModel({ ...ADDED, id: "claude-test-2" }));
-    await inDo(admin => admin.setGatewayModelMode("claude-test", "disabled"));
-    await inDo(admin => admin.setGatewayModelMode("claude-test-2", "hidden"));
-    await inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "hidden"));
+    await inDo((admin) => admin.addGatewayModel(ADDED));
+    await inDo((admin) => admin.addGatewayModel({ ...ADDED, id: "claude-test-2" }));
+    await inDo((admin) => admin.setGatewayModelMode("claude-test", "disabled"));
+    await inDo((admin) => admin.setGatewayModelMode("claude-test-2", "hidden"));
+    await inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "hidden"));
 
-    await inDo(admin => admin.removeGatewayModel("claude-test"));
+    await inDo((admin) => admin.removeGatewayModel("claude-test"));
     expect(await stored()).toEqual({
       modelModes: { "claude-test-2": "hidden", "claude-fable-5-1": "hidden" },
       addedModels: [{ ...ADDED, id: "claude-test-2" }],
     });
 
     // Its ID is free again, in the default mode.
-    await inDo(admin => admin.addGatewayModel(ADDED));
-    const view = await inDo(admin => admin.getSettings("admin"));
-    expect(view.gatewayModels!.models.find(model => model.id === "claude-test"))
-        .toMatchObject({ mode: "enabled", added: true });
+    await inDo((admin) => admin.addGatewayModel(ADDED));
+    const view = await inDo((admin) => admin.getSettings("admin"));
+    expect(view.gatewayModels!.models.find((model) => model.id === "claude-test")).toMatchObject({
+      mode: "enabled",
+      added: true,
+    });
   });
 
   // A mode set for a model that a queued removal is about to drop would otherwise outlive it.
   it("refuses a mode for a model whose removal is ahead of it", async () => {
     const { inDo, stored } = adminSettings();
-    await inDo(admin => admin.addGatewayModel(ADDED));
-    const results = await inDo(admin => Promise.allSettled([
-      admin.removeGatewayModel("claude-test"), admin.setGatewayModelMode("claude-test", "disabled"),
-    ]));
-    expect(results.map(result => result.status)).toEqual(["fulfilled", "rejected"]);
+    await inDo((admin) => admin.addGatewayModel(ADDED));
+    const results = await inDo((admin) =>
+      Promise.allSettled([
+        admin.removeGatewayModel("claude-test"),
+        admin.setGatewayModelMode("claude-test", "disabled"),
+      ]),
+    );
+    expect(results.map((result) => result.status)).toEqual(["fulfilled", "rejected"]);
     expect(await stored()).toEqual({ modelModes: {}, addedModels: [] });
   });
 
   it("refuses to remove a model that was not added", async () => {
     const { inDo, stored, put } = adminSettings();
-    await inDo(admin => admin.addGatewayModel(ADDED));
+    await inDo((admin) => admin.addGatewayModel(ADDED));
     put.mockClear();
     for (let id of ["claude-test-2", "claude-fable-5-1"]) {
-      await expect(inDo(admin => admin.removeGatewayModel(id)))
-          .rejects.toThrow(`No such added model: ${id}`);
+      await expect(inDo((admin) => admin.removeGatewayModel(id))).rejects.toThrow(
+        `No such added model: ${id}`,
+      );
     }
     expect((await stored()).addedModels).toEqual([ADDED]);
     expect(put).not.toHaveBeenCalled();
@@ -285,175 +347,222 @@ describe("AdminSettings added gateway models", () => {
   // ID over, and with it the stored mode.
   it("keeps a suggested model's mode when removing an added model it shadows", async () => {
     const { inDo, stored } = adminSettings();
-    await inDo(admin => admin.updateAdminConfig({
-      addedModels: [{ ...ADDED, id: "claude-fable-5-1" }],
+    await inDo((admin) =>
+      admin.updateAdminConfig({
+        addedModels: [{ ...ADDED, id: "claude-fable-5-1" }],
+        modelModes: { "claude-fable-5-1": "disabled" },
+      }),
+    );
+    await inDo((admin) => admin.removeGatewayModel("claude-fable-5-1"));
+    expect(await stored()).toEqual({
       modelModes: { "claude-fable-5-1": "disabled" },
-    }));
-    await inDo(admin => admin.removeGatewayModel("claude-fable-5-1"));
-    expect(await stored()).toEqual(
-        { modelModes: { "claude-fable-5-1": "disabled" }, addedModels: [] });
+      addedModels: [],
+    });
   });
 });
 
 // Whether users may add their own models, as stored and as the admin panel is shown it.
-const userModels = (inDo: ReturnType<typeof adminSettings>["inDo"]) => inDo(async admin => ({
-  stored: admin.getAdminConfig().userModelsEnabled,
-  view: (await admin.getSettings("admin")).gatewayModels!.userModelsEnabled,
-}));
+const userModels = (inDo: ReturnType<typeof adminSettings>["inDo"]) =>
+  inDo(async (admin) => ({
+    stored: admin.getAdminConfig().userModelsEnabled,
+    view: (await admin.getSettings("admin")).gatewayModels!.userModelsEnabled,
+  }));
 
 describe("AdminSettings users' own models", () => {
   it("allows them until turned off, storing and mirroring each change", async () => {
     const { inDo, put, mirror } = adminSettings();
     expect(await userModels(inDo)).toEqual({ stored: true, view: true });
 
-    await inDo(admin => admin.setUserModelsEnabled(false));
+    await inDo((admin) => admin.setUserModelsEnabled(false));
     expect(await userModels(inDo)).toEqual({ stored: false, view: false });
     expect(put).toHaveBeenCalledTimes(1);
     expect(put.mock.calls[0]![0]).toBe(".adminConfig");
     expect(JSON.parse(mirror.current!).userModelsEnabled).toBe(false);
 
-    await inDo(admin => admin.setUserModelsEnabled(true));
+    await inDo((admin) => admin.setUserModelsEnabled(true));
     expect(await userModels(inDo)).toEqual({ stored: true, view: true });
     expect(JSON.parse(mirror.current!).userModelsEnabled).toBe(true);
   });
 
   it("leaves the gateway's models and their modes alone", async () => {
     const { inDo, stored } = adminSettings();
-    await inDo(admin => admin.addGatewayModel(ADDED));
-    await inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "disabled"));
-    const before = await inDo(admin => admin.getSettings("admin"));
+    await inDo((admin) => admin.addGatewayModel(ADDED));
+    await inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "disabled"));
+    const before = await inDo((admin) => admin.getSettings("admin"));
 
-    await inDo(admin => admin.setUserModelsEnabled(false));
-    expect(await stored()).toEqual(
-        { modelModes: { "claude-fable-5-1": "disabled" }, addedModels: [ADDED] });
-    const after = await inDo(admin => admin.getSettings("admin"));
+    await inDo((admin) => admin.setUserModelsEnabled(false));
+    expect(await stored()).toEqual({
+      modelModes: { "claude-fable-5-1": "disabled" },
+      addedModels: [ADDED],
+    });
+    const after = await inDo((admin) => admin.getSettings("admin"));
     expect(after.gatewayModels).toEqual({ ...before.gatewayModels, userModelsEnabled: false });
   });
 });
 
 // Whether the admin UI may suggest models from models.dev, as stored and as the admin panel is
 // shown it.
-const suggestions = (inDo: ReturnType<typeof adminSettings>["inDo"]) => inDo(async admin => ({
-  stored: admin.getAdminConfig().modelsDevSuggestions,
-  view: (await admin.getSettings("admin")).gatewayModels!.modelsDevSuggestions,
-}));
+const suggestions = (inDo: ReturnType<typeof adminSettings>["inDo"]) =>
+  inDo(async (admin) => ({
+    stored: admin.getAdminConfig().modelsDevSuggestions,
+    view: (await admin.getSettings("admin")).gatewayModels!.modelsDevSuggestions,
+  }));
 
 describe("AdminSettings models.dev suggestions", () => {
   it("are off until turned on, storing and mirroring each change", async () => {
     const { inDo, put, mirror } = adminSettings();
     expect(await suggestions(inDo)).toEqual({ stored: false, view: false });
 
-    await inDo(admin => admin.setModelsDevSuggestions(true));
+    await inDo((admin) => admin.setModelsDevSuggestions(true));
     expect(await suggestions(inDo)).toEqual({ stored: true, view: true });
     expect(put).toHaveBeenCalledTimes(1);
     expect(put.mock.calls[0]![0]).toBe(".adminConfig");
     expect(JSON.parse(mirror.current!).modelsDevSuggestions).toBe(true);
 
-    await inDo(admin => admin.setModelsDevSuggestions(false));
+    await inDo((admin) => admin.setModelsDevSuggestions(false));
     expect(await suggestions(inDo)).toEqual({ stored: false, view: false });
     expect(JSON.parse(mirror.current!).modelsDevSuggestions).toBe(false);
   });
 
   it("leave the gateway's models, their modes and users' own models alone", async () => {
     const { inDo, stored } = adminSettings();
-    await inDo(admin => admin.addGatewayModel(ADDED));
-    await inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "disabled"));
-    await inDo(admin => admin.setUserModelsEnabled(false));
-    const before = await inDo(admin => admin.getSettings("admin"));
+    await inDo((admin) => admin.addGatewayModel(ADDED));
+    await inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "disabled"));
+    await inDo((admin) => admin.setUserModelsEnabled(false));
+    const before = await inDo((admin) => admin.getSettings("admin"));
 
-    await inDo(admin => admin.setModelsDevSuggestions(true));
-    expect(await stored()).toEqual(
-        { modelModes: { "claude-fable-5-1": "disabled" }, addedModels: [ADDED] });
-    const after = await inDo(admin => admin.getSettings("admin"));
+    await inDo((admin) => admin.setModelsDevSuggestions(true));
+    expect(await stored()).toEqual({
+      modelModes: { "claude-fable-5-1": "disabled" },
+      addedModels: [ADDED],
+    });
+    const after = await inDo((admin) => admin.getSettings("admin"));
     expect(after.gatewayModels).toEqual({ ...before.gatewayModels, modelsDevSuggestions: true });
   });
 });
 
 describe("AdminSettings.getSettings gateway models", () => {
-  it("lists every gateway model in its mode, and the providers a model may be added under",
-      async () => {
+  it("lists every gateway model in its mode, and the providers a model may be added under", async () => {
     // ollama is enabled here, but AI Gateway does not serve it.
     const { inDo } = adminSettings({ ...GATEWAY, CF_AI_GATEWAY_PROVIDERS: "anthropic,ollama" });
-    await inDo(admin => admin.addGatewayModel(ADDED));
-    await inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "disabled"));
+    await inDo((admin) => admin.addGatewayModel(ADDED));
+    await inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "disabled"));
 
-    const { gatewayModels } = await inDo(admin => admin.getSettings("admin"));
+    const { gatewayModels } = await inDo((admin) => admin.getSettings("admin"));
     expect(gatewayModels!.providers).toEqual(["anthropic"]);
-    const byId = new Map(gatewayModels!.models.map(model => [model.id, model]));
-    expect(byId.get("claude-fable-5-1")).toMatchObject(
-        { provider: "anthropic", mode: "disabled", defaultMode: "enabled", added: false });
+    const byId = new Map(gatewayModels!.models.map((model) => [model.id, model]));
+    expect(byId.get("claude-fable-5-1")).toMatchObject({
+      provider: "anthropic",
+      mode: "disabled",
+      defaultMode: "enabled",
+      added: false,
+    });
     expect(byId.get("claude-opus-5")).toMatchObject({ mode: "hidden", defaultMode: "hidden" });
     expect(byId.get("claude-test")).toStrictEqual({
-      ...ADDED, mode: "enabled", defaultMode: "enabled", added: true,
-      reasoningLevels: ["off", "minimal", "low", "medium", "high"], builtInReasoning: null,
-      builtInCompactionInputBudget: 500000, maxCompactionInputBudget: 500000,
+      ...ADDED,
+      mode: "enabled",
+      defaultMode: "enabled",
+      added: true,
+      reasoningLevels: ["off", "minimal", "low", "medium", "high"],
+      builtInReasoning: null,
+      builtInCompactionInputBudget: 500000,
+      maxCompactionInputBudget: 500000,
       runtimeKnown: false,
     });
     expect(gatewayModels!.models.at(-1)!.id).toBe("claude-test");
     expect(gatewayModels!.defaultReasoning).toBeNull();
   });
 
-  it("gives each model its reasoning levels, its compaction budgets and its settings",
-      async () => {
-    const { inDo } = adminSettings(
-        { ...GATEWAY, CF_AI_GATEWAY_PROVIDERS: "anthropic,openai,cloudflare" });
+  it("gives each model its reasoning levels, its compaction budgets and its settings", async () => {
+    const { inDo } = adminSettings({
+      ...GATEWAY,
+      CF_AI_GATEWAY_PROVIDERS: "anthropic,openai,cloudflare",
+    });
     const workersAi: GatewayModel = {
-      provider: "cloudflare", id: "@cf/test/added", name: "Added", contextWindow: 100000,
+      provider: "cloudflare",
+      id: "@cf/test/added",
+      name: "Added",
+      contextWindow: 100000,
       outputLimit: 8000,
     };
-    await inDo(admin => admin.addGatewayModel(workersAi));
-    await inDo(admin => admin.setGatewayModelSettings(
-        "gpt-6-sol", { reasoning: "xhigh", compactionInputBudget: 500000 }));
-    await inDo(admin => admin.setDefaultReasoning("medium"));
+    await inDo((admin) => admin.addGatewayModel(workersAi));
+    await inDo((admin) =>
+      admin.setGatewayModelSettings("gpt-6-sol", {
+        reasoning: "xhigh",
+        compactionInputBudget: 500000,
+      }),
+    );
+    await inDo((admin) => admin.setDefaultReasoning("medium"));
 
-    const { gatewayModels } = await inDo(admin => admin.getSettings("admin"));
+    const { gatewayModels } = await inDo((admin) => admin.getSettings("admin"));
     expect(gatewayModels!.defaultReasoning).toBe("medium");
     const view = (id: string) => {
-      const { reasoningLevels, builtInCompactionInputBudget, maxCompactionInputBudget,
-          runtimeKnown, settings } = gatewayModels!.models.find(model => model.id === id)!;
-      return { reasoningLevels, builtInCompactionInputBudget, maxCompactionInputBudget,
-          runtimeKnown, settings };
+      const {
+        reasoningLevels,
+        builtInCompactionInputBudget,
+        maxCompactionInputBudget,
+        runtimeKnown,
+        settings,
+      } = gatewayModels!.models.find((model) => model.id === id)!;
+      return {
+        reasoningLevels,
+        builtInCompactionInputBudget,
+        maxCompactionInputBudget,
+        runtimeKnown,
+        settings,
+      };
     };
     // The one built-in budget below what the window leaves: 1,050,000 less a 128,000 response.
     expect(view("gpt-6-sol")).toStrictEqual({
       reasoningLevels: ["off", "low", "medium", "high", "xhigh", "max"],
-      builtInCompactionInputBudget: 272000, maxCompactionInputBudget: 922000,
-      runtimeKnown: true, settings: { reasoning: "xhigh", compactionInputBudget: 500000 },
+      builtInCompactionInputBudget: 272000,
+      maxCompactionInputBudget: 922000,
+      runtimeKnown: true,
+      settings: { reasoning: "xhigh", compactionInputBudget: 500000 },
     });
     // The deployment's default is no setting of a model's own.
     expect(view("claude-opus-5-5")).toStrictEqual({
       reasoningLevels: ["low", "medium", "high", "xhigh", "max"],
-      builtInCompactionInputBudget: 1000000, maxCompactionInputBudget: 1000000,
-      runtimeKnown: true, settings: undefined,
+      builtInCompactionInputBudget: 1000000,
+      maxCompactionInputBudget: 1000000,
+      runtimeKnown: true,
+      settings: undefined,
     });
     // Workers AI charges the response to the window: 262,144 less 32,768.
     expect(view("@cf/zai-org/glm-5.2")).toStrictEqual({
       reasoningLevels: ["off", "high", "max"],
-      builtInCompactionInputBudget: 229376, maxCompactionInputBudget: 229376,
-      runtimeKnown: true, settings: undefined,
+      builtInCompactionInputBudget: 229376,
+      maxCompactionInputBudget: 229376,
+      runtimeKnown: true,
+      settings: undefined,
     });
     // An added model's limits are its own, and the runtime takes it for one that does no
     // reasoning.
     expect(view("@cf/test/added")).toStrictEqual({
       reasoningLevels: [],
-      builtInCompactionInputBudget: 92000, maxCompactionInputBudget: 92000,
-      runtimeKnown: false, settings: undefined,
+      builtInCompactionInputBudget: 92000,
+      maxCompactionInputBudget: 92000,
+      runtimeKnown: false,
+      settings: undefined,
     });
-    expect(gatewayModels!.models.find(model => model.id === "claude-opus-5-5"))
-        .not.toHaveProperty("settings");
+    expect(
+      gatewayModels!.models.find((model) => model.id === "claude-opus-5-5"),
+    ).not.toHaveProperty("settings");
   });
 
   it("says what each model is asked for while no reasoning level is set", async () => {
-    const { inDo } = adminSettings(
-        { ...GATEWAY, CF_AI_GATEWAY_PROVIDERS: "anthropic,openai,cloudflare" });
-    await inDo(admin => admin.addGatewayModel({ ...ADDED, behavesLike: "claude-opus-5-5" }));
-    await inDo(admin => admin.addGatewayModel({ ...ADDED, id: "claude-plain" }));
+    const { inDo } = adminSettings({
+      ...GATEWAY,
+      CF_AI_GATEWAY_PROVIDERS: "anthropic,openai,cloudflare",
+    });
+    await inDo((admin) => admin.addGatewayModel({ ...ADDED, behavesLike: "claude-opus-5-5" }));
+    await inDo((admin) => admin.addGatewayModel({ ...ADDED, id: "claude-plain" }));
     // Neither a level of the model's own nor the deployment's default is its built-in request.
-    await inDo(admin => admin.setGatewayModelSettings("claude-opus-5-5", { reasoning: "low" }));
-    await inDo(admin => admin.setDefaultReasoning("high"));
+    await inDo((admin) => admin.setGatewayModelSettings("claude-opus-5-5", { reasoning: "low" }));
+    await inDo((admin) => admin.setDefaultReasoning("high"));
 
-    const { models } = (await inDo(admin => admin.getSettings("admin"))).gatewayModels!;
-    const builtIn = (id: string) => models.find(model => model.id === id)!.builtInReasoning;
+    const { models } = (await inDo((admin) => admin.getSettings("admin"))).gatewayModels!;
+    const builtIn = (id: string) => models.find((model) => model.id === id)!.builtInReasoning;
     // The model decides.
     expect(builtIn("claude-opus-5-5")).toBe("adaptive");
     expect(builtIn("claude-sonnet-5")).toBe("adaptive");
@@ -467,8 +576,8 @@ describe("AdminSettings.getSettings gateway models", () => {
 
   it("lists the providers in catalog order", async () => {
     const { inDo } = adminSettings({ ...GATEWAY, CF_AI_GATEWAY_PROVIDERS: "openai,anthropic" });
-    const { gatewayModels } = await inDo(admin => admin.getSettings("admin"));
-    const providers = [...new Set(gatewayModels!.models.map(model => model.provider))];
+    const { gatewayModels } = await inDo((admin) => admin.getSettings("admin"));
+    const providers = [...new Set(gatewayModels!.models.map((model) => model.provider))];
     expect(providers).toHaveLength(2);
     expect(gatewayModels!.providers).toEqual(providers);
   });
@@ -477,14 +586,15 @@ describe("AdminSettings.getSettings gateway models", () => {
     // No transport: the gateway config's constructor throws.
     const { inDo } = adminSettings({ ...GATEWAY, CF_AI_GATEWAY_API_TOKEN: undefined });
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
-    const view = await inDo(admin => admin.getSettings("admin"));
+    const view = await inDo((admin) => admin.getSettings("admin"));
     const events = logged.mock.calls.map(([entry]) => (entry as { event?: unknown })?.event);
     logged.mockRestore();
     expect(view.gatewayModels).toBeUndefined();
     expect(view.signupsEnabled).toBe(true);
     expect(events).toEqual(["gateway.models.read.failed"]);
-    await expect(inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "hidden")))
-        .rejects.toThrow("AI Gateway mode needs a transport");
+    await expect(
+      inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "hidden")),
+    ).rejects.toThrow("AI Gateway mode needs a transport");
   });
 });
 
@@ -493,8 +603,9 @@ describe("AdminSettings gateway model settings", () => {
 
   it("stores a model's settings, and mirrors them to KV", async () => {
     const { inDo, settings, put, mirror } = adminSettings();
-    await inDo(admin => admin.setGatewayModelSettings(
-        OPUS, { reasoning: "low", compactionInputBudget: 300000 }));
+    await inDo((admin) =>
+      admin.setGatewayModelSettings(OPUS, { reasoning: "low", compactionInputBudget: 300000 }),
+    );
     const stored = { [OPUS]: { reasoning: "low", compactionInputBudget: 300000 } };
     expect(await settings()).toStrictEqual(stored);
     expect(put).toHaveBeenCalledTimes(1);
@@ -504,33 +615,38 @@ describe("AdminSettings gateway model settings", () => {
 
   it("replaces a model's settings whole, and forgets them once empty", async () => {
     const { inDo, settings, mirror } = adminSettings();
-    await inDo(admin => admin.setGatewayModelSettings(
-        OPUS, { reasoning: "low", compactionInputBudget: 300000 }));
-    await inDo(admin => admin.setGatewayModelSettings("claude-fable-5-1", { reasoning: "max" }));
+    await inDo((admin) =>
+      admin.setGatewayModelSettings(OPUS, { reasoning: "low", compactionInputBudget: 300000 }),
+    );
+    await inDo((admin) => admin.setGatewayModelSettings("claude-fable-5-1", { reasoning: "max" }));
 
     // The budget is not carried over.
-    await inDo(admin => admin.setGatewayModelSettings(OPUS, { reasoning: "high" }));
-    expect(await settings()).toStrictEqual(
-        { "claude-fable-5-1": { reasoning: "max" }, [OPUS]: { reasoning: "high" } });
+    await inDo((admin) => admin.setGatewayModelSettings(OPUS, { reasoning: "high" }));
+    expect(await settings()).toStrictEqual({
+      "claude-fable-5-1": { reasoning: "max" },
+      [OPUS]: { reasoning: "high" },
+    });
 
-    await inDo(admin => admin.setGatewayModelSettings(OPUS, {}));
+    await inDo((admin) => admin.setGatewayModelSettings(OPUS, {}));
     expect(await settings()).toStrictEqual({ "claude-fable-5-1": { reasoning: "max" } });
-    expect(JSON.parse(mirror.current!).modelSettings)
-        .toStrictEqual({ "claude-fable-5-1": { reasoning: "max" } });
+    expect(JSON.parse(mirror.current!).modelSettings).toStrictEqual({
+      "claude-fable-5-1": { reasoning: "max" },
+    });
   });
 
   // A request clamps the level to one the model has: Opus 5.5 can't stop thinking.
   it("stores a level the model does not have", async () => {
     const { inDo, settings } = adminSettings();
-    await inDo(admin => admin.setGatewayModelSettings(OPUS, { reasoning: "off" }));
+    await inDo((admin) => admin.setGatewayModelSettings(OPUS, { reasoning: "off" }));
     expect(await settings()).toStrictEqual({ [OPUS]: { reasoning: "off" } });
   });
 
   it("accepts a compaction budget up to the room the model's window leaves", async () => {
     const { inDo, settings } = adminSettings();
-    await inDo(admin => admin.setGatewayModelSettings(OPUS, { compactionInputBudget: 1 }));
-    await inDo(admin => admin.setGatewayModelSettings(
-        "@cf/zai-org/glm-5.2", { compactionInputBudget: 229376 }));
+    await inDo((admin) => admin.setGatewayModelSettings(OPUS, { compactionInputBudget: 1 }));
+    await inDo((admin) =>
+      admin.setGatewayModelSettings("@cf/zai-org/glm-5.2", { compactionInputBudget: 229376 }),
+    );
     expect(await settings()).toStrictEqual({
       [OPUS]: { compactionInputBudget: 1 },
       "@cf/zai-org/glm-5.2": { compactionInputBudget: 229376 },
@@ -538,37 +654,55 @@ describe("AdminSettings gateway model settings", () => {
   });
 
   it.each([
-    ["one over the room the window leaves", "@cf/zai-org/glm-5.2", 229377,
+    [
+      "one over the room the window leaves",
+      "@cf/zai-org/glm-5.2",
+      229377,
       'The compaction budget of the "GLM 5.2 (Workers AI)" model must be a whole number of ' +
-      "tokens from 1 to 229376."],
-    ["zero", OPUS, 0, 'The compaction budget of the "Claude Opus 5.5" model must be a whole ' +
-      "number of tokens from 1 to 1000000."],
+        "tokens from 1 to 229376.",
+    ],
+    [
+      "zero",
+      OPUS,
+      0,
+      'The compaction budget of the "Claude Opus 5.5" model must be a whole ' +
+        "number of tokens from 1 to 1000000.",
+    ],
     ["a negative one", OPUS, -1, "must be a whole number of tokens from 1 to 1000000."],
     ["a fractional one", OPUS, 1000.5, "must be a whole number of tokens from 1 to 1000000."],
     ["one that is not a number", OPUS, NaN, "must be a whole number of tokens from 1 to 1000000."],
-  ])("refuses a compaction budget of %s, leaving storage and the mirror alone",
-      async (_, id, compactionInputBudget, message) => {
-    const { inDo, settings, put } = adminSettings();
-    await inDo(admin => admin.setGatewayModelSettings(id, { reasoning: "low" }));
-    put.mockClear();
-    await expect(inDo(admin => admin.setGatewayModelSettings(
-        id, { reasoning: "high", compactionInputBudget }))).rejects.toThrow(message);
-    expect(await settings()).toStrictEqual({ [id]: { reasoning: "low" } });
-    expect(put).not.toHaveBeenCalled();
-  });
+  ])(
+    "refuses a compaction budget of %s, leaving storage and the mirror alone",
+    async (_, id, compactionInputBudget, message) => {
+      const { inDo, settings, put } = adminSettings();
+      await inDo((admin) => admin.setGatewayModelSettings(id, { reasoning: "low" }));
+      put.mockClear();
+      await expect(
+        inDo((admin) =>
+          admin.setGatewayModelSettings(id, { reasoning: "high", compactionInputBudget }),
+        ),
+      ).rejects.toThrow(message);
+      expect(await settings()).toStrictEqual({ [id]: { reasoning: "low" } });
+      expect(put).not.toHaveBeenCalled();
+    },
+  );
 
   // Workers AI reserves 32,768 tokens for the response, which is more than this window. Such a
   // model can't be added, so this is one that was stored.
   it("refuses any compaction budget for a model whose window leaves no room", async () => {
     const { inDo, settings } = adminSettings();
-    await inDo(admin => admin.updateAdminConfig({ addedModels: [
-      { provider: "cloudflare", id: "@cf/test/tiny", name: "Tiny", contextWindow: 1000 },
-    ] }));
-    await expect(inDo(admin => admin.setGatewayModelSettings(
-        "@cf/test/tiny", { compactionInputBudget: 1 }))).rejects.toThrow(
-        'The "Tiny" model\'s context window leaves no room for a compaction budget.');
+    await inDo((admin) =>
+      admin.updateAdminConfig({
+        addedModels: [
+          { provider: "cloudflare", id: "@cf/test/tiny", name: "Tiny", contextWindow: 1000 },
+        ],
+      }),
+    );
+    await expect(
+      inDo((admin) => admin.setGatewayModelSettings("@cf/test/tiny", { compactionInputBudget: 1 })),
+    ).rejects.toThrow('The "Tiny" model\'s context window leaves no room for a compaction budget.');
     // Its level can still be set.
-    await inDo(admin => admin.setGatewayModelSettings("@cf/test/tiny", { reasoning: "high" }));
+    await inDo((admin) => admin.setGatewayModelSettings("@cf/test/tiny", { reasoning: "high" }));
     expect(await settings()).toStrictEqual({ "@cf/test/tiny": { reasoning: "high" } });
   });
 
@@ -576,8 +710,9 @@ describe("AdminSettings gateway model settings", () => {
     const { inDo, settings, put } = adminSettings();
     // The second is a suggested model of a provider this gateway does not enable.
     for (let id of ["claude-fable-9", "gpt-6-luna", "constructor"]) {
-      await expect(inDo(admin => admin.setGatewayModelSettings(id, { reasoning: "low" })))
-          .rejects.toThrow(`No such model: ${id}`);
+      await expect(
+        inDo((admin) => admin.setGatewayModelSettings(id, { reasoning: "low" })),
+      ).rejects.toThrow(`No such model: ${id}`);
     }
     expect(await settings()).toStrictEqual({});
     expect(put).not.toHaveBeenCalled();
@@ -585,70 +720,78 @@ describe("AdminSettings gateway model settings", () => {
 
   it("gives a model whose ID is __proto__ settings of its own", async () => {
     const { inDo, settings, mirror } = adminSettings();
-    await inDo(admin => admin.addGatewayModel({ ...ADDED, id: "__proto__" }));
-    await inDo(admin => admin.setGatewayModelSettings("__proto__", { reasoning: "low" }));
+    await inDo((admin) => admin.addGatewayModel({ ...ADDED, id: "__proto__" }));
+    await inDo((admin) => admin.setGatewayModelSettings("__proto__", { reasoning: "low" }));
     expect(Object.entries(await settings())).toEqual([["__proto__", { reasoning: "low" }]]);
-    expect(Object.entries(parseAdminConfig(mirror.current).modelSettings))
-        .toEqual([["__proto__", { reasoning: "low" }]]);
-    const view = await inDo(admin => admin.getSettings("admin"));
-    expect(view.gatewayModels!.models.find(model => model.id === "__proto__")?.settings)
-        .toStrictEqual({ reasoning: "low" });
+    expect(Object.entries(parseAdminConfig(mirror.current).modelSettings)).toEqual([
+      ["__proto__", { reasoning: "low" }],
+    ]);
+    const view = await inDo((admin) => admin.getSettings("admin"));
+    expect(
+      view.gatewayModels!.models.find((model) => model.id === "__proto__")?.settings,
+    ).toStrictEqual({ reasoning: "low" });
 
-    await inDo(admin => admin.setGatewayModelSettings("__proto__", {}));
+    await inDo((admin) => admin.setGatewayModelSettings("__proto__", {}));
     expect(Object.entries(await settings())).toEqual([]);
   });
 
   it("removes an added model along with its settings", async () => {
     const { inDo, settings } = adminSettings();
-    await inDo(admin => admin.addGatewayModel(ADDED));
-    await inDo(admin => admin.setGatewayModelSettings("claude-test", { reasoning: "low" }));
-    await inDo(admin => admin.setGatewayModelSettings(OPUS, { reasoning: "max" }));
+    await inDo((admin) => admin.addGatewayModel(ADDED));
+    await inDo((admin) => admin.setGatewayModelSettings("claude-test", { reasoning: "low" }));
+    await inDo((admin) => admin.setGatewayModelSettings(OPUS, { reasoning: "max" }));
 
-    await inDo(admin => admin.removeGatewayModel("claude-test"));
+    await inDo((admin) => admin.removeGatewayModel("claude-test"));
     expect(await settings()).toStrictEqual({ [OPUS]: { reasoning: "max" } });
 
     // Its ID is free again, with nothing set.
-    await inDo(admin => admin.addGatewayModel(ADDED));
-    const view = await inDo(admin => admin.getSettings("admin"));
-    expect(view.gatewayModels!.models.find(model => model.id === "claude-test"))
-        .not.toHaveProperty("settings");
+    await inDo((admin) => admin.addGatewayModel(ADDED));
+    const view = await inDo((admin) => admin.getSettings("admin"));
+    expect(
+      view.gatewayModels!.models.find((model) => model.id === "claude-test"),
+    ).not.toHaveProperty("settings");
   });
 
   // Settings outlive their model when the catalog drops a model an admin had changed.
   it("starts a model with nothing set whatever its ID was left with", async () => {
     const { inDo, settings } = adminSettings();
-    await inDo(admin => admin.updateAdminConfig({
-      modelSettings: { "claude-test": { reasoning: "max" }, [OPUS]: { reasoning: "low" } },
-    }));
-    await inDo(admin => admin.addGatewayModel(ADDED));
+    await inDo((admin) =>
+      admin.updateAdminConfig({
+        modelSettings: { "claude-test": { reasoning: "max" }, [OPUS]: { reasoning: "low" } },
+      }),
+    );
+    await inDo((admin) => admin.addGatewayModel(ADDED));
     expect(await settings()).toStrictEqual({ [OPUS]: { reasoning: "low" } });
   });
 
   it("keeps a suggested model's settings when removing an added model it shadows", async () => {
     const { inDo, settings } = adminSettings();
-    await inDo(admin => admin.updateAdminConfig({
-      addedModels: [{ ...ADDED, id: OPUS }],
-      modelSettings: { [OPUS]: { reasoning: "low" } },
-    }));
-    await inDo(admin => admin.removeGatewayModel(OPUS));
+    await inDo((admin) =>
+      admin.updateAdminConfig({
+        addedModels: [{ ...ADDED, id: OPUS }],
+        modelSettings: { [OPUS]: { reasoning: "low" } },
+      }),
+    );
+    await inDo((admin) => admin.removeGatewayModel(OPUS));
     expect(await settings()).toStrictEqual({ [OPUS]: { reasoning: "low" } });
   });
 
   it("stores the deployment's default reasoning level, and mirrors it to KV", async () => {
     const { inDo, put, mirror } = adminSettings();
-    const level = () => inDo(async admin => ({
-      stored: admin.getAdminConfig().defaultReasoning,
-      view: (await admin.getSettings("admin")).gatewayModels!.defaultReasoning,
-    }));
+    const level = () =>
+      inDo(async (admin) => ({
+        stored: admin.getAdminConfig().defaultReasoning,
+        view: (await admin.getSettings("admin")).gatewayModels!.defaultReasoning,
+      }));
     expect(await level()).toEqual({ stored: null, view: null });
 
-    await inDo(admin => admin.setDefaultReasoning("high"));
+    await inDo((admin) => admin.setDefaultReasoning("high"));
     expect(await level()).toEqual({ stored: "high", view: "high" });
     expect(put).toHaveBeenCalledTimes(1);
     expect(put.mock.calls[0]![0]).toBe(".adminConfig");
     expect(JSON.parse(mirror.current!).defaultReasoning).toBe("high");
 
-    await inDo(admin => admin.setDefaultReasoning(null));
+    await inDo((admin) => admin.setDefaultReasoning(null));
     expect(await level()).toEqual({ stored: null, view: null });
     expect(JSON.parse(mirror.current!).defaultReasoning).toBeNull();
   });
@@ -657,31 +800,36 @@ describe("AdminSettings gateway model settings", () => {
 describe("AdminSettings added models that behave like another", () => {
   it("stores the model an added model behaves like, trimmed", async () => {
     const { inDo, stored } = adminSettings();
-    await inDo(admin => admin.addGatewayModel({ ...ADDED, behavesLike: " claude-opus-5-5 " }));
-    expect((await stored()).addedModels)
-        .toStrictEqual([{ ...ADDED, behavesLike: "claude-opus-5-5" }]);
+    await inDo((admin) => admin.addGatewayModel({ ...ADDED, behavesLike: " claude-opus-5-5 " }));
+    expect((await stored()).addedModels).toStrictEqual([
+      { ...ADDED, behavesLike: "claude-opus-5-5" },
+    ]);
 
     // The runtime has no entry for the model's own ID, so it takes the other model's levels.
-    const view = await inDo(admin => admin.getSettings("admin"));
-    expect(view.gatewayModels!.models.find(model => model.id === "claude-test")).toMatchObject({
-      behavesLike: "claude-opus-5-5", runtimeKnown: false, behavesLikeKnown: true,
+    const view = await inDo((admin) => admin.getSettings("admin"));
+    expect(view.gatewayModels!.models.find((model) => model.id === "claude-test")).toMatchObject({
+      behavesLike: "claude-opus-5-5",
+      runtimeKnown: false,
+      behavesLikeKnown: true,
       reasoningLevels: ["low", "medium", "high", "xhigh", "max"],
     });
   });
 
   // As after an upgrade to a runtime that dropped the other model.
-  it("reports a stored one the runtime does not know, and nothing for a model with none",
-      async () => {
+  it("reports a stored one the runtime does not know, and nothing for a model with none", async () => {
     const { inDo } = adminSettings();
     const plain = { ...ADDED, id: "claude-plain" };
-    await inDo(admin => admin.updateAdminConfig(
-        { addedModels: [{ ...ADDED, behavesLike: "claude-nope" }, plain] }));
-    const { models } = (await inDo(admin => admin.getSettings("admin"))).gatewayModels!;
-    expect(models.find(model => model.id === ADDED.id)).toMatchObject({
-      behavesLike: "claude-nope", runtimeKnown: false, behavesLikeKnown: false,
+    await inDo((admin) =>
+      admin.updateAdminConfig({ addedModels: [{ ...ADDED, behavesLike: "claude-nope" }, plain] }),
+    );
+    const { models } = (await inDo((admin) => admin.getSettings("admin"))).gatewayModels!;
+    expect(models.find((model) => model.id === ADDED.id)).toMatchObject({
+      behavesLike: "claude-nope",
+      runtimeKnown: false,
+      behavesLikeKnown: false,
       reasoningLevels: ["off", "minimal", "low", "medium", "high"],
     });
-    expect(models.find(model => model.id === plain.id)).not.toHaveProperty("behavesLikeKnown");
+    expect(models.find((model) => model.id === plain.id)).not.toHaveProperty("behavesLikeKnown");
   });
 
   it.each([
@@ -691,47 +839,56 @@ describe("AdminSettings added models that behave like another", () => {
     ["named by an inherited key", "constructor"],
   ])("refuses a model %s", async (_, behavesLike) => {
     const { inDo, stored, put } = adminSettings();
-    await expect(inDo(admin => admin.addGatewayModel({ ...ADDED, behavesLike })))
-        .rejects.toThrow(`"${behavesLike}" is not a model the runtime knows under provider ` +
-            '"anthropic", so "claude-test" can\'t behave like it.');
+    await expect(inDo((admin) => admin.addGatewayModel({ ...ADDED, behavesLike }))).rejects.toThrow(
+      `"${behavesLike}" is not a model the runtime knows under provider ` +
+        '"anthropic", so "claude-test" can\'t behave like it.',
+    );
     expect((await stored()).addedModels).toEqual([]);
     expect(put).not.toHaveBeenCalled();
   });
 
   it("refuses an over-long one as malformed", async () => {
     const { inDo, stored } = adminSettings();
-    await expect(inDo(admin => admin.addGatewayModel({ ...ADDED, behavesLike: "x".repeat(201) })))
-        .rejects.toThrow("Invalid model:");
+    await expect(
+      inDo((admin) => admin.addGatewayModel({ ...ADDED, behavesLike: "x".repeat(201) })),
+    ).rejects.toThrow("Invalid model:");
     expect((await stored()).addedModels).toEqual([]);
   });
 
   // The runtime's own entry is used, so the claim is unused rather than wrong.
-  it("accepts one for a model the runtime knows, and reports that it knows the model",
-      async () => {
+  it("accepts one for a model the runtime knows, and reports that it knows the model", async () => {
     const { inDo } = adminSettings();
-    await inDo(admin => admin.addGatewayModel(
-        { ...ADDED, id: "claude-sonnet-4-5", behavesLike: "claude-opus-5-5" }));
-    const view = await inDo(admin => admin.getSettings("admin"));
-    expect(view.gatewayModels!.models.find(model => model.id === "claude-sonnet-4-5"))
-        .toMatchObject({ behavesLike: "claude-opus-5-5", runtimeKnown: true });
+    await inDo((admin) =>
+      admin.addGatewayModel({ ...ADDED, id: "claude-sonnet-4-5", behavesLike: "claude-opus-5-5" }),
+    );
+    const view = await inDo((admin) => admin.getSettings("admin"));
+    expect(
+      view.gatewayModels!.models.find((model) => model.id === "claude-sonnet-4-5"),
+    ).toMatchObject({ behavesLike: "claude-opus-5-5", runtimeKnown: true });
   });
 });
 
 // The gateway model with this ID, as the admin panel is shown it.
 const shownModel = (view: Awaited<ReturnType<AdminSettings["getSettings"]>>, id: string) =>
-    view.gatewayModels!.models.find(model => model.id === id);
+  view.gatewayModels!.models.find((model) => model.id === id);
 
 describe("AdminSettings added models with stated capabilities", () => {
   it("stores the well-formed part of what an added model is stated to do", async () => {
     const { inDo, stored, mirror } = adminSettings();
-    await inDo(admin => admin.addGatewayModel({
-      ...ADDED,
-      capabilities: { imageInput: false, reasoningLevels: ["max", "low", "low"], strict: true },
-    } as GatewayModel));
+    await inDo((admin) =>
+      admin.addGatewayModel({
+        ...ADDED,
+        capabilities: { imageInput: false, reasoningLevels: ["max", "low", "low"], strict: true },
+      } as GatewayModel),
+    );
     // A malformed statement is no reason to refuse the model.
-    await inDo(admin => admin.addGatewayModel({
-      ...ADDED, id: "claude-plain", capabilities: { imageInput: "no", reasoningLevels: "high" },
-    } as unknown as GatewayModel));
+    await inDo((admin) =>
+      admin.addGatewayModel({
+        ...ADDED,
+        id: "claude-plain",
+        capabilities: { imageInput: "no", reasoningLevels: "high" },
+      } as unknown as GatewayModel),
+    );
     const clean = [
       { ...ADDED, capabilities: { imageInput: false, reasoningLevels: ["low", "max"] } },
       { ...ADDED, id: "claude-plain" },
@@ -742,23 +899,33 @@ describe("AdminSettings added models with stated capabilities", () => {
   });
 
   // The runtime has no entry for either model's own ID.
-  it("lists the levels stated for a model, ahead of those of the model it behaves like",
-      async () => {
+  it("lists the levels stated for a model, ahead of those of the model it behaves like", async () => {
     const { inDo } = adminSettings({ ...GATEWAY, CF_AI_GATEWAY_PROVIDERS: "anthropic,openai" });
     const capabilities: GatewayModelCapabilities = { reasoningLevels: ["low", "max"] };
-    await inDo(admin => admin.addGatewayModel(
-        { ...ADDED, behavesLike: "claude-opus-5-5", capabilities }));
-    await inDo(admin => admin.addGatewayModel({
-      ...ADDED, provider: "openai", id: "gpt-test", capabilities: { reasoningLevels: ["off"] },
-    }));
-    const view = await inDo(admin => admin.getSettings("admin"));
+    await inDo((admin) =>
+      admin.addGatewayModel({ ...ADDED, behavesLike: "claude-opus-5-5", capabilities }),
+    );
+    await inDo((admin) =>
+      admin.addGatewayModel({
+        ...ADDED,
+        provider: "openai",
+        id: "gpt-test",
+        capabilities: { reasoningLevels: ["off"] },
+      }),
+    );
+    const view = await inDo((admin) => admin.getSettings("admin"));
     expect(shownModel(view, "claude-test")).toMatchObject({
-      behavesLike: "claude-opus-5-5", capabilities, runtimeKnown: false,
-      reasoningLevels: ["low", "max"], builtInReasoning: "adaptive",
+      behavesLike: "claude-opus-5-5",
+      capabilities,
+      runtimeKnown: false,
+      reasoningLevels: ["low", "max"],
+      builtInReasoning: "adaptive",
     });
     // One stated to do no reasoning has no level to set, and is asked for none.
     expect(shownModel(view, "gpt-test")).toMatchObject({
-      capabilities: { reasoningLevels: ["off"] }, runtimeKnown: false, reasoningLevels: [],
+      capabilities: { reasoningLevels: ["off"] },
+      runtimeKnown: false,
+      reasoningLevels: [],
       builtInReasoning: null,
     });
   });
@@ -767,23 +934,29 @@ describe("AdminSettings added models with stated capabilities", () => {
   it("lists the runtime's levels for a model the runtime knows, whatever is stated", async () => {
     const { inDo } = adminSettings();
     const capabilities: GatewayModelCapabilities = { reasoningLevels: ["max"] };
-    await inDo(admin => admin.addGatewayModel({ ...ADDED, capabilities }));
-    await inDo(admin => admin.addGatewayModel({ ...ADDED, id: "claude-sonnet-4-5", capabilities }));
-    const view = await inDo(admin => admin.getSettings("admin"));
-    expect(shownModel(view, "claude-test"))
-        .toMatchObject({ runtimeKnown: false, reasoningLevels: ["max"] });
+    await inDo((admin) => admin.addGatewayModel({ ...ADDED, capabilities }));
+    await inDo((admin) =>
+      admin.addGatewayModel({ ...ADDED, id: "claude-sonnet-4-5", capabilities }),
+    );
+    const view = await inDo((admin) => admin.getSettings("admin"));
+    expect(shownModel(view, "claude-test")).toMatchObject({
+      runtimeKnown: false,
+      reasoningLevels: ["max"],
+    });
     expect(shownModel(view, "claude-sonnet-4-5")).toMatchObject({
-      capabilities, runtimeKnown: true,
+      capabilities,
+      runtimeKnown: true,
       reasoningLevels: ["off", "minimal", "low", "medium", "high"],
     });
   });
 });
 
 // The providers an admin turned on, as stored and as the admin panel is shown every provider.
-const providers = (inDo: ReturnType<typeof adminSettings>["inDo"]) => inDo(async admin => ({
-  stored: admin.getAdminConfig().addedProviders,
-  view: (await admin.getSettings("admin")).gatewayModels!.providerSettings,
-}));
+const providers = (inDo: ReturnType<typeof adminSettings>["inDo"]) =>
+  inDo(async (admin) => ({
+    stored: admin.getAdminConfig().addedProviders,
+    view: (await admin.getSettings("admin")).gatewayModels!.providerSettings,
+  }));
 
 describe("AdminSettings gateway providers", () => {
   const FLOOR = [
@@ -796,61 +969,76 @@ describe("AdminSettings gateway providers", () => {
 
   it("turns a provider on and off, storing and mirroring each change", async () => {
     const { inDo, put, mirror } = adminSettings();
-    expect(await providers(inDo)).toStrictEqual(
-        { stored: [], view: [...FLOOR, OPENAI_OFF, GOOGLE_OFF] });
+    expect(await providers(inDo)).toStrictEqual({
+      stored: [],
+      view: [...FLOOR, OPENAI_OFF, GOOGLE_OFF],
+    });
 
-    await inDo(admin => admin.setGatewayProviderEnabled("openai", true));
-    expect(await providers(inDo)).toStrictEqual(
-        { stored: ["openai"], view: [...FLOOR, OPENAI_ON, GOOGLE_OFF] });
+    await inDo((admin) => admin.setGatewayProviderEnabled("openai", true));
+    expect(await providers(inDo)).toStrictEqual({
+      stored: ["openai"],
+      view: [...FLOOR, OPENAI_ON, GOOGLE_OFF],
+    });
     expect(put).toHaveBeenCalledTimes(1);
     expect(put.mock.calls[0]![0]).toBe(".adminConfig");
     expect(JSON.parse(mirror.current!).addedProviders).toStrictEqual(["openai"]);
     // Its suggested models are the deployment's, and models can be added under it.
-    const on = (await inDo(admin => admin.getSettings("admin"))).gatewayModels!;
+    const on = (await inDo((admin) => admin.getSettings("admin"))).gatewayModels!;
     expect(on.providers).toEqual(["cloudflare", "anthropic", "openai"]);
-    expect(on.models.find(model => model.id === "gpt-6-sol"))
-        .toMatchObject({ provider: "openai", mode: "hidden", defaultMode: "hidden" });
-    await inDo(admin => admin.addGatewayModel({ ...ADDED, provider: "openai", id: "gpt-test" }));
+    expect(on.models.find((model) => model.id === "gpt-6-sol")).toMatchObject({
+      provider: "openai",
+      mode: "hidden",
+      defaultMode: "hidden",
+    });
+    await inDo((admin) => admin.addGatewayModel({ ...ADDED, provider: "openai", id: "gpt-test" }));
 
     // Once is enough. Reading the config back drops a repeat, so only the raw write shows one.
-    await inDo(admin => admin.setGatewayProviderEnabled("openai", true));
+    await inDo((admin) => admin.setGatewayProviderEnabled("openai", true));
     expect(JSON.parse(mirror.current!).addedProviders).toStrictEqual(["openai"]);
 
-    await inDo(admin => admin.setGatewayProviderEnabled("openai", false));
-    expect(await providers(inDo)).toStrictEqual(
-        { stored: [], view: [...FLOOR, OPENAI_OFF, GOOGLE_OFF] });
+    await inDo((admin) => admin.setGatewayProviderEnabled("openai", false));
+    expect(await providers(inDo)).toStrictEqual({
+      stored: [],
+      view: [...FLOOR, OPENAI_OFF, GOOGLE_OFF],
+    });
     expect(JSON.parse(mirror.current!).addedProviders).toStrictEqual([]);
-    const off = (await inDo(admin => admin.getSettings("admin"))).gatewayModels!;
+    const off = (await inDo((admin) => admin.getSettings("admin"))).gatewayModels!;
     expect(off.providers).toEqual(["cloudflare", "anthropic"]);
-    expect(off.models.filter(model => model.provider === "openai")).toEqual([]);
+    expect(off.models.filter((model) => model.provider === "openai")).toEqual([]);
   });
 
   it("keeps the admin's other providers when one is turned off", async () => {
     const { inDo } = adminSettings();
-    await inDo(admin => admin.setGatewayProviderEnabled("google", true));
-    await inDo(admin => admin.setGatewayProviderEnabled("openai", true));
-    await inDo(admin => admin.setGatewayProviderEnabled("google", false));
+    await inDo((admin) => admin.setGatewayProviderEnabled("google", true));
+    await inDo((admin) => admin.setGatewayProviderEnabled("openai", true));
+    await inDo((admin) => admin.setGatewayProviderEnabled("google", false));
     expect((await providers(inDo)).stored).toStrictEqual(["openai"]);
   });
 
   it("refuses to turn off a provider the environment enables", async () => {
     const { inDo, put } = adminSettings();
-    await expect(inDo(admin => admin.setGatewayProviderEnabled("anthropic", false)))
-        .rejects.toThrow(new Error('Provider "anthropic" is enabled by CF_AI_GATEWAY_PROVIDERS ' +
-            "and can only be turned off there."));
+    await expect(
+      inDo((admin) => admin.setGatewayProviderEnabled("anthropic", false)),
+    ).rejects.toThrow(
+      new Error(
+        'Provider "anthropic" is enabled by CF_AI_GATEWAY_PROVIDERS ' +
+          "and can only be turned off there.",
+      ),
+    );
     expect((await providers(inDo)).view.slice(0, 2)).toStrictEqual(FLOOR);
     expect(put).not.toHaveBeenCalled();
 
     // Nor one that an admin had also turned on before the environment listed it.
-    await inDo(admin => admin.updateAdminConfig({ addedProviders: ["anthropic"] }));
-    await expect(inDo(admin => admin.setGatewayProviderEnabled("anthropic", false)))
-        .rejects.toThrow("can only be turned off there.");
+    await inDo((admin) => admin.updateAdminConfig({ addedProviders: ["anthropic"] }));
+    await expect(
+      inDo((admin) => admin.setGatewayProviderEnabled("anthropic", false)),
+    ).rejects.toThrow("can only be turned off there.");
     expect((await providers(inDo)).stored).toStrictEqual(["anthropic"]);
   });
 
   it("stores nothing when turning on a provider the environment enables", async () => {
     const { inDo } = adminSettings();
-    await inDo(admin => admin.setGatewayProviderEnabled("anthropic", true));
+    await inDo((admin) => admin.setGatewayProviderEnabled("anthropic", true));
     const { stored, view } = await providers(inDo);
     expect(stored).toStrictEqual([]);
     expect(view.slice(0, 2)).toStrictEqual(FLOOR);
@@ -861,8 +1049,9 @@ describe("AdminSettings gateway providers", () => {
     for (let listed of ["anthropic", "anthropic,ollama"]) {
       const { inDo, put } = adminSettings({ ...GATEWAY, CF_AI_GATEWAY_PROVIDERS: listed });
       for (let enabled of [true, false]) {
-        await expect(inDo(admin => admin.setGatewayProviderEnabled("ollama", enabled)))
-            .rejects.toThrow(new Error('Provider "ollama" is not served through AI Gateway.'));
+        await expect(
+          inDo((admin) => admin.setGatewayProviderEnabled("ollama", enabled)),
+        ).rejects.toThrow(new Error('Provider "ollama" is not served through AI Gateway.'));
       }
       expect((await providers(inDo)).stored).toStrictEqual([]);
       expect(put).not.toHaveBeenCalled();
@@ -872,51 +1061,58 @@ describe("AdminSettings gateway providers", () => {
   it("keeps what is stored for a provider's models while the provider is off", async () => {
     const { inDo, stored, settings } = adminSettings();
     const added = { ...ADDED, provider: "openai" as const, id: "gpt-test" };
-    await inDo(admin => admin.setGatewayProviderEnabled("openai", true));
-    await inDo(admin => admin.setGatewayModelMode("gpt-6-luna", "disabled"));
-    await inDo(admin => admin.setGatewayModelSettings("gpt-6-luna", { reasoning: "low" }));
-    await inDo(admin => admin.addGatewayModel(added));
-    await inDo(admin => admin.setGatewayModelMode("gpt-test", "hidden"));
-    const before = (await inDo(admin => admin.getSettings("admin"))).gatewayModels!;
+    await inDo((admin) => admin.setGatewayProviderEnabled("openai", true));
+    await inDo((admin) => admin.setGatewayModelMode("gpt-6-luna", "disabled"));
+    await inDo((admin) => admin.setGatewayModelSettings("gpt-6-luna", { reasoning: "low" }));
+    await inDo((admin) => admin.addGatewayModel(added));
+    await inDo((admin) => admin.setGatewayModelMode("gpt-test", "hidden"));
+    const before = (await inDo((admin) => admin.getSettings("admin"))).gatewayModels!;
     const kept = {
-      modelModes: { "gpt-6-luna": "disabled", "gpt-test": "hidden" }, addedModels: [added],
+      modelModes: { "gpt-6-luna": "disabled", "gpt-test": "hidden" },
+      addedModels: [added],
     };
     expect(await stored()).toEqual(kept);
 
-    await inDo(admin => admin.setGatewayProviderEnabled("openai", false));
+    await inDo((admin) => admin.setGatewayProviderEnabled("openai", false));
     expect(await stored()).toEqual(kept);
     expect(await settings()).toStrictEqual({ "gpt-6-luna": { reasoning: "low" } });
-    const off = (await inDo(admin => admin.getSettings("admin"))).gatewayModels!;
-    expect(off.models.filter(model => model.provider === "openai")).toEqual([]);
+    const off = (await inDo((admin) => admin.getSettings("admin"))).gatewayModels!;
+    expect(off.models.filter((model) => model.provider === "openai")).toEqual([]);
     // Out of the table, its models can't be changed, and an added one keeps its ID.
-    await expect(inDo(admin => admin.setGatewayModelMode("gpt-6-luna", "enabled")))
-        .rejects.toThrow("No such model: gpt-6-luna");
-    await expect(inDo(admin => admin.addGatewayModel({ ...ADDED, id: "gpt-test" })))
-        .rejects.toThrow('"gpt-test" is already an added model.');
+    await expect(
+      inDo((admin) => admin.setGatewayModelMode("gpt-6-luna", "enabled")),
+    ).rejects.toThrow("No such model: gpt-6-luna");
+    await expect(
+      inDo((admin) => admin.addGatewayModel({ ...ADDED, id: "gpt-test" })),
+    ).rejects.toThrow('"gpt-test" is already an added model.');
 
-    await inDo(admin => admin.setGatewayProviderEnabled("openai", true));
-    expect((await inDo(admin => admin.getSettings("admin"))).gatewayModels).toStrictEqual(before);
+    await inDo((admin) => admin.setGatewayProviderEnabled("openai", true));
+    expect((await inDo((admin) => admin.getSettings("admin"))).gatewayModels).toStrictEqual(before);
   });
 
   // The environment listing google with no token is a gateway that does not start. An admin
   // turning it on must leave every other gateway read and write working.
-  it("turns google on for a deployment with no token, and reports that it needs one",
-      async () => {
+  it("turns google on for a deployment with no token, and reports that it needs one", async () => {
     const { inDo, stored } = adminSettings({
-      ...GATEWAY, CF_AI_GATEWAY_API_TOKEN: undefined, WORKERS_AI: { fetch: vi.fn() },
+      ...GATEWAY,
+      CF_AI_GATEWAY_API_TOKEN: undefined,
+      WORKERS_AI: { fetch: vi.fn() },
     });
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      await inDo(admin => admin.setGatewayProviderEnabled("google", true));
-      const { gatewayModels } = await inDo(admin => admin.getSettings("admin"));
+      await inDo((admin) => admin.setGatewayProviderEnabled("google", true));
+      const { gatewayModels } = await inDo((admin) => admin.getSettings("admin"));
       expect(gatewayModels!.providerSettings).toStrictEqual([
-        ...FLOOR, OPENAI_OFF, { provider: "google", enabledBy: "admin", needsApiToken: true },
+        ...FLOOR,
+        OPENAI_OFF,
+        { provider: "google", enabledBy: "admin", needsApiToken: true },
       ]);
-      expect(gatewayModels!.models.map(model => model.id)).toContain("gemini-3.6-flash");
+      expect(gatewayModels!.models.map((model) => model.id)).toContain("gemini-3.6-flash");
 
-      await inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "hidden"));
-      await inDo(admin => admin.addGatewayModel(
-          { ...ADDED, provider: "google", id: "gemini-test" }));
+      await inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "hidden"));
+      await inDo((admin) =>
+        admin.addGatewayModel({ ...ADDED, provider: "google", id: "gemini-test" }),
+      );
       expect((await stored()).modelModes).toEqual({ "claude-fable-5-1": "hidden" });
       expect(logged).not.toHaveBeenCalled();
     } finally {
@@ -929,54 +1125,87 @@ describe("AdminSettings gateway providers", () => {
 const KIMI = "@cf/moonshotai/kimi-k2.7-code";
 
 // One event of a Workers AI chat completion, as the gateway streams it.
-const chunk = (choice: object, rest: object = {}) => `data: ${JSON.stringify({
-  id: "completion", object: "chat.completion.chunk", created: 0, model: KIMI,
-  choices: [{ index: 0, ...choice }], ...rest,
-})}\n\n`;
+const chunk = (choice: object, rest: object = {}) =>
+  `data: ${JSON.stringify({
+    id: "completion",
+    object: "chat.completion.chunk",
+    created: 0,
+    model: KIMI,
+    choices: [{ index: 0, ...choice }],
+    ...rest,
+  })}\n\n`;
 function completion(text: string): Response {
   return new Response(
-      chunk({ delta: { role: "assistant", content: text }, finish_reason: null }) +
-      chunk({ delta: {}, finish_reason: "stop" },
-          { usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }) +
+    chunk({ delta: { role: "assistant", content: text }, finish_reason: null }) +
+      chunk(
+        { delta: {}, finish_reason: "stop" },
+        { usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } },
+      ) +
       "data: [DONE]\n\n",
-      { headers: { "content-type": "text/event-stream" } });
+    { headers: { "content-type": "text/event-stream" } },
+  );
 }
 const refusal = (status: number, said: string) => () => new Response(said, { status });
 
 // A stream of server-sent events, each named by its type as Anthropic and OpenAI name theirs.
-const events = (sent: { type: string }[]) => new Response(
-    sent.map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(""),
-    { headers: { "content-type": "text/event-stream" } });
+const events = (sent: { type: string }[]) =>
+  new Response(
+    sent.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(""),
+    { headers: { "content-type": "text/event-stream" } },
+  );
 // "OK" as each provider's own API streams it, by the gateway route the request took.
 function answered(request: Request): Response {
   const { pathname } = new URL(request.url);
   if (pathname.includes("/anthropic/")) {
     return events([
-      { type: "message_start", message: {
-        id: "message", type: "message", role: "assistant", model: "claude", content: [],
-        stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 },
-      } },
+      {
+        type: "message_start",
+        message: {
+          id: "message",
+          type: "message",
+          role: "assistant",
+          model: "claude",
+          content: [],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: { input_tokens: 1, output_tokens: 1 },
+        },
+      },
       { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
       { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "OK" } },
       { type: "content_block_stop", index: 0 },
-      { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null },
-        usage: { output_tokens: 1 } },
+      {
+        type: "message_delta",
+        delta: { stop_reason: "end_turn", stop_sequence: null },
+        usage: { output_tokens: 1 },
+      },
       { type: "message_stop" },
     ] as { type: string }[]);
   }
   if (pathname.includes("/openai/")) {
     const item = {
-      type: "message", id: "message", role: "assistant", status: "completed",
+      type: "message",
+      id: "message",
+      role: "assistant",
+      status: "completed",
       content: [{ type: "output_text", text: "OK", annotations: [] }],
     };
     return events([
-      { type: "response.output_item.added", output_index: 0,
-        item: { ...item, status: "in_progress", content: [] } },
+      {
+        type: "response.output_item.added",
+        output_index: 0,
+        item: { ...item, status: "in_progress", content: [] },
+      },
       { type: "response.output_item.done", output_index: 0, item },
-      { type: "response.completed", response: {
-        id: "response", status: "completed", output: [item],
-        usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
-      } },
+      {
+        type: "response.completed",
+        response: {
+          id: "response",
+          status: "completed",
+          output: [item],
+          usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+        },
+      },
     ] as { type: string }[]);
   }
   return completion("OK");
@@ -988,13 +1217,14 @@ function answered(request: Request): Response {
  * test, `testModel` one model test and `testNewModel` one test of a model that is described,
  * each returning its result with the entries it logged.
  */
-function tested(respond: (request: Request) => Response | Promise<Response>,
-                vars: object = {}) {
-  const requests: { url: string, headers: Headers, body: Record<string, unknown> }[] = [];
+function tested(respond: (request: Request) => Response | Promise<Response>, vars: object = {}) {
+  const requests: { url: string; headers: Headers; body: Record<string, unknown> }[] = [];
   const fetch = vi.fn(async (input: Request | string | URL, init?: RequestInit) => {
     const request = new Request(input, init);
     requests.push({
-      url: request.url, headers: request.headers, body: await request.clone().json(),
+      url: request.url,
+      headers: request.headers,
+      body: await request.clone().json(),
     });
     return respond(request);
   });
@@ -1003,67 +1233,88 @@ function tested(respond: (request: Request) => Response | Promise<Response>,
     const logged = vi.spyOn(console, "info").mockImplementation(() => {});
     try {
       const result = await settings.inDo(run);
-      const entries = logged.mock.calls.map(([entry]) => entry as Record<string, unknown>)
-          .filter(entry => entry?.event === event);
+      const entries = logged.mock.calls
+        .map(([entry]) => entry as Record<string, unknown>)
+        .filter((entry) => entry?.event === event);
       return { result, entries };
     } finally {
       logged.mockRestore();
     }
   };
-  const test = (provider: Parameters<AdminSettings["testGatewayProvider"]>[0]) => logging(
-      "gateway.provider.test", admin => admin.testGatewayProvider(provider, "admin@example.com"));
-  const testModel = (modelId: string) => logging(
-      "gateway.model.test", admin => admin.testGatewayModel(modelId, "admin@example.com"));
-  const testNewModel = (model: GatewayModel) => logging(
-      "gateway.model.test", admin => admin.testNewGatewayModel(model, "admin@example.com"));
+  const test = (provider: Parameters<AdminSettings["testGatewayProvider"]>[0]) =>
+    logging("gateway.provider.test", (admin) =>
+      admin.testGatewayProvider(provider, "admin@example.com"),
+    );
+  const testModel = (modelId: string) =>
+    logging("gateway.model.test", (admin) => admin.testGatewayModel(modelId, "admin@example.com"));
+  const testNewModel = (model: GatewayModel) =>
+    logging("gateway.model.test", (admin) => admin.testNewGatewayModel(model, "admin@example.com"));
   return { ...settings, fetch, requests, test, testModel, testNewModel };
 }
 
 describe("AdminSettings.testGatewayProvider", () => {
   const TIMED_OUT = "The model did not answer within 15 seconds.";
-  const NO_TOKEN = 'Provider "google" cannot use the Workers AI binding transport, and no ' +
-      "CF_AI_GATEWAY_API_TOKEN is configured for the HTTPS one.";
+  const NO_TOKEN =
+    'Provider "google" cannot use the Workers AI binding transport, and no ' +
+    "CF_AI_GATEWAY_API_TOKEN is configured for the HTTPS one.";
 
   it("asks the provider's first suggested model for a few tokens, as the admin", async () => {
     const { test, requests, put, inDo } = tested(() => completion("OK"));
-    const before = await inDo(admin => admin.getAdminConfig());
+    const before = await inDo((admin) => admin.getAdminConfig());
     const { result, entries } = await test("cloudflare");
 
     expect(KIMI).toBe(Object.keys(SUGGESTED_MODELS.cloudflare)[0]);
     expect(result).toStrictEqual({ model: KIMI, ok: true });
     expect(requests).toHaveLength(1);
     const [{ url, headers, body }] = requests;
-    expect(url).toBe("https://workers-binding.ai/ai-gateway/gateways/platform-gateway/" +
-        "workers-ai/v1/chat/completions");
-    expect(JSON.parse(headers.get("cf-aig-metadata")!))
-        .toStrictEqual({ user: "admin@example.com" });
+    expect(url).toBe(
+      "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/" +
+        "workers-ai/v1/chat/completions",
+    );
+    expect(JSON.parse(headers.get("cf-aig-metadata")!)).toStrictEqual({
+      user: "admin@example.com",
+    });
     // Every test sends the same request, which a caching gateway must not answer itself.
     expect(headers.get("cf-aig-skip-cache")).toBe("true");
     expect(body.model).toBe(KIMI);
     expect(body.max_completion_tokens ?? body.max_tokens).toBe(16);
 
-    expect(entries).toEqual([{
-      component: "workshop.admin.settings", event: "gateway.provider.test",
-      message: "tested an AI Gateway provider", modelId: KIMI, outcome: "ok",
-      durationMs: expect.any(Number),
-    }]);
+    expect(entries).toEqual([
+      {
+        component: "workshop.admin.settings",
+        event: "gateway.provider.test",
+        message: "tested an AI Gateway provider",
+        modelId: KIMI,
+        outcome: "ok",
+        durationMs: expect.any(Number),
+      },
+    ]);
     // Nothing is stored.
-    expect(await inDo(admin => admin.getAdminConfig())).toStrictEqual(before);
+    expect(await inDo((admin) => admin.getAdminConfig())).toStrictEqual(before);
     expect(put).not.toHaveBeenCalled();
   });
 
-  it("reports a refused request with its status, and logs neither its message nor the prompt",
-      async () => {
+  it("reports a refused request with its status, and logs neither its message nor the prompt", async () => {
     const { test, requests } = tested(refusal(401, "Incorrect API key provided."));
     const { result, entries } = await test("cloudflare");
-    expect(result).toStrictEqual(
-        { model: KIMI, ok: false, status: 401, message: "401 Incorrect API key provided." });
+    expect(result).toStrictEqual({
+      model: KIMI,
+      ok: false,
+      status: 401,
+      message: "401 Incorrect API key provided.",
+    });
 
-    expect(entries).toEqual([{
-      component: "workshop.admin.settings", event: "gateway.provider.test",
-      message: "tested an AI Gateway provider", modelId: KIMI, outcome: "error", statusCode: 401,
-      durationMs: expect.any(Number),
-    }]);
+    expect(entries).toEqual([
+      {
+        component: "workshop.admin.settings",
+        event: "gateway.provider.test",
+        message: "tested an AI Gateway provider",
+        modelId: KIMI,
+        outcome: "error",
+        statusCode: 401,
+        durationMs: expect.any(Number),
+      },
+    ]);
     const prompt = (requests[0]!.body.messages as { content: string }[]).at(-1)!.content;
     expect(prompt).toBeTypeOf("string");
     expect(JSON.stringify(entries)).not.toContain(prompt);
@@ -1073,22 +1324,35 @@ describe("AdminSettings.testGatewayProvider", () => {
   // pi's OpenAI adapter words a refusal differently from the provider SDKs.
   it("reports the status of a refused OpenAI request", async () => {
     const [model] = Object.keys(SUGGESTED_MODELS.openai);
-    const { test, requests } = tested(() => Response.json(
+    const { test, requests } = tested(() =>
+      Response.json(
         { error: { message: "Incorrect API key provided.", code: "invalid_api_key" } },
-        { status: 401 }));
+        { status: 401 },
+      ),
+    );
     const { result, entries } = await test("openai");
-    expect(requests.map(({ url }) => url)).toEqual(
-        ["https://workers-binding.ai/ai-gateway/gateways/platform-gateway/openai/responses"]);
+    expect(requests.map(({ url }) => url)).toEqual([
+      "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/openai/responses",
+    ]);
     expect(result).toStrictEqual({
-      model, ok: false, status: 401,
-      message: 'OpenAI API error (401): ' +
-          '{"message":"Incorrect API key provided.","code":"invalid_api_key"}',
+      model,
+      ok: false,
+      status: 401,
+      message:
+        "OpenAI API error (401): " +
+        '{"message":"Incorrect API key provided.","code":"invalid_api_key"}',
     });
-    expect(entries).toEqual([{
-      component: "workshop.admin.settings", event: "gateway.provider.test",
-      message: "tested an AI Gateway provider", modelId: model, outcome: "error", statusCode: 401,
-      durationMs: expect.any(Number),
-    }]);
+    expect(entries).toEqual([
+      {
+        component: "workshop.admin.settings",
+        event: "gateway.provider.test",
+        message: "tested an AI Gateway provider",
+        modelId: model,
+        outcome: "error",
+        statusCode: 401,
+        durationMs: expect.any(Number),
+      },
+    ]);
   });
 
   // pi's Google adapter reports a refusal as the response body alone, which names no status.
@@ -1101,8 +1365,9 @@ describe("AdminSettings.testGatewayProvider", () => {
       urls.push(request.url);
       skipCache.push(request.headers.get("cf-aig-skip-cache"));
       return Response.json(
-          { error: { code: 401, message: "API key not valid.", status: "UNAUTHENTICATED" } },
-          { status: 401 });
+        { error: { code: 401, message: "API key not valid.", status: "UNAUTHENTICATED" } },
+        { status: 401 },
+      );
     });
     try {
       const { result, entries } = await test("google");
@@ -1111,7 +1376,8 @@ describe("AdminSettings.testGatewayProvider", () => {
       // Over HTTPS too, a gateway that caches responses is told to ask the provider.
       expect(skipCache).toEqual(["true"]);
       expect(result).toStrictEqual({
-        model: "gemini-3.6-flash", ok: false,
+        model: "gemini-3.6-flash",
+        ok: false,
         message: '{"error":{"code":401,"message":"API key not valid.","status":"UNAUTHENTICATED"}}',
       });
       expect(entries).toMatchObject([{ modelId: "gemini-3.6-flash", outcome: "error" }]);
@@ -1122,8 +1388,7 @@ describe("AdminSettings.testGatewayProvider", () => {
     expect(binding).not.toHaveBeenCalled();
   });
 
-  it("reports a provider that needs a token the deployment lacks, without a request",
-      async () => {
+  it("reports a provider that needs a token the deployment lacks, without a request", async () => {
     const { test, fetch } = tested(() => completion("OK"), { CF_AI_GATEWAY_API_TOKEN: undefined });
     const { result, entries } = await test("google");
     expect(result).toStrictEqual({ model: "gemini-3.6-flash", ok: false, message: NO_TOKEN });
@@ -1138,9 +1403,12 @@ describe("AdminSettings.testGatewayProvider", () => {
     const realTimeout = AbortSignal.timeout.bind(AbortSignal);
     const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation(() => realTimeout(20));
     try {
-      const { test, requests } = tested(request => new Promise<Response>((_, reject) => {
-        request.signal.addEventListener("abort", () => reject(request.signal.reason));
-      }));
+      const { test, requests } = tested(
+        (request) =>
+          new Promise<Response>((_, reject) => {
+            request.signal.addEventListener("abort", () => reject(request.signal.reason));
+          }),
+      );
       const { result, entries } = await test("cloudflare");
       expect(timeout).toHaveBeenCalledWith(15_000);
       expect(requests).toHaveLength(1);
@@ -1153,8 +1421,7 @@ describe("AdminSettings.testGatewayProvider", () => {
   });
 
   it("tests a provider that is off, and leaves it off", async () => {
-    const { test, inDo } = tested(
-        () => completion("OK"), { CF_AI_GATEWAY_PROVIDERS: "anthropic" });
+    const { test, inDo } = tested(() => completion("OK"), { CF_AI_GATEWAY_PROVIDERS: "anthropic" });
     expect((await test("cloudflare")).result).toStrictEqual({ model: KIMI, ok: true });
     const { stored, view } = await providers(inDo);
     expect(stored).toStrictEqual([]);
@@ -1165,8 +1432,9 @@ describe("AdminSettings.testGatewayProvider", () => {
     const { inDo, fetch } = tested(() => completion("OK"));
     const logged = vi.spyOn(console, "info").mockImplementation(() => {});
     try {
-      await expect(inDo(admin => admin.testGatewayProvider("ollama", "admin@example.com")))
-          .rejects.toThrow(new Error('Provider "ollama" is not served through AI Gateway.'));
+      await expect(
+        inDo((admin) => admin.testGatewayProvider("ollama", "admin@example.com")),
+      ).rejects.toThrow(new Error('Provider "ollama" is not served through AI Gateway.'));
       expect(logged).not.toHaveBeenCalled();
     } finally {
       logged.mockRestore();
@@ -1174,13 +1442,14 @@ describe("AdminSettings.testGatewayProvider", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("puts a failure's message on one line, cuts it short, and keeps the token out of it",
-      async () => {
+  it("puts a failure's message on one line, cuts it short, and keeps the token out of it", async () => {
     const said = `bad\n\n  key:\tgateway-token was\r\nrefused ${"x".repeat(400)}`;
     const { test } = tested(refusal(403, said));
     const { result, entries } = await test("cloudflare");
     expect(result).toStrictEqual({
-      model: KIMI, ok: false, status: 403,
+      model: KIMI,
+      ok: false,
+      status: 403,
       message: `403 bad key: [redacted] was refused ${"x".repeat(400)}`.slice(0, 300),
     });
     expect(JSON.stringify(entries)).not.toContain("gateway-token");
@@ -1202,12 +1471,12 @@ describe("AdminSettings.testGatewayProvider", () => {
     });
     const logged = vi.spyOn(console, "info").mockImplementation(() => {});
     try {
-      await inDo(async admin => {
+      await inDo(async (admin) => {
         const test = admin.testGatewayProvider("cloudflare", "admin@example.com");
         await requested.promise;
         await admin.setGatewayModelMode("claude-fable-5-1", "hidden");
         const view = (await admin.getSettings("admin")).gatewayModels!;
-        expect(view.models.find(model => model.id === "claude-fable-5-1")?.mode).toBe("hidden");
+        expect(view.models.find((model) => model.id === "claude-fable-5-1")?.mode).toBe("hidden");
         answer.resolve(completion("OK"));
         expect(await test).toStrictEqual({ model: KIMI, ok: true });
       });
@@ -1221,14 +1490,19 @@ describe("AdminSettings.testGatewayProvider", () => {
 // cap. pi gives a Claude whose effort it manages that effort in a closing system message.
 const asked = ({ body }: { body: Record<string, unknown> }) => {
   const { messages, thinking, output_config, reasoning } = body as {
-    messages?: { output_config?: { effort: string } }[],
-    thinking?: { type: string, budget_tokens?: number },
-    output_config?: { effort: string }, reasoning?: { effort: string },
+    messages?: { output_config?: { effort: string } }[];
+    thinking?: { type: string; budget_tokens?: number };
+    output_config?: { effort: string };
+    reasoning?: { effort: string };
   };
   return {
-    thinking: thinking?.type, budget: thinking?.budget_tokens,
-    effort: messages?.at(-1)?.output_config?.effort ?? output_config?.effort ??
-        reasoning?.effort ?? body.reasoning_effort,
+    thinking: thinking?.type,
+    budget: thinking?.budget_tokens,
+    effort:
+      messages?.at(-1)?.output_config?.effort ??
+      output_config?.effort ??
+      reasoning?.effort ??
+      body.reasoning_effort,
     cap: body.max_tokens ?? body.max_output_tokens ?? body.max_completion_tokens,
   };
 };
@@ -1239,8 +1513,10 @@ describe("AdminSettings.testGatewayModel", () => {
   const SONNET_5 = "claude-sonnet-5";
   const EVERY_PROVIDER = { CF_AI_GATEWAY_PROVIDERS: "anthropic,openai,cloudflare" };
   const LOGGED = {
-    component: "workshop.admin.settings", event: "gateway.model.test",
-    message: "tested an AI Gateway model", durationMs: expect.any(Number),
+    component: "workshop.admin.settings",
+    event: "gateway.model.test",
+    message: "tested an AI Gateway model",
+    durationMs: expect.any(Number),
   };
   // An AdminSettings whose models all answer "OK". `sent` tests one and returns what its request
   // asked for.
@@ -1256,16 +1532,19 @@ describe("AdminSettings.testGatewayModel", () => {
 
   it("asks the model for an answer, as the admin, and stores nothing", async () => {
     const { testModel, requests, put, inDo } = tested(answered);
-    const before = await inDo(admin => admin.getAdminConfig());
+    const before = await inDo((admin) => admin.getAdminConfig());
     const { result, entries } = await testModel(GLM);
 
     expect(result).toStrictEqual({ model: GLM, ok: true });
     expect(requests).toHaveLength(1);
     const [{ url, headers, body }] = requests;
-    expect(url).toBe("https://workers-binding.ai/ai-gateway/gateways/platform-gateway/" +
-        "workers-ai/v1/chat/completions");
-    expect(JSON.parse(headers.get("cf-aig-metadata")!))
-        .toStrictEqual({ user: "admin@example.com" });
+    expect(url).toBe(
+      "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/" +
+        "workers-ai/v1/chat/completions",
+    );
+    expect(JSON.parse(headers.get("cf-aig-metadata")!)).toStrictEqual({
+      user: "admin@example.com",
+    });
     // Every test of a model sends the same request, which a caching gateway must not answer
     // itself.
     expect(headers.get("cf-aig-skip-cache")).toBe("true");
@@ -1273,7 +1552,7 @@ describe("AdminSettings.testGatewayModel", () => {
     expect(body.messages).toEqual([{ role: "user", content: "Reply with OK." }]);
 
     expect(entries).toEqual([{ ...LOGGED, modelId: GLM, outcome: "ok" }]);
-    expect(await inDo(admin => admin.getAdminConfig())).toStrictEqual(before);
+    expect(await inDo((admin) => admin.getAdminConfig())).toStrictEqual(before);
     expect(put).not.toHaveBeenCalled();
   });
 
@@ -1287,13 +1566,13 @@ describe("AdminSettings.testGatewayModel", () => {
     expect(await sent(GLM)).toEqual({ cap: 2048 });
 
     // The deployment's default, for a model with no level of its own.
-    await inDo(admin => admin.setDefaultReasoning("high"));
+    await inDo((admin) => admin.setDefaultReasoning("high"));
     expect(await sent(SONNET_5)).toEqual({ thinking: "adaptive", effort: "high", cap: 2048 });
     expect(await sent("gpt-6-sol")).toEqual({ effort: "high", cap: 2048 });
     expect(await sent(GLM)).toEqual({ effort: "high", cap: 2048 });
 
     // The model's own level comes ahead of the default.
-    await inDo(admin => admin.setGatewayModelSettings(SONNET_5, { reasoning: "low" }));
+    await inDo((admin) => admin.setGatewayModelSettings(SONNET_5, { reasoning: "low" }));
     expect(await sent(SONNET_5)).toEqual({ thinking: "adaptive", effort: "low", cap: 2048 });
     expect(requests).toHaveLength(7);
   });
@@ -1308,44 +1587,56 @@ describe("AdminSettings.testGatewayModel", () => {
 
   it("asks an added model in the format of the model it behaves like", async () => {
     const { sent, inDo } = answering();
-    await inDo(admin => admin.addGatewayModel({ ...ADDED, behavesLike: OPUS }));
-    await inDo(admin => admin.addGatewayModel({ ...ADDED, id: "claude-plain" }));
+    await inDo((admin) => admin.addGatewayModel({ ...ADDED, behavesLike: OPUS }));
+    await inDo((admin) => admin.addGatewayModel({ ...ADDED, id: "claude-plain" }));
     // The built-in request is borrowed too: an Anthropic model the runtime does not know is
     // asked for nothing.
     expect(await sent("claude-test")).toEqual({ thinking: "adaptive", effort: "high", cap: 2048 });
     expect(await sent("claude-plain")).toEqual({ cap: 2048 });
 
     // Opus 5.5 takes a level as an effort, and a model the runtime does not know as a budget.
-    await inDo(admin => admin.setDefaultReasoning("medium"));
-    expect(await sent("claude-test"))
-        .toEqual({ thinking: "adaptive", effort: "medium", cap: 2048 });
+    await inDo((admin) => admin.setDefaultReasoning("medium"));
+    expect(await sent("claude-test")).toEqual({
+      thinking: "adaptive",
+      effort: "medium",
+      cap: 2048,
+    });
     expect(await sent("claude-plain")).toEqual({ thinking: "enabled", budget: 1024, cap: 2048 });
   });
 
   // A Workers AI model the runtime does not know is otherwise taken to do no reasoning.
   it("asks an added model for a level it is stated to take", async () => {
     const { sent, inDo } = answering();
-    const workersAi: GatewayModel =
-        { provider: "cloudflare", id: "@cf/test/stated", name: "Stated", contextWindow: 100000 };
-    await inDo(admin => admin.addGatewayModel(
-        { ...workersAi, capabilities: { reasoningLevels: ["off", "high"] } }));
-    await inDo(admin => admin.addGatewayModel({ ...workersAi, id: "@cf/test/plain" }));
+    const workersAi: GatewayModel = {
+      provider: "cloudflare",
+      id: "@cf/test/stated",
+      name: "Stated",
+      contextWindow: 100000,
+    };
+    await inDo((admin) =>
+      admin.addGatewayModel({ ...workersAi, capabilities: { reasoningLevels: ["off", "high"] } }),
+    );
+    await inDo((admin) => admin.addGatewayModel({ ...workersAi, id: "@cf/test/plain" }));
     // Nothing, while no level is set.
     expect(await sent("@cf/test/stated")).toEqual({ cap: 2048 });
 
     // A level it is not stated to take is the next one up that it is.
-    await inDo(admin => admin.setDefaultReasoning("medium"));
+    await inDo((admin) => admin.setDefaultReasoning("medium"));
     expect(await sent("@cf/test/stated")).toEqual({ effort: "high", cap: 2048 });
     expect(await sent("@cf/test/plain")).toEqual({ cap: 2048 });
   });
 
-  it("caps the response at 2,048 tokens, or at the model's own cap when that is lower",
-      async () => {
+  it("caps the response at 2,048 tokens, or at the model's own cap when that is lower", async () => {
     const { sent, inDo } = answering();
-    await inDo(admin => admin.addGatewayModel({
-      provider: "cloudflare", id: "@cf/test/short", name: "Short", contextWindow: 100000,
-      outputLimit: 1000,
-    }));
+    await inDo((admin) =>
+      admin.addGatewayModel({
+        provider: "cloudflare",
+        id: "@cf/test/short",
+        name: "Short",
+        contextWindow: 100000,
+        outputLimit: 1000,
+      }),
+    );
     expect(await sent("@cf/test/short")).toEqual({ cap: 1000 });
     // Workers AI's own models answer with up to 32,768 tokens.
     expect(await sent(KIMI)).toEqual({ cap: 2048 });
@@ -1353,8 +1644,8 @@ describe("AdminSettings.testGatewayModel", () => {
 
   it("tests a model that is hidden or disabled, and leaves it so", async () => {
     const { sent, inDo, stored, put } = answering();
-    await inDo(admin => admin.setGatewayModelMode(GLM, "disabled"));
-    await inDo(admin => admin.setGatewayModelMode(KIMI, "hidden"));
+    await inDo((admin) => admin.setGatewayModelMode(GLM, "disabled"));
+    await inDo((admin) => admin.setGatewayModelMode(KIMI, "hidden"));
     put.mockClear();
     expect(await sent(GLM)).toEqual({ cap: 2048 });
     expect(await sent(KIMI)).toEqual({ cap: 2048 });
@@ -1362,13 +1653,15 @@ describe("AdminSettings.testGatewayModel", () => {
     expect(put).not.toHaveBeenCalled();
   });
 
-  it("reports a refused request with its status, and logs neither its message nor the prompt",
-      async () => {
+  it("reports a refused request with its status, and logs neither its message nor the prompt", async () => {
     const { testModel, requests } = tested(refusal(401, "Incorrect API key\n for gateway-token."));
     const { result, entries } = await testModel(GLM);
     // On one line, without the deployment's gateway token.
     expect(result).toStrictEqual({
-      model: GLM, ok: false, status: 401, message: "401 Incorrect API key for [redacted].",
+      model: GLM,
+      ok: false,
+      status: 401,
+      message: "401 Incorrect API key for [redacted].",
     });
 
     expect(entries).toEqual([{ ...LOGGED, modelId: GLM, outcome: "error", statusCode: 401 }]);
@@ -1378,15 +1671,16 @@ describe("AdminSettings.testGatewayModel", () => {
     expect(JSON.stringify(entries)).not.toContain("Incorrect API key");
   });
 
-  it("reports a model whose provider needs a token the deployment lacks, without a request",
-      async () => {
+  it("reports a model whose provider needs a token the deployment lacks, without a request", async () => {
     const { testModel, fetch, inDo } = tested(answered, { CF_AI_GATEWAY_API_TOKEN: undefined });
-    await inDo(admin => admin.setGatewayProviderEnabled("google", true));
+    await inDo((admin) => admin.setGatewayProviderEnabled("google", true));
     const { result, entries } = await testModel("gemini-3.6-flash");
     expect(result).toStrictEqual({
-      model: "gemini-3.6-flash", ok: false,
-      message: 'Provider "google" cannot use the Workers AI binding transport, and no ' +
-          "CF_AI_GATEWAY_API_TOKEN is configured for the HTTPS one.",
+      model: "gemini-3.6-flash",
+      ok: false,
+      message:
+        'Provider "google" cannot use the Workers AI binding transport, and no ' +
+        "CF_AI_GATEWAY_API_TOKEN is configured for the HTTPS one.",
     });
     expect(fetch).not.toHaveBeenCalled();
     expect(entries).toEqual([{ ...LOGGED, modelId: "gemini-3.6-flash", outcome: "error" }]);
@@ -1398,14 +1692,20 @@ describe("AdminSettings.testGatewayModel", () => {
     const realTimeout = AbortSignal.timeout.bind(AbortSignal);
     const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation(() => realTimeout(20));
     try {
-      const { testModel, requests } = tested(request => new Promise<Response>((_, reject) => {
-        request.signal.addEventListener("abort", () => reject(request.signal.reason));
-      }));
+      const { testModel, requests } = tested(
+        (request) =>
+          new Promise<Response>((_, reject) => {
+            request.signal.addEventListener("abort", () => reject(request.signal.reason));
+          }),
+      );
       const { result, entries } = await testModel(GLM);
       expect(timeout).toHaveBeenCalledWith(30_000);
       expect(requests).toHaveLength(1);
-      expect(result).toStrictEqual(
-          { model: GLM, ok: false, message: "The model did not answer within 30 seconds." });
+      expect(result).toStrictEqual({
+        model: GLM,
+        ok: false,
+        message: "The model did not answer within 30 seconds.",
+      });
       expect(entries).toEqual([{ ...LOGGED, modelId: GLM, outcome: "error" }]);
     } finally {
       timeout.mockRestore();
@@ -1418,8 +1718,9 @@ describe("AdminSettings.testGatewayModel", () => {
     try {
       // The second is a suggested model of a provider this gateway does not enable.
       for (let id of ["claude-fable-9", "gpt-6-luna", "constructor"]) {
-        await expect(inDo(admin => admin.testGatewayModel(id, "admin@example.com")))
-            .rejects.toThrow(new Error(`No such model: ${id}`));
+        await expect(
+          inDo((admin) => admin.testGatewayModel(id, "admin@example.com")),
+        ).rejects.toThrow(new Error(`No such model: ${id}`));
       }
       expect(logged).not.toHaveBeenCalled();
     } finally {
@@ -1438,12 +1739,12 @@ describe("AdminSettings.testGatewayModel", () => {
     });
     const logged = vi.spyOn(console, "info").mockImplementation(() => {});
     try {
-      await inDo(async admin => {
+      await inDo(async (admin) => {
         const test = admin.testGatewayModel(GLM, "admin@example.com");
         await requested.promise;
         await admin.setGatewayModelMode("claude-fable-5-1", "hidden");
         const view = (await admin.getSettings("admin")).gatewayModels!;
-        expect(view.models.find(model => model.id === "claude-fable-5-1")?.mode).toBe("hidden");
+        expect(view.models.find((model) => model.id === "claude-fable-5-1")?.mode).toBe("hidden");
         answer.resolve(completion("OK"));
         expect(await test).toStrictEqual({ model: GLM, ok: true });
       });
@@ -1455,41 +1756,59 @@ describe("AdminSettings.testGatewayModel", () => {
 
 // The results of a test in which the model answered every request, one for each of `levels`.
 const passed = (model: GatewayModel, levels: (string | null)[]) =>
-    levels.map(reasoning => ({ model: model.id, ok: true, reasoning }));
+  levels.map((reasoning) => ({ model: model.id, ok: true, reasoning }));
 
 describe("AdminSettings.testNewGatewayModel", () => {
   const OPUS = "claude-opus-5-5";
   const LOGGED = {
-    component: "workshop.admin.settings", event: "gateway.model.test",
-    message: "tested an AI Gateway model", durationMs: expect.any(Number),
+    component: "workshop.admin.settings",
+    event: "gateway.model.test",
+    message: "tested an AI Gateway model",
+    durationMs: expect.any(Number),
   };
   // A Workers AI model that neither the catalog nor the runtime knows, stated to take two levels.
   const STATED: GatewayModel = {
-    provider: "cloudflare", id: "@cf/moonshotai/kimi-k3", name: "Kimi K3", contextWindow: 262144,
+    provider: "cloudflare",
+    id: "@cf/moonshotai/kimi-k3",
+    name: "Kimi K3",
+    contextWindow: 262144,
     capabilities: { reasoningLevels: ["off", "high"] },
   };
-  const PLAIN: GatewayModel =
-      { provider: "cloudflare", id: "@cf/test/plain", name: "Plain", contextWindow: 100000 };
+  const PLAIN: GatewayModel = {
+    provider: "cloudflare",
+    id: "@cf/test/plain",
+    name: "Plain",
+    contextWindow: 100000,
+  };
   // What each request asked for, least effort first: the requests are sent together, so the
   // order they arrive in says nothing.
   const EFFORTS = [undefined, "none", "low", "medium", "high", "xhigh", "max"];
-  const sent = (requests: ReturnType<typeof tested>["requests"]) => requests.map(asked).toSorted(
-      (a, b) => EFFORTS.indexOf(a.effort as string) - EFFORTS.indexOf(b.effort as string));
+  const sent = (requests: ReturnType<typeof tested>["requests"]) =>
+    requests
+      .map(asked)
+      .toSorted(
+        (a, b) => EFFORTS.indexOf(a.effort as string) - EFFORTS.indexOf(b.effort as string),
+      );
 
-  it("asks the described model once with no level set and once at each level it would list",
-      async () => {
+  it("asks the described model once with no level set and once at each level it would list", async () => {
     const { testNewModel, requests } = tested(answered);
     const { result, entries } = await testNewModel(STATED);
 
     expect(result).toStrictEqual(passed(STATED, [null, "off", "high"]));
     // Workers AI takes "off" as the effort "none".
-    expect(sent(requests)).toEqual(
-        [{ cap: 2048 }, { effort: "none", cap: 2048 }, { effort: "high", cap: 2048 }]);
+    expect(sent(requests)).toEqual([
+      { cap: 2048 },
+      { effort: "none", cap: 2048 },
+      { effort: "high", cap: 2048 },
+    ]);
     for (let { url, headers, body } of requests) {
-      expect(url).toBe("https://workers-binding.ai/ai-gateway/gateways/platform-gateway/" +
-          "workers-ai/v1/chat/completions");
-      expect(JSON.parse(headers.get("cf-aig-metadata")!))
-          .toStrictEqual({ user: "admin@example.com" });
+      expect(url).toBe(
+        "https://workers-binding.ai/ai-gateway/gateways/platform-gateway/" +
+          "workers-ai/v1/chat/completions",
+      );
+      expect(JSON.parse(headers.get("cf-aig-metadata")!)).toStrictEqual({
+        user: "admin@example.com",
+      });
       expect(headers.get("cf-aig-skip-cache")).toBe("true");
       expect(body.model).toBe(STATED.id);
       expect(body.messages).toEqual([{ role: "user", content: "Reply with OK." }]);
@@ -1500,25 +1819,34 @@ describe("AdminSettings.testNewGatewayModel", () => {
   });
 
   // A stored model's test asks for the default level. This one tests that level beside the rest.
-  it("sets no level on the first request, whatever the deployment's default level is",
-      async () => {
+  it("sets no level on the first request, whatever the deployment's default level is", async () => {
     const { testNewModel, requests, inDo } = tested(answered);
-    await inDo(admin => admin.setDefaultReasoning("high"));
-    expect((await testNewModel(STATED)).result)
-        .toStrictEqual(passed(STATED, [null, "off", "high"]));
-    expect(sent(requests)).toEqual(
-        [{ cap: 2048 }, { effort: "none", cap: 2048 }, { effort: "high", cap: 2048 }]);
+    await inDo((admin) => admin.setDefaultReasoning("high"));
+    expect((await testNewModel(STATED)).result).toStrictEqual(
+      passed(STATED, [null, "off", "high"]),
+    );
+    expect(sent(requests)).toEqual([
+      { cap: 2048 },
+      { effort: "none", cap: 2048 },
+      { effort: "high", cap: 2048 },
+    ]);
   });
 
   it("tests the levels of the model it behaves like, when none is stated", async () => {
     const { testNewModel, requests } = tested(answered);
     const model = { ...ADDED, behavesLike: OPUS };
-    expect((await testNewModel(model)).result)
-        .toStrictEqual(passed(model, [null, "low", "medium", "high", "xhigh", "max"]));
+    expect((await testNewModel(model)).result).toStrictEqual(
+      passed(model, [null, "low", "medium", "high", "xhigh", "max"]),
+    );
     // Opus 5.5 takes a level as an effort. With none set it is asked for adaptive thinking, which
     // pi sends at the effort "high".
-    expect(sent(requests)).toEqual(["low", "medium", "high", "high", "xhigh", "max"].map(
-        effort => ({ thinking: "adaptive", effort, cap: 2048 })));
+    expect(sent(requests)).toEqual(
+      ["low", "medium", "high", "high", "xhigh", "max"].map((effort) => ({
+        thinking: "adaptive",
+        effort,
+        cap: 2048,
+      })),
+    );
   });
 
   it("sends the one request for a model that would list no level", async () => {
@@ -1529,114 +1857,134 @@ describe("AdminSettings.testNewGatewayModel", () => {
     expect(entries).toEqual([{ ...LOGGED, modelId: PLAIN.id, outcome: "ok" }]);
   });
 
-  it("reports a level the provider refuses as that level's result, beside the others",
-      async () => {
-    const { testNewModel, requests } = tested(async request => {
-      const { reasoning_effort } = await request.json() as { reasoning_effort?: string };
+  it("reports a level the provider refuses as that level's result, beside the others", async () => {
+    const { testNewModel, requests } = tested(async (request) => {
+      const { reasoning_effort } = (await request.json()) as { reasoning_effort?: string };
       return reasoning_effort === "high"
-          ? new Response("This model takes no\n effort above none.", { status: 400 })
-          : completion("OK");
+        ? new Response("This model takes no\n effort above none.", { status: 400 })
+        : completion("OK");
     });
     const { result, entries } = await testNewModel(STATED);
     expect(result).toStrictEqual([
       ...passed(STATED, [null, "off"]),
       {
-        model: STATED.id, ok: false, status: 400, reasoning: "high",
+        model: STATED.id,
+        ok: false,
+        status: 400,
+        reasoning: "high",
         message: "400 This model takes no effort above none.",
       },
     ]);
     expect(requests).toHaveLength(3);
     const ok = { ...LOGGED, modelId: STATED.id, outcome: "ok" };
-    expect(entries.filter(entry => entry.outcome === "ok")).toEqual([ok, ok]);
-    expect(entries.filter(entry => entry.outcome !== "ok"))
-        .toEqual([{ ...LOGGED, modelId: STATED.id, outcome: "error", statusCode: 400 }]);
+    expect(entries.filter((entry) => entry.outcome === "ok")).toEqual([ok, ok]);
+    expect(entries.filter((entry) => entry.outcome !== "ok")).toEqual([
+      { ...LOGGED, modelId: STATED.id, outcome: "error", statusCode: 400 },
+    ]);
   });
 
   // What is tested is the model as it would be stored, not as it was sent.
-  it("asks the model by the ID, the levels and the output limit it would be stored with",
-      async () => {
+  it("asks the model by the ID, the levels and the output limit it would be stored with", async () => {
     const { testNewModel, requests } = tested(answered);
     const stored = { ...STATED, outputLimit: 1000 };
     const { result } = await testNewModel({
-      ...stored, id: `  ${STATED.id} `, capabilities: { reasoningLevels: ["high", "off", "high"] },
+      ...stored,
+      id: `  ${STATED.id} `,
+      capabilities: { reasoningLevels: ["high", "off", "high"] },
     });
     expect(result).toStrictEqual(passed(stored, [null, "off", "high"]));
     // A response is capped at the model's own limit, where that is under the test's.
-    expect(sent(requests)).toEqual(
-        [{ cap: 1000 }, { effort: "none", cap: 1000 }, { effort: "high", cap: 1000 }]);
+    expect(sent(requests)).toEqual([
+      { cap: 1000 },
+      { effort: "none", cap: 1000 },
+      { effort: "high", cap: 1000 },
+    ]);
     expect(requests.map(({ body }) => body.model)).toEqual([STATED.id, STATED.id, STATED.id]);
   });
 
   it("stores nothing", async () => {
     const { testNewModel, requests, put, inDo } = tested(answered);
-    await inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "hidden"));
+    await inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "hidden"));
     put.mockClear();
-    const before = await inDo(admin => admin.getAdminConfig());
+    const before = await inDo((admin) => admin.getAdminConfig());
 
     await testNewModel(STATED);
     expect(requests).toHaveLength(3);
-    expect(await inDo(admin => admin.getAdminConfig())).toStrictEqual(before);
+    expect(await inDo((admin) => admin.getAdminConfig())).toStrictEqual(before);
     expect(put).not.toHaveBeenCalled();
   });
 
-  it("leaves the model to be added as it was described, with the levels that were tested",
-      async () => {
+  it("leaves the model to be added as it was described, with the levels that were tested", async () => {
     const { testNewModel, inDo, stored, settings } = tested(answered);
     const { result } = await testNewModel(STATED);
 
-    await inDo(admin => admin.addGatewayModel(STATED));
+    await inDo((admin) => admin.addGatewayModel(STATED));
     expect(await stored()).toStrictEqual({ modelModes: {}, addedModels: [STATED] });
     expect(await settings()).toStrictEqual({});
-    const model = shownModel(await inDo(admin => admin.getSettings("admin")), STATED.id)!;
+    const model = shownModel(await inDo((admin) => admin.getSettings("admin")), STATED.id)!;
     expect(model).toMatchObject({ ...STATED, mode: "enabled", added: true });
     expect(result.map(({ reasoning }) => reasoning)).toEqual([null, ...model.reasoningLevels]);
   });
 
   it.each<[string, GatewayModel, string]>([
-    ["a malformed model", { ...ADDED, id: "claude-new", contextWindow: 1.5 },
+    [
+      "a malformed model",
+      { ...ADDED, id: "claude-new", contextWindow: 1.5 },
       "Invalid model: it needs an ID and a name, neither over-long, and token limits that are " +
-      "positive integers. The ID of a model it behaves like can't be over-long either."],
+        "positive integers. The ID of a model it behaves like can't be over-long either.",
+    ],
     ["a suggested model's ID", { ...ADDED, id: OPUS }, `"${OPUS}" is already a suggested model.`],
-    ["an added model's ID", { ...ADDED, name: "Second" },
-      '"claude-test" is already an added model.'],
-    ["a model to behave like that the runtime does not know",
+    [
+      "an added model's ID",
+      { ...ADDED, name: "Second" },
+      '"claude-test" is already an added model.',
+    ],
+    [
+      "a model to behave like that the runtime does not know",
       { ...ADDED, id: "claude-new", behavesLike: "claude-nope" },
       '"claude-nope" is not a model the runtime knows under provider "anthropic", so ' +
-      '"claude-new" can\'t behave like it.'],
-    ["a provider that is off", { ...ADDED, id: "gpt-test", provider: "openai" },
-      'Provider "openai" is not enabled on this deployment.'],
-    ["a window that leaves a prompt no room",
+        '"claude-new" can\'t behave like it.',
+    ],
+    [
+      "a provider that is off",
+      { ...ADDED, id: "gpt-test", provider: "openai" },
+      'Provider "openai" is not enabled on this deployment.',
+    ],
+    [
+      "a window that leaves a prompt no room",
       { ...ADDED, id: "claude-new", contextWindow: 8000, outputLimit: 8000 },
       'The "Claude Test" model\'s context window leaves no room for a prompt: 8000 tokens of ' +
-      "it are reserved for the response. Give the model an output limit under its context " +
-      "window."],
+        "it are reserved for the response. Give the model an output limit under its context " +
+        "window.",
+    ],
   ])("refuses %s in addGatewayModel's words, without a request", async (_, model, message) => {
     const { inDo, fetch } = tested(answered);
-    await inDo(admin => admin.addGatewayModel(ADDED));
+    await inDo((admin) => admin.addGatewayModel(ADDED));
     const logged = vi.spyOn(console, "info").mockImplementation(() => {});
     try {
-      await expect(inDo(admin => admin.testNewGatewayModel(model, "admin@example.com")))
-          .rejects.toThrow(new Error(message));
+      await expect(
+        inDo((admin) => admin.testNewGatewayModel(model, "admin@example.com")),
+      ).rejects.toThrow(new Error(message));
       expect(logged).not.toHaveBeenCalled();
     } finally {
       logged.mockRestore();
     }
-    await expect(inDo(admin => admin.addGatewayModel(model))).rejects.toThrow(new Error(message));
+    await expect(inDo((admin) => admin.addGatewayModel(model))).rejects.toThrow(new Error(message));
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it("throws outside AI Gateway mode, whatever the model", async () => {
     const { inDo } = adminSettings({});
     for (let model of [STATED, { ...STATED, id: " " }]) {
-      await expect(inDo(admin => admin.testNewGatewayModel(model, "admin@example.com")))
-          .rejects.toThrow(new Error(NOT_GATEWAY));
+      await expect(
+        inDo((admin) => admin.testNewGatewayModel(model, "admin@example.com")),
+      ).rejects.toThrow(new Error(NOT_GATEWAY));
     }
   });
 
   // The requests are out for as long as thirty seconds, which no other admin call waits for.
   // None is answered before all three are out, which requests sent in turn would never be.
-  it("sends the requests together, and lets the config be read and changed while they are out",
-      async () => {
+  it("sends the requests together, and lets the config be read and changed while they are out", async () => {
     const requested = Promise.withResolvers<void>();
     const answer = Promise.withResolvers<void>();
     let out = 0;
@@ -1647,12 +1995,12 @@ describe("AdminSettings.testNewGatewayModel", () => {
     });
     const logged = vi.spyOn(console, "info").mockImplementation(() => {});
     try {
-      await inDo(async admin => {
+      await inDo(async (admin) => {
         const test = admin.testNewGatewayModel(STATED, "admin@example.com");
         await requested.promise;
         await admin.setGatewayModelMode("claude-fable-5-1", "hidden");
         const view = (await admin.getSettings("admin")).gatewayModels!;
-        expect(view.models.find(model => model.id === "claude-fable-5-1")?.mode).toBe("hidden");
+        expect(view.models.find((model) => model.id === "claude-fable-5-1")?.mode).toBe("hidden");
         answer.resolve();
         expect(await test).toStrictEqual(passed(STATED, [null, "off", "high"]));
       });
@@ -1665,31 +2013,38 @@ describe("AdminSettings.testNewGatewayModel", () => {
 describe("AdminSettings outside AI Gateway mode", () => {
   it("has no gateway models to show, and refuses to change any", async () => {
     const { inDo, stored, settings, put } = adminSettings({});
-    expect((await inDo(admin => admin.getSettings("admin"))).gatewayModels).toBeUndefined();
+    expect((await inDo((admin) => admin.getSettings("admin"))).gatewayModels).toBeUndefined();
 
-    await expect(inDo(admin => admin.setGatewayModelMode("claude-fable-5-1", "hidden")))
-        .rejects.toThrow(NOT_GATEWAY);
-    await expect(inDo(admin => admin.addGatewayModel(ADDED))).rejects.toThrow(NOT_GATEWAY);
-    await inDo(admin => admin.updateAdminConfig({ addedModels: [ADDED] }));
+    await expect(
+      inDo((admin) => admin.setGatewayModelMode("claude-fable-5-1", "hidden")),
+    ).rejects.toThrow(NOT_GATEWAY);
+    await expect(inDo((admin) => admin.addGatewayModel(ADDED))).rejects.toThrow(NOT_GATEWAY);
+    await inDo((admin) => admin.updateAdminConfig({ addedModels: [ADDED] }));
     put.mockClear();
-    await expect(inDo(admin => admin.removeGatewayModel("claude-test"))).rejects.toThrow(NOT_GATEWAY);
-    await expect(inDo(admin => admin.setUserModelsEnabled(false))).rejects.toThrow(NOT_GATEWAY);
-    await expect(inDo(admin => admin.setModelsDevSuggestions(true))).rejects.toThrow(NOT_GATEWAY);
-    await expect(inDo(admin => admin.setGatewayModelSettings("claude-test", { reasoning: "low" })))
-        .rejects.toThrow(NOT_GATEWAY);
-    await expect(inDo(admin => admin.setDefaultReasoning("low"))).rejects.toThrow(NOT_GATEWAY);
-    await expect(inDo(admin => admin.setGatewayProviderEnabled("openai", true)))
-        .rejects.toThrow(NOT_GATEWAY);
-    await expect(inDo(admin => admin.testGatewayProvider("anthropic", "admin")))
-        .rejects.toThrow(NOT_GATEWAY);
-    await expect(inDo(admin => admin.testGatewayModel("claude-fable-5-1", "admin")))
-        .rejects.toThrow(NOT_GATEWAY);
-    expect(await inDo(admin => admin.getAdminConfig().addedProviders)).toStrictEqual([]);
+    await expect(inDo((admin) => admin.removeGatewayModel("claude-test"))).rejects.toThrow(
+      NOT_GATEWAY,
+    );
+    await expect(inDo((admin) => admin.setUserModelsEnabled(false))).rejects.toThrow(NOT_GATEWAY);
+    await expect(inDo((admin) => admin.setModelsDevSuggestions(true))).rejects.toThrow(NOT_GATEWAY);
+    await expect(
+      inDo((admin) => admin.setGatewayModelSettings("claude-test", { reasoning: "low" })),
+    ).rejects.toThrow(NOT_GATEWAY);
+    await expect(inDo((admin) => admin.setDefaultReasoning("low"))).rejects.toThrow(NOT_GATEWAY);
+    await expect(inDo((admin) => admin.setGatewayProviderEnabled("openai", true))).rejects.toThrow(
+      NOT_GATEWAY,
+    );
+    await expect(inDo((admin) => admin.testGatewayProvider("anthropic", "admin"))).rejects.toThrow(
+      NOT_GATEWAY,
+    );
+    await expect(
+      inDo((admin) => admin.testGatewayModel("claude-fable-5-1", "admin")),
+    ).rejects.toThrow(NOT_GATEWAY);
+    expect(await inDo((admin) => admin.getAdminConfig().addedProviders)).toStrictEqual([]);
     expect(await settings()).toStrictEqual({});
-    expect(await inDo(admin => admin.getAdminConfig().defaultReasoning)).toBeNull();
+    expect(await inDo((admin) => admin.getAdminConfig().defaultReasoning)).toBeNull();
     expect(await stored()).toEqual({ modelModes: {}, addedModels: [ADDED] });
-    expect(await inDo(admin => admin.getAdminConfig().userModelsEnabled)).toBe(true);
-    expect(await inDo(admin => admin.getAdminConfig().modelsDevSuggestions)).toBe(false);
+    expect(await inDo((admin) => admin.getAdminConfig().userModelsEnabled)).toBe(true);
+    expect(await inDo((admin) => admin.getAdminConfig().modelsDevSuggestions)).toBe(false);
     expect(put).not.toHaveBeenCalled();
   });
 });

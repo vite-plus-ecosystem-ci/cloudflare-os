@@ -1,6 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
-  isDoResetError, isLoopLimitError, retryOnDoReset, wrapDoStubForTelemetry,
+  isDoResetError,
+  isLoopLimitError,
+  retryOnDoReset,
+  wrapDoStubForTelemetry,
 } from "../src/do-retry";
 import { createWorkshopLogger } from "../src/observability";
 
@@ -44,12 +47,12 @@ describe("isDoResetError", () => {
 // The runtime's two "Subrequest depth limit exceeded" messages. They report different counters,
 // and only the first is cleared by restarting the calling object.
 const LOOP_LIMIT_MESSAGE =
-    "Subrequest depth limit exceeded. This request looped back into the Workers runtime too " +
-    "many times. This can happen e.g. if you have a Worker or Durable Object that calls other " +
-    "Workers or objects recursively.";
+  "Subrequest depth limit exceeded. This request looped back into the Workers runtime too " +
+  "many times. This can happen e.g. if you have a Worker or Durable Object that calls other " +
+  "Workers or objects recursively.";
 const STAGE_LIMIT_MESSAGE =
-    "Subrequest depth limit exceeded. This request passed through too many Workers stages " +
-    "within the Workers runtime while being handled.";
+  "Subrequest depth limit exceeded. This request passed through too many Workers stages " +
+  "within the Workers runtime while being handled.";
 
 describe("isLoopLimitError", () => {
   it("matches the runtime's looped-back rejection", () => {
@@ -80,8 +83,9 @@ describe("isLoopLimitError", () => {
   it("rejects an Error whose message is not a string", () => {
     expect(isLoopLimitError(Object.assign(new Error(), { message: 42 }))).toBe(false);
     expect(isLoopLimitError(Object.assign(new Error(), { message: undefined }))).toBe(false);
-    expect(isLoopLimitError(Object.assign(new Error(), { message: [LOOP_LIMIT_MESSAGE] })))
-        .toBe(false);
+    expect(isLoopLimitError(Object.assign(new Error(), { message: [LOOP_LIMIT_MESSAGE] }))).toBe(
+      false,
+    );
   });
 });
 
@@ -92,8 +96,10 @@ describe("isLoopLimitError", () => {
 function wrappedStub(members: Record<string, unknown>) {
   const reported: unknown[] = [];
   const stub = wrapDoStubForTelemetry(
-      { id: { toString: () => "user-do-id" }, ...members } as any, undefined,
-      e => reported.push(e));
+    { id: { toString: () => "user-do-id" }, ...members } as any,
+    undefined,
+    (e) => reported.push(e),
+  );
   return { stub, reported };
 }
 
@@ -104,7 +110,11 @@ describe("wrapDoStubForTelemetry onRejection", () => {
 
   it("is called once with a rejection, which is rethrown by identity", async () => {
     const error = new Error("some app error");
-    const { stub, reported } = wrappedStub({ read: async () => { throw error; } });
+    const { stub, reported } = wrappedStub({
+      read: async () => {
+        throw error;
+      },
+    });
 
     await expect(stub.read()).rejects.toBe(error);
     expect(reported).toHaveLength(1);
@@ -114,25 +124,32 @@ describe("wrapDoStubForTelemetry onRejection", () => {
   it("is called for a DO reset as well, alongside the reset telemetry", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const error = resetError(PRODUCTION_RESET);
-    const { stub, reported } = wrappedStub({ read: async () => { throw error; } });
+    const { stub, reported } = wrappedStub({
+      read: async () => {
+        throw error;
+      },
+    });
 
     await expect(stub.read()).rejects.toBe(error);
     expect(reported).toHaveLength(1);
     expect(reported[0]).toBe(error);
-    const surfaced = warn.mock.calls.map(([entry]) => entry as Record<string, unknown>)
-        .filter(entry => entry.event === "user_do.reset.surfaced");
-    expect(surfaced).toEqual(
-        [expect.objectContaining({ operation: "read", durableObjectId: "user-do-id" })]);
+    const surfaced = warn.mock.calls
+      .map(([entry]) => entry as Record<string, unknown>)
+      .filter((entry) => entry.event === "user_do.reset.surfaced");
+    expect(surfaced).toEqual([
+      expect.objectContaining({ operation: "read", durableObjectId: "user-do-id" }),
+    ]);
   });
 
-  it("is not called for a resolving call, a synchronous return or a non-function property",
-      async () => {
+  it("is not called for a resolving call, a synchronous return or a non-function property", async () => {
     const error = new Error("some app error");
     const { stub, reported } = wrappedStub({
       read: async () => "ok",
       name: () => "sync",
       limit: 3,
-      fail: async () => { throw error; },
+      fail: async () => {
+        throw error;
+      },
     });
 
     expect(await stub.read()).toBe("ok");
@@ -164,11 +181,12 @@ function failingThunk(errors: unknown[], value = "ok") {
 
 function recoveredEvents(spy: ReturnType<typeof vi.spyOn>): number {
   return spy.mock.calls.filter(
-      ([entry]) => (entry as { event?: unknown })?.event === "user_do.reset.recovered").length;
+    ([entry]) => (entry as { event?: unknown })?.event === "user_do.reset.recovered",
+  ).length;
 }
 
 function spies() {
-  vi.spyOn(Math, "random").mockReturnValue(0);  // pin the jitter to a zero wait
+  vi.spyOn(Math, "random").mockReturnValue(0); // pin the jitter to a zero wait
   return vi.spyOn(console, "info").mockImplementation(() => {});
 }
 
@@ -201,10 +219,12 @@ describe("retryOnDoReset", () => {
 
     const log = createWorkshopLogger("workshop.overseer").with({ gadgetId: "g1" });
     expect(await retryOnDoReset(thunk.call, log)).toBe("ok");
-    const recovered = info.mock.calls.map(([entry]) => entry as Record<string, unknown>)
-        .filter(entry => entry.event === "user_do.reset.recovered");
-    expect(recovered).toEqual(
-        [expect.objectContaining({ component: "workshop.overseer", gadgetId: "g1" })]);
+    const recovered = info.mock.calls
+      .map(([entry]) => entry as Record<string, unknown>)
+      .filter((entry) => entry.event === "user_do.reset.recovered");
+    expect(recovered).toEqual([
+      expect.objectContaining({ component: "workshop.overseer", gadgetId: "g1" }),
+    ]);
   });
 
   it("waits a jittered delay bounded by the retry window", async () => {
@@ -214,7 +234,7 @@ describe("retryOnDoReset", () => {
     const thunk = failingThunk([resetError(PRODUCTION_RESET)]);
 
     expect(await retryOnDoReset(thunk.call)).toBe("ok");
-    expect(wait).toHaveBeenCalledExactlyOnceWith(0.5 * 250);  // Math.random() * RETRY_JITTER_MS
+    expect(wait).toHaveBeenCalledExactlyOnceWith(0.5 * 250); // Math.random() * RETRY_JITTER_MS
   });
 
   it("retries a bare retryable rejection (connection lost)", async () => {
@@ -231,7 +251,7 @@ describe("retryOnDoReset", () => {
     const error = resetError({ retryable: true, overloaded: true });
     const thunk = failingThunk([error]);
 
-    await expect(retryOnDoReset(thunk.call)).rejects.toBe(error);  // identity, flags intact
+    await expect(retryOnDoReset(thunk.call)).rejects.toBe(error); // identity, flags intact
     expect(thunk.count()).toBe(1);
     expect(recoveredEvents(info)).toBe(0);
   });
@@ -268,8 +288,8 @@ describe("retryOnDoReset", () => {
     } catch (e) {
       caught = e;
     }
-    expect(caught).toBe(second);  // the retry's own rejection, not a re-wrap
-    expect(thunk.count()).toBe(2);  // single retry by construction
+    expect(caught).toBe(second); // the retry's own rejection, not a re-wrap
+    expect(thunk.count()).toBe(2); // single retry by construction
     // The frontend classifier reads the flags as own enumerable props; pin that they survive.
     expect({ ...(caught as object) }).toMatchObject(PRODUCTION_RESET);
     expect(recoveredEvents(info)).toBe(0);

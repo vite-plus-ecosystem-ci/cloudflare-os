@@ -1,7 +1,7 @@
 // End-to-end interop of `./oauth-client` with the connect handshake and `CredentialCoordinator`,
 // in workerd because `claimOAuth` compares nonces with `crypto.subtle.timingSafeEqual`.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { advanceToOAuth, claimOAuth, putInitiation } from "../../src/connect-handshake";
 import { CredentialCoordinator, isCredentialsExpired } from "../../src/credentials";
 import {
@@ -24,7 +24,8 @@ type ConnectAttempt = { codeVerifier: string; redirectUri: string; startedUnder:
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
-    status, headers: { "Content-Type": "application/json" },
+    status,
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -60,11 +61,12 @@ function setup() {
   });
   const kv = fakeKv();
   const creds = new CredentialCoordinator<Grant>(kv, {
-    expiresAt: grant => grant.expiresAt,
-    discardMint: mint => client.revoke({ token: mint.refreshToken!, tokenTypeHint: "refresh_token" }),
+    expiresAt: (grant) => grant.expiresAt,
+    discardMint: (mint) =>
+      client.revoke({ token: mint.refreshToken!, tokenTypeHint: "refresh_token" }),
   });
   const refresh = oauthRefresh<Grant>(client, {
-    refreshToken: grant => grant.refreshToken,
+    refreshToken: (grant) => grant.refreshToken,
     merge: mergeOAuthTokens,
     expiredMessage: "Reconnect your Vendor account.",
   });
@@ -73,16 +75,30 @@ function setup() {
 
 /** Maps a code exchange onto the stored grant, picking fields rather than spreading. */
 function toGrant(accountId: string, tokens: OAuthTokens): Grant {
-  const grant: Grant = { accountId, accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken, scopes: tokens.scopes ?? [] };
+  const grant: Grant = {
+    accountId,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    scopes: tokens.scopes ?? [],
+  };
   if (tokens.expiresAt !== undefined) grant.expiresAt = tokens.expiresAt;
   return grant;
 }
 
-const grantA: Grant = { accountId: "a", accessToken: "at-a", refreshToken: "rt-a",
-  scopes: ["read"], expiresAt: Date.now() + 3_600_000 };
-const grantB: Grant = { accountId: "a", accessToken: "at-b", refreshToken: "rt-b",
-  scopes: ["read"], expiresAt: Date.now() + 3_600_000 };
+const grantA: Grant = {
+  accountId: "a",
+  accessToken: "at-a",
+  refreshToken: "rt-a",
+  scopes: ["read"],
+  expiresAt: Date.now() + 3_600_000,
+};
+const grantB: Grant = {
+  accountId: "a",
+  accessToken: "at-b",
+  refreshToken: "rt-b",
+  scopes: ["read"],
+  expiresAt: Date.now() + 3_600_000,
+};
 
 async function rejection(promise: Promise<unknown>): Promise<unknown> {
   try {
@@ -97,13 +113,17 @@ describe("oauth-client with the connect handshake and CredentialCoordinator", ()
   it("connects through PKCE, then refreshes once after expiry", async () => {
     const { provider, client, kv, creds, refresh } = setup();
     let challenge: string | null = null;
-    provider.respond = async form => {
+    provider.respond = async (form) => {
       if (form.get("grant_type") === "authorization_code") {
         expect(form.get("redirect_uri")).toBe(REDIRECT_URI);
         expect(await pkceChallenge(form.get("code_verifier")!)).toBe(challenge);
         // Inside the coordinator's default 60s skew, so the first read refreshes.
-        return json({ access_token: "at-1", refresh_token: "rt-1", scope: "read write",
-          expires_in: 30 });
+        return json({
+          access_token: "at-1",
+          refresh_token: "rt-1",
+          scope: "read write",
+          expires_in: 30,
+        });
       }
       return json({ access_token: "at-2", expires_in: 3600 });
     };
@@ -117,21 +137,34 @@ describe("oauth-client with the connect handshake and CredentialCoordinator", ()
       startedUnder: creds.connectionGeneration(),
     });
     expect(oauthNonce).not.toBeNull();
-    const url = client.authorizationUrl({ redirectUri: REDIRECT_URI, state: oauthNonce!,
-      scopes: ["read", "write"], codeChallenge: pkce.codeChallenge });
+    const url = client.authorizationUrl({
+      redirectUri: REDIRECT_URI,
+      state: oauthNonce!,
+      scopes: ["read", "write"],
+      codeChallenge: pkce.codeChallenge,
+    });
     challenge = url.searchParams.get("code_challenge");
 
     const claim = claimOAuth<ConnectAttempt>(kv, url.searchParams.get("state")!, now);
     expect(claim).not.toBeNull();
-    const tokens = await client.exchangeCode({ code: "auth-code", redirectUri: claim!.redirectUri,
-      codeVerifier: claim!.codeVerifier });
+    const tokens = await client.exchangeCode({
+      code: "auth-code",
+      redirectUri: claim!.redirectUri,
+      codeVerifier: claim!.codeVerifier,
+    });
     creds.connect(toGrant("a", tokens), { ifGeneration: claim!.startedUnder });
 
     const refreshed = await creds.fresh(refresh);
-    expect(refreshed).toMatchObject({ accountId: "a", accessToken: "at-2", refreshToken: "rt-1",
-      scopes: ["read", "write"] });
-    expect(provider.tokenRequests.map(form => form.get("grant_type")))
-      .toEqual(["authorization_code", "refresh_token"]);
+    expect(refreshed).toMatchObject({
+      accountId: "a",
+      accessToken: "at-2",
+      refreshToken: "rt-1",
+      scopes: ["read", "write"],
+    });
+    expect(provider.tokenRequests.map((form) => form.get("grant_type"))).toEqual([
+      "authorization_code",
+      "refresh_token",
+    ]);
     expect(provider.tokenRequests[1].get("refresh_token")).toBe("rt-1");
 
     expect(await creds.fresh(refresh)).toEqual(refreshed);
@@ -168,8 +201,12 @@ describe("oauth-client with the connect handshake and CredentialCoordinator", ()
     provider.respond = response;
     let notified = 0;
 
-    expect(await creds.adjudicateRejection(creds.identity(),
-      { refresh, notify: async () => void notified++ })).toBe("unavailable");
+    expect(
+      await creds.adjudicateRejection(creds.identity(), {
+        refresh,
+        notify: async () => void notified++,
+      }),
+    ).toBe("unavailable");
     expect(notified).toBe(0);
     expect(creds.stored()).toEqual(grantA);
     expect(await creds.fresh(refresh)).toEqual(grantA);
@@ -181,8 +218,12 @@ describe("oauth-client with the connect handshake and CredentialCoordinator", ()
     provider.respond = () => json({ error: "invalid_grant" }, 400);
     let notified = 0;
 
-    expect(await creds.adjudicateRejection(creds.identity(),
-      { refresh, notify: async () => void notified++ })).toBe("expired");
+    expect(
+      await creds.adjudicateRejection(creds.identity(), {
+        refresh,
+        notify: async () => void notified++,
+      }),
+    ).toBe("expired");
     expect(notified).toBe(1);
     expect(isCredentialsExpired(await rejection(creds.fresh(refresh)))).toBe(true);
     expect(provider.tokenRequests).toHaveLength(1);

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { AiModelConfig } from "@gadgets/workshop-shared/api";
 import { completeText, httpStatusFromError } from "../src/ai-invoke.js";
 import { getModel } from "../src/ai-models.js";
@@ -11,8 +11,9 @@ describe("httpStatusFromError", () => {
   });
 
   it("reads the status from the wording of pi's OpenAI adapter", () => {
-    expect(httpStatusFromError('OpenAI API error (401): {"message":"bad key"}', undefined))
-        .toBe(401);
+    expect(httpStatusFromError('OpenAI API error (401): {"message":"bad key"}', undefined)).toBe(
+      401,
+    );
     expect(httpStatusFromError("OpenAI API error (529): 529 overloaded", undefined)).toBe(529);
   });
 
@@ -46,35 +47,46 @@ describe("completeText", () => {
   function answering(config: Partial<AiModelConfig> = {}) {
     const sent: Headers[] = [];
     const bodies: Record<string, unknown>[] = [];
-    const event = (choice: object) => `data: ${JSON.stringify({
-      id: "completion", object: "chat.completion.chunk", created: 0, model: MODEL,
-      choices: [{ index: 0, ...choice }],
-    })}\n\n`;
+    const event = (choice: object) =>
+      `data: ${JSON.stringify({
+        id: "completion",
+        object: "chat.completion.chunk",
+        created: 0,
+        model: MODEL,
+        choices: [{ index: 0, ...choice }],
+      })}\n\n`;
     const fetch = vi.fn(async (input: Request | string | URL, init?: RequestInit) => {
       const request = new Request(input, init);
       sent.push(request.headers);
       bodies.push(await request.json());
       return new Response(
-          event({ delta: { role: "assistant", content: "OK" }, finish_reason: null }) +
-          event({ delta: {}, finish_reason: "stop" }) + "data: [DONE]\n\n",
-          { headers: { "content-type": "text/event-stream" } });
+        event({ delta: { role: "assistant", content: "OK" }, finish_reason: null }) +
+          event({ delta: {}, finish_reason: "stop" }) +
+          "data: [DONE]\n\n",
+        { headers: { "content-type": "text/event-stream" } },
+      );
     });
-    const handle = getModel({
-      CF_AI_GATEWAY: "platform-gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
-      CF_AI_GATEWAY_PROVIDERS: "cloudflare",
-      WORKERS_AI: { fetch },
-    } as unknown as Cloudflare.Env,
-        { provider: "cloudflare", model: MODEL, apiToken: "", ...config },
-        { type: "user", id: "user-123", name: "User" });
+    const handle = getModel(
+      {
+        CF_AI_GATEWAY: "platform-gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
+        CF_AI_GATEWAY_PROVIDERS: "cloudflare",
+        WORKERS_AI: { fetch },
+      } as unknown as Cloudflare.Env,
+      { provider: "cloudflare", model: MODEL, apiToken: "", ...config },
+      { type: "user", id: "user-123", name: "User" },
+    );
     return { handle, sent, bodies };
   }
 
   it("sends a request's own headers beside the handle's", async () => {
     const { handle, sent } = answering();
-    expect(await completeText(handle, {
-      prompt: "hello", headers: { "cf-aig-skip-cache": "true" },
-    })).toBe("OK");
+    expect(
+      await completeText(handle, {
+        prompt: "hello",
+        headers: { "cf-aig-skip-cache": "true" },
+      }),
+    ).toBe("OK");
     expect(sent).toHaveLength(1);
     expect(sent[0]!.get("cf-aig-skip-cache")).toBe("true");
     expect(JSON.parse(sent[0]!.get("cf-aig-metadata")!)).toStrictEqual({ user: "user-123" });
@@ -97,6 +109,6 @@ describe("completeText", () => {
     expect(await completeText(handle, { prompt: "hello" })).toBe("OK");
     expect(await completeText(handle, { prompt: "hello", thinking: false })).toBe("OK");
     expect(await completeText(handle, { prompt: "hello", thinking: true })).toBe("OK");
-    expect(bodies.map(body => body.reasoning_effort)).toEqual(["none", "none", "high"]);
+    expect(bodies.map((body) => body.reasoning_effort)).toEqual(["none", "none", "high"]);
   });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   commitStagedCredentials,
   discardStagedCredentials,
@@ -39,9 +39,13 @@ describe("credential stage", () => {
     expect(commitStagedCredentials<Grant>(kv, 1_500, first)).toBeNull();
     expect(kv.keys()).toEqual([STAGED_CREDENTIALS_KEY]);
     expect(peekStagedCredentials<Grant>(kv, 1_500)).toEqual({
-      creds: { ...GRANT, accessToken: "second" }, stageId: second,
+      creds: { ...GRANT, accessToken: "second" },
+      stageId: second,
     });
-    expect(commitStagedCredentials<Grant>(kv, 1_500, second)).toEqual({ ...GRANT, accessToken: "second" });
+    expect(commitStagedCredentials<Grant>(kv, 1_500, second)).toEqual({
+      ...GRANT,
+      accessToken: "second",
+    });
     expect(kv.keys()).toEqual([]);
   });
 

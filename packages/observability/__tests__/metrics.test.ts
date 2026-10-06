@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
   ACTIVITY_V1_SLOTS,
@@ -39,7 +39,7 @@ describe("activity/v1 schema", () => {
 describe("encodeActivityPoints", () => {
   it("writes one point per scope, in the golden layout", () => {
     const points = encodeActivityPoints(FULL);
-    expect(points.map(point => point.indexes)).toEqual([
+    expect(points.map((point) => point.indexes)).toEqual([
       [`activity|actor|usr_${ACTOR}`],
       [`activity|owner|usr_${OWNER}`],
       [`activity|workspace|ws_${WORKSPACE}`],
@@ -47,15 +47,21 @@ describe("encodeActivityPoints", () => {
     expect(points[0]).toEqual({
       indexes: [`activity|actor|usr_${ACTOR}`],
       blobs: [
-        "activity/v1", "gadget.created", "actor", `usr_${ACTOR}`, `usr_${OWNER}`,
-        `ws_${WORKSPACE}`, "success", "blueprint", `ws_${WORKSPACE}/7`,
+        "activity/v1",
+        "gadget.created",
+        "actor",
+        `usr_${ACTOR}`,
+        `usr_${OWNER}`,
+        `ws_${WORKSPACE}`,
+        "success",
+        "blueprint",
+        `ws_${WORKSPACE}/7`,
       ],
       doubles: [0, 0],
     });
     for (const point of points) {
       expect(point.blobs!.length).toBeLessThanOrEqual(20);
-      expect(new TextEncoder().encode(point.indexes![0] as string).length)
-          .toBeLessThanOrEqual(96);
+      expect(new TextEncoder().encode(point.indexes![0] as string).length).toBeLessThanOrEqual(96);
     }
   });
 
@@ -75,20 +81,34 @@ describe("encodeActivityPoints", () => {
   });
 
   it("omits the scopes of ids the event lacks, and blanks their columns", () => {
-    const points = encodeActivityPoints(
-        { eventType: "user.authenticated", actorId: ACTOR, detail: "password" });
-    expect(points.map(point => point.indexes![0])).toEqual([`activity|actor|usr_${ACTOR}`]);
+    const points = encodeActivityPoints({
+      eventType: "user.authenticated",
+      actorId: ACTOR,
+      detail: "password",
+    });
+    expect(points.map((point) => point.indexes![0])).toEqual([`activity|actor|usr_${ACTOR}`]);
     expect(points[0].blobs).toEqual([
-      "activity/v1", "user.authenticated", "actor", `usr_${ACTOR}`, "", "", "success",
-      "password", "",
+      "activity/v1",
+      "user.authenticated",
+      "actor",
+      `usr_${ACTOR}`,
+      "",
+      "",
+      "success",
+      "password",
+      "",
     ]);
   });
 
   it("attributes an event with no actor to the unattributed sentinel", () => {
-    const points = encodeActivityPoints(
-        { eventType: "gadget.proposed", workspaceId: WORKSPACE, gadgetId: 2 });
-    expect(points.map(point => point.indexes![0])).toEqual([
-      `activity|actor|${UNATTRIBUTED_ACTOR}`, `activity|workspace|ws_${WORKSPACE}`,
+    const points = encodeActivityPoints({
+      eventType: "gadget.proposed",
+      workspaceId: WORKSPACE,
+      gadgetId: 2,
+    });
+    expect(points.map((point) => point.indexes![0])).toEqual([
+      `activity|actor|${UNATTRIBUTED_ACTOR}`,
+      `activity|workspace|ws_${WORKSPACE}`,
     ]);
     expect(column(points[0], COMMON_SLOTS.actorId)).toBe(UNATTRIBUTED_ACTOR);
   });
@@ -125,10 +145,18 @@ describe("recordActivity", () => {
 
   it("logs rather than throws when a write fails", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    ambient.METRICS = { writeDataPoint: () => { throw new Error("dataset down"); } };
+    ambient.METRICS = {
+      writeDataPoint: () => {
+        throw new Error("dataset down");
+      },
+    };
     expect(() => recordActivity(FULL)).not.toThrow();
-    expect(warn).toHaveBeenCalledWith(expect.objectContaining({
-      event: "metrics.write.failed", eventType: FULL.eventType, error: "Error: dataset down",
-    }));
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "metrics.write.failed",
+        eventType: FULL.eventType,
+        error: "Error: dataset down",
+      }),
+    );
   });
 });

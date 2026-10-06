@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { CATALOG_TTL_MS, HydratedTools } from "../src/catalog.js";
 import type { McpTool } from "../src/client.js";
@@ -26,9 +26,12 @@ describe("HydratedTools", () => {
 
   it("coalesces concurrent loads of one tool", async () => {
     let release!: (value: McpTool) => void;
-    const load = vi.fn((name: string) => new Promise<McpTool>(resolve => {
-      release = resolve;
-    }));
+    const load = vi.fn(
+      (name: string) =>
+        new Promise<McpTool>((resolve) => {
+          release = resolve;
+        }),
+    );
     const cache = new HydratedTools();
 
     const first = cache.resolve("a", load);
@@ -73,7 +76,7 @@ describe("HydratedTools", () => {
       description: "x".repeat(4000),
       inputSchema: { type: "object", description: "y".repeat(20_000) },
     });
-    for (let i = 0; i < 50; i++) await cache.resolve(`large_${i}`, async name => large(name));
+    for (let i = 0; i < 50; i++) await cache.resolve(`large_${i}`, async (name) => large(name));
 
     const reload = vi.fn(async (name: string) => large(name));
     await cache.resolve("large_0", reload);

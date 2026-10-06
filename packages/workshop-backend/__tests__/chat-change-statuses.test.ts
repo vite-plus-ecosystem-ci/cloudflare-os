@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { AiChatMessage } from "@gadgets/workshop-shared/api";
 import { chatChangeStatuses } from "../src/agent-compaction";
 
@@ -6,7 +6,11 @@ const AUTHOR = { type: "user" as const, id: "alice@example.com", name: "Alice" }
 
 function msg(sequence: number, body: object): AiChatMessage {
   return {
-    chatId: 1, sequence, timestamp: new Date(sequence), author: AUTHOR, ...body,
+    chatId: 1,
+    sequence,
+    timestamp: new Date(sequence),
+    author: AUTHOR,
+    ...body,
   } as AiChatMessage;
 }
 
@@ -90,7 +94,7 @@ describe("chatChangeStatuses", () => {
     ]);
     expect(statuses.get(0)).toBe("reverted");
     expect(statuses.get(1)).toBe("reverted");
-    expect(statuses.get(2)).toBeUndefined();  // the revert itself is not in its own range
+    expect(statuses.get(2)).toBeUndefined(); // the revert itself is not in its own range
   });
 
   it("works on a log tail, marking only messages present in it", () => {

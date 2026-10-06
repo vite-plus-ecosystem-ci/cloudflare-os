@@ -1,16 +1,22 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import * as Y from "yjs";
 import type { BlueprintMetadata } from "@gadgets/workshop-shared/api";
 import {
-  blueprintContentKey, deleteBlueprintContent, readBlueprintRelease, sanitizeBlueprintOutput,
+  blueprintContentKey,
+  deleteBlueprintContent,
+  readBlueprintRelease,
+  sanitizeBlueprintOutput,
 } from "../src/blueprint-archive.js";
 import { listReleaseFiles, readReleasePack } from "../src/blueprint-release.js";
 import { parseGitCommitRefs } from "../src/git-codec.js";
 import type { OverseerDurableObject } from "../src/overseer.js";
 import { parseBlueprintKvRecord } from "../src/storage-schema/blueprints-kv.js";
-import { bundledBlueprintsManifestVersion, installBundledBlueprints } from "../src/bundled-blueprints.js";
+import {
+  bundledBlueprintsManifestVersion,
+  installBundledBlueprints,
+} from "../src/bundled-blueprints.js";
 import { BUNDLED_BLUEPRINTS } from "../src/generated/bundled-blueprints.js";
 
 declare module "cloudflare:workers" {
@@ -29,8 +35,10 @@ function readBlueprintFile(entry: (typeof BUNDLED_BLUEPRINTS)[number], filename:
  * to a `var` and gathers every export into one trailing `export { ... }` list.
  */
 function exportsName(code: string, name: string): boolean {
-  return new RegExp(`export\\s+(?:class|function|const|let|var)\\s+${name}\\b`, "u").test(code) ||
-    new RegExp(`export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}`, "su").test(code);
+  return (
+    new RegExp(`export\\s+(?:class|function|const|let|var)\\s+${name}\\b`, "u").test(code) ||
+    new RegExp(`export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}`, "su").test(code)
+  );
 }
 
 // A deployment to install into: the pool's real content bucket, and an in-memory stand-in for the
@@ -39,7 +47,9 @@ function makeDeployment() {
   let kv = new Map<string, string>();
   let bindings = {
     BLUEPRINTS: {
-      put: async (key: string, value: string) => { kv.set(key, value); },
+      put: async (key: string, value: string) => {
+        kv.set(key, value);
+      },
     } as unknown as KVNamespace,
     BLUEPRINT_CONTENT: env.BLUEPRINT_CONTENT,
   };
@@ -61,7 +71,7 @@ function makeDeployment() {
 
 async function storedKeys(blueprintId: string): Promise<string[]> {
   let listing = await env.BLUEPRINT_CONTENT.list({ prefix: `${blueprintId}/` });
-  return listing.objects.map(object => object.key).toSorted();
+  return listing.objects.map((object) => object.key).toSorted();
 }
 
 async function storedContent(key: string): Promise<Uint8Array> {
@@ -75,8 +85,9 @@ async function snapshotContent(files: Iterable<[string, string]>): Promise<Uint8
   let doc = new Y.Doc();
   let map = doc.getMap<Y.Text>();
   for (let [path, text] of files) map.set(path, new Y.Text(text));
-  let compressed = new Response(Y.encodeStateAsUpdateV2(doc) as BufferSource).body!
-      .pipeThrough(new CompressionStream("gzip"));
+  let compressed = new Response(Y.encodeStateAsUpdateV2(doc) as BufferSource).body!.pipeThrough(
+    new CompressionStream("gzip"),
+  );
   return new Uint8Array(await new Response(compressed).arrayBuffer());
 }
 
@@ -87,8 +98,10 @@ let workspaces = 0;
  * the Overseer do it, and returns the files of the gadget that results. The owner's user DO is
  * faked.
  */
-async function instantiate(blueprintId: string, metadata: BlueprintMetadata)
-    : Promise<Map<string, string>> {
+async function instantiate(
+  blueprintId: string,
+  metadata: BlueprintMetadata,
+): Promise<Map<string, string>> {
   let stub = env.TEST_OVERSEER.getByName(`bundled-blueprints-${++workspaces}`);
   return await runInDurableObject(stub, async (instance: OverseerDurableObject) => {
     let impl = (instance as unknown as { impl: any }).impl;
@@ -98,7 +111,7 @@ async function instantiate(blueprintId: string, metadata: BlueprintMetadata)
     };
     impl.ownerId = "owner-user-do";
     impl.users = { idFromString: (id: string) => id, get: () => owner };
-    impl.markOutputsDirty = () => {};  // would sync the new gadget's format to the owner
+    impl.markOutputsDirty = () => {}; // would sync the new gadget's format to the owner
 
     await instance.initializeFromBlueprint(blueprintId, metadata, metadata.output);
     let [gadget, ...others] = [...impl.storage.gadgets.list()];
@@ -112,8 +125,9 @@ async function instantiate(blueprintId: string, metadata: BlueprintMetadata)
 // installer reads the generated module's entries, so changing one in place is how a test stands
 // in for a deployment that ships something else.
 async function withEntry(
-    mutate: (entry: (typeof BUNDLED_BLUEPRINTS)[number]) => void, fn: () => Promise<void>)
-    : Promise<void> {
+  mutate: (entry: (typeof BUNDLED_BLUEPRINTS)[number]) => void,
+  fn: () => Promise<void>,
+): Promise<void> {
   let entry = BUNDLED_BLUEPRINTS[0];
   let original = { ...entry };
   try {
@@ -185,93 +199,118 @@ describe("bundled blueprints", () => {
   // stored before releases were commits is read as the snapshot release of its files, and an
   // install of those same files is that same commit.
   it.skipIf(BUNDLED_BLUEPRINTS.length === 0)(
-      "installs the commit that the same files, stored as a snapshot, are read as", async () => {
-    let entry = BUNDLED_BLUEPRINTS[0];
-    let deployment = makeDeployment();
-    await deployment.install();
-    let installed = deployment.published(entry.blueprintId);
+    "installs the commit that the same files, stored as a snapshot, are read as",
+    async () => {
+      let entry = BUNDLED_BLUEPRINTS[0];
+      let deployment = makeDeployment();
+      await deployment.install();
+      let installed = deployment.published(entry.blueprintId);
 
-    let older = { ...installed };
-    delete older.commitId;
-    await env.BLUEPRINT_CONTENT.put(
-        blueprintContentKey("older-install", older), await snapshotContent(entry.files));
-    let release = await readBlueprintRelease(env, "older-install", older);
-    expect(release.commitId).toBe(installed.commitId);
-  });
-
-  it.skipIf(BUNDLED_BLUEPRINTS.length === 0)(
-      "installs the same release again when the files have not changed", async () => {
-    let { blueprintId } = BUNDLED_BLUEPRINTS[0];
-    let deployment = makeDeployment();
-
-    await deployment.install();
-    let first = deployment.published(blueprintId);
-    let record = deployment.kv.get(blueprintId);
-    let key = `${blueprintId}/${first.commitId}`;
-    let content = await storedContent(key);
-
-    await deployment.install();
-    expect(deployment.kv.get(blueprintId)).toBe(record);
-    expect(await storedKeys(blueprintId)).toEqual([key]);
-    expect(await storedContent(key)).toEqual(content);
-  });
+      let older = { ...installed };
+      delete older.commitId;
+      await env.BLUEPRINT_CONTENT.put(
+        blueprintContentKey("older-install", older),
+        await snapshotContent(entry.files),
+      );
+      let release = await readBlueprintRelease(env, "older-install", older);
+      expect(release.commitId).toBe(installed.commitId);
+    },
+  );
 
   it.skipIf(BUNDLED_BLUEPRINTS.length === 0)(
-      "installs changed files as a new release with no parent", async () => {
-    let { blueprintId, files } = BUNDLED_BLUEPRINTS[0];
-    let deployment = makeDeployment();
-    await deployment.install();
-    let before = deployment.published(blueprintId);
+    "installs the same release again when the files have not changed",
+    async () => {
+      let { blueprintId } = BUNDLED_BLUEPRINTS[0];
+      let deployment = makeDeployment();
 
-    let added: [string, string] = ["lib/added.js", "export const added = true;\n"];
-    await withEntry(entry => { entry.files = [...files, added]; }, () => deployment.install());
-    let after = deployment.published(blueprintId);
+      await deployment.install();
+      let first = deployment.published(blueprintId);
+      let record = deployment.kv.get(blueprintId);
+      let key = `${blueprintId}/${first.commitId}`;
+      let content = await storedContent(key);
 
-    expect(after.commitId).not.toBe(before.commitId);
-    let objects = await readReleasePack(
-        await storedContent(`${blueprintId}/${after.commitId}`), after.commitId!);
-    expect(listReleaseFiles(objects, after.commitId!)).toEqual(new Map([...files, added]));
-    // A bundled blueprint's releases are not chained to one another.
-    let commit = objects.get(after.commitId!)!;
-    expect(parseGitCommitRefs(commit.payload, after.commitId!).parents).toEqual([]);
-
-    // The release it replaced stays where it was, for whoever read the metadata that names it
-    // just before this install and goes on to instantiate from it.
-    expect(await storedKeys(blueprintId)).toEqual(
-        [`${blueprintId}/${before.commitId}`, `${blueprintId}/${after.commitId}`].toSorted());
-    expect(await instantiate(blueprintId, before)).toEqual(new Map(files));
-    expect(await instantiate(blueprintId, after)).toEqual(new Map([...files, added]));
-  });
+      await deployment.install();
+      expect(deployment.kv.get(blueprintId)).toBe(record);
+      expect(await storedKeys(blueprintId)).toEqual([key]);
+      expect(await storedContent(key)).toEqual(content);
+    },
+  );
 
   it.skipIf(BUNDLED_BLUEPRINTS.length === 0)(
-      "installs the same release when only its metadata has changed", async () => {
-    let { blueprintId } = BUNDLED_BLUEPRINTS[0];
-    let deployment = makeDeployment();
-    await deployment.install();
-    let before = deployment.published(blueprintId);
+    "installs changed files as a new release with no parent",
+    async () => {
+      let { blueprintId, files } = BUNDLED_BLUEPRINTS[0];
+      let deployment = makeDeployment();
+      await deployment.install();
+      let before = deployment.published(blueprintId);
 
-    let lastUpdated = new Date(before.lastUpdated.valueOf() + 1000);
-    await withEntry(entry => {
-      entry.title += " (Beta)";
-      entry.version += 1;
-      entry.lastUpdated = lastUpdated.toISOString();
-    }, () => deployment.install());
+      let added: [string, string] = ["lib/added.js", "export const added = true;\n"];
+      await withEntry(
+        (entry) => {
+          entry.files = [...files, added];
+        },
+        () => deployment.install(),
+      );
+      let after = deployment.published(blueprintId);
 
-    expect(deployment.published(blueprintId)).toEqual({
-      ...before, title: `${before.title} (Beta)`, version: before.version + 1, lastUpdated,
-    });
-    expect(await storedKeys(blueprintId)).toEqual([`${blueprintId}/${before.commitId}`]);
-  });
+      expect(after.commitId).not.toBe(before.commitId);
+      let objects = await readReleasePack(
+        await storedContent(`${blueprintId}/${after.commitId}`),
+        after.commitId!,
+      );
+      expect(listReleaseFiles(objects, after.commitId!)).toEqual(new Map([...files, added]));
+      // A bundled blueprint's releases are not chained to one another.
+      let commit = objects.get(after.commitId!)!;
+      expect(parseGitCommitRefs(commit.payload, after.commitId!).parents).toEqual([]);
+
+      // The release it replaced stays where it was, for whoever read the metadata that names it
+      // just before this install and goes on to instantiate from it.
+      expect(await storedKeys(blueprintId)).toEqual(
+        [`${blueprintId}/${before.commitId}`, `${blueprintId}/${after.commitId}`].toSorted(),
+      );
+      expect(await instantiate(blueprintId, before)).toEqual(new Map(files));
+      expect(await instantiate(blueprintId, after)).toEqual(new Map([...files, added]));
+    },
+  );
+
+  it.skipIf(BUNDLED_BLUEPRINTS.length === 0)(
+    "installs the same release when only its metadata has changed",
+    async () => {
+      let { blueprintId } = BUNDLED_BLUEPRINTS[0];
+      let deployment = makeDeployment();
+      await deployment.install();
+      let before = deployment.published(blueprintId);
+
+      let lastUpdated = new Date(before.lastUpdated.valueOf() + 1000);
+      await withEntry(
+        (entry) => {
+          entry.title += " (Beta)";
+          entry.version += 1;
+          entry.lastUpdated = lastUpdated.toISOString();
+        },
+        () => deployment.install(),
+      );
+
+      expect(deployment.published(blueprintId)).toEqual({
+        ...before,
+        title: `${before.title} (Beta)`,
+        version: before.version + 1,
+        lastUpdated,
+      });
+      expect(await storedKeys(blueprintId)).toEqual([`${blueprintId}/${before.commitId}`]);
+    },
+  );
 
   it("ships print layouts for every standard output format", () => {
     for (let entry of BUNDLED_BLUEPRINTS) {
-      expect(readBlueprintFile(entry, "client.js"), entry.blueprintId)
-        .toContain("@media print");
+      expect(readBlueprintFile(entry, "client.js"), entry.blueprintId).toContain("@media print");
     }
   });
 
   it("renders document HTML and PDF exports without the editor chrome", () => {
-    let entry = BUNDLED_BLUEPRINTS.find(blueprint => blueprint.blueprintId === "format.document")!;
+    let entry = BUNDLED_BLUEPRINTS.find(
+      (blueprint) => blueprint.blueprintId === "format.document",
+    )!;
     let client = readBlueprintFile(entry, "client.js");
 
     // The TypeScript build rewrites the source; what survives is the export-mode check itself.
@@ -305,8 +344,10 @@ describe("bundled blueprints", () => {
 
     for (let entry of BUNDLED_BLUEPRINTS) {
       let serverCode = readBlueprintFile(entry, "server.js");
-      expect(exportsName(serverCode, "ExportHandler"),
-        `${entry.blueprintId}: server.js exports ExportHandler`).toBe(true);
+      expect(
+        exportsName(serverCode, "ExportHandler"),
+        `${entry.blueprintId}: server.js exports ExportHandler`,
+      ).toBe(true);
       for (let declaration of expectedFormats[entry.blueprintId] ?? []) {
         expect(serverCode, `${entry.blueprintId}: ${declaration}`).toContain(declaration);
       }
@@ -328,56 +369,68 @@ describe("bundled blueprints", () => {
   // Skipped when the deployment bundles nothing, which BUNDLED_BLUEPRINTS_DIR makes a supported
   // configuration rather than a broken checkout.
   it.skipIf(BUNDLED_BLUEPRINTS.length === 0)(
-      "changes the manifest version when an entry's revision changes", () => {
-    let entry = BUNDLED_BLUEPRINTS[0];
-    let before = bundledBlueprintsManifestVersion();
-    expect(before).toContain(entry.blueprintId);
+    "changes the manifest version when an entry's revision changes",
+    () => {
+      let entry = BUNDLED_BLUEPRINTS[0];
+      let before = bundledBlueprintsManifestVersion();
+      expect(before).toContain(entry.blueprintId);
 
-    let original = entry.revision;
-    try {
-      entry.revision = original + 1;
-      expect(bundledBlueprintsManifestVersion()).not.toBe(before);
-    } finally {
-      entry.revision = original;
-    }
-  });
+      let original = entry.revision;
+      try {
+        entry.revision = original + 1;
+        expect(bundledBlueprintsManifestVersion()).not.toBe(before);
+      } finally {
+        entry.revision = original;
+      }
+    },
+  );
 
   it.skipIf(BUNDLED_BLUEPRINTS.length === 0)(
-      "changes the manifest version when bundled source changes", () => {
-    let entry = BUNDLED_BLUEPRINTS[0];
-    let before = bundledBlueprintsManifestVersion();
-    let original = entry.contentHash;
-    try {
-      entry.contentHash = `${original}-changed`;
-      expect(bundledBlueprintsManifestVersion()).not.toBe(before);
-    } finally {
-      entry.contentHash = original;
-    }
-  });
+    "changes the manifest version when bundled source changes",
+    () => {
+      let entry = BUNDLED_BLUEPRINTS[0];
+      let before = bundledBlueprintsManifestVersion();
+      let original = entry.contentHash;
+      try {
+        entry.contentHash = `${original}-changed`;
+        expect(bundledBlueprintsManifestVersion()).not.toBe(before);
+      } finally {
+        entry.contentHash = original;
+      }
+    },
+  );
 
   // Curated text is the input most likely to be edited -- it is the whole point of keeping it in a
   // text file -- and an edit that doesn't reach deployments which already installed would be
   // invisible: the build succeeds and the old wording stays put.
   it.skipIf(BUNDLED_BLUEPRINTS.length === 0)(
-      "changes the manifest version when curated presentation changes, with no revision bump", () => {
-    let entry = BUNDLED_BLUEPRINTS[0];
-    let before = bundledBlueprintsManifestVersion();
+    "changes the manifest version when curated presentation changes, with no revision bump",
+    () => {
+      let entry = BUNDLED_BLUEPRINTS[0];
+      let before = bundledBlueprintsManifestVersion();
 
-    for (let mutate of [
-      () => { entry.description += " Now with more detail."; },
-      () => { entry.title += " (Beta)"; },
-      () => { entry.output = {...entry.output, noun: "Document"}; },
-    ]) {
-      let restore = {...entry};
-      try {
-        mutate();
-        expect(bundledBlueprintsManifestVersion()).not.toBe(before);
-        expect(entry.revision).toBe(restore.revision);
-      } finally {
-        Object.assign(entry, restore);
+      for (let mutate of [
+        () => {
+          entry.description += " Now with more detail.";
+        },
+        () => {
+          entry.title += " (Beta)";
+        },
+        () => {
+          entry.output = { ...entry.output, noun: "Document" };
+        },
+      ]) {
+        let restore = { ...entry };
+        try {
+          mutate();
+          expect(bundledBlueprintsManifestVersion()).not.toBe(before);
+          expect(entry.revision).toBe(restore.revision);
+        } finally {
+          Object.assign(entry, restore);
+        }
       }
-    }
 
-    expect(bundledBlueprintsManifestVersion()).toBe(before);
-  });
+      expect(bundledBlueprintsManifestVersion()).toBe(before);
+    },
+  );
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   FRONTEND_ERROR_MESSAGE_TYPE,
   MAX_MESSAGE_CHARS,
@@ -33,7 +33,9 @@ describe("serializeException", () => {
 
     const hostile = {};
     Object.defineProperty(hostile, "message", {
-      get() { throw new Error("getter invoked"); },
+      get() {
+        throw new Error("getter invoked");
+      },
     });
     expect(() => serializeException(hostile)).not.toThrow();
     expect(serializeException(hostile)).toEqual({ type: "Object" });
@@ -42,7 +44,9 @@ describe("serializeException", () => {
   it("retains readable Error fields when the stack accessor throws", () => {
     const error = new Error("still useful");
     Object.defineProperty(error, "stack", {
-      get() { throw new Error("stack unavailable"); },
+      get() {
+        throw new Error("stack unavailable");
+      },
     });
 
     expect(serializeException(error)).toEqual({
@@ -105,13 +109,23 @@ describe("normalizeFrontendErrorReport", () => {
   });
 
   it.each([
-    ["a username with no password", "https://user@workshop.example/p", "https://workshop.example/p"],
-    ["a password with no username", "https://:secret@workshop.example/p", "https://workshop.example/p"],
+    [
+      "a username with no password",
+      "https://user@workshop.example/p",
+      "https://workshop.example/p",
+    ],
+    [
+      "a password with no username",
+      "https://:secret@workshop.example/p",
+      "https://workshop.example/p",
+    ],
     ["a port", "https://workshop.example:8443/p", "https://workshop.example:8443/p"],
     ["plain http", "http://workshop.example/p", "http://workshop.example/p"],
   ])("keeps a page location with %s usable", (_case, pageLocation, expected) => {
-    expect(normalizeFrontendErrorReport({ ...report, pageLocation }))
-      .toEqual({ ...report, pageLocation: expected });
+    expect(normalizeFrontendErrorReport({ ...report, pageLocation })).toEqual({
+      ...report,
+      pageLocation: expected,
+    });
   });
 
   it.each([
@@ -156,8 +170,11 @@ describe("normalizeFrontendErrorReport", () => {
     const pageLocation = prefix + "p".repeat(MAX_STRING_CHARS - prefix.length);
     const reportedUserId = "u".repeat(MAX_STRING_CHARS);
 
-    expect(normalizeFrontendErrorReport({ ...report, pageLocation, reportedUserId }))
-      .toEqual({ ...report, pageLocation, reportedUserId });
+    expect(normalizeFrontendErrorReport({ ...report, pageLocation, reportedUserId })).toEqual({
+      ...report,
+      pageLocation,
+      reportedUserId,
+    });
   });
 
   it("normalizes malformed fields instead of losing the report", () => {
@@ -231,16 +248,18 @@ describe("extractFrontendFrameReport", () => {
   });
 
   it("normalizes imperfect frame-owned data", () => {
-    expect(extractFrontendFrameReport({
-      type: FRONTEND_ERROR_MESSAGE_TYPE,
-      report: {
-        failureSite: "",
-        severity: "critical",
-        handled: "no",
-        captureMechanism: "other",
-        exception: "boom",
-      },
-    })).toEqual({
+    expect(
+      extractFrontendFrameReport({
+        type: FRONTEND_ERROR_MESSAGE_TYPE,
+        report: {
+          failureSite: "",
+          severity: "critical",
+          handled: "no",
+          captureMechanism: "other",
+          exception: "boom",
+        },
+      }),
+    ).toEqual({
       failureSite: "frame.unknown",
       severity: "error",
       handled: true,

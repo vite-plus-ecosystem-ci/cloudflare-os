@@ -2,7 +2,7 @@
 // the line-level unified diff whose hunks must match the shape parsePatch produces from GitHub's
 // own patches.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   MAX_DIFF_BLOB_BYTES,
   TreeUnavailableError,
@@ -22,7 +22,7 @@ function oid(n: number): string {
 
 function treePayload(entries: { mode: string; name: string; oid: string }[]): Uint8Array {
   const encoder = new TextEncoder();
-  const pieces = entries.flatMap(entry => {
+  const pieces = entries.flatMap((entry) => {
     const oidBytes = new Uint8Array(20);
     for (let i = 0; i < 20; i++) {
       oidBytes[i] = parseInt(entry.oid.slice(i * 2, i * 2 + 2), 16);
@@ -46,11 +46,11 @@ function fakeSource(
   const treeReads: string[] = [];
   const blobReads: string[] = [];
   const source: TreeDiffSource = {
-    getTree: async id => {
+    getTree: async (id) => {
       treeReads.push(id);
       return trees[id] ?? null;
     },
-    getBlob: async id => {
+    getBlob: async (id) => {
       blobReads.push(id);
       return blobs[id] ?? "unavailable";
     },
@@ -70,14 +70,20 @@ describe("parseGitTreePayload", () => {
       { mode: "160000", name: "vendored", oid: oid(5) },
     ];
     expect(parseGitTreePayload(treePayload(entries), oid(9))).toEqual(entries);
-    expect(entries.map(entry => treeEntryKind(entry.mode)))
-      .toEqual(["file", "dir", "file", "symlink", "gitlink"]);
+    expect(entries.map((entry) => treeEntryKind(entry.mode))).toEqual([
+      "file",
+      "dir",
+      "file",
+      "symlink",
+      "gitlink",
+    ]);
   });
 
   it("rejects truncated payloads and non-UTF-8 names", () => {
     const good = treePayload([{ mode: "100644", name: "a", oid: oid(1) }]);
-    expect(() => parseGitTreePayload(good.subarray(0, good.length - 1), oid(9)))
-      .toThrow(/not a well-formed tree/);
+    expect(() => parseGitTreePayload(good.subarray(0, good.length - 1), oid(9))).toThrow(
+      /not a well-formed tree/,
+    );
 
     const badName = new Uint8Array([...text("100644 "), 0xff, 0, ...new Uint8Array(20)]);
     expect(() => parseGitTreePayload(badName, oid(9))).toThrow(/non-UTF-8 entry name/);
@@ -132,7 +138,7 @@ describe("diffTextLines", () => {
     changedFar[1] = "x2";
     changedFar[19] = "x20";
     const far = diffTextLines(lines.join("\n"), changedFar.join("\n"));
-    expect(far.hunks.map(hunk => hunk.header)).toEqual(["@@ -1,5 +1,5 @@", "@@ -17,7 +17,7 @@"]);
+    expect(far.hunks.map((hunk) => hunk.header)).toEqual(["@@ -1,5 +1,5 @@", "@@ -17,7 +17,7 @@"]);
 
     const changedNear = [...lines];
     changedNear[1] = "x2";
@@ -193,8 +199,9 @@ describe("diffTextLines", () => {
     changed[0] = "x1";
     const far = diffTextLines(lines.join("\n"), changed.join("\n"));
     expect(far.hunks).toHaveLength(1);
-    expect(far.hunks[0].lines.every(line => line.text !== "\\ No newline at end of file"))
-      .toBe(true);
+    expect(far.hunks[0].lines.every((line) => line.text !== "\\ No newline at end of file")).toBe(
+      true,
+    );
   });
 
   it("marks an added or removed file that never had a final newline", () => {
@@ -239,16 +246,25 @@ describe("diffTextLines", () => {
     const newMid = Array.from({ length: 700 }, (_, i) => `new${i}`);
     const { hunks, additions, deletions } = diffTextLines(
       [...prefix, ...oldMid, ...suffix].join("\n") + "\n",
-      [...prefix, ...newMid, ...suffix].join("\n") + "\n");
+      [...prefix, ...newMid, ...suffix].join("\n") + "\n",
+    );
     expect(deletions).toBe(700);
     expect(additions).toBe(700);
     expect(hunks).toHaveLength(1);
     expect(hunks[0].header).toBe("@@ -8,706 +8,706 @@");
     expect(hunks[0].lines).toHaveLength(3 + 700 + 700 + 3);
-    expect(hunks[0].lines[0]).toEqual(
-      { kind: "context", text: "keep8", oldLineNumber: 8, newLineNumber: 8 });
-    expect(hunks[0].lines.at(-1)).toEqual(
-      { kind: "context", text: "tail3", oldLineNumber: 713, newLineNumber: 713 });
+    expect(hunks[0].lines[0]).toEqual({
+      kind: "context",
+      text: "keep8",
+      oldLineNumber: 8,
+      newLineNumber: 8,
+    });
+    expect(hunks[0].lines.at(-1)).toEqual({
+      kind: "context",
+      text: "tail3",
+      oldLineNumber: 713,
+      newLineNumber: 713,
+    });
   });
 
   it("skips the Myers run entirely for an over-long changed middle", () => {
@@ -256,26 +272,38 @@ describe("diffTextLines", () => {
     // even though its edit distance path would have been fine for jsdiff's memory.
     const inserted = Array.from({ length: 20001 }, (_, i) => `ins${i}`);
     const { hunks, additions, deletions } = diffTextLines(
-      "a\nb\n", ["a", ...inserted, "b"].join("\n") + "\n");
+      "a\nb\n",
+      ["a", ...inserted, "b"].join("\n") + "\n",
+    );
     expect(deletions).toBe(0);
     expect(additions).toBe(20001);
     expect(hunks).toHaveLength(1);
     expect(hunks[0].header).toBe("@@ -1,2 +1,20003 @@");
-    expect(hunks[0].lines[0]).toEqual(
-      { kind: "context", text: "a", oldLineNumber: 1, newLineNumber: 1 });
+    expect(hunks[0].lines[0]).toEqual({
+      kind: "context",
+      text: "a",
+      oldLineNumber: 1,
+      newLineNumber: 1,
+    });
     expect(hunks[0].lines[1]).toEqual({ kind: "added", text: "ins0", newLineNumber: 2 });
-    expect(hunks[0].lines.at(-1)).toEqual(
-      { kind: "context", text: "b", oldLineNumber: 2, newLineNumber: 20003 });
+    expect(hunks[0].lines.at(-1)).toEqual({
+      kind: "context",
+      text: "b",
+      oldLineNumber: 2,
+      newLineNumber: 20003,
+    });
   });
 
   it("keeps the EOF-newline markers in the fallback path", () => {
     const oldText = Array.from({ length: 700 }, (_, i) => `old${i}`).join("\n");
     const newText = Array.from({ length: 700 }, (_, i) => `new${i}`).join("\n");
-    const { hunks } = diffTextLines(oldText, newText);  // both sides unterminated
+    const { hunks } = diffTextLines(oldText, newText); // both sides unterminated
     expect(hunks).toHaveLength(1);
     expect(hunks[0].lines[700]).toEqual({ kind: "context", text: "\\ No newline at end of file" });
-    expect(hunks[0].lines.at(-1)).toEqual(
-      { kind: "context", text: "\\ No newline at end of file" });
+    expect(hunks[0].lines.at(-1)).toEqual({
+      kind: "context",
+      text: "\\ No newline at end of file",
+    });
   });
 });
 
@@ -309,7 +337,7 @@ describe("diffGitTrees", () => {
     const { source, blobReads } = fakeSource(trees, blobs);
     const files = await diffGitTrees(source, oid(10), oid(20));
 
-    expect(files.map(file => [file.path, file.status])).toEqual([
+    expect(files.map((file) => [file.path, file.status])).toEqual([
       ["a.txt", "modified"],
       ["sub/y.txt", "added"],
     ]);
@@ -328,7 +356,7 @@ describe("diffGitTrees", () => {
   it("treats a null old tree as empty (the whole new tree is added)", async () => {
     const { source } = fakeSource(trees, blobs);
     const files = await diffGitTrees(source, null, oid(21));
-    expect(files.map(file => [file.path, file.status])).toEqual([
+    expect(files.map((file) => [file.path, file.status])).toEqual([
       ["x.txt", "added"],
       ["y.txt", "added"],
     ]);
@@ -374,7 +402,7 @@ describe("diffGitTrees", () => {
       {},
     );
     const files = await diffGitTrees(source, oid(30), oid(31));
-    expect(files.map(file => [file.path, file.status, file.diffOmitted])).toEqual([
+    expect(files.map((file) => [file.path, file.status, file.diffOmitted])).toEqual([
       ["run.sh", "modified", true],
       ["vendored", "modified", true],
     ]);
@@ -391,7 +419,7 @@ describe("diffGitTrees", () => {
       blobs,
     );
     const files = await diffGitTrees(source, oid(30), oid(31));
-    expect(files.map(file => [file.path, file.status])).toEqual([
+    expect(files.map((file) => [file.path, file.status])).toEqual([
       ["thing/x.txt", "removed"],
       ["thing", "added"],
     ]);
@@ -415,7 +443,10 @@ describe("diffGitTrees", () => {
   });
 
   it("throws TreeUnavailableError when a needed tree cannot be loaded", async () => {
-    const { source } = fakeSource({ [oid(30)]: [{ mode: "40000", name: "sub", oid: oid(99) }] }, {});
+    const { source } = fakeSource(
+      { [oid(30)]: [{ mode: "40000", name: "sub", oid: oid(99) }] },
+      {},
+    );
     await expect(diffGitTrees(source, oid(30), null)).rejects.toThrow(TreeUnavailableError);
   });
 });
@@ -435,8 +466,10 @@ describe("changedPathsBetweenTrees", () => {
       [oid(21)]: [{ mode: "100644", name: "x.txt", oid: oid(4) }],
     };
     const { source, blobReads } = fakeSource(trees, {});
-    expect(await changedPathsBetweenTrees(source, oid(10), oid(20)))
-      .toEqual(["a.txt", "sub/x.txt"]);
+    expect(await changedPathsBetweenTrees(source, oid(10), oid(20))).toEqual([
+      "a.txt",
+      "sub/x.txt",
+    ]);
     expect(blobReads).toEqual([]);
   });
 });

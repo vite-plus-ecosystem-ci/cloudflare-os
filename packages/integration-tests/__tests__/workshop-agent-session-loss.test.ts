@@ -3,11 +3,14 @@
 // overseer.ts #resumeInterruptedAgents, main.tsx reconnect()). The agent session must do the same,
 // or a turn the product completed is reported as a failure after the whole turn budget has passed.
 import { createServer, connect as connectTcp, type Server, type Socket } from "node:net";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import { openAgentSession } from "../src/agent-session.js";
 import { startTestGatekeeperHarness, type Harness } from "../src/harness.js";
 import {
-  scriptedChatCompletions, SCRIPTED_MODEL_CONFIG, SCRIPTED_MODEL_ID, SCRIPTED_MODEL_PROFILE,
+  scriptedChatCompletions,
+  SCRIPTED_MODEL_CONFIG,
+  SCRIPTED_MODEL_ID,
+  SCRIPTED_MODEL_PROFILE,
 } from "../src/mock-model.js";
 import { NetworkInterceptor, type Handler } from "../src/network-interceptor.js";
 
@@ -16,7 +19,7 @@ type Relay = { url: URL; cut(): void; close(): Promise<void> };
 
 function startRelay(target: URL): Promise<Relay> {
   const sockets = new Set<Socket>();
-  const server: Server = createServer(downstream => {
+  const server: Server = createServer((downstream) => {
     const upstream = connectTcp({ host: target.hostname, port: Number(target.port) });
     sockets.add(downstream).add(upstream);
     downstream.pipe(upstream).pipe(downstream);
@@ -29,15 +32,19 @@ function startRelay(target: URL): Promise<Relay> {
     downstream.on("close", drop).on("error", drop);
     upstream.on("close", drop).on("error", drop);
   });
-  return new Promise(resolve => server.listen(0, "127.0.0.1", () => {
-    const address = server.address();
-    if (address === null || typeof address === "string") throw new Error("relay has no port");
-    resolve({
-      url: new URL(`http://127.0.0.1:${address.port}`),
-      cut: () => { for (const socket of sockets) socket.destroy(); },
-      close: () => new Promise(done => server.close(() => done())),
-    });
-  }));
+  return new Promise((resolve) =>
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (address === null || typeof address === "string") throw new Error("relay has no port");
+      resolve({
+        url: new URL(`http://127.0.0.1:${address.port}`),
+        cut: () => {
+          for (const socket of sockets) socket.destroy();
+        },
+        close: () => new Promise((done) => server.close(() => done())),
+      });
+    }),
+  );
 }
 
 let harness: Harness;
@@ -84,11 +91,15 @@ it("reconnects when the session breaks mid-turn and reports what the agent did",
 
     const result = await turn;
     expect(result.outcome).toEqual({ status: "completed" });
-    expect(result.history).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: "message", author: expect.objectContaining({ type: "agent" }), message: "Done.",
-      }),
-    ]));
+    expect(result.history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "message",
+          author: expect.objectContaining({ type: "agent" }),
+          message: "Done.",
+        }),
+      ]),
+    );
   } finally {
     await relay.close();
   }
@@ -103,7 +114,7 @@ it("fails the active turn once the session cannot be re-established", async () =
     timeoutMs: 120_000,
   });
   turn.catch(() => {});
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise((resolve) => setTimeout(resolve, 500));
 
   serverClosed = true;
   await harness.server.close();
