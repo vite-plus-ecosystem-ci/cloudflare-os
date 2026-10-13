@@ -7,11 +7,13 @@
 // `encodeURIComponent`, a normalization one side does and the other does not -- shows up here
 // rather than as a resource the backend rejects after the user has filled the form.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("@gadgets/configurator-ui", () => ({
   h: (component: unknown, props: unknown, ...children: unknown[]) => ({
-    component, props, children,
+    component,
+    props,
+    children,
   }),
   Autocomplete: "Autocomplete",
   Field: "Field",
@@ -30,29 +32,43 @@ import chatSpaceConfigurator from "../src/configurator/chat-space-configurator-u
 import chatThreadConfigurator from "../src/configurator/chat-thread-configurator-ui";
 import googleSlidesConfigurator from "../src/configurator/google-slides-configurator-ui";
 import {
-  GMAIL_RESOURCE, GOOGLE_CALENDAR_RESOURCE, GOOGLE_CHAT_RESOURCE, GOOGLE_CHAT_SPACE_RESOURCE,
+  GMAIL_RESOURCE,
+  GOOGLE_CALENDAR_RESOURCE,
+  GOOGLE_CHAT_RESOURCE,
+  GOOGLE_CHAT_SPACE_RESOURCE,
   GOOGLE_CHAT_THREAD_RESOURCE,
-  GOOGLE_DRIVE_FILE_RESOURCE, GOOGLE_DRIVE_FOLDER_RESOURCE, GOOGLE_DRIVE_RESOURCE,
+  GOOGLE_DRIVE_FILE_RESOURCE,
+  GOOGLE_DRIVE_FOLDER_RESOURCE,
+  GOOGLE_DRIVE_RESOURCE,
   GOOGLE_SLIDES_RESOURCE,
   parseResourceUrl,
 } from "../src/resources";
 
 // The configurators never call `ui` from these two methods; it is present only to satisfy the
 // context type, and touching it is a bug.
-const noUi = new Proxy({}, {
-  get() { throw new Error("must not call the ui capability"); },
-}) as never;
+const noUi = new Proxy(
+  {},
+  {
+    get() {
+      throw new Error("must not call the ui capability");
+    },
+  },
+) as never;
 
 const gmailUrl = (values: Record<string, unknown>) =>
   gmailConfigurator.resourceUrl!({ values, ui: noUi }) as string;
 
 const gmailValues = (resourceUrl: string) =>
   gmailConfigurator.initialValuesFromResourceUrl!({
-    resourceUrl, resourceUrlPattern: GMAIL_RESOURCE.urlPattern, ui: noUi,
+    resourceUrl,
+    resourceUrlPattern: GMAIL_RESOURCE.urlPattern,
+    ui: noUi,
   });
 
 const configurableUrl = (
-  configurator: { resourceUrl?: (context: { values: Record<string, unknown>; ui: never }) => string },
+  configurator: {
+    resourceUrl?: (context: { values: Record<string, unknown>; ui: never }) => string;
+  },
   values: Record<string, unknown>,
 ) => configurator.resourceUrl!({ values, ui: noUi });
 
@@ -76,16 +92,28 @@ const renderedCopy = (configurator: { render?: (context: never) => unknown }) =>
 describe("Gmail configurator URLs", () => {
   it.for([
     ["the whole mailbox", { mode: "all" }, { kind: "gmail" }],
-    ["a search", { mode: "search", query: "from:alerts@example.com" },
-      { kind: "gmail", searchQuery: "from:alerts@example.com" }],
-    ["a search with spaces", { mode: "search", query: "is:unread subject:invoice" },
-      { kind: "gmail", searchQuery: "is:unread subject:invoice" }],
+    [
+      "a search",
+      { mode: "search", query: "from:alerts@example.com" },
+      { kind: "gmail", searchQuery: "from:alerts@example.com" },
+    ],
+    [
+      "a search with spaces",
+      { mode: "search", query: "is:unread subject:invoice" },
+      { kind: "gmail", searchQuery: "is:unread subject:invoice" },
+    ],
     // A literal `+` in an address must survive as a `+`, not become a space.
-    ["a search naming a plus address", { mode: "search", query: "to:nathan+receipts@example.com" },
-      { kind: "gmail", searchQuery: "to:nathan+receipts@example.com" }],
+    [
+      "a search naming a plus address",
+      { mode: "search", query: "to:nathan+receipts@example.com" },
+      { kind: "gmail", searchQuery: "to:nathan+receipts@example.com" },
+    ],
     ["a label", { mode: "label", label: "Receipts" }, { kind: "gmail", labelName: "Receipts" }],
-    ["a label with a slash", { mode: "label", label: "Work/Invoices" },
-      { kind: "gmail", labelName: "Work/Invoices" }],
+    [
+      "a label with a slash",
+      { mode: "label", label: "Work/Invoices" },
+      { kind: "gmail", labelName: "Work/Invoices" },
+    ],
   ] as const)("builds a URL the server parses back for %s", ([, values, target]) => {
     expect(parseResourceUrl(gmailUrl(values))).toEqual(target);
   });
@@ -107,17 +135,21 @@ describe("Gmail configurator URLs", () => {
 
     expect(gmailValues(pasted)).toEqual({ mode: "search", query: "is:unread subject:invoice" });
     expect(parseResourceUrl(pasted)).toEqual({
-      kind: "gmail", searchQuery: "is:unread subject:invoice",
+      kind: "gmail",
+      searchQuery: "is:unread subject:invoice",
     });
   });
 
   it("keeps an escaped plus literal in a pasted URL", () => {
     const pasted = "https://mail.google.com/mail/u/0/#search/to%3Anathan%2Breceipts%40example.com";
 
-    expect(gmailValues(pasted))
-      .toEqual({ mode: "search", query: "to:nathan+receipts@example.com" });
+    expect(gmailValues(pasted)).toEqual({
+      mode: "search",
+      query: "to:nathan+receipts@example.com",
+    });
     expect(parseResourceUrl(pasted)).toEqual({
-      kind: "gmail", searchQuery: "to:nathan+receipts@example.com",
+      kind: "gmail",
+      searchQuery: "to:nathan+receipts@example.com",
     });
   });
 
@@ -142,7 +174,8 @@ describe("Calendar configurator URLs", () => {
       ui,
     });
     const resourceUrl = calendarConfigurator.resourceUrl!({
-      values, ui,
+      values,
+      ui,
     });
 
     expect(calendarConfigurator.isReady!({ values: { calendarId: "primary" } })).toBe(false);
@@ -159,7 +192,9 @@ describe("Calendar configurator URLs", () => {
 describe("Google Chat configurator URLs", () => {
   const chatValues = (resourceUrl: string) =>
     chatSpaceConfigurator.initialValuesFromResourceUrl!({
-      resourceUrl, resourceUrlPattern: GOOGLE_CHAT_SPACE_RESOURCE.urlPattern, ui: noUi,
+      resourceUrl,
+      resourceUrlPattern: GOOGLE_CHAT_SPACE_RESOURCE.urlPattern,
+      ui: noUi,
     });
 
   it("mints the whole-account resource", () => {
@@ -186,10 +221,10 @@ describe("Google Chat configurator URLs", () => {
   });
 
   it("explains that a conversation connection is shareable but an account one is not", () => {
-    expect(renderedCopy(chatAccountConfigurator))
-      .toContain("cannot be shared with collaborators");
-    expect(renderedCopy(chatSpaceConfigurator))
-      .toContain("only if their own Google account can open it too");
+    expect(renderedCopy(chatAccountConfigurator)).toContain("cannot be shared with collaborators");
+    expect(renderedCopy(chatSpaceConfigurator)).toContain(
+      "only if their own Google account can open it too",
+    );
   });
 });
 
@@ -198,7 +233,11 @@ describe("Google Chat thread configurator URLs", () => {
     chatThreadConfigurator.isReady!({ values: { link }, ui: noUi } as never);
 
   it.for([
-    ["https://chat.google.com/dm/pBt6ayAAAAE/HrpoFQHIJRc/HrpoFQHIJRc?cls=10", "pBt6ayAAAAE", "HrpoFQHIJRc"],
+    [
+      "https://chat.google.com/dm/pBt6ayAAAAE/HrpoFQHIJRc/HrpoFQHIJRc?cls=10",
+      "pBt6ayAAAAE",
+      "HrpoFQHIJRc",
+    ],
     ["https://chat.google.com/room/AAAA1234/TTT?cls=10", "AAAA1234", "TTT"],
     ["spaces/AAAA1234/threads/TTT", "AAAA1234", "TTT"],
   ] as const)("mints a canonical thread URL from %s", ([link, spaceId, threadId]) => {
@@ -211,7 +250,9 @@ describe("Google Chat thread configurator URLs", () => {
   it("round-trips a canonical thread URL", () => {
     const url = "https://chat.google.com/room/AAAA1234/TTT";
     const values = chatThreadConfigurator.initialValuesFromResourceUrl!({
-      resourceUrl: url, resourceUrlPattern: GOOGLE_CHAT_THREAD_RESOURCE.urlPattern, ui: noUi,
+      resourceUrl: url,
+      resourceUrlPattern: GOOGLE_CHAT_THREAD_RESOURCE.urlPattern,
+      ui: noUi,
     });
     expect(configurableUrl(chatThreadConfigurator, values)).toBe(url);
   });
@@ -221,13 +262,14 @@ describe("Google Chat thread configurator URLs", () => {
     "https://chat.google.com/room/AAAA1234/...",
     "spaces/AAAA1234",
     "https://example.com/room/AAAA1234/TTT",
-  ])("is not ready for %s", link => {
+  ])("is not ready for %s", (link) => {
     expect(threadReady(link)).toBe(false);
   });
 
   it("explains who can open a thread connection", () => {
-    expect(renderedCopy(chatThreadConfigurator))
-      .toContain("only if their own Google account can open its conversation");
+    expect(renderedCopy(chatThreadConfigurator)).toContain(
+      "only if their own Google account can open its conversation",
+    );
   });
 });
 
@@ -252,7 +294,9 @@ describe("Drive configurator URLs", () => {
     let url = configurableUrl(driveFolderConfigurator, values);
     expect(url).toBe(
       GOOGLE_DRIVE_FOLDER_RESOURCE.urlPattern.replace(
-        ":folderId", encodeURIComponent(values.folderId)),
+        ":folderId",
+        encodeURIComponent(values.folderId),
+      ),
     );
     expect(parseResourceUrl(url)).toEqual({ kind: "driveFolder", folderId: values.folderId });
   });
@@ -268,13 +312,15 @@ describe("Drive configurator URLs", () => {
   it("prefills encoded IDs from urlPattern named groups", () => {
     let fileValues = { fileId: "file/id with spaces" };
     let fileUrl = configurableUrl(driveFileConfigurator, fileValues);
-    expect(valuesFromUrlPattern(fileUrl, GOOGLE_DRIVE_FILE_RESOURCE.urlPattern))
-      .toEqual(fileValues);
+    expect(valuesFromUrlPattern(fileUrl, GOOGLE_DRIVE_FILE_RESOURCE.urlPattern)).toEqual(
+      fileValues,
+    );
 
     let folderValues = { folderId: "folder/id with spaces" };
     let folderUrl = configurableUrl(driveFolderConfigurator, folderValues);
-    expect(valuesFromUrlPattern(folderUrl, GOOGLE_DRIVE_FOLDER_RESOURCE.urlPattern))
-      .toEqual(folderValues);
+    expect(valuesFromUrlPattern(folderUrl, GOOGLE_DRIVE_FOLDER_RESOURCE.urlPattern)).toEqual(
+      folderValues,
+    );
   });
 });
 
@@ -282,7 +328,10 @@ describe("Google Slides configurator URLs", () => {
   it("mints a presentation URL the server parses and the prefill reads back", () => {
     let values = { presentationId: "1AbC-dEf_9xYz" };
     let url = configurableUrl(googleSlidesConfigurator, values);
-    expect(parseResourceUrl(url)).toEqual({ kind: "slides", presentationId: values.presentationId });
+    expect(parseResourceUrl(url)).toEqual({
+      kind: "slides",
+      presentationId: values.presentationId,
+    });
     expect(valuesFromUrlPattern(url, GOOGLE_SLIDES_RESOURCE.urlPattern)).toEqual(values);
   });
 });

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { applyAppTheme } from "./theme";
 
 describe("applyAppTheme", () => {
@@ -12,8 +12,9 @@ describe("applyAppTheme", () => {
 
     expect(document.documentElement.dataset.mode).toBe("dark");
     expect(document.documentElement.style.colorScheme).toBe("dark");
-    expect(document.documentElement.style.getPropertyValue("--color-kumo-brand"))
-      .toContain("#3b82f6");
+    expect(document.documentElement.style.getPropertyValue("--color-kumo-brand")).toContain(
+      "#3b82f6",
+    );
 
     applyAppTheme({ mode: "light", accentColor: null });
 

@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { createExecutionContext } from "cloudflare:test";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { DeviceSessionHandoff } from "../src/auth/device-session-handoff";
 import { deviceSessionCallback } from "../src/auth/device-session-callback";
 import server from "../src/server";
@@ -17,12 +17,15 @@ const handoff: DeviceSessionHandoff = {
   ciphertext: "D".repeat(128),
 };
 
-function request(body: URLSearchParams, options?: {
-  origin?: string;
-  method?: string;
-  mode?: string;
-  destination?: string;
-}): Request {
+function request(
+  body: URLSearchParams,
+  options?: {
+    origin?: string;
+    method?: string;
+    mode?: string;
+    destination?: string;
+  },
+): Request {
   return new Request(`${origin}/api/device-session/callback`, {
     method: options?.method ?? "POST",
     headers: {
@@ -40,11 +43,12 @@ describe("device session callback", () => {
   it("redeems a staged transfer through the Worker route exactly once", async () => {
     const user = env.TEST_USER.getByName(`device-session-route-${crypto.randomUUID()}`);
     await user.authenticateFromCfAccess("route-user@example.com", true);
-    const key = await crypto.subtle.generateKey(
-        { name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]) as CryptoKeyPair;
+    const key = (await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, [
+      "deriveBits",
+    ])) as CryptoKeyPair;
     const publicKey = new Uint8Array(
-        await crypto.subtle.exportKey("raw", key.publicKey) as ArrayBuffer)
-        .toBase64({ alphabet: "base64url", omitPadding: true });
+      (await crypto.subtle.exportKey("raw", key.publicKey)) as ArrayBuffer,
+    ).toBase64({ alphabet: "base64url", omitPadding: true });
     const start = await user.stageDeviceSessionHandoff(publicKey, state);
     const body = new URLSearchParams({ ...start, state });
 
@@ -61,10 +65,7 @@ describe("device session callback", () => {
 
   it("consumes the server-held handoff and redirects to the claimed HTTPS app link", async () => {
     const consume = vi.fn().mockResolvedValue(handoff);
-    const response = await deviceSessionCallback(
-      request(new URLSearchParams(fields)),
-      consume,
-    );
+    const response = await deviceSessionCallback(request(new URLSearchParams(fields)), consume);
     expect(consume).toHaveBeenCalledWith(userDoId, state, ticket);
     expect(response.status).toBe(303);
     const callback = new URL(response.headers.get("Location")!);
@@ -87,12 +88,22 @@ describe("device session callback", () => {
       request(new URLSearchParams({ ...fields, userDoId: "bad" })),
       request(new URLSearchParams({ userDoId, state })),
       request(new URLSearchParams({ ...fields, ticket: "bad" })),
-      request(new URLSearchParams([
-        ["userDoId", userDoId], ["state", state], ["state", state], ["ticket", ticket],
-      ])),
-      request(new URLSearchParams([
-        ["userDoId", userDoId], ["state", state], ["ticket", ticket], ["ticket", ticket],
-      ])),
+      request(
+        new URLSearchParams([
+          ["userDoId", userDoId],
+          ["state", state],
+          ["state", state],
+          ["ticket", ticket],
+        ]),
+      ),
+      request(
+        new URLSearchParams([
+          ["userDoId", userDoId],
+          ["state", state],
+          ["ticket", ticket],
+          ["ticket", ticket],
+        ]),
+      ),
       request(new URLSearchParams(fields), { method: "GET" }),
     ]) {
       expect((await deviceSessionCallback(candidate, consume)).status).toBeGreaterThanOrEqual(400);
@@ -111,7 +122,10 @@ describe("device session callback", () => {
   it("rejects another Access user's handoff before consuming its ticket", async () => {
     const consume = vi.fn().mockResolvedValue(handoff);
     const response = await deviceSessionCallback(
-      request(new URLSearchParams(fields)), consume, "c".repeat(64));
+      request(new URLSearchParams(fields)),
+      consume,
+      "c".repeat(64),
+    );
     expect(response.status).toBe(403);
     expect(consume).not.toHaveBeenCalled();
   });
@@ -127,9 +141,11 @@ describe("device session callback", () => {
   });
 
   it("does not disguise a storage failure as an expired transfer", async () => {
-    await expect(deviceSessionCallback(
-      request(new URLSearchParams(fields)),
-      vi.fn().mockRejectedValue(new Error("storage unavailable")),
-    )).rejects.toThrow("storage unavailable");
+    await expect(
+      deviceSessionCallback(
+        request(new URLSearchParams(fields)),
+        vi.fn().mockRejectedValue(new Error("storage unavailable")),
+      ),
+    ).rejects.toThrow("storage unavailable");
   });
 });

@@ -1,10 +1,7 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  MAX_CHAT_ATTACHMENT_BYTES,
-  prepareChatAttachment,
-} from "./prepareChatAttachment";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { MAX_CHAT_ATTACHMENT_BYTES, prepareChatAttachment } from "./prepareChatAttachment";
 
 const OVER_LIMIT = MAX_CHAT_ATTACHMENT_BYTES + 1;
 const png = new File(["png"], "photo.png", { type: "image/png" });
@@ -34,11 +31,9 @@ describe("prepareChatAttachment", () => {
   });
 
   it("rejects a non-image attachment above the upload limit", async () => {
-    const file = new File(
-      [new Uint8Array(MAX_CHAT_ATTACHMENT_BYTES + 1)],
-      "large.bin",
-      { type: "application/octet-stream" },
-    );
+    const file = new File([new Uint8Array(MAX_CHAT_ATTACHMENT_BYTES + 1)], "large.bin", {
+      type: "application/octet-stream",
+    });
 
     await expect(prepareChatAttachment(file)).rejects.toThrow(
       "Attachments must be 4.0 MB or smaller.",
@@ -56,7 +51,7 @@ describe("prepareChatAttachment", () => {
 
   it("falls back to JPEG when the browser encodes WebP requests as PNG", async () => {
     stubCanvas((type) =>
-      type === "image/jpeg" ? { size: 1, type } : { size: OVER_LIMIT, type: "image/png" }
+      type === "image/jpeg" ? { size: 1, type } : { size: OVER_LIMIT, type: "image/png" },
     );
 
     await expect(prepareChatAttachment(png)).resolves.toEqual({

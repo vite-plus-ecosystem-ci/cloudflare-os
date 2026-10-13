@@ -4,7 +4,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { RpcStub } from "capnweb";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Overseer } from "@gadgets/workshop-shared/api";
 
 const testState = vi.hoisted(() => ({
@@ -23,10 +23,7 @@ vi.mock("./prepareChatAttachment", () => ({
   }),
 }));
 
-import {
-  useComposerAttachments,
-  type ComposerAttachment,
-} from "./useComposerAttachments";
+import { useComposerAttachments, type ComposerAttachment } from "./useComposerAttachments";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -49,9 +46,9 @@ describe("useComposerAttachments", () => {
   });
 
   it("clears only sent attachments and cleans up through their staging Overseer", async () => {
-    const uploadChatAttachment = vi.fn<Overseer["uploadChatAttachment"]>(
-      async () => ({ id: `upload-${++testState.nextId}` }),
-    );
+    const uploadChatAttachment = vi.fn<Overseer["uploadChatAttachment"]>(async () => ({
+      id: `upload-${++testState.nextId}`,
+    }));
     const deleteFromFirst = vi.fn<Overseer["deleteChatAttachment"]>(async () => {});
     const firstOverseer = {
       uploadChatAttachment,
@@ -86,15 +83,11 @@ describe("useComposerAttachments", () => {
     root = createRoot(container);
     await act(async () => root!.render(<Harness />));
 
-    await act(async () => addFiles!([
-      new File(["one"], "one.txt", { type: "text/plain" }),
-    ]));
+    await act(async () => addFiles!([new File(["one"], "one.txt", { type: "text/plain" })]));
     await waitFor(() => attachments[0]?.uploadState === "ready");
     const sentSnapshot = [...attachments];
 
-    await act(async () => addFiles!([
-      new File(["two"], "two.txt", { type: "text/plain" }),
-    ]));
+    await act(async () => addFiles!([new File(["two"], "two.txt", { type: "text/plain" })]));
     await waitFor(() => attachments.length === 2 && attachments[1].uploadState === "ready");
     act(() => clearSentAttachments!(sentSnapshot));
 
@@ -112,7 +105,10 @@ describe("useComposerAttachments", () => {
   it("deletes an upload that finishes after the composer unmounts", async () => {
     let finishUpload!: (handle: { id: string }) => void;
     const uploadChatAttachment = vi.fn<Overseer["uploadChatAttachment"]>(
-      () => new Promise((resolve) => { finishUpload = resolve; }),
+      () =>
+        new Promise((resolve) => {
+          finishUpload = resolve;
+        }),
     );
     const deleteChatAttachment = vi.fn<Overseer["deleteChatAttachment"]>(async () => {});
     const overseer = {
@@ -133,9 +129,7 @@ describe("useComposerAttachments", () => {
     container = document.createElement("div");
     root = createRoot(container);
     await act(async () => root!.render(<Harness />));
-    await act(async () => addFiles([
-      new File(["one"], "one.txt", { type: "text/plain" }),
-    ]));
+    await act(async () => addFiles([new File(["one"], "one.txt", { type: "text/plain" })]));
     await waitFor(() => uploadChatAttachment.mock.calls.length === 1);
 
     await act(async () => root!.unmount());

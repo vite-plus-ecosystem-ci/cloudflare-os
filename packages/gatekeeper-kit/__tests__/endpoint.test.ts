@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { normalizeVendorEndpoint } from "../src/endpoint";
 
 const hostPattern = /^[a-z0-9-]+\.mktorest\.com$/i;
@@ -6,43 +6,53 @@ const label = "Marketo REST endpoint";
 
 describe("normalizeVendorEndpoint", () => {
   it("preserves the path and drops the query and fragment", () => {
-    expect(normalizeVendorEndpoint(
-      "https://123-abc.mktorest.com/rest/v1/?access_token=secret#part",
-      { hostPattern, label },
-    )).toBe("https://123-abc.mktorest.com/rest/v1");
+    expect(
+      normalizeVendorEndpoint("https://123-abc.mktorest.com/rest/v1/?access_token=secret#part", {
+        hostPattern,
+        label,
+      }),
+    ).toBe("https://123-abc.mktorest.com/rest/v1");
   });
 
   it("requires HTTPS by default", () => {
-    expect(() => normalizeVendorEndpoint("http://123-abc.mktorest.com", { hostPattern, label }))
-      .toThrow("Marketo REST endpoint must use https.");
+    expect(() =>
+      normalizeVendorEndpoint("http://123-abc.mktorest.com", { hostPattern, label }),
+    ).toThrow("Marketo REST endpoint must use https.");
   });
 
   it("allows HTTP when HTTPS is not required", () => {
-    expect(normalizeVendorEndpoint("http://123-abc.mktorest.com/path", {
-      hostPattern,
-      label,
-      requireHttps: false,
-    })).toBe("http://123-abc.mktorest.com/path");
+    expect(
+      normalizeVendorEndpoint("http://123-abc.mktorest.com/path", {
+        hostPattern,
+        label,
+        requireHttps: false,
+      }),
+    ).toBe("http://123-abc.mktorest.com/path");
   });
 
   it("refuses non-HTTP schemes even when HTTPS is not required", () => {
-    expect(() => normalizeVendorEndpoint("javascript:alert(1)", {
-      hostPattern,
-      label,
-      requireHttps: false,
-    })).toThrow("Marketo REST endpoint must use http or https.");
+    expect(() =>
+      normalizeVendorEndpoint("javascript:alert(1)", {
+        hostPattern,
+        label,
+        requireHttps: false,
+      }),
+    ).toThrow("Marketo REST endpoint must use http or https.");
   });
 
   it("refuses hosts outside the allowlist", () => {
-    expect(() => normalizeVendorEndpoint("https://evil.com", { hostPattern, label }))
-      .toThrow("That is not a recognized Marketo REST endpoint host.");
+    expect(() => normalizeVendorEndpoint("https://evil.com", { hostPattern, label })).toThrow(
+      "That is not a recognized Marketo REST endpoint host.",
+    );
   });
 
   it("anchors an unanchored host pattern", () => {
-    expect(() => normalizeVendorEndpoint("https://evil-marketo.com.attacker.net", {
-      hostPattern: /marketo\.com/,
-      label,
-    })).toThrow("That is not a recognized Marketo REST endpoint host.");
+    expect(() =>
+      normalizeVendorEndpoint("https://evil-marketo.com.attacker.net", {
+        hostPattern: /marketo\.com/,
+        label,
+      }),
+    ).toThrow("That is not a recognized Marketo REST endpoint host.");
   });
 
   it("anchors an alternation as one pattern", () => {
@@ -53,29 +63,36 @@ describe("normalizeVendorEndpoint", () => {
   });
 
   it("accepts and preserves a port while matching only the hostname", () => {
-    expect(normalizeVendorEndpoint("https://ha.example.com:8123/hass/", {
-      hostPattern: /^ha\.example\.com$/,
-      label: "Home Assistant endpoint",
-    })).toBe("https://ha.example.com:8123/hass");
+    expect(
+      normalizeVendorEndpoint("https://ha.example.com:8123/hass/", {
+        hostPattern: /^ha\.example\.com$/,
+        label: "Home Assistant endpoint",
+      }),
+    ).toBe("https://ha.example.com:8123/hass");
   });
 
   it("refuses userinfo", () => {
-    expect(() => normalizeVendorEndpoint("https://u:p@ha.example.com", {
-      hostPattern: /^ha\.example\.com$/,
-      label: "Home Assistant endpoint",
-    })).toThrow("Home Assistant endpoint must not include credentials.");
+    expect(() =>
+      normalizeVendorEndpoint("https://u:p@ha.example.com", {
+        hostPattern: /^ha\.example\.com$/,
+        label: "Home Assistant endpoint",
+      }),
+    ).toThrow("Home Assistant endpoint must not include credentials.");
   });
 
   it("does not accept an allowed hostname as a suffix", () => {
-    expect(() => normalizeVendorEndpoint("https://123-abc.mktorest.com.evil.com", {
-      hostPattern,
-      label,
-    })).toThrow("That is not a recognized Marketo REST endpoint host.");
+    expect(() =>
+      normalizeVendorEndpoint("https://123-abc.mktorest.com.evil.com", {
+        hostPattern,
+        label,
+      }),
+    ).toThrow("That is not a recognized Marketo REST endpoint host.");
   });
 
   it("reports unparseable input without echoing it", () => {
-    expect(() => normalizeVendorEndpoint("not a url", { hostPattern, label }))
-      .toThrow("Marketo REST endpoint is not a valid URL.");
+    expect(() => normalizeVendorEndpoint("not a url", { hostPattern, label })).toThrow(
+      "Marketo REST endpoint is not a valid URL.",
+    );
   });
 
   it("refuses a stateful host pattern rather than alternating on identical input", () => {

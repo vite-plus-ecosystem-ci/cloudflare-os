@@ -5,13 +5,17 @@
 // with the old account's Worker. This test drives the real `render` against a recording JSX runtime
 // so that omission fails here instead of producing a binding that queries the wrong resource.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("@gadgets/configurator-ui", () => {
-  const runtimeComponent = (name: string) => Object.assign(() => undefined, { componentName: name });
+  const runtimeComponent = (name: string) =>
+    Object.assign(() => undefined, { componentName: name });
   return {
-    h: (component: unknown, props: unknown, ...children: unknown[]) =>
-      ({ component, props: props ?? {}, children: children.flat() }),
+    h: (component: unknown, props: unknown, ...children: unknown[]) => ({
+      component,
+      props: props ?? {},
+      children: children.flat(),
+    }),
     Fragment: runtimeComponent("Fragment"),
     Section: runtimeComponent("Section"),
     Field: runtimeComponent("Field"),
@@ -20,8 +24,8 @@ vi.mock("@gadgets/configurator-ui", () => {
   };
 });
 
-const { default: workerConfigurator } = await import(
-  "../src/configurator/cloudflare-worker-configurator-ui.js");
+const { default: workerConfigurator } =
+  await import("../src/configurator/cloudflare-worker-configurator-ui.js");
 
 type RenderedNode = { component: unknown; props: Record<string, unknown>; children: unknown[] };
 
@@ -49,11 +53,16 @@ function renderWith(values: { accountId: string | null; workerName: string | nul
   const cleared: string[] = [];
   const tree = workerConfigurator.render({
     values,
-    setValues: patch => void patches.push(patch),
+    setValues: (patch) => void patches.push(patch),
     clearFields: (...names) => void cleared.push(...names),
-    ui: new Proxy({}, {
-      get() { throw new Error("render must not call the ui capability"); },
-    }) as never,
+    ui: new Proxy(
+      {},
+      {
+        get() {
+          throw new Error("render must not call the ui capability");
+        },
+      },
+    ) as never,
   });
   return { tree, patches, cleared };
 }
@@ -65,14 +74,18 @@ describe("worker configurator field dependencies", () => {
       workerName: "old-worker",
     });
 
-    (control(tree, "accountId").onChange as (value: string) => void)("ffffffffffffffffffffffffffffffff");
+    (control(tree, "accountId").onChange as (value: string) => void)(
+      "ffffffffffffffffffffffffffffffff",
+    );
 
     // Both halves matter: the query text so the field looks empty, the value so it *is* empty.
     expect(cleared).toContain("workerName");
-    expect(patches).toEqual([{
-      accountId: "ffffffffffffffffffffffffffffffff",
-      workerName: null,
-    }]);
+    expect(patches).toEqual([
+      {
+        accountId: "ffffffffffffffffffffffffffffffff",
+        workerName: null,
+      },
+    ]);
   });
 
   it("is not ready once the account changed, so the stale pair cannot be submitted", () => {
@@ -86,7 +99,9 @@ describe("worker configurator field dependencies", () => {
     const { tree, patches } = renderWith(before);
     expect(workerConfigurator.isReady!({ values: before })).toBe(true);
 
-    (control(tree, "accountId").onChange as (value: string) => void)("ffffffffffffffffffffffffffffffff");
+    (control(tree, "accountId").onChange as (value: string) => void)(
+      "ffffffffffffffffffffffffffffffff",
+    );
 
     expect(workerConfigurator.isReady!({ values: { ...before, ...patches[0] } })).toBe(false);
   });

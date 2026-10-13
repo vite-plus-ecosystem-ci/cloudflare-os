@@ -3,26 +3,33 @@ import {
   withTestTimeout,
   VITEST_TOOL_SCRATCH_EXCLUSIONS,
   WRANGLER_RUNTIME_SCRATCH_EXCLUSIONS,
-} from '@gadgets/scripts/vitest-task'
+} from "@gadgets/scripts/vitest-task";
 
 export default {
+  test: {
+    // Vitest v4 compatibility: preserve mock call history.
+    // Remove after tests no longer rely on calls from setup or earlier tests.
+    // https://release-v1-2-0-viteplus-dev.voidzero-docs.workers.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
+    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+    clearMocks: false,
+  },
   run: {
     tasks: {
       /** Builds the fixture and orders both validated Workers before test files start. */
-      'build:test-gatekeeper': {
+      "build:test-gatekeeper": {
         command: withTestTimeout(
-          'capnweb-validate build --cwd fixtures/gatekeeper-test --out .wrangler/validate',
+          "capnweb-validate build --cwd fixtures/gatekeeper-test --out .wrangler/validate",
         ),
         cache: false,
-        dependsOn: ['@gadgets/workshop-backend#build:integration-worker'],
+        dependsOn: ["@gadgets/workshop-backend#build:integration-worker"],
       },
       /**
        * gatekeeper-google as the release before the hook delivery queue moved, for the suite that
        * upgrades it in place (`scripts/build-upgrade-base.ts`). Uncached: the script reads git and
        * the pnpm store, which no fingerprint covers, and returns at once when its output is current.
        */
-      'build:upgrade-base': {
-        command: withTestTimeout('node scripts/build-upgrade-base.ts'),
+      "build:upgrade-base": {
+        command: withTestTimeout("node scripts/build-upgrade-base.ts"),
         cache: false,
       },
       /**
@@ -43,7 +50,7 @@ export default {
        * does write: `tmp/` (per-boot bundles) and `state/` (local DO/KV storage).
        */
       test: {
-        ...vitestTaskWithExclusions('vitest run', [
+        ...vitestTaskWithExclusions("vitest run", [
           ...VITEST_TOOL_SCRATCH_EXCLUSIONS,
           ...WRANGLER_RUNTIME_SCRATCH_EXCLUSIONS,
         ]),
@@ -51,11 +58,12 @@ export default {
         // which are tracked here for the same reason the fixture's is, and the release the Google
         // upgrade suite starts from.
         dependsOn: [
-          'build:test-gatekeeper', 'build:upgrade-base',
-          '@gadgets/github-gatekeeper#build:integration-worker',
-          '@gadgets/google-gatekeeper#build:integration-worker',
+          "build:test-gatekeeper",
+          "build:upgrade-base",
+          "@gadgets/github-gatekeeper#build:integration-worker",
+          "@gadgets/google-gatekeeper#build:integration-worker",
         ],
       },
     },
   },
-}
+};
