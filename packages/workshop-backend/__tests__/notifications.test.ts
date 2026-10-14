@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import { RpcStub, RpcTarget } from "capnweb";
-import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
+import { afterEach, describe, expect, it, vi, type Mock } from "vite-plus/test";
 import type { NotificationSubscriber, UserNotification } from "@gadgets/workshop-shared/api";
 import { deliver, registerDevice } from "../src/notification-service.js";
 import type { UserDurableObject } from "../src/user.js";
@@ -15,7 +15,7 @@ declare module "cloudflare:workers" {
 const encoder = new TextEncoder();
 const SUBSCRIPTION_ID = "b".repeat(64);
 // Ids the stub service mints, in order.
-const [ONE, TWO, THREE] = ["1", "2", "3"].map(digit => digit.repeat(64));
+const [ONE, TWO, THREE] = ["1", "2", "3"].map((digit) => digit.repeat(64));
 const NOTIFICATION: UserNotification = {
   id: "11111111-1111-4111-8111-111111111111",
   kind: "taskCompleted",
@@ -24,9 +24,12 @@ const NOTIFICATION: UserNotification = {
   chatTitle: "Build the demo",
 };
 
-const { privateKey, publicKey } = await crypto.subtle.generateKey(
-    { name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]) as CryptoKeyPair;
-const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", privateKey) as ArrayBuffer);
+const { privateKey, publicKey } = (await crypto.subtle.generateKey(
+  { name: "ECDSA", namedCurve: "P-256" },
+  true,
+  ["sign", "verify"],
+)) as CryptoKeyPair;
+const pkcs8 = new Uint8Array((await crypto.subtle.exportKey("pkcs8", privateKey)) as ArrayBuffer);
 const INSTALL = {
   NOTIFICATION_SERVICE_URL: "https://notifications.example.test",
   CFOS_INSTALL_ID: "install-1",
@@ -35,8 +38,10 @@ const INSTALL = {
 };
 const installEnv = { ...env, ...INSTALL } as Cloudflare.Env;
 
-const base64urlBytes = (value: string) => Uint8Array.from(
-    atob(value.replaceAll("-", "+").replaceAll("_", "/")), character => character.charCodeAt(0));
+const base64urlBytes = (value: string) =>
+  Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), (character) =>
+    character.charCodeAt(0),
+  );
 
 type Fetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -48,10 +53,13 @@ function stubService(refuse?: { subscriptionId: string; status: string; code: nu
   let fetcher = vi.fn<Fetch>(async (input, init) => {
     let body = JSON.parse(String(init?.body));
     if (new URL(String(input)).pathname === "/v1/subscriptions") {
-      return Response.json({
-        deviceKey: body.deviceRegistrationId[0].repeat(64),
-        subscriptionId: String(++minted).repeat(64),
-      }, { status: 201 });
+      return Response.json(
+        {
+          deviceKey: body.deviceRegistrationId[0].repeat(64),
+          subscriptionId: String(++minted).repeat(64),
+        },
+        { status: 201 },
+      );
     }
     return body.subscriptionId === refuse?.subscriptionId
       ? Response.json({ status: refuse.status }, { status: refuse.code })
@@ -61,7 +69,8 @@ function stubService(refuse?: { subscriptionId: string; status: string; code: nu
   return fetcher;
 }
 
-const bodies = (fetcher: Mock<Fetch>, pathname: string) => fetcher.mock.calls
+const bodies = (fetcher: Mock<Fetch>, pathname: string) =>
+  fetcher.mock.calls
     .filter(([url]) => new URL(String(url)).pathname === pathname)
     .map(([, init]) => JSON.parse(String(init?.body)));
 
@@ -93,17 +102,26 @@ describe("notification service", () => {
     });
     expect(headers.get("x-cfos-install-id")).toBe(INSTALL.CFOS_INSTALL_ID);
     expect(headers.get("x-cfos-key-id")).toBe(INSTALL.CFOS_INSTALL_KEY_ID);
-    expect(base64urlBytes(headers.get("x-cfos-content-digest")!))
-        .toEqual(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(body))));
+    expect(base64urlBytes(headers.get("x-cfos-content-digest")!)).toEqual(
+      new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(body))),
+    );
     // The canonical request the service verifies.
     let canonical = [
-      "CFOS1", "POST", "/v1/deliveries",
-      ...["install-id", "key-id", "timestamp", "nonce", "content-digest"]
-          .map(name => headers.get(`x-cfos-${name}`)),
+      "CFOS1",
+      "POST",
+      "/v1/deliveries",
+      ...["install-id", "key-id", "timestamp", "nonce", "content-digest"].map((name) =>
+        headers.get(`x-cfos-${name}`),
+      ),
     ].join("\n");
-    expect(await crypto.subtle.verify(
-        { name: "ECDSA", hash: "SHA-256" }, publicKey,
-        base64urlBytes(headers.get("x-cfos-signature")!), encoder.encode(canonical))).toBe(true);
+    expect(
+      await crypto.subtle.verify(
+        { name: "ECDSA", hash: "SHA-256" },
+        publicKey,
+        base64urlBytes(headers.get("x-cfos-signature")!),
+        encoder.encode(canonical),
+      ),
+    ).toBe(true);
   });
 
   it.each([
@@ -119,14 +137,21 @@ describe("notification service", () => {
 
   it("exchanges a device registration for its device's subscription", async () => {
     let fetcher = stubService();
-    await expect(registerDevice(installEnv, "d".repeat(64)))
-        .resolves.toEqual({ deviceKey: "d".repeat(64), subscriptionId: ONE });
-    expect(bodies(fetcher, "/v1/subscriptions")).toEqual([{ deviceRegistrationId: "d".repeat(64) }]);
+    await expect(registerDevice(installEnv, "d".repeat(64))).resolves.toEqual({
+      deviceKey: "d".repeat(64),
+      subscriptionId: ONE,
+    });
+    expect(bodies(fetcher, "/v1/subscriptions")).toEqual([
+      { deviceRegistrationId: "d".repeat(64) },
+    ]);
   });
 
   it("sends nothing to a plaintext service URL", async () => {
     let fetcher = stubService();
-    let plaintext = { ...installEnv, NOTIFICATION_SERVICE_URL: "http://notifications.example.test" };
+    let plaintext = {
+      ...installEnv,
+      NOTIFICATION_SERVICE_URL: "http://notifications.example.test",
+    };
     await expect(deliver(plaintext, SUBSCRIPTION_ID, NOTIFICATION)).rejects.toThrow("HTTPS");
     expect(fetcher).not.toHaveBeenCalled();
   });
@@ -145,27 +170,32 @@ class Subscriber extends RpcTarget {
 
 // Runs `fn` on a fresh User DO whose installation has the notification service configured.
 async function inUser(fn: (user: UserDurableObject) => Promise<void>): Promise<void> {
-  await runInDurableObject(env.TEST_USER.getByName(`notifications-${crypto.randomUUID()}`),
-      async user => {
-        let implementation = user as unknown as { env: Cloudflare.Env };
-        implementation.env = { ...implementation.env, ...INSTALL };
-        await fn(user);
-      });
+  await runInDurableObject(
+    env.TEST_USER.getByName(`notifications-${crypto.randomUUID()}`),
+    async (user) => {
+      let implementation = user as unknown as { env: Cloudflare.Env };
+      implementation.env = { ...implementation.env, ...INSTALL };
+      await fn(user);
+    },
+  );
 }
 
 // The subscriptions pushed to, sorted.
 const pushed = (fetcher: Mock<Fetch>) =>
-  bodies(fetcher, "/v1/deliveries").map(({ subscriptionId }) => subscriptionId).toSorted();
+  bodies(fetcher, "/v1/deliveries")
+    .map(({ subscriptionId }) => subscriptionId)
+    .toSorted();
 
 // Registers a phone, then publishes NOTIFICATION while `notify` is the only open tab's answer
 // (none when undefined), and returns the subscriptions pushed to.
 async function publish(notify?: () => Promise<void>): Promise<string[]> {
   let fetcher = stubService();
-  await inUser(async user => {
+  await inUser(async (user) => {
     await user.registerNotificationDevice("a".repeat(64));
     if (notify) {
       await user.subscribeToNotifications(
-          new RpcStub(new Subscriber(notify)) as unknown as RpcStub<NotificationSubscriber>);
+        new RpcStub(new Subscriber(notify)) as unknown as RpcStub<NotificationSubscriber>,
+      );
     }
     let published = user.publishNotification(NOTIFICATION);
     if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(3_000);
@@ -193,7 +223,7 @@ describe("UserDurableObject notifications", () => {
 
   it("pushes to each device's latest subscription", async () => {
     let fetcher = stubService();
-    await inUser(async user => {
+    await inUser(async (user) => {
       await user.registerNotificationDevice("a".repeat(64)); // phone: ONE
       await user.registerNotificationDevice("b".repeat(64)); // tablet: TWO
       await user.registerNotificationDevice("a".repeat(64)); // phone reopens the app: THREE
@@ -212,15 +242,21 @@ describe("UserDurableObject notifications", () => {
     let fetcher = stubService({ subscriptionId: ONE, status, code });
     let failed: boolean | undefined;
     let first: string[] = [];
-    await inUser(async user => {
+    await inUser(async (user) => {
       await user.registerNotificationDevice("a".repeat(64));
       await user.registerNotificationDevice("b".repeat(64));
-      failed = await user.publishNotification(NOTIFICATION).then(() => false, () => true);
+      failed = await user.publishNotification(NOTIFICATION).then(
+        () => false,
+        () => true,
+      );
       first = pushed(fetcher);
       fetcher.mockClear();
       await user.publishNotification(NOTIFICATION).catch(() => {});
     });
-    expect({ failed, first, next: pushed(fetcher) })
-        .toEqual({ failed: fails, first: [ONE, TWO], next });
+    expect({ failed, first, next: pushed(fetcher) }).toEqual({
+      failed: fails,
+      first: [ONE, TWO],
+      next,
+    });
   });
 });

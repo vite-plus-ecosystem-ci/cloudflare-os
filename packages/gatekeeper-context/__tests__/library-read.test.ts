@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { ObservationGate, type ObserverKv } from "@gadgets/gatekeeper-kit/observers";
 import type {
-  GatekeeperUserVerifier, ObservationDescription,
+  GatekeeperUserVerifier,
+  ObservationDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
 import { CONTEXT_OBSERVER_DENIED, contextObserverStrategy } from "../src/context-observers.js";
 import type { ContextCollectionDurableObject } from "../src/context-collection.js";
@@ -24,7 +25,7 @@ function makeKv(): ObserverKv {
 function verifier(allowed: string[]): Fetcher<GatekeeperUserVerifier> {
   return {
     async hasCollectionsAccess(_sharingDomain: string, collectionIds: string[]) {
-      return collectionIds.map(id => allowed.includes(id));
+      return collectionIds.map((id) => allowed.includes(id));
     },
   } as unknown as Fetcher<GatekeeperUserVerifier>;
 }
@@ -55,22 +56,35 @@ function makeSession() {
         let id = name.split(":").at(-1);
         return { title: `${id} title`, description: `${id} description`, documentCount: 1 };
       },
-      async listContextDocuments() { return [DOCUMENT]; },
-      async getContextDocument() { return DOCUMENT; },
+      async listContextDocuments() {
+        return [DOCUMENT];
+      },
+      async getContextDocument() {
+        return DOCUMENT;
+      },
     }),
   } as unknown as DurableObjectNamespace<ContextCollectionDurableObject>;
   let userLibraries = {
     idFromName: (name: string) => name,
     get: () => ({
       async getEnabledCollections() {
-        return new Map([["public", "public"], ["private", "private"]]);
+        return new Map([
+          ["public", "public"],
+          ["private", "private"],
+        ]);
       },
     }),
   } as unknown as DurableObjectNamespace<UserLibraryDurableObject>;
   let session = new LibraryReadSession(
-    collections, userLibraries, DOMAIN, "owner",
+    collections,
+    userLibraries,
+    DOMAIN,
+    "owner",
     new ObservationGate(
-      authorizer as unknown as ConstructorParameters<typeof ObservationGate>[0], strategy));
+      authorizer as unknown as ConstructorParameters<typeof ObservationGate>[0],
+      strategy,
+    ),
+  );
   return { session, strategy, authorized };
 }
 
@@ -81,8 +95,10 @@ describe("LibraryReadSession sharing", () => {
 
     let listing = await session.list();
 
-    expect(listing.entries.map(entry => entry.type === "collection" && entry.id))
-      .toEqual(["public", "private"]);
+    expect(listing.entries.map((entry) => entry.type === "collection" && entry.id)).toEqual([
+      "public",
+      "private",
+    ]);
     expect(authorized).toHaveLength(1);
     expect(authorized[0].excludeObservers).toBeUndefined();
     await strategy.addObserver("later", verifier(["public"]));
@@ -99,8 +115,9 @@ describe("LibraryReadSession sharing", () => {
       await reveal(session);
 
       expect(authorized[0].excludeObservers).toEqual(["existing"]);
-      await expect(strategy.addObserver("later", verifier(["public"])))
-        .rejects.toThrow(CONTEXT_OBSERVER_DENIED);
+      await expect(strategy.addObserver("later", verifier(["public"]))).rejects.toThrow(
+        CONTEXT_OBSERVER_DENIED,
+      );
       await strategy.addObserver("owner-account", verifier(["public", "private"]));
     }
   });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { webhookOrigin, type Env } from "../src/github-env";
 
 const withOrigin = (WEBHOOK_ORIGIN?: string) => ({ WEBHOOK_ORIGIN }) as Env;
@@ -9,8 +9,12 @@ describe("webhookOrigin", () => {
   });
 
   it("accepts an https origin, with or without a trailing slash", () => {
-    expect(webhookOrigin(withOrigin("https://gadgets.example.com"))).toBe("https://gadgets.example.com");
-    expect(webhookOrigin(withOrigin("https://Gadgets.Example.com/"))).toBe("https://gadgets.example.com");
+    expect(webhookOrigin(withOrigin("https://gadgets.example.com"))).toBe(
+      "https://gadgets.example.com",
+    );
+    expect(webhookOrigin(withOrigin("https://Gadgets.Example.com/"))).toBe(
+      "https://gadgets.example.com",
+    );
   });
 
   it.each([
@@ -18,7 +22,9 @@ describe("webhookOrigin", () => {
     "https://gadgets.example.com/gatekeeper/github",
     "https://user:secret@gadgets.example.com",
     "gadgets.example.com",
-  ])("refuses %s, which webhooks would not reach safely", origin => {
-    expect(() => webhookOrigin(withOrigin(origin))).toThrow("WEBHOOK_ORIGIN must be an https origin");
+  ])("refuses %s, which webhooks would not reach safely", (origin) => {
+    expect(() => webhookOrigin(withOrigin(origin))).toThrow(
+      "WEBHOOK_ORIGIN must be an https origin",
+    );
   });
 });

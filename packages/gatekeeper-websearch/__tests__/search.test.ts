@@ -1,11 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { ObservationDescription } from "@gadgets/workshop-shared/gatekeeper";
 import { search } from "../src/search.js";
 
 type WebSearch = Ai["websearch"];
 
 function respond(items: unknown[]): WebSearch {
-  return async () => Response.json({ items, metadata: { query: "q", requestId: "r", latencyMs: 1 } });
+  return async () =>
+    Response.json({ items, metadata: { query: "q", requestId: "r", latencyMs: 1 } });
 }
 
 const insufficientCredits: WebSearch = async () =>
@@ -21,29 +22,40 @@ function recorder() {
   };
 }
 
-const refuse = async () => { throw new Error("refused"); };
+const refuse = async () => {
+  throw new Error("refused");
+};
 
 describe("search", () => {
-  it("searches the default gateway with the pinned provider and keeps only the result fields",
-      async () => {
-    const websearch = vi.fn(respond([{
-      url: "https://developers.cloudflare.com/workers/",
-      title: "Cloudflare Workers",
-      description: "Build serverless applications.",
-      lastModifiedDate: "2026-09-30",
-      faviconUrl: "https://developers.cloudflare.com/favicon.png",
-    }]));
+  it("searches the default gateway with the pinned provider and keeps only the result fields", async () => {
+    const websearch = vi.fn(
+      respond([
+        {
+          url: "https://developers.cloudflare.com/workers/",
+          title: "Cloudflare Workers",
+          description: "Build serverless applications.",
+          lastModifiedDate: "2026-09-30",
+          faviconUrl: "https://developers.cloudflare.com/favicon.png",
+        },
+      ]),
+    );
 
     const results = await search({ websearch }, "workers docs", recorder().audit);
 
-    expect(websearch).toHaveBeenCalledWith(
-        { gatewayId: "default", query: "workers docs", provider: "ceramic", limit: 10 });
-    expect(results).toEqual([{
-      url: "https://developers.cloudflare.com/workers/",
-      title: "Cloudflare Workers",
-      description: "Build serverless applications.",
-      lastModifiedDate: "2026-09-30",
-    }]);
+    expect(websearch).toHaveBeenCalledWith({
+      gatewayId: "default",
+      query: "workers docs",
+      provider: "ceramic",
+      limit: 10,
+    });
+    expect(results).toEqual([
+      {
+        url: "https://developers.cloudflare.com/workers/",
+        title: "Cloudflare Workers",
+        description: "Build serverless applications.",
+        lastModifiedDate: "2026-09-30",
+      },
+    ]);
   });
 
   it("sends and records nothing for a query outside the API's 1 to 1,024 characters", async () => {
@@ -79,7 +91,9 @@ describe("search", () => {
   it("keeps the record of a search that fails after it was sent", async () => {
     const failures: WebSearch[] = [
       insufficientCredits,
-      async () => { throw new Error("binding unavailable"); },
+      async () => {
+        throw new Error("binding unavailable");
+      },
       async () => Response.json({ unexpected: true }),
     ];
     for (const websearch of failures) {
@@ -90,7 +104,8 @@ describe("search", () => {
   });
 
   it("reports a failed search's status without the provider's body", async () => {
-    await expect(search({ websearch: insufficientCredits }, "q", recorder().audit))
-      .rejects.toThrow(/^Web search failed with HTTP 402\.$/);
+    await expect(search({ websearch: insufficientCredits }, "q", recorder().audit)).rejects.toThrow(
+      /^Web search failed with HTTP 402\.$/,
+    );
   });
 });

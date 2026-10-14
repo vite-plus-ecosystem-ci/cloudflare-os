@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   ActionDescriptionBuilder,
   buildDescription,
@@ -13,7 +13,8 @@ import {
 
 const encoder = new TextEncoder();
 
-const bytes = (list: string[]) => list.reduce((sum, item) => sum + encoder.encode(item).byteLength, 0);
+const bytes = (list: string[]) =>
+  list.reduce((sum, item) => sum + encoder.encode(item).byteLength, 0);
 
 describe("ActionDescriptionBuilder", () => {
   it("carries values as fields and keeps the description to prose", () => {
@@ -31,10 +32,12 @@ describe("ActionDescriptionBuilder", () => {
   });
 
   it("omits the syntax key when none is given", () => {
-    expect(buildDescription().verbatim("SQL", "select 1", "sql").finish().fields)
-      .toEqual([{ label: "SQL", kind: "text", value: "select 1", syntax: "sql" }]);
-    expect(buildDescription().verbatim("Body", "x").finish().fields)
-      .toEqual([{ label: "Body", kind: "text", value: "x" }]);
+    expect(buildDescription().verbatim("SQL", "select 1", "sql").finish().fields).toEqual([
+      { label: "SQL", kind: "text", value: "select 1", syntax: "sql" },
+    ]);
+    expect(buildDescription().verbatim("Body", "x").finish().fields).toEqual([
+      { label: "Body", kind: "text", value: "x" },
+    ]);
   });
 
   it("keeps a short value inline and moves one a line cannot show into text", () => {
@@ -77,16 +80,24 @@ describe("ActionDescriptionBuilder", () => {
   });
 
   it("carries a list as items, or as JSON when an item has a line break", () => {
-    expect(buildDescription().list("Labels", ["bug", "help wanted"]).finish().fields)
-      .toEqual([{ label: "Labels", kind: "list", items: ["bug", "help wanted"] }]);
-    expect(buildDescription().list("Labels", ["a\nb", "c"]).finish().fields)
-      .toEqual([{ label: "Labels", kind: "json", value: '[\n  "a\\nb",\n  "c"\n]' }]);
+    expect(buildDescription().list("Labels", ["bug", "help wanted"]).finish().fields).toEqual([
+      { label: "Labels", kind: "list", items: ["bug", "help wanted"] },
+    ]);
+    expect(buildDescription().list("Labels", ["a\nb", "c"]).finish().fields).toEqual([
+      { label: "Labels", kind: "json", value: '[\n  "a\\nb",\n  "c"\n]' },
+    ]);
   });
 
   it("pretty-prints JSON and marks an unserializable value incomplete", () => {
-    expect(buildDescription().json("Arguments", { a: 1, b: ["x"] }).finish()).toEqual({
+    expect(
+      buildDescription()
+        .json("Arguments", { a: 1, b: ["x"] })
+        .finish(),
+    ).toEqual({
       description: "",
-      fields: [{ label: "Arguments", kind: "json", value: '{\n  "a": 1,\n  "b": [\n    "x"\n  ]\n}' }],
+      fields: [
+        { label: "Arguments", kind: "json", value: '{\n  "a": 1,\n  "b": [\n    "x"\n  ]\n}' },
+      ],
       descriptionIsComplete: true,
     });
 
@@ -96,8 +107,9 @@ describe("ActionDescriptionBuilder", () => {
     expect(incomplete).toEqual({ description: "**Arguments:** _(could not be displayed)_" });
 
     // `undefined` has no JSON form at all.
-    expect(buildDescription().json("Value", undefined).finish().description)
-      .toBe("**Value:** _(could not be displayed)_");
+    expect(buildDescription().json("Value", undefined).finish().description).toBe(
+      "**Value:** _(could not be displayed)_",
+    );
   });
 
   it("truncates an oversize field on a UTF-8 boundary and drops the flag", () => {
@@ -116,8 +128,11 @@ describe("ActionDescriptionBuilder", () => {
 
   it("truncates a list by whole items", () => {
     const items = Array.from({ length: 100 }, (_, i) => `recipient-${i}@example.com`);
-    const { fields, descriptionIsComplete } =
-      new ActionDescriptionBuilder(undefined, { maxBytes: 400 }).list("To", items).finish();
+    const { fields, descriptionIsComplete } = new ActionDescriptionBuilder(undefined, {
+      maxBytes: 400,
+    })
+      .list("To", items)
+      .finish();
 
     expect(descriptionIsComplete).toBeUndefined();
     const field = fields![0] as { items: string[]; truncated?: object };
@@ -137,8 +152,12 @@ describe("ActionDescriptionBuilder", () => {
     expect(descriptionIsComplete).toBeUndefined();
     expect(fields).toHaveLength(2);
     expect(fields![0]!.truncated?.shownBytes).toBeGreaterThan(0);
-    expect(fields![1]).toEqual(
-      { label: "Second", kind: "inline", value: "", truncated: { shownBytes: 0, totalBytes: 1 } });
+    expect(fields![1]).toEqual({
+      label: "Second",
+      kind: "inline",
+      value: "",
+      truncated: { shownBytes: 0, totalBytes: 1 },
+    });
     // Inline values take the same path, so nothing slips past the cap; after the first stub,
     // omitted fields are only counted.
     expect(description).toBe("Intro.\n\n_(1 more field omitted: description limit reached)_");
@@ -151,7 +170,7 @@ describe("ActionDescriptionBuilder", () => {
     const { description, fields, descriptionIsComplete } = builder.finish();
 
     expect(descriptionIsComplete).toBeUndefined();
-    expect(fields!.filter(field => field.truncated?.shownBytes === 0)).toHaveLength(1);
+    expect(fields!.filter((field) => field.truncated?.shownBytes === 0)).toHaveLength(1);
     expect(fields).toHaveLength(2);
     expect(description).toMatch(/\n\n_\(\d{4} more fields omitted: description limit reached\)_$/);
   });
@@ -172,7 +191,9 @@ describe("ActionDescriptionBuilder", () => {
     ]);
     for (const field of shown.fields!) {
       // oxlint-disable-next-line no-control-regex -- asserting none reach a value
-      expect((field as { value: string }).value).not.toMatch(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/);
+      expect((field as { value: string }).value).not.toMatch(
+        /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/,
+      );
     }
   });
 
@@ -202,13 +223,18 @@ describe("ActionDescriptionBuilder", () => {
     expect(shown.fields).toEqual([
       { label: "Email", kind: "json", value: '"admin\\u200b@x.com"' },
       { label: "Items", kind: "json", value: '[\n  "ok",\n  "\\ufeffc"\n]' },
-      { label: "Value", kind: "json", value: '{\n  "s": "co\\u00adop",\n  "t": "a\\udb40\\udc01b"\n}' },
+      {
+        label: "Value",
+        kind: "json",
+        value: '{\n  "s": "co\\u00adop",\n  "t": "a\\udb40\\udc01b"\n}',
+      },
     ]);
     expect(JSON.parse('"a\\udb40\\udc01b"')).toBe("a\u{E0001}b");
   });
 
   it("keeps text whose only invisibles belong to emoji as text", () => {
-    const text = "Thanks \u2764\uFE0F from \u{1F468}\u200D\u{1F469}\u200D\u{1F467}, " +
+    const text =
+      "Thanks \u2764\uFE0F from \u{1F468}\u200D\u{1F469}\u200D\u{1F467}, " +
       "\u{1F44D}\u{1F3FD} \u{1F9D1}\u{1F3FD}\u200D\u{1F4BB}, press 1\uFE0F\u20E3 " +
       "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
     expect(buildDescription().verbatim("Body", text).finish()).toEqual({
@@ -219,7 +245,9 @@ describe("ActionDescriptionBuilder", () => {
   });
 
   it("reroutes text with invisibles outside emoji to JSON, exact and complete", () => {
-    const secretTags = [..."secret"].map(c => String.fromCodePoint(0xE0000 + c.charCodeAt(0))).join("");
+    const secretTags = [..."secret"]
+      .map((c) => String.fromCodePoint(0xe0000 + c.charCodeAt(0)))
+      .join("");
     for (const text of [
       "pay\u200Dload",
       "a\u{E0100}b",
@@ -246,8 +274,9 @@ describe("ActionDescriptionBuilder", () => {
     });
 
     // `inline` takes the same path for such a value.
-    expect(buildDescription().inline("Name", "a\r\nb").finish().fields)
-      .toEqual([{ label: "Name", kind: "text", value: "a\r\nb" }]);
+    expect(buildDescription().inline("Name", "a\r\nb").finish().fields).toEqual([
+      { label: "Name", kind: "text", value: "a\r\nb" },
+    ]);
   });
 
   it("reroutes carriage returns that are not CRLF line breaks to JSON", () => {
@@ -269,32 +298,58 @@ describe("ActionDescriptionBuilder", () => {
   });
 
   it("names provider bytes as a complete file and agent bytes as an incomplete one", () => {
-    const file = { name: "report.pdf", mediaType: "application/pdf", size: 1234, sha256: "ab".repeat(32) };
-    expect(buildDescription().file("Attachment 1", { ...file, origin: "provider" }).finish())
-      .toEqual({
-        description: "",
-        fields: [{ label: "Attachment 1", kind: "file", ...file, origin: "provider" }],
-        descriptionIsComplete: true,
-      });
+    const file = {
+      name: "report.pdf",
+      mediaType: "application/pdf",
+      size: 1234,
+      sha256: "ab".repeat(32),
+    };
+    expect(
+      buildDescription()
+        .file("Attachment 1", { ...file, origin: "provider" })
+        .finish(),
+    ).toEqual({
+      description: "",
+      fields: [{ label: "Attachment 1", kind: "file", ...file, origin: "provider" }],
+      descriptionIsComplete: true,
+    });
 
-    const agent = buildDescription().file("File", { ...file, origin: "agent" }).finish();
+    const agent = buildDescription()
+      .file("File", { ...file, origin: "agent" })
+      .finish();
     expect(agent.fields).toEqual([{ label: "File", kind: "file", ...file, origin: "agent" }]);
     expect(Object.hasOwn(agent, "descriptionIsComplete")).toBe(false);
   });
 
   it("takes only a file's own members, whatever else the caller's object carries", () => {
     const stray = {
-      label: "Forged", kind: "inline", truncated: { shownBytes: 0, totalBytes: 1 },
-      name: "a.txt", mediaType: "text/plain", size: 1, origin: "provider",
+      label: "Forged",
+      kind: "inline",
+      truncated: { shownBytes: 0, totalBytes: 1 },
+      name: "a.txt",
+      mediaType: "text/plain",
+      size: 1,
+      origin: "provider",
     } as unknown as FileDescription;
     expect(buildDescription().file("File", stray).finish().fields).toEqual([
-      { label: "File", kind: "file", name: "a.txt", mediaType: "text/plain", size: 1, origin: "provider" },
+      {
+        label: "File",
+        kind: "file",
+        name: "a.txt",
+        mediaType: "text/plain",
+        size: 1,
+        origin: "provider",
+      },
     ]);
   });
 
   it("keeps a file name with invisible characters in the file field, for surfaces to escape", () => {
     const file = { name: "invoice\u202Efdp.exe", mediaType: "application/pdf", size: 1 };
-    expect(buildDescription().file("File", { ...file, origin: "provider" }).finish()).toEqual({
+    expect(
+      buildDescription()
+        .file("File", { ...file, origin: "provider" })
+        .finish(),
+    ).toEqual({
       description: "",
       fields: [{ label: "File", kind: "file", ...file, origin: "provider" }],
       descriptionIsComplete: true,
@@ -306,21 +361,24 @@ describe("ActionDescriptionBuilder", () => {
     const { description, fields, descriptionIsComplete } = builder.verbatim("Body", "b").finish();
 
     expect(description).toBe("p".repeat(500));
-    expect(fields).toEqual(
-      [{ label: "Body", kind: "inline", value: "", truncated: { shownBytes: 0, totalBytes: 1 } }]);
+    expect(fields).toEqual([
+      { label: "Body", kind: "inline", value: "", truncated: { shownBytes: 0, totalBytes: 1 } },
+    ]);
     expect(descriptionIsComplete).toBeUndefined();
   });
 
   it("leaves a description whose prose alone overflows the budget incomplete", () => {
-    const { description, descriptionIsComplete } =
-      new ActionDescriptionBuilder("p".repeat(500), { maxBytes: 300 }).finish();
+    const { description, descriptionIsComplete } = new ActionDescriptionBuilder("p".repeat(500), {
+      maxBytes: 300,
+    }).finish();
 
     // Shown in full, since prose is never cut, but past the budget all the same.
     expect(description).toBe("p".repeat(500));
     expect(descriptionIsComplete).toBeUndefined();
 
     const later = new ActionDescriptionBuilder("Intro.", { maxBytes: 300 })
-      .prose("q".repeat(500)).finish();
+      .prose("q".repeat(500))
+      .finish();
     expect(later.description).toBe(`Intro.\n\n${"q".repeat(500)}`);
     expect(later.descriptionIsComplete).toBeUndefined();
   });
@@ -330,14 +388,18 @@ describe("ActionDescriptionBuilder", () => {
     expect(Object.hasOwn(proseOnly, "descriptionIsComplete")).toBe(true);
     expect(Object.hasOwn(proseOnly, "fields")).toBe(false);
     const incomplete = new ActionDescriptionBuilder(undefined, { maxBytes: 200 })
-      .verbatim("Body", "long enough to be cut ".repeat(20)).finish();
+      .verbatim("Body", "long enough to be cut ".repeat(20))
+      .finish();
     expect(Object.hasOwn(incomplete, "descriptionIsComplete")).toBe(false);
   });
 
   it("keeps a description at the full budget within the storage limit once serialized", () => {
     const builder = buildDescription("Intro.");
     for (let i = 0; i < 50; i++) builder.inline(`Field ${i}`, `value ${i}`);
-    builder.list("To", Array.from({ length: 500 }, (_, i) => `r${i}@example.com`));
+    builder.list(
+      "To",
+      Array.from({ length: 500 }, (_, i) => `r${i}@example.com`),
+    );
     builder.json("Arguments", { body: "j".repeat(20_000) });
     builder.verbatim("Body", "b".repeat(200_000), "markdown");
     for (let i = 0; i < 100; i++) builder.verbatim(`Extra ${i}`, "e".repeat(1000));
@@ -369,7 +431,9 @@ describe("sanitizers", () => {
   });
 
   it("block-quotes untrusted prose without headings or fences", () => {
-    expect(quoteUntrusted("## Heading\n> quoted\n```\nx", 100)).toBe("> Heading\n> quoted\n> '''\n> x");
+    expect(quoteUntrusted("## Heading\n> quoted\n```\nx", 100)).toBe(
+      "> Heading\n> quoted\n> '''\n> x",
+    );
     expect(quoteUntrusted("abcdef", 3)).toBe("> abc…");
     expect(quoteUntrusted("safe\r<!--\r\nx", 100)).toBe("> safe\n> <!--\n> x");
   });

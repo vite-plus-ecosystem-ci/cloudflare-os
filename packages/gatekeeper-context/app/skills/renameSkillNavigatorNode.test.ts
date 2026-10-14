@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { ContextApi } from "../../src/context-types";
 import { renamedSkillManifestPath, renameSkillNavigatorNode } from "./renameSkillNavigatorNode";
 
@@ -12,11 +12,15 @@ describe("renameSkillNavigatorNode", () => {
   it("delegates an atomic skill rename to the collection", async () => {
     const context = createApi();
 
-    await renameSkillNavigatorNode(context, {
-      type: "skill",
-      collectionId: "collection",
-      path: "teams/review/SKILL.md",
-    }, "audit");
+    await renameSkillNavigatorNode(
+      context,
+      {
+        type: "skill",
+        collectionId: "collection",
+        path: "teams/review/SKILL.md",
+      },
+      "audit",
+    );
 
     expect(context.renameContextSkill).toHaveBeenCalledWith(
       "collection",
@@ -28,8 +32,9 @@ describe("renameSkillNavigatorNode", () => {
 
 describe("renamedSkillManifestPath", () => {
   it("preserves the skill's parent directory", () => {
-    expect(renamedSkillManifestPath("legacy/review/SKILL.md", "audit"))
-      .toBe("legacy/audit/SKILL.md");
+    expect(renamedSkillManifestPath("legacy/review/SKILL.md", "audit")).toBe(
+      "legacy/audit/SKILL.md",
+    );
   });
 
   it("puts a collection-root manifest in its named directory", () => {

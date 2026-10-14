@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   humanizeSkillName,
   isValidSkillName,
@@ -8,8 +8,7 @@ import {
 
 describe("skill names", () => {
   it("humanizes metadata names for display", () => {
-    expect(humanizeSkillName("incident-response-playbook"))
-      .toBe("Incident Response Playbook");
+    expect(humanizeSkillName("incident-response-playbook")).toBe("Incident Response Playbook");
   });
 
   it("converts human-readable titles to valid metadata names", () => {

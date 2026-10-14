@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { SlackApi, SlackApiError, type SlackInstallation, type SlackOAuthGrant } from "./slack-api";
 import { stageCredentials } from "@gadgets/gatekeeper-kit/credential-stage";
 
@@ -6,11 +6,25 @@ import { stageCredentials } from "@gadgets/gatekeeper-kit/credential-stage";
 // separately by the Worker prebuild. The only emulation here is the Workers hosting surface.
 vi.mock("cloudflare:workers", () => {
   class Entrypoint {
-    constructor(public ctx: unknown, public env: unknown) {}
+    constructor(
+      public ctx: unknown,
+      public env: unknown,
+    ) {}
   }
-  class Target { [Symbol.dispose]() {} }
-  class Stub { dup() { return this; } }
-  return { WorkerEntrypoint: Entrypoint, DurableObject: Entrypoint, RpcTarget: Target, RpcStub: Stub };
+  class Target {
+    [Symbol.dispose]() {}
+  }
+  class Stub {
+    dup() {
+      return this;
+    }
+  }
+  return {
+    WorkerEntrypoint: Entrypoint,
+    DurableObject: Entrypoint,
+    RpcTarget: Target,
+    RpcStub: Stub,
+  };
 });
 vi.mock("capnweb-validate", () => ({
   validateRpc: () => (target: unknown) => target,
@@ -22,15 +36,25 @@ vi.mock("./generated/conversation-configurator-ui.txt", () => ({ default: "" }))
 vi.mock("./generated/thread-configurator-ui.txt", () => ({ default: "" }));
 
 const {
-  SlackUserImpl, SlackWorkspaceGatekeeperImpl, SlackConversationGatekeeperImpl,
-  SlackThreadGatekeeperImpl, SlackVerifier, UserAccount,
+  SlackUserImpl,
+  SlackWorkspaceGatekeeperImpl,
+  SlackConversationGatekeeperImpl,
+  SlackThreadGatekeeperImpl,
+  SlackVerifier,
+  UserAccount,
 } = await import("./slack");
 
 class MemoryKv {
   values = new Map<string, unknown>();
-  get<T>(key: string): T | undefined { return this.values.get(key) as T | undefined; }
-  put<T>(key: string, value: T) { this.values.set(key, value); }
-  delete(key: string) { this.values.delete(key); }
+  get<T>(key: string): T | undefined {
+    return this.values.get(key) as T | undefined;
+  }
+  put<T>(key: string, value: T) {
+    this.values.set(key, value);
+  }
+  delete(key: string) {
+    this.values.delete(key);
+  }
   list<T>({ prefix }: { prefix: string }): Map<string, T> {
     return new Map([...this.values].filter(([key]) => key.startsWith(prefix))) as Map<string, T>;
   }
@@ -58,9 +82,14 @@ function context(initialProps: Record<string, unknown>) {
 
 beforeEach(() => {
   installation = { teamId: "", isEnterpriseInstall: true, enterpriseId: "EORG" };
-  workspaces = [{ id: "TONE", name: "One" }, { id: "TTWO", name: "Two" }];
+  workspaces = [
+    { id: "TONE", name: "One" },
+    { id: "TTWO", name: "Two" },
+  ];
   vi.spyOn(SlackApi.prototype, "listWorkspaces").mockImplementation(async () => workspaces);
-  vi.spyOn(SlackApi.prototype, "getWorkspaceInfo").mockImplementation(async function (this: SlackApi) {
+  vi.spyOn(SlackApi.prototype, "getWorkspaceInfo").mockImplementation(async function (
+    this: SlackApi,
+  ) {
     let teamId = await this.workspaceTeamId();
     return { teamId, name: teamId, domain: teamId.toLowerCase() };
   });
@@ -83,15 +112,17 @@ describe("Slack resource binding identity", () => {
     expect(ctx.exports.SlackConversationGatekeeperImpl).toHaveBeenCalledWith({
       props: { userObjectId: "account", teamId: "TONE", conversationId: "CONE" },
     });
-    await expect(user.getGatekeeperClassFor("https://app.slack.com/client/EORG"))
-        .rejects.toThrow("not an enterprise");
+    await expect(user.getGatekeeperClassFor("https://app.slack.com/client/EORG")).rejects.toThrow(
+      "not an enterprise",
+    );
   });
 
   it("resolves a thread's workspace from its permalink host", async () => {
     let resolve = vi.spyOn(SlackApi.prototype, "workspaceIdForDomain").mockResolvedValue("TTWO");
     let ctx = context({ userObjectId: "account" });
-    await new SlackUserImpl(ctx as never, {} as never)
-        .getGatekeeperClassFor("https://two.slack.com/archives/CTWO/p123000001");
+    await new SlackUserImpl(ctx as never, {} as never).getGatekeeperClassFor(
+      "https://two.slack.com/archives/CTWO/p123000001",
+    );
     expect(resolve).toHaveBeenCalledWith("two");
     expect(ctx.exports.SlackThreadGatekeeperImpl).toHaveBeenCalledWith({
       props: expect.objectContaining({ teamId: "TTWO", conversationId: "CTWO" }),
@@ -119,7 +150,9 @@ describe("Slack resource binding identity", () => {
 
   it("does not redirect a selected binding after its workspace grant is removed", async () => {
     let binding = new SlackWorkspaceGatekeeperImpl(
-        context({ userObjectId: "account", teamId: "TTWO" }) as never, {} as never);
+      context({ userObjectId: "account", teamId: "TTWO" }) as never,
+      {} as never,
+    );
     await binding.describe();
     workspaces = [{ id: "TONE", name: "One" }];
     await expect(binding.describe()).rejects.toMatchObject({ code: "team_access_not_granted" });
@@ -130,18 +163,34 @@ describe("Slack resource binding identity", () => {
     let ctx = context({ userObjectId: "account", teamId: "TONE" });
     let account = ctx.exports.UserAccount.get();
     let currentToken = { token: "org-token", expires: new Date(Date.now() + 60 * 60 * 1000) };
-    let getAccessToken = vi.spyOn(account, "getAccessToken").mockImplementation(async () => currentToken);
-    let read = vi.fn(async () => Response.json({ ok: true,
-      members: [{ id: "WSELF", name: "ddr" }], response_metadata: { next_cursor: "next-page" } }));
+    let getAccessToken = vi
+      .spyOn(account, "getAccessToken")
+      .mockImplementation(async () => currentToken);
+    let read = vi.fn(async () =>
+      Response.json({
+        ok: true,
+        members: [{ id: "WSELF", name: "ddr" }],
+        response_metadata: { next_cursor: "next-page" },
+      }),
+    );
     vi.stubGlobal("fetch", read);
-    let queue = { dup() { return this; }, authorizeObservation: vi.fn(async () => undefined) };
-    let session = await new SlackWorkspaceGatekeeperImpl(ctx as never, {} as never)
-        .startSession(queue as never);
+    let queue = {
+      dup() {
+        return this;
+      },
+      authorizeObservation: vi.fn(async () => undefined),
+    };
+    let session = await new SlackWorkspaceGatekeeperImpl(ctx as never, {} as never).startSession(
+      queue as never,
+    );
     let cursor = await session.listUsers();
     expect(await cursor.next()).toMatchObject([{ id: "WSELF" }]);
     installation = { teamId: "TTWO", isEnterpriseInstall: false };
     workspaces = [{ id: "TTWO", name: "Two" }];
-    currentToken = { token: "workspace-token", expires: new Date(Date.now() + 12 * 60 * 60 * 1000) };
+    currentToken = {
+      token: "workspace-token",
+      expires: new Date(Date.now() + 12 * 60 * 60 * 1000),
+    };
     vi.setSystemTime(Date.now() + 2 * 60 * 60 * 1000);
     await expect(cursor.next()).rejects.toMatchObject({ code: "team_access_not_granted" });
     expect(getAccessToken).toHaveBeenCalledTimes(2);
@@ -155,8 +204,14 @@ describe("Slack resource binding identity", () => {
     let account = new UserAccount(ctx as never, {} as never);
     ctx.storage.kv.put("teamId", "TONE");
     ctx.storage.kv.put("teamName", "Old workspace");
-    let grant: SlackOAuthGrant = { accessToken: token, grantedScopes: ["users:read"],
-      userId: "WSELF", teamId: "", isEnterpriseInstall: true, enterpriseId: "EORG" };
+    let grant: SlackOAuthGrant = {
+      accessToken: token,
+      grantedScopes: ["users:read"],
+      userId: "WSELF",
+      teamId: "",
+      isEnterpriseInstall: true,
+      enterpriseId: "EORG",
+    };
     let stageId = stageCredentials(ctx.storage.kv, grant, Date.now());
     expect(await account.getInstallation()).toEqual({ teamId: "TONE" });
     await account.commitReconnect(stageId);
@@ -167,14 +222,28 @@ describe("Slack resource binding identity", () => {
   it("preserves legacy narrow grants for new consent without claiming they can already be read", async () => {
     let ctx = context({});
     let account = new UserAccount(ctx as never, {} as never);
-    ctx.storage.kv.put("grantedScopes",
-        ["users:read", "channels:history", "groups:history", "im:history", "mpim:history"]);
-    expect(await account.getGrantedResourceUrlPatterns()).toEqual([]);
-    expect(await account.getResourceUrlPatternsForReconnect())
-        .toEqual(["https://*.slack.com/archives/:conversationId/:messageId"]);
     ctx.storage.kv.put("grantedScopes", [
-      "users:read", "channels:read", "channels:history", "groups:read", "groups:history",
-      "im:read", "im:history", "mpim:read", "mpim:history", "search:read",
+      "users:read",
+      "channels:history",
+      "groups:history",
+      "im:history",
+      "mpim:history",
+    ]);
+    expect(await account.getGrantedResourceUrlPatterns()).toEqual([]);
+    expect(await account.getResourceUrlPatternsForReconnect()).toEqual([
+      "https://*.slack.com/archives/:conversationId/:messageId",
+    ]);
+    ctx.storage.kv.put("grantedScopes", [
+      "users:read",
+      "channels:read",
+      "channels:history",
+      "groups:read",
+      "groups:history",
+      "im:read",
+      "im:history",
+      "mpim:read",
+      "mpim:history",
+      "search:read",
     ]);
     expect(await account.getGrantedResourceUrlPatterns()).toEqual([]);
     expect(await account.getResourceUrlPatternsForReconnect()).toEqual([
@@ -187,9 +256,13 @@ describe("Slack resource binding identity", () => {
 describe("Slack org observer isolation", () => {
   it("checks the observer's selected workspace rather than enterprise equality", async () => {
     let binding = new SlackWorkspaceGatekeeperImpl(
-        context({ userObjectId: "account", teamId: "TTWO" }) as never, {} as never);
+      context({ userObjectId: "account", teamId: "TTWO" }) as never,
+      {} as never,
+    );
     let observer = { hasWorkspaceAccess: vi.fn(async () => false) };
-    await expect(binding.addObserver("observer", observer as never)).rejects.toThrow("not a member");
+    await expect(binding.addObserver("observer", observer as never)).rejects.toThrow(
+      "not a member",
+    );
     expect(observer.hasWorkspaceAccess).toHaveBeenCalledWith("TTWO");
   });
 
@@ -197,41 +270,73 @@ describe("Slack org observer isolation", () => {
     let ctx = context({ userObjectId: "account", teamId: "TTWO" });
     let binding = new SlackWorkspaceGatekeeperImpl(ctx as never, {} as never);
     ctx.storage.kv.put("trackedConversation:COLD", "observed");
-    let observer = { hasWorkspaceAccess: vi.fn(async () => true),
-      hasConversationAccess: vi.fn(async () => true) };
+    let observer = {
+      hasWorkspaceAccess: vi.fn(async () => true),
+      hasConversationAccess: vi.fn(async () => true),
+    };
     await binding.addObserver("observer", observer as never);
     expect(observer.hasConversationAccess).toHaveBeenCalledWith("COLD", "TTWO");
     observer.hasConversationAccess.mockResolvedValue(false);
     let queue = { authorizeObservation: vi.fn(async () => undefined) };
-    await binding.authorizeConversationObservation(queue as never, ["CNEW"], { title: "Read", description: "Test" });
+    await binding.authorizeConversationObservation(queue as never, ["CNEW"], {
+      title: "Read",
+      description: "Test",
+    });
     expect(observer.hasConversationAccess).toHaveBeenCalledWith("CNEW", "TTWO");
-    expect(queue.authorizeObservation).toHaveBeenCalledWith(expect.objectContaining({
-      excludeObservers: ["observer"],
-    }));
+    expect(queue.authorizeObservation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        excludeObservers: ["observer"],
+      }),
+    );
     expect(ctx.storage.kv.get("trackedConversation:CNEW")).toBe("observed");
   });
 
   it("keeps blocked observations pending so retries recheck observer access", async () => {
     let ctx = context({ userObjectId: "account", teamId: "TONE" });
     let binding = new SlackWorkspaceGatekeeperImpl(ctx as never, {} as never);
-    let observer = { hasWorkspaceAccess: vi.fn(async () => true),
-      hasConversationAccess: vi.fn(async () => false) };
+    let observer = {
+      hasWorkspaceAccess: vi.fn(async () => true),
+      hasConversationAccess: vi.fn(async () => false),
+    };
     await binding.addObserver("observer", observer as never);
-    let queue = { authorizeObservation: vi.fn(async () => { throw new Error("blocked"); }) };
-    await expect(binding.authorizeConversationObservation(
-        queue as never, ["CNEW"], { title: "Read", description: "Test" })).rejects.toThrow("blocked");
+    let queue = {
+      authorizeObservation: vi.fn(async () => {
+        throw new Error("blocked");
+      }),
+    };
+    await expect(
+      binding.authorizeConversationObservation(queue as never, ["CNEW"], {
+        title: "Read",
+        description: "Test",
+      }),
+    ).rejects.toThrow("blocked");
     expect(ctx.storage.kv.get("trackedConversation:CNEW")).toBe("pending");
-    await expect(binding.authorizeConversationObservation(
-        queue as never, ["CNEW"], { title: "Read", description: "Test" })).rejects.toThrow("blocked");
+    await expect(
+      binding.authorizeConversationObservation(queue as never, ["CNEW"], {
+        title: "Read",
+        description: "Test",
+      }),
+    ).rejects.toThrow("blocked");
     expect(observer.hasConversationAccess).toHaveBeenCalledTimes(2);
   });
 
   it("passes workspace identity into conversation and thread observer checks", async () => {
     let observer = { hasConversationAccess: vi.fn(async () => true) };
-    let ctx = context({ userObjectId: "account", teamId: "TTWO", conversationId: "CTWO",
-      threadTs: "123.000001", permalink: "https://two.slack.com/archives/CTWO/p123000001" });
-    await new SlackConversationGatekeeperImpl(ctx as never, {} as never).addObserver("id", observer as never);
-    await new SlackThreadGatekeeperImpl(ctx as never, {} as never).addObserver("id", observer as never);
+    let ctx = context({
+      userObjectId: "account",
+      teamId: "TTWO",
+      conversationId: "CTWO",
+      threadTs: "123.000001",
+      permalink: "https://two.slack.com/archives/CTWO/p123000001",
+    });
+    await new SlackConversationGatekeeperImpl(ctx as never, {} as never).addObserver(
+      "id",
+      observer as never,
+    );
+    await new SlackThreadGatekeeperImpl(ctx as never, {} as never).addObserver(
+      "id",
+      observer as never,
+    );
     expect(observer.hasConversationAccess).toHaveBeenNthCalledWith(1, "CTWO", "TTWO");
     expect(observer.hasConversationAccess).toHaveBeenNthCalledWith(2, "CTWO", "TTWO");
   });
@@ -241,7 +346,11 @@ describe("Slack org observer isolation", () => {
     workspaces = [{ id: "TONE", name: "One" }];
     expect(await verifier.hasWorkspaceAccess("TTWO")).toBe(false);
     expect(await verifier.hasConversationAccess("CTWO", "TTWO")).toBe(false);
-    vi.spyOn(SlackApi.prototype, "listWorkspaces").mockRejectedValue(new SlackApiError("ratelimited", 429));
-    await expect(verifier.hasWorkspaceAccess("TONE")).rejects.toMatchObject({ code: "ratelimited" });
+    vi.spyOn(SlackApi.prototype, "listWorkspaces").mockRejectedValue(
+      new SlackApiError("ratelimited", 429),
+    );
+    await expect(verifier.hasWorkspaceAccess("TONE")).rejects.toMatchObject({
+      code: "ratelimited",
+    });
   });
 });

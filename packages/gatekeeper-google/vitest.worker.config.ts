@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 import deployed from "./cloudflare.config.ts";
 
 const { compatibilityDate, compatibilityFlags } = deployed.worker;
@@ -15,21 +15,28 @@ export default defineConfig({
         compatibilityDate,
         compatibilityFlags,
         bindings: {
-          CLIENT_ID: "test-client", CLIENT_SECRET: "test-secret",
-          PUBSUB_TOPIC: "projects/test/topics/chat", PUBSUB_PUSH_SERVICE_ACCOUNT: "push@test.iam.gserviceaccount.com",
+          CLIENT_ID: "test-client",
+          CLIENT_SECRET: "test-secret",
+          PUBSUB_TOPIC: "projects/test/topics/chat",
+          PUBSUB_PUSH_SERVICE_ACCOUNT: "push@test.iam.gserviceaccount.com",
         },
         durableObjects: {
-          ChatHookDriver: {className: "ChatHookDriver", useSQLite: true},
-          GmailGatekeeperImpl: {className: "GmailGatekeeperImpl", useSQLite: true},
-          GmailHookDriver: {className: "GmailHookDriver", useSQLite: true},
-          GoogleChatGatekeeperImpl: {className: "GoogleChatGatekeeperImpl", useSQLite: true},
-          TestHooks: {className: "TestHooks", useSQLite: true},
-          UserAccount: {className: "UserAccount", useSQLite: true},
+          ChatHookDriver: { className: "ChatHookDriver", useSQLite: true },
+          GmailGatekeeperImpl: { className: "GmailGatekeeperImpl", useSQLite: true },
+          GmailHookDriver: { className: "GmailHookDriver", useSQLite: true },
+          GoogleChatGatekeeperImpl: { className: "GoogleChatGatekeeperImpl", useSQLite: true },
+          TestHooks: { className: "TestHooks", useSQLite: true },
+          UserAccount: { className: "UserAccount", useSQLite: true },
         },
       },
     }),
   ],
   test: {
+    // Vitest v4 compatibility: preserve mock call history.
+    // Remove after tests no longer rely on calls from setup or earlier tests.
+    // https://release-v1-2-0-viteplus-dev.voidzero-docs.workers.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
+    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+    clearMocks: false,
     testTimeout: 15_000,
     include: [
       "__tests__/workerd/chat-actions.test.ts",

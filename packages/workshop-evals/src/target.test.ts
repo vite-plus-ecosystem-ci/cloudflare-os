@@ -1,13 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { assertModelAccess, resolveModelAccess, type LocalModelAccess } from "./target.js";
 
 describe("resolveModelAccess", () => {
   it("uses HTTPS when a Gateway token is present and no binding preference is set", () => {
-    expect(resolveModelAccess({
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account",
-      CF_AI_GATEWAY_API_TOKEN: "token",
-    })).toEqual({
+    expect(
+      resolveModelAccess({
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account",
+        CF_AI_GATEWAY_API_TOKEN: "token",
+      }),
+    ).toEqual({
       kind: "gateway",
       gateway: "gateway",
       accountId: "account",
@@ -17,10 +19,12 @@ describe("resolveModelAccess", () => {
   });
 
   it("uses the Workers AI binding when the Gateway token is absent", () => {
-    expect(resolveModelAccess({
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account",
-    })).toEqual({
+    expect(
+      resolveModelAccess({
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account",
+      }),
+    ).toEqual({
       kind: "gateway",
       gateway: "gateway",
       accountId: "account",
@@ -29,12 +33,14 @@ describe("resolveModelAccess", () => {
   });
 
   it("keeps an injected Gateway token available when the binding is explicitly requested", () => {
-    expect(resolveModelAccess({
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account",
-      CF_AI_GATEWAY_API_TOKEN: "injected-token",
-      CF_AI_GATEWAY_USE_BINDING: " TrUe ",
-    })).toEqual({
+    expect(
+      resolveModelAccess({
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account",
+        CF_AI_GATEWAY_API_TOKEN: "injected-token",
+        CF_AI_GATEWAY_USE_BINDING: " TrUe ",
+      }),
+    ).toEqual({
       kind: "gateway",
       gateway: "gateway",
       accountId: "account",
@@ -51,56 +57,67 @@ describe("resolveModelAccess", () => {
       transport: "https",
       apiToken: "token",
     };
-    expect(resolveModelAccess({
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account",
-      CF_AI_GATEWAY_API_TOKEN: "token",
-      CF_AI_GATEWAY_USE_BINDING: "false",
-    })).toEqual(https);
-    expect(resolveModelAccess({
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account",
-      CF_AI_GATEWAY_API_TOKEN: "token",
-      CF_AI_GATEWAY_USE_BINDING: " False ",
-    })).toEqual(https);
+    expect(
+      resolveModelAccess({
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account",
+        CF_AI_GATEWAY_API_TOKEN: "token",
+        CF_AI_GATEWAY_USE_BINDING: "false",
+      }),
+    ).toEqual(https);
+    expect(
+      resolveModelAccess({
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account",
+        CF_AI_GATEWAY_API_TOKEN: "token",
+        CF_AI_GATEWAY_USE_BINDING: " False ",
+      }),
+    ).toEqual(https);
   });
 
   it("requires the Gateway token when the binding is opted out", () => {
-    expect(() => resolveModelAccess({
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account",
-      CF_AI_GATEWAY_USE_BINDING: "false",
-    })).toThrow("CF_AI_GATEWAY_API_TOKEN must be set when CF_AI_GATEWAY_USE_BINDING is false");
+    expect(() =>
+      resolveModelAccess({
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account",
+        CF_AI_GATEWAY_USE_BINDING: "false",
+      }),
+    ).toThrow("CF_AI_GATEWAY_API_TOKEN must be set when CF_AI_GATEWAY_USE_BINDING is false");
   });
 
   it("rejects an unrecognized binding flag", () => {
-    expect(() => resolveModelAccess({
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account",
-      CF_AI_GATEWAY_USE_BINDING: "yes",
-    })).toThrow('CF_AI_GATEWAY_USE_BINDING must be "true" or "false"');
+    expect(() =>
+      resolveModelAccess({
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account",
+        CF_AI_GATEWAY_USE_BINDING: "yes",
+      }),
+    ).toThrow('CF_AI_GATEWAY_USE_BINDING must be "true" or "false"');
   });
 
   it("uses direct Workers AI credentials", () => {
-    expect(resolveModelAccess({
-      CLOUDFLARE_ACCOUNT_ID: "account",
-      CLOUDFLARE_API_TOKEN: "token",
-    })).toEqual({ kind: "direct", accountId: "account", apiToken: "token" });
+    expect(
+      resolveModelAccess({
+        CLOUDFLARE_ACCOUNT_ID: "account",
+        CLOUDFLARE_API_TOKEN: "token",
+      }),
+    ).toEqual({ kind: "direct", accountId: "account", apiToken: "token" });
   });
 
   it("rejects a partial Gateway configuration", () => {
-    expect(() => resolveModelAccess({ CF_AI_GATEWAY: "gateway" }))
-      .toThrow("require CF_AI_GATEWAY");
+    expect(() => resolveModelAccess({ CF_AI_GATEWAY: "gateway" })).toThrow("require CF_AI_GATEWAY");
   });
 
   it("rejects a Gateway token without a Gateway", () => {
-    expect(() => resolveModelAccess({ CF_AI_GATEWAY_API_TOKEN: "token" }))
-      .toThrow("require CF_AI_GATEWAY");
+    expect(() => resolveModelAccess({ CF_AI_GATEWAY_API_TOKEN: "token" })).toThrow(
+      "require CF_AI_GATEWAY",
+    );
   });
 
   it("rejects a binding flag without a Gateway", () => {
-    expect(() => resolveModelAccess({ CF_AI_GATEWAY_USE_BINDING: "true" }))
-      .toThrow("require CF_AI_GATEWAY");
+    expect(() => resolveModelAccess({ CF_AI_GATEWAY_USE_BINDING: "true" })).toThrow(
+      "require CF_AI_GATEWAY",
+    );
   });
 
   it("rejects missing model access", () => {
@@ -111,11 +128,17 @@ describe("resolveModelAccess", () => {
 describe("assertModelAccess", () => {
   const direct: LocalModelAccess = { kind: "direct", accountId: "account", apiToken: "token" };
   const binding: LocalModelAccess = {
-    kind: "gateway", gateway: "gateway", accountId: "account", transport: "binding",
+    kind: "gateway",
+    gateway: "gateway",
+    accountId: "account",
+    transport: "binding",
   };
   const bindingWithToken: LocalModelAccess = { ...binding, apiToken: "token" };
   const https: LocalModelAccess = {
-    kind: "gateway", gateway: "gateway", accountId: "account", transport: "https",
+    kind: "gateway",
+    gateway: "gateway",
+    accountId: "account",
+    transport: "https",
     apiToken: "token",
   };
   const google = { provider: "google", model: "gemini-3.6-flash" } as const;

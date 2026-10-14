@@ -1,17 +1,28 @@
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type { ActionState, AiChatMessage, Overseer } from "@gadgets/workshop-shared/api";
 import type { TestSession } from "../fixtures/gatekeeper-test/src/test-gatekeeper.js";
 import { openAgentSession, type WorkshopAgentSession } from "../src/agent-session.js";
 import {
-  startTestGatekeeperHarness, TEST_VENDOR_ID, testActionState, testControl, type Harness,
+  startTestGatekeeperHarness,
+  TEST_VENDOR_ID,
+  testActionState,
+  testControl,
+  type Harness,
 } from "../src/harness.js";
 import {
-  SCRIPTED_MODEL_ID, scriptedModelRouter, type ChatCompletionStep, type RoutedScriptedModel,
+  SCRIPTED_MODEL_ID,
+  scriptedModelRouter,
+  type ChatCompletionStep,
+  type RoutedScriptedModel,
 } from "../src/mock-model.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 import {
-  accountLabel, restartWorkspace, streamGeneration, waitFor, withOwnerWorkspace,
+  accountLabel,
+  restartWorkspace,
+  streamGeneration,
+  waitFor,
+  withOwnerWorkspace,
 } from "../src/rpc-client.js";
 
 let harness: Harness;
@@ -46,8 +57,9 @@ const writeValues = (...writes: (number | string)[]): ChatCompletionStep => ({
     id: "write-test-value",
     name: "executeCode",
     arguments: {
-      code: `export default async function(self, env) { console.log(${
-        writes.map(args => `await env.TEST_AMBIENT.writeValue(${args})`).join(", ")}); }`,
+      code: `export default async function(self, env) { console.log(${writes
+        .map((args) => `await env.TEST_AMBIENT.writeValue(${args})`)
+        .join(", ")}); }`,
     },
   },
 });
@@ -64,15 +76,17 @@ const labelOf = (session: WorkshopAgentSession) =>
   accountLabel(session.connectedAccount(TEST_VENDOR_ID));
 
 async function expectIdle(ws: RpcStub<Overseer>) {
-  expect((await ws.listChats()).map(chat => chat.activeAgent)).toEqual([undefined]);
+  expect((await ws.listChats()).map((chat) => chat.activeAgent)).toEqual([undefined]);
 }
 
 const SET_VALUE = { tag: "set-value", label: "Set value" };
 
 // Auto-approval applies after its RPC returns, so wait for the turn it resumes to finish.
 async function waitForResumedTurn(ws: RpcStub<Overseer>, model: RoutedScriptedModel) {
-  await waitFor("the resumed turn to finish", async () =>
-    model.remainingSteps() === 0 && !(await ws.listChats())[0]?.activeAgent || null);
+  await waitFor(
+    "the resumed turn to finish",
+    async () => (model.remainingSteps() === 0 && !(await ws.listChats())[0]?.activeAgent) || null,
+  );
 }
 
 async function waitForPendingActions(session: WorkshopAgentSession, count: number) {
@@ -84,16 +98,21 @@ async function waitForPendingActions(session: WorkshopAgentSession, count: numbe
 
 async function actionStatus(session: WorkshopAgentSession, id: number) {
   const { entries } = await session.listActions({ filter: "action" });
-  const entry = entries.find(candidate => candidate.id === id);
+  const entry = entries.find((candidate) => candidate.id === id);
   if (entry?.type !== "action") throw new Error(`No action record ${id}`);
   return { state: entry.state, resolvedBy: entry.resolvedBy };
 }
 
-const decidedBy = (session: WorkshopAgentSession, state: ActionState) =>
-  ({ state, resolvedBy: { type: "user", id: session.username } });
+const decidedBy = (session: WorkshopAgentSession, state: ActionState) => ({
+  state,
+  resolvedBy: { type: "user", id: session.username },
+});
 
-const agentSaid = (history: AiChatMessage[], text: string) => history.filter(message =>
-  message.type === "message" && message.author.type === "agent" && message.message === text).length;
+const agentSaid = (history: AiChatMessage[], text: string) =>
+  history.filter(
+    (message) =>
+      message.type === "message" && message.author.type === "agent" && message.message === text,
+  ).length;
 
 it.concurrent("rejecting an action discards it and leaves the agent stopped", async () => {
   const model = models.script([writeValues(7), { text: "This must not run." }]);
@@ -102,7 +121,7 @@ it.concurrent("rejecting an action discards it and leaves the agent stopped", as
 
   await session.runTurn("Set the test value to 7.");
   const [action] = await waitForPendingActions(session, 1);
-  await withOwnerWorkspace(harness.url, session.username, async ws => {
+  await withOwnerWorkspace(harness.url, session.username, async (ws) => {
     await ws.rejectAction(action.id);
     await expectIdle(ws);
   });
@@ -126,16 +145,23 @@ it.concurrent("approving every held write applies each and resumes the agent onc
     { description: { title: "Set the test value to 8" } },
   ]);
   expect(await actionState(label)).toEqual({
-    pending: [{ id: 1, value: 7 }, { id: 2, value: 8 }],
+    pending: [
+      { id: 1, value: 7 },
+      { id: 2, value: 8 },
+    ],
     applyCount: 0,
   });
   expect(model.requests).toHaveLength(1);
 
-  await withOwnerWorkspace(harness.url, session.username, async ws => {
+  await withOwnerWorkspace(harness.url, session.username, async (ws) => {
     await ws.approveAction(first.id);
     await expectIdle(ws);
   });
-  expect(await actionState(label)).toEqual({ pending: [{ id: 2, value: 8 }], value: 7, applyCount: 1 });
+  expect(await actionState(label)).toEqual({
+    pending: [{ id: 2, value: 8 }],
+    value: 7,
+    applyCount: 1,
+  });
   expect(model.requests).toHaveLength(1);
 
   const resumed = await session.approveActionsAndWait([second.id]);
@@ -148,31 +174,40 @@ it.concurrent("approving every held write applies each and resumes the agent onc
   expect(model.remainingSteps()).toBe(0);
   expect(agentSaid(resumed.history, "Both values are applied.")).toBe(1);
 
-  await withOwnerWorkspace(harness.url, session.username, ws =>
-    expect(ws.approveAction(first.id)).rejects.toThrow("Action is not pending"));
+  await withOwnerWorkspace(harness.url, session.username, (ws) =>
+    expect(ws.approveAction(first.id)).rejects.toThrow("Action is not pending"),
+  );
   expect((await actionState(label)).applyCount).toBe(2);
 });
 
 it.concurrent("approving a held write while its code runs lets the agent carry on", async () => {
   const model = models.script([
-    { toolCall: { id: "write-then-wait", name: "executeCode", arguments: {
-      // The wait keeps the tool running while the test approves the write.
-      code: "export default async function(self, env) { " +
-          "await env.TEST_AMBIENT.writeValue(7); await scheduler.wait(2000); }",
-    } } },
+    {
+      toolCall: {
+        id: "write-then-wait",
+        name: "executeCode",
+        arguments: {
+          // The wait keeps the tool running while the test approves the write.
+          code:
+            "export default async function(self, env) { " +
+            "await env.TEST_AMBIENT.writeValue(7); await scheduler.wait(2000); }",
+        },
+      },
+    },
     { text: "The value is applied." },
   ]);
   await using session = await openSession(model, "agentmidtool");
 
   const turn = session.runTurn("Set the test value to 7.");
   const [action] = await waitForPendingActions(session, 1);
-  await withOwnerWorkspace(harness.url, session.username, ws => ws.approveAction(action.id));
+  await withOwnerWorkspace(harness.url, session.username, (ws) => ws.approveAction(action.id));
   expect(agentSaid((await turn).history, "The value is applied.")).toBe(1);
 });
 
 it.concurrent("always approving a held write's kind applies it and resumes the agent", async () => {
   const model = models.script([
-    writeValues("7, { autoApprovable: true }"), { text: "The value is applied." },
+    writeValues("7, { autoApprovable: true }"),
+    { text: "The value is applied." },
   ]);
   await using session = await openSession(model, "agentalways");
   const label = labelOf(session);
@@ -181,7 +216,7 @@ it.concurrent("always approving a held write's kind applies it and resumes the a
   const [action] = await waitForPendingActions(session, 1);
   expect(model.requests).toHaveLength(1);
 
-  await withOwnerWorkspace(harness.url, session.username, async ws => {
+  await withOwnerWorkspace(harness.url, session.username, async (ws) => {
     await ws.setAutoApprovedActionKind(action.gatekeeperId!, SET_VALUE);
     await waitForResumedTurn(ws, model);
   });
@@ -191,44 +226,66 @@ it.concurrent("always approving a held write's kind applies it and resumes the a
 });
 
 it.concurrent.each(["approve", "reject"] as const)(
-    "an always-approved write queued behind a held one applies once the user chooses %s",
-    async decision => {
-  const model = models.script([
-    writeValues(7), writeValues("8, { autoApprovable: true }"), { text: "The value is applied." },
-  ]);
-  await using session = await openSession(model, `agentqueued${decision}`);
-  const label = labelOf(session);
+  "an always-approved write queued behind a held one applies once the user chooses %s",
+  async (decision) => {
+    const model = models.script([
+      writeValues(7),
+      writeValues("8, { autoApprovable: true }"),
+      { text: "The value is applied." },
+    ]);
+    await using session = await openSession(model, `agentqueued${decision}`);
+    const label = labelOf(session);
 
-  await session.runTurn("Set the test value to 7.");
-  const [held] = await waitForPendingActions(session, 1);
-  await withOwnerWorkspace(harness.url, session.username, ws =>
-      ws.setAutoApprovedActionKind(held.gatekeeperId!, SET_VALUE));
+    await session.runTurn("Set the test value to 7.");
+    const [held] = await waitForPendingActions(session, 1);
+    await withOwnerWorkspace(harness.url, session.username, (ws) =>
+      ws.setAutoApprovedActionKind(held.gatekeeperId!, SET_VALUE),
+    );
 
-  await session.runTurn("Set the test value to 8.");
-  await waitForPendingActions(session, 2);
-  expect(model.requests).toHaveLength(2);
+    await session.runTurn("Set the test value to 8.");
+    await waitForPendingActions(session, 2);
+    expect(model.requests).toHaveLength(2);
 
-  await withOwnerWorkspace(harness.url, session.username, async ws => {
-    await (decision === "approve" ? ws.approveAction(held.id) : ws.rejectAction(held.id));
-    await waitForResumedTurn(ws, model);
-  });
-  expect(await actionState(label))
-      .toEqual({ pending: [], value: 8, applyCount: decision === "approve" ? 2 : 1 });
-  expect(model.requests).toHaveLength(3);
-});
+    await withOwnerWorkspace(harness.url, session.username, async (ws) => {
+      await (decision === "approve" ? ws.approveAction(held.id) : ws.rejectAction(held.id));
+      await waitForResumedTurn(ws, model);
+    });
+    expect(await actionState(label)).toEqual({
+      pending: [],
+      value: 8,
+      applyCount: decision === "approve" ? 2 : 1,
+    });
+    expect(model.requests).toHaveLength(3);
+  },
+);
 
 it.concurrent("approving an older turn's held write leaves a newer finished turn ended", async () => {
   const secondUrl = "https://gadgets-test.example/things/second";
   const model = models.script([
     writeValues(7),
-    { toolCall: { id: "request-second", name: "requestConnection", arguments: {
-      vendorId: TEST_VENDOR_ID, resourceUrl: secondUrl, reason: "Set the second value.",
-      bindingName: "SECOND",
-    } } },
-    { toolCall: { id: "write-second", name: "executeCode", arguments: {
-      code: "export default async function(self, env) { " +
-          "await env.SECOND.writeValue(8, { autoApprovable: true }); }",
-    } } },
+    {
+      toolCall: {
+        id: "request-second",
+        name: "requestConnection",
+        arguments: {
+          vendorId: TEST_VENDOR_ID,
+          resourceUrl: secondUrl,
+          reason: "Set the second value.",
+          bindingName: "SECOND",
+        },
+      },
+    },
+    {
+      toolCall: {
+        id: "write-second",
+        name: "executeCode",
+        arguments: {
+          code:
+            "export default async function(self, env) { " +
+            "await env.SECOND.writeValue(8, { autoApprovable: true }); }",
+        },
+      },
+    },
     { text: "The second value is applied." },
   ]);
   await using session = await openSession(model, "agentolder");
@@ -236,10 +293,11 @@ it.concurrent("approving an older turn's held write leaves a newer finished turn
   await session.runTurn("Set the test value to 7.");
   const [held] = await waitForPendingActions(session, 1);
   const { history } = await session.runTurn("Set the second value to 8.");
-  const request = history.find(message => message.type === "connectionRequest");
-  if (request?.type !== "connectionRequest") throw new Error("The agent did not request a connection");
+  const request = history.find((message) => message.type === "connectionRequest");
+  if (request?.type !== "connectionRequest")
+    throw new Error("The agent did not request a connection");
 
-  await withOwnerWorkspace(harness.url, session.username, async ws => {
+  await withOwnerWorkspace(harness.url, session.username, async (ws) => {
     using second = await ws.newGatekeeper(session.connectedAccount(TEST_VENDOR_ID).id, secondUrl);
     if (!second) throw new Error("Failed to create the second connection");
     const secondId = await second.getId();
@@ -254,64 +312,76 @@ it.concurrent("approving an older turn's held write leaves a newer finished turn
 });
 
 it.concurrent.each(["retry", "reject"] as const)(
-    "a failed apply stays pending until the user chooses %s", async choice => {
-  const model = models.script([writeValues(9), { text: "The retried value is applied." }]);
-  await using session = await openSession(model, `agentfail${choice}`);
-  const label = labelOf(session);
+  "a failed apply stays pending until the user chooses %s",
+  async (choice) => {
+    const model = models.script([writeValues(9), { text: "The retried value is applied." }]);
+    await using session = await openSession(model, `agentfail${choice}`);
+    const label = labelOf(session);
 
-  await session.runTurn("Set the test value to 9.");
-  const [action] = await waitForPendingActions(session, 1);
-  await failNextApply(label, "Test apply failed");
-  await withOwnerWorkspace(harness.url, session.username, async ws => {
-    await expect(ws.approveAction(action.id)).rejects.toThrow("Test apply failed");
-    await expectIdle(ws);
-  });
-  expect(await actionStatus(session, action.id)).toEqual({ state: "pending" });
-  expect(await actionState(label)).toEqual({ pending: [{ id: 1, value: 9 }], applyCount: 0 });
-  expect(model.requests).toHaveLength(1);
-
-  if (choice === "retry") {
-    const resumed = await session.approveActionsAndWait([action.id]);
-    expect(resumed.outcome).toEqual({ status: "completed" });
-    expect(await actionState(label)).toEqual({ pending: [], value: 9, applyCount: 1 });
-    expect(await actionStatus(session, action.id)).toMatchObject(decidedBy(session, "approved"));
-    expect(model.requests).toHaveLength(2);
-    expect(agentSaid(resumed.history, "The retried value is applied.")).toBe(1);
-  } else {
-    await withOwnerWorkspace(harness.url, session.username, async ws => {
-      await ws.rejectAction(action.id);
+    await session.runTurn("Set the test value to 9.");
+    const [action] = await waitForPendingActions(session, 1);
+    await failNextApply(label, "Test apply failed");
+    await withOwnerWorkspace(harness.url, session.username, async (ws) => {
+      await expect(ws.approveAction(action.id)).rejects.toThrow("Test apply failed");
       await expectIdle(ws);
     });
-    expect(await actionState(label)).toEqual({ pending: [], applyCount: 0 });
-    expect(await actionStatus(session, action.id)).toMatchObject(decidedBy(session, "rejected"));
+    expect(await actionStatus(session, action.id)).toEqual({ state: "pending" });
+    expect(await actionState(label)).toEqual({ pending: [{ id: 1, value: 9 }], applyCount: 0 });
     expect(model.requests).toHaveLength(1);
-    expect(model.remainingSteps()).toBe(1);
-  }
-});
+
+    if (choice === "retry") {
+      const resumed = await session.approveActionsAndWait([action.id]);
+      expect(resumed.outcome).toEqual({ status: "completed" });
+      expect(await actionState(label)).toEqual({ pending: [], value: 9, applyCount: 1 });
+      expect(await actionStatus(session, action.id)).toMatchObject(decidedBy(session, "approved"));
+      expect(model.requests).toHaveLength(2);
+      expect(agentSaid(resumed.history, "The retried value is applied.")).toBe(1);
+    } else {
+      await withOwnerWorkspace(harness.url, session.username, async (ws) => {
+        await ws.rejectAction(action.id);
+        await expectIdle(ws);
+      });
+      expect(await actionState(label)).toEqual({ pending: [], applyCount: 0 });
+      expect(await actionStatus(session, action.id)).toMatchObject(decidedBy(session, "rejected"));
+      expect(model.requests).toHaveLength(1);
+      expect(model.remainingSteps()).toBe(1);
+    }
+  },
+);
 
 // Known bug, kept as a deterministic repro: Overseer.approveAction checks `pending`, then awaits
 // applyPendingAction before marking the action approved, so two concurrent approvals (separate
 // approval surfaces, tabs, or a retry after a dropped WebSocket) both dispatch the apply, and a
 // non-idempotent gatekeeper writes twice. Drop `.fails` once approval claims the action first.
 it.concurrent.fails("approving one action twice at once applies it once", async () => {
-  await using session = await openSession(models.script([{ text: "Ready." }]), "agentdoubleapprove");
+  await using session = await openSession(
+    models.script([{ text: "Ready." }]),
+    "agentdoubleapprove",
+  );
   const label = labelOf(session);
   // A workspace is listed, so withOwnerWorkspace can open it, once it has seen activity.
   await session.runTurn("Get ready.");
 
-  await withOwnerWorkspace(harness.url, session.username, async ws => {
-    using connection = await ws.newGatekeeper(session.connectedAccount(TEST_VENDOR_ID).id,
-        "https://gadgets-test.example/things/double-approval");
+  await withOwnerWorkspace(harness.url, session.username, async (ws) => {
+    using connection = await ws.newGatekeeper(
+      session.connectedAccount(TEST_VENDOR_ID).id,
+      "https://gadgets-test.example/things/double-approval",
+    );
     if (!connection) throw new Error("Failed to create the test connection");
-    using testSession = await connection.openSession() as RpcStub<TestSession>;
+    using testSession = (await connection.openSession()) as RpcStub<TestSession>;
     expect(await testSession.writeValue(23)).toBe(1);
     const [action] = await waitForPendingActions(session, 1);
 
     await control("hold-next-apply", { label });
     const first = ws.approveAction(action.id);
     try {
-      await waitFor("the first apply to be held", async () => await applyAttempts(label) === 1 || null);
-      await expect(() => ws.approveAction(action.id)).rejects.toThrow(`Action is not pending: ${action.id}`);
+      await waitFor(
+        "the first apply to be held",
+        async () => (await applyAttempts(label)) === 1 || null,
+      );
+      await expect(() => ws.approveAction(action.id)).rejects.toThrow(
+        `Action is not pending: ${action.id}`,
+      );
     } finally {
       await control("release-apply", { label });
       await Promise.allSettled([first]);
@@ -335,11 +405,14 @@ it.concurrent("approving after a workspace restart applies and resumes once", as
   expect(await actionState(label)).toEqual(held);
   expect(model.requests).toHaveLength(1);
 
-  await withOwnerWorkspace(harness.url, session.username, ws => restartWorkspace(harness.url, ws));
+  await withOwnerWorkspace(harness.url, session.username, (ws) =>
+    restartWorkspace(harness.url, ws),
+  );
   await waitFor("the restart to drop the session", async () => session.connectionDrops > 0 || null);
 
-  expect((await session.listActions({ filter: "pending" })).entries.map(e => e.id))
-      .toEqual([action.id]);
+  expect((await session.listActions({ filter: "pending" })).entries.map((e) => e.id)).toEqual([
+    action.id,
+  ]);
   expect(await actionState(label)).toEqual(held);
   expect(model.requests).toHaveLength(1);
 
@@ -368,7 +441,7 @@ it.concurrent("a turn interrupted by a workspace restart resumes and completes",
 
   const turning = session.runTurn("What is 6 times 7?");
   await waitFor("the pending model request", async () => model.requests.length === 2 || null);
-  const before = await withOwnerWorkspace(harness.url, session.username, async ws => {
+  const before = await withOwnerWorkspace(harness.url, session.username, async (ws) => {
     const generation = await streamGeneration(ws);
     await restartWorkspace(harness.url, ws);
     return generation;
@@ -378,7 +451,7 @@ it.concurrent("a turn interrupted by a workspace restart resumes and completes",
   expect(model.requests).toHaveLength(3);
   expect(model.remainingSteps()).toBe(0);
   expect(model.requests[2]).toEqual(model.requests[1]);
-  await withOwnerWorkspace(harness.url, session.username, async ws => {
+  await withOwnerWorkspace(harness.url, session.username, async (ws) => {
     await expectIdle(ws);
     expect(await streamGeneration(ws)).not.toBe(before);
   });

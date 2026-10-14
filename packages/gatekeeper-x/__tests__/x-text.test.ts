@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { comparableText, comparableUrl, duplicateKey, extractMentions, extractUrls, weightedLength, withoutLeadingMentions } from "../src/x-text";
+import { describe, expect, it } from "vite-plus/test";
+import {
+  comparableText,
+  comparableUrl,
+  duplicateKey,
+  extractMentions,
+  extractUrls,
+  weightedLength,
+  withoutLeadingMentions,
+} from "../src/x-text";
 
 describe("weightedLength", () => {
   it("counts Latin text one per character", () => {
@@ -8,7 +16,9 @@ describe("weightedLength", () => {
   });
 
   it("counts every link as 23, however long", () => {
-    expect(weightedLength("see https://example.com/a/very/long/path?with=query&and=more")).toBe(4 + 23);
+    expect(weightedLength("see https://example.com/a/very/long/path?with=query&and=more")).toBe(
+      4 + 23,
+    );
     expect(weightedLength("https://a.co")).toBe(23);
     expect(weightedLength("visit example.com today")).toBe(6 + 23 + 6);
   });
@@ -36,7 +46,10 @@ describe("weightedLength", () => {
 
 describe("extraction", () => {
   it("finds links as written, without trailing punctuation", () => {
-    expect(extractUrls("Read https://example.com/x. And foo.io!")).toEqual(["https://example.com/x", "foo.io"]);
+    expect(extractUrls("Read https://example.com/x. And foo.io!")).toEqual([
+      "https://example.com/x",
+      "foo.io",
+    ]);
     expect(extractUrls("no links here")).toEqual([]);
   });
 
@@ -47,7 +60,11 @@ describe("extraction", () => {
 
   it("weighs long drafts in time linear in their length", () => {
     // Each took seconds when a failed match could backtrack across the whole run.
-    for (const text of ["a.".repeat(50_000), "a-".repeat(50_000), `https://x.co/${".".repeat(100_000)}a`]) {
+    for (const text of [
+      "a.".repeat(50_000),
+      "a-".repeat(50_000),
+      `https://x.co/${".".repeat(100_000)}a`,
+    ]) {
       const started = performance.now();
       weightedLength(text);
       comparableText(text);
@@ -56,7 +73,10 @@ describe("extraction", () => {
   });
 
   it("finds mentions, once each, ignoring email addresses", () => {
-    expect(extractMentions("@jack hi @Jack, mail me at a@b.com or ask @bob_1")).toEqual(["jack", "bob_1"]);
+    expect(extractMentions("@jack hi @Jack, mail me at a@b.com or ask @bob_1")).toEqual([
+      "jack",
+      "bob_1",
+    ]);
     expect(extractMentions("@@double @this_handle_is_too_long")).toEqual([]);
   });
 });
@@ -80,18 +100,23 @@ describe("comparableText", () => {
   it("takes a query straight after a bare domain as part of the link, as X does", () => {
     expect(extractUrls("Read example.com?q=one")).toEqual(["example.com?q=one"]);
     expect(extractUrls("See example.com?q=one.")).toEqual(["example.com?q=one"]);
-    expect(comparableText("Read example.com?q=one")).toBe(comparableText("Read https://t.co/AbCdEf"));
+    expect(comparableText("Read example.com?q=one")).toBe(
+      comparableText("Read https://t.co/AbCdEf"),
+    );
     expect(comparableUrl("EXAMPLE.com?q=One")).toBe("example.com?q=One");
   });
 
   it("keeps the punctuation after a link, however the link was written", () => {
     expect(comparableText("Visit example.com.")).toBe(comparableText("Visit https://t.co/AbCdEf."));
-    expect(comparableText("See (https://example.com/a), then")).toBe(comparableText("See (https://t.co/x), then"));
+    expect(comparableText("See (https://example.com/a), then")).toBe(
+      comparableText("See (https://t.co/x), then"),
+    );
   });
 
   it("equates a draft with the post X made of it", () => {
-    expect(comparableText("Hello https://example.com/page world"))
-      .toBe(comparableText("Hello  https://t.co/AbCdEf   world"));
+    expect(comparableText("Hello https://example.com/page world")).toBe(
+      comparableText("Hello  https://t.co/AbCdEf   world"),
+    );
   });
 
   it("tells different texts apart", () => {
@@ -105,8 +130,12 @@ describe("duplicateKey", () => {
   });
 
   it("tells apart drafts that differ only in where their links point", () => {
-    expect(duplicateKey("https://example.com/one")).not.toBe(duplicateKey("https://example.com/two"));
-    expect(duplicateKey("Read this: example.com/a")).not.toBe(duplicateKey("Read this: example.com/b"));
+    expect(duplicateKey("https://example.com/one")).not.toBe(
+      duplicateKey("https://example.com/two"),
+    );
+    expect(duplicateKey("Read this: example.com/a")).not.toBe(
+      duplicateKey("Read this: example.com/b"),
+    );
   });
 });
 
@@ -118,6 +147,8 @@ describe("comparableUrl", () => {
 
   it("tells different destinations apart", () => {
     expect(comparableUrl("https://example.com/a")).not.toBe(comparableUrl("https://example.com/b"));
-    expect(comparableUrl("https://example.com/Path")).not.toBe(comparableUrl("https://example.com/path"));
+    expect(comparableUrl("https://example.com/Path")).not.toBe(
+      comparableUrl("https://example.com/path"),
+    );
   });
 });

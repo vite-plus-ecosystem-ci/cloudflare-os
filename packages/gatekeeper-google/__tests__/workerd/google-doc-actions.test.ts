@@ -1,5 +1,5 @@
 import { abortAllDurableObjects, env } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { googleDocActionTab } from "../../src/google";
 import { MARKDOWN_RENDERING_VERSION } from "../../src/markdown-converter";
 import type { GoogleDocsTab } from "../../src/docs-api";
@@ -54,12 +54,7 @@ type ModelTab = {
 };
 type BodyElement = GoogleDocsTab["body"]["content"][number];
 
-function withoutDeletedParagraphs<T>(
-  text: string,
-  values: T[],
-  start: number,
-  end: number,
-): T[] {
+function withoutDeletedParagraphs<T>(text: string, values: T[], start: number, end: number): T[] {
   let kept: T[] = [];
   let paragraph = 0;
   for (let index = text.indexOf("\n"); index !== -1; index = text.indexOf("\n", index + 1)) {
@@ -129,8 +124,10 @@ class DocsModel {
   readonly #held = new Map<RequestKind, { reach: () => void; released: Promise<void> }>();
 
   install(): void {
-    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request, init?: RequestInit) =>
-      this.fetch(input, init)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL | Request, init?: RequestInit) => this.fetch(input, init)),
+    );
   }
 
   addMarker(name: string, id: string, tabId = MAIN_TAB): void {
@@ -143,7 +140,10 @@ class DocsModel {
   }
 
   removeTab(id: string): void {
-    this.tabs.splice(this.tabs.findIndex(tab => tab.id === id), 1);
+    this.tabs.splice(
+      this.tabs.findIndex((tab) => tab.id === id),
+      1,
+    );
     this.#revision++;
   }
 
@@ -157,12 +157,10 @@ class DocsModel {
     tab.links = [{ start: 0, end: text.length, url }];
   }
 
-  setParagraphs(
-    tabId: string, paragraphs: { text: string; namedStyleType: string }[],
-  ): void {
+  setParagraphs(tabId: string, paragraphs: { text: string; namedStyleType: string }[]): void {
     let tab = this.#tab(tabId);
-    tab.text = paragraphs.map(paragraph => paragraph.text).join("\n");
-    tab.paragraphStyles = paragraphs.map(paragraph => paragraph.namedStyleType);
+    tab.text = paragraphs.map((paragraph) => paragraph.text).join("\n");
+    tab.paragraphStyles = paragraphs.map((paragraph) => paragraph.namedStyleType);
   }
 
   setNumberedList(tabId: string, items: string[]): void {
@@ -193,22 +191,29 @@ class DocsModel {
   text(tabId = MAIN_TAB): string {
     let tab = this.#tab(tabId);
     if (!tab.body) return tab.text;
-    return tab.body.content.flatMap(element =>
-      element.paragraph?.elements.flatMap(part => part.textRun?.content ?? []) ?? [],
-    ).join("").replace(/\n$/, "");
+    return tab.body.content
+      .flatMap(
+        (element) =>
+          element.paragraph?.elements.flatMap((part) => part.textRun?.content ?? []) ?? [],
+      )
+      .join("")
+      .replace(/\n$/, "");
   }
 
   renderedText(tabId = MAIN_TAB): string {
     let tab = this.#tab(tabId);
     let counts = new Map<string, number>();
-    return tab.text.split("\n").map((text, index) => {
-      let list = tab.paragraphLists?.[index];
-      if (list === "indented") return `\t${text}`;
-      if (!list) return text;
-      let number = (counts.get(list.id) ?? 0) + 1;
-      counts.set(list.id, number);
-      return `${number}. ${text}`;
-    }).join("\n");
+    return tab.text
+      .split("\n")
+      .map((text, index) => {
+        let list = tab.paragraphLists?.[index];
+        if (list === "indented") return `\t${text}`;
+        if (!list) return text;
+        let number = (counts.get(list.id) ?? 0) + 1;
+        counts.set(list.id, number);
+        return `${number}. ${text}`;
+      })
+      .join("\n");
   }
 
   clearMarkers(): void {
@@ -223,8 +228,12 @@ class DocsModel {
   hold(kind: RequestKind): { reached: Promise<void>; release: () => void } {
     let reach!: () => void;
     let release!: () => void;
-    let reached = new Promise<void>(resolve => { reach = resolve; });
-    let released = new Promise<void>(resolve => { release = resolve; });
+    let reached = new Promise<void>((resolve) => {
+      reach = resolve;
+    });
+    let released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     this.#held.set(kind, { reach, released });
     return { reached, release };
   }
@@ -247,10 +256,15 @@ class DocsModel {
       if (this.driveFailure) {
         let { status, reason } = this.driveFailure;
         return Response.json(
-          { error: { code: status, errors: reason ? [{ reason }] : [] } }, { status });
+          { error: { code: status, errors: reason ? [{ reason }] : [] } },
+          { status },
+        );
       }
-      return Response.json(
-        { id: "doc-1", name: "Test document", modifiedTime: this.driveModifiedTime });
+      return Response.json({
+        id: "doc-1",
+        name: "Test document",
+        modifiedTime: this.driveModifiedTime,
+      });
     }
     if (url.hostname !== "docs.googleapis.com") {
       throw new Error(`Unexpected provider request: ${url}`);
@@ -263,8 +277,15 @@ class DocsModel {
       if (this.createFailures > 0) {
         this.createFailures--;
         return Response.json(
-          { error: { code: 403, message: "The caller does not have permission", status: "PERMISSION_DENIED" } },
-          { status: 403 });
+          {
+            error: {
+              code: 403,
+              message: "The caller does not have permission",
+              status: "PERMISSION_DENIED",
+            },
+          },
+          { status: 403 },
+        );
       }
       return Response.json({ documentId: "doc-1" });
     }
@@ -292,8 +313,10 @@ class DocsModel {
       this.cleanupFailures--;
       throw new Error("cleanup failed");
     }
-    if (body.writeControl?.requiredRevisionId &&
-        body.writeControl.requiredRevisionId !== `revision-${this.#revision}`) {
+    if (
+      body.writeControl?.requiredRevisionId &&
+      body.writeControl.requiredRevisionId !== `revision-${this.#revision}`
+    ) {
       return Response.json({ error: { code: 400, message: "revision mismatch" } }, { status: 400 });
     }
 
@@ -309,9 +332,13 @@ class DocsModel {
 
       // Google resolves an unqualified coordinate against a default tab, so a request that omits
       // the ID would edit whichever tab that happens to be.
-      let coordinate = request.createNamedRange?.range ?? request.insertText?.location ??
-        request.deleteContentRange?.range ?? request.updateParagraphStyle?.range ??
-        request.createParagraphBullets?.range ?? request.deleteParagraphBullets?.range ??
+      let coordinate =
+        request.createNamedRange?.range ??
+        request.insertText?.location ??
+        request.deleteContentRange?.range ??
+        request.updateParagraphStyle?.range ??
+        request.createParagraphBullets?.range ??
+        request.deleteParagraphBullets?.range ??
         request.updateTextStyle?.range;
       if (!coordinate?.tabId) {
         throw new Error(`Google Docs request is missing tabId: ${JSON.stringify(request)}`);
@@ -328,9 +355,7 @@ class DocsModel {
 
       hasContent = true;
       if (request.insertText) {
-        this.#insertText(
-          tab, request.insertText.location.index, request.insertText.text,
-        );
+        this.#insertText(tab, request.insertText.location.index, request.insertText.text);
       } else if (request.deleteContentRange) {
         let { startIndex, endIndex } = request.deleteContentRange.range;
         this.#deleteText(tab, startIndex, endIndex);
@@ -344,14 +369,20 @@ class DocsModel {
         this.#setBullets(tab, request.deleteParagraphBullets.range);
       } else if (request.createParagraphBullets) {
         this.#setBullets(
-          tab, request.createParagraphBullets.range, request.createParagraphBullets.bulletPreset,
+          tab,
+          request.createParagraphBullets.range,
+          request.createParagraphBullets.bulletPreset,
         );
-      } else if (request.updateTextStyle && (
-        request.updateTextStyle.textStyle?.link || request.updateTextStyle.fields?.includes("link")
-      )) {
+      } else if (
+        request.updateTextStyle &&
+        (request.updateTextStyle.textStyle?.link ||
+          request.updateTextStyle.fields?.includes("link"))
+      ) {
         let { startIndex, endIndex } = request.updateTextStyle.range;
         this.#setLink(
-          tab, startIndex - 1, endIndex - 1,
+          tab,
+          startIndex - 1,
+          endIndex - 1,
           request.updateTextStyle.textStyle?.link?.url,
         );
       }
@@ -437,16 +468,16 @@ class DocsModel {
     tab.text = tab.text.slice(0, start) + tab.text.slice(end);
   }
 
-  #replaceBodyText(
-    tab: ModelTab, startIndex: number, endIndex: number, replacement: string,
-  ): void {
+  #replaceBodyText(tab: ModelTab, startIndex: number, endIndex: number, replacement: string): void {
     let content = tab.body!.content;
     for (let structureIndex = 0; structureIndex < content.length; structureIndex++) {
       let structure = content[structureIndex];
       let elements = structure.paragraph?.elements;
       if (!elements) continue;
-      let elementIndex = elements.findIndex(element => element.textRun &&
-        startIndex >= element.startIndex && endIndex <= element.endIndex);
+      let elementIndex = elements.findIndex(
+        (element) =>
+          element.textRun && startIndex >= element.startIndex && endIndex <= element.endIndex,
+      );
       if (elementIndex < 0) continue;
 
       let element = elements[elementIndex];
@@ -494,15 +525,18 @@ class DocsModel {
   ): void {
     let indexes = paragraphsIn(tab.text, range);
     if (!preset) {
-      for (let index of indexes) if (tab.paragraphLists?.[index]) tab.paragraphLists[index] = "indented";
+      for (let index of indexes)
+        if (tab.paragraphLists?.[index]) tab.paragraphLists[index] = "indented";
       return;
     }
-    let lists = tab.paragraphLists ??= tab.text.split("\n").map(() => null);
+    let lists = (tab.paragraphLists ??= tab.text.split("\n").map(() => null));
     let first = indexes[0];
     if (first === undefined) return;
     let preceding = lists[first - 1];
-    let id = isListItem(preceding) && preceding.preset === preset
-      ? preceding.id : `list-${this.#nextListId++}`;
+    let id =
+      isListItem(preceding) && preceding.preset === preset
+        ? preceding.id
+        : `list-${this.#nextListId++}`;
     for (let index of indexes) lists[index] = { id, preset };
   }
 
@@ -548,20 +582,25 @@ class DocsModel {
   ): void {
     if (tab.body) {
       for (let element of tab.body.content) {
-        if (element.paragraph && range.startIndex < element.endIndex &&
-            range.endIndex > element.startIndex) {
+        if (
+          element.paragraph &&
+          range.startIndex < element.endIndex &&
+          range.endIndex > element.startIndex
+        ) {
           element.paragraph.paragraphStyle.namedStyleType = namedStyleType;
         }
       }
       return;
     }
-    let styles = tab.paragraphStyles ??=
-      tab.text.split("\n").map(() => "NORMAL_TEXT");
+    let styles = (tab.paragraphStyles ??= tab.text.split("\n").map(() => "NORMAL_TEXT"));
     for (let index of paragraphsIn(tab.text, range)) styles[index] = namedStyleType;
   }
 
   #replaceTableText(
-    tab: ModelTab, startIndex: number, endIndex: number, replacement: string,
+    tab: ModelTab,
+    startIndex: number,
+    endIndex: number,
+    replacement: string,
   ): void {
     let table = tab.table;
     if (!table) throw new Error("Expected a table-backed tab");
@@ -574,10 +613,15 @@ class DocsModel {
     table[start.field] = text.slice(0, start.offset) + replacement + text.slice(end.offset);
   }
 
-  #tableTextPoint(table: NonNullable<ModelTab["table"]>, index: number): {
-    field: "before" | "after";
-    offset: number;
-  } | undefined {
+  #tableTextPoint(
+    table: NonNullable<ModelTab["table"]>,
+    index: number,
+  ):
+    | {
+        field: "before" | "after";
+        offset: number;
+      }
+    | undefined {
     let content = this.#tableBody(table).content;
     let paragraphs = [
       { field: "before" as const, element: content[1] },
@@ -593,7 +637,7 @@ class DocsModel {
   #tableBody(table: NonNullable<ModelTab["table"]>): GoogleDocsTab["body"] {
     return buildTab([
       { runs: [`${table.before}\n`] },
-      { table: table.rows.map(row => row.map(cell => `${cell}\n`)) },
+      { table: table.rows.map((row) => row.map((cell) => `${cell}\n`)) },
       { runs: [`${table.after}\n`] },
     ]).body;
   }
@@ -612,7 +656,7 @@ class DocsModel {
   }
 
   #tab(id: string): ModelTab {
-    let tab = this.tabs.find(candidate => candidate.id === id);
+    let tab = this.tabs.find((candidate) => candidate.id === id);
     if (!tab) throw new Error(`Google Docs has no tab "${id}"`);
     return tab;
   }
@@ -622,8 +666,10 @@ class DocsModel {
     let namedRanges: Record<string, { namedRanges: { namedRangeId: string; name: string }[] }> = {};
     for (const [namedRangeId, marker] of this.markers) {
       if (marker.tabId !== tab.id) continue;
-      (namedRanges[marker.name] ??= { namedRanges: [] })
-        .namedRanges.push({ namedRangeId, name: marker.name });
+      (namedRanges[marker.name] ??= { namedRanges: [] }).namedRanges.push({
+        namedRangeId,
+        name: marker.name,
+      });
     }
     let body = tab.body;
     if (!body && tab.table) body = this.#tableBody(tab.table);
@@ -631,20 +677,25 @@ class DocsModel {
     let paragraphLists = tab.paragraphLists;
     let paragraphStyles = tab.paragraphStyles;
     // One paragraph per line, carrying whichever of the per-paragraph attributes this tab has.
-    let paragraphBody = () => buildTab(tab.text.split("\n").map((paragraphText, index) => {
-      let list = paragraphLists?.[index];
-      return {
-        runs: [`${paragraphText}\n`],
-        namedStyleType: paragraphStyles?.[index],
-        ...isListItem(list) ? { bullet: { listId: list.id } } : {},
-      };
-    }), lists).body;
+    let paragraphBody = () =>
+      buildTab(
+        tab.text.split("\n").map((paragraphText, index) => {
+          let list = paragraphLists?.[index];
+          return {
+            runs: [`${paragraphText}\n`],
+            namedStyleType: paragraphStyles?.[index],
+            ...(isListItem(list) ? { bullet: { listId: list.id } } : {}),
+          };
+        }),
+        lists,
+      ).body;
 
     if (!body && paragraphLists) {
       for (let item of paragraphLists) {
         if (!isListItem(item)) continue;
         let level = item.preset.startsWith("BULLET_")
-          ? { glyphSymbol: "●" } : { glyphType: "DECIMAL" };
+          ? { glyphSymbol: "●" }
+          : { glyphType: "DECIMAL" };
         lists[item.id] ??= { listProperties: { nestingLevels: [level] } };
       }
       body = paragraphBody();
@@ -665,8 +716,9 @@ class DocsModel {
     return {
       tabProperties: { tabId: tab.id, title: tab.title },
       documentTab: { body, lists, namedRanges },
-      childTabs: this.tabs.filter(child => child.parentId === tab.id)
-        .map(child => this.#documentTab(child)),
+      childTabs: this.tabs
+        .filter((child) => child.parentId === tab.id)
+        .map((child) => this.#documentTab(child)),
     };
   }
 
@@ -674,9 +726,10 @@ class DocsModel {
     return {
       documentId: "doc-1",
       title: "Test document",
-      ...this.editable ? { revisionId: `revision-${this.#revision}` } : {},
-      tabs: this.tabs.filter(tab => tab.parentId === undefined)
-        .map(tab => this.#documentTab(tab)),
+      ...(this.editable ? { revisionId: `revision-${this.#revision}` } : {}),
+      tabs: this.tabs
+        .filter((tab) => tab.parentId === undefined)
+        .map((tab) => this.#documentTab(tab)),
     };
   }
 }
@@ -698,7 +751,15 @@ afterEach(() => {
 describe("Google Doc tables", () => {
   it("returns table cells with their row structure", async () => {
     let docs = new DocsModel();
-    docs.setTable(MAIN_TAB, "Before", [["Owner", "Status"], ["Alice", "Ready"]], "After");
+    docs.setTable(
+      MAIN_TAB,
+      "Before",
+      [
+        ["Owner", "Status"],
+        ["Alice", "Ready"],
+      ],
+      "After",
+    );
     docs.install();
 
     await expect(hooks().readContent("table-read")).resolves.toContain(
@@ -711,9 +772,9 @@ describe("Google Doc tables", () => {
     docs.setBody(MAIN_TAB, buildTab([{ table: [["Cell\n"]] }]).body);
     docs.install();
 
-    await expect(Promise.resolve(
-      hooks().submitAppend("table-append", "added"),
-    )).rejects.toThrow("appendText: the selected tab does not end in a paragraph");
+    await expect(Promise.resolve(hooks().submitAppend("table-append", "added"))).rejects.toThrow(
+      "appendText: the selected tab does not end in a paragraph",
+    );
     expect(await hooks().lastActionDescription).toBe("");
     expect(docs.contentBatches).toBe(0);
   });
@@ -724,17 +785,15 @@ describe("Google Doc tables", () => {
     docs.install();
     let actionId = await hooks().submitAppend("table-append-replay", "added");
 
-    docs.setBody(MAIN_TAB, buildTab([
-      { runs: ["Before\n"] },
-      { table: [["Cell\n"]] },
-    ]).body);
+    docs.setBody(MAIN_TAB, buildTab([{ runs: ["Before\n"] }, { table: [["Cell\n"]] }]).body);
     docs.externalEdit();
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(Date.now() + 60_000);
 
     expect(await hooks().readContent("table-append-replay")).not.toContain("added");
-    expect(await hooks().applyAction("table-append-replay", actionId))
-      .toContain("appendText: the selected tab does not end in a paragraph");
+    expect(await hooks().applyAction("table-append-replay", actionId)).toContain(
+      "appendText: the selected tab does not end in a paragraph",
+    );
   });
 
   it("invalidates a queued append before writing when a table becomes last", async () => {
@@ -743,14 +802,12 @@ describe("Google Doc tables", () => {
     docs.install();
     let actionId = await hooks().submitAppend("table-append-apply", "added");
 
-    docs.setBody(MAIN_TAB, buildTab([
-      { runs: ["Before\n"] },
-      { table: [["Cell\n"]] },
-    ]).body);
+    docs.setBody(MAIN_TAB, buildTab([{ runs: ["Before\n"] }, { table: [["Cell\n"]] }]).body);
     docs.externalEdit();
 
-    expect(await hooks().applyAction("table-append-apply", actionId))
-      .toContain("appendText: the selected tab does not end in a paragraph");
+    expect(await hooks().applyAction("table-append-apply", actionId)).toContain(
+      "appendText: the selected tab does not end in a paragraph",
+    );
     expect(docs.contentBatches).toBe(0);
     expect(docs.markers.size).toBe(0);
   });
@@ -790,9 +847,9 @@ describe("Google Doc tables", () => {
     await hooks().submitReplace("table-edit", "Before", "Long before");
     let content = await hooks().readContent("table-edit");
 
-    await expect(Promise.resolve(
-      hooks().submitReplace("table-edit", content.trimEnd(), "Updated"),
-    )).rejects.toThrow("replaceText: structured content cannot be edited");
+    await expect(
+      Promise.resolve(hooks().submitReplace("table-edit", content.trimEnd(), "Updated")),
+    ).rejects.toThrow("replaceText: structured content cannot be edited");
     expect(await hooks().lastActionDescription).toBe("");
     expect(docs.contentBatches).toBe(0);
   });
@@ -801,16 +858,29 @@ describe("Google Doc tables", () => {
 describe("Google Doc structured elements", () => {
   it("rejects a rich-link URL edit before requesting approval", async () => {
     let docs = new DocsModel();
-    docs.setBody(MAIN_TAB, buildTab([{ runs: [
-      "See ",
-      { richLink: { title: "Launch plan", uri: "https://docs.google.com/document/d/plan" } },
-      " today\n",
-    ] }]).body);
+    docs.setBody(
+      MAIN_TAB,
+      buildTab([
+        {
+          runs: [
+            "See ",
+            { richLink: { title: "Launch plan", uri: "https://docs.google.com/document/d/plan" } },
+            " today\n",
+          ],
+        },
+      ]).body,
+    );
     docs.install();
 
-    await expect(Promise.resolve(hooks().submitReplace(
-      "chip-url", "https://docs.google.com/document/d/plan", "https://example.com/new",
-    ))).rejects.toThrow("replaceText: structured content cannot be edited");
+    await expect(
+      Promise.resolve(
+        hooks().submitReplace(
+          "chip-url",
+          "https://docs.google.com/document/d/plan",
+          "https://example.com/new",
+        ),
+      ),
+    ).rejects.toThrow("replaceText: structured content cannot be edited");
     expect(await hooks().lastActionDescription).toBe("");
     expect(docs.contentBatches).toBe(0);
   });
@@ -822,25 +892,25 @@ describe("Google Doc structured elements", () => {
     docs.setBody(MAIN_TAB, tab.body);
     docs.install();
 
-    await expect(Promise.resolve(hooks().submitReplace(
-      "image-boundary", "[Image] Caption", "X[Image] Caption",
-    ))).rejects.toThrow("structured content cannot be edited");
+    await expect(
+      Promise.resolve(
+        hooks().submitReplace("image-boundary", "[Image] Caption", "X[Image] Caption"),
+      ),
+    ).rejects.toThrow("structured content cannot be edited");
     expect(await hooks().lastActionDescription).toBe("");
   });
 
   it("applies a heading immediately before structured content", async () => {
     let docs = new DocsModel();
-    docs.setBody(MAIN_TAB, buildTab([
-      { runs: ["Before\n"] },
-      { runs: [{ date: "Sep 16, 2026" }, "\n"] },
-    ]).body);
+    docs.setBody(
+      MAIN_TAB,
+      buildTab([{ runs: ["Before\n"] }, { runs: [{ date: "Sep 16, 2026" }, "\n"] }]).body,
+    );
     docs.install();
     let actionId = await hooks().submitReplace("heading-before-chip", "Before", "# Before");
 
     expect(await hooks().applyAction("heading-before-chip", actionId)).toBeNull();
-    expect(await hooks().readContent("heading-before-chip")).toBe(
-      "# Before\n\nSep 16, 2026\n",
-    );
+    expect(await hooks().readContent("heading-before-chip")).toBe("# Before\n\nSep 16, 2026\n");
   });
 });
 
@@ -850,7 +920,9 @@ describe("Google Doc list edits", () => {
     docs.setNumberedList(MAIN_TAB, ["Existing"]);
     docs.install();
     let actionId = await hooks().submitReplace(
-      "prepend-list", "1. Existing", "1. New\n1. Existing",
+      "prepend-list",
+      "1. Existing",
+      "1. New\n1. Existing",
     );
 
     await hooks().applyAction("prepend-list", actionId);
@@ -863,7 +935,9 @@ describe("Google Doc list edits", () => {
     docs.setNumberedList(MAIN_TAB, ["First", "Second"]);
     docs.install();
     let actionId = await hooks().submitReplace(
-      "rewrite-list", "1. First\n1. Second", "1. Changed first\n1. Changed second",
+      "rewrite-list",
+      "1. First\n1. Second",
+      "1. Changed first\n1. Changed second",
     );
 
     expect(await hooks().applyAction("rewrite-list", actionId)).toBeNull();
@@ -875,9 +949,7 @@ describe("Google Doc list edits", () => {
     docs.setNumberedList(MAIN_TAB, ["First", "prose", "Second"]);
     docs.interruptList(MAIN_TAB, 1);
     docs.install();
-    let actionId = await hooks().submitReplace(
-      "restart-list", "2. Second", "3. Second",
-    );
+    let actionId = await hooks().submitReplace("restart-list", "2. Second", "3. Second");
     expect(await hooks().lastActionFields).toEqual([
       markdownField("Old", "2. Second"),
       markdownField("Requested New", "3. Second"),
@@ -897,7 +969,9 @@ describe("Google Doc list edits", () => {
     docs.interruptList(MAIN_TAB, 1);
     docs.install();
     let actionId = await hooks().submitReplace(
-      "list-prose", "1. First\n\nBody", "1. Changed\n\nUpdated",
+      "list-prose",
+      "1. First\n\nBody",
+      "1. Changed\n\nUpdated",
     );
     let preview = await hooks().readContent("list-prose");
 
@@ -914,7 +988,8 @@ describe("Google Doc list edits", () => {
     docs.interruptList(MAIN_TAB, 3);
     docs.install();
     let actionId = await hooks().submitReplace(
-      "section", "Intro\n\n- Ship\n- Docs\n\nOwner",
+      "section",
+      "Intro\n\n- Ship\n- Docs\n\nOwner",
       "Intro edited\n\n- Ship now\n- Docs\n- Launch\n\nOwner: Bob",
     );
     let preview = await hooks().readContent("section");
@@ -940,9 +1015,17 @@ describe("Google Doc list edits", () => {
     expect(await hooks().readContent("final")).toBe(preview);
   });
 
-  let paragraphs = (...texts: string[]) => (docs: DocsModel) => docs.setParagraphs(
-    MAIN_TAB, texts.map(text => ({ text, namedStyleType: "NORMAL_TEXT" })));
-  let bullets = (...texts: string[]) => (docs: DocsModel) => docs.setBulletedList(MAIN_TAB, texts);
+  let paragraphs =
+    (...texts: string[]) =>
+    (docs: DocsModel) =>
+      docs.setParagraphs(
+        MAIN_TAB,
+        texts.map((text) => ({ text, namedStyleType: "NORMAL_TEXT" })),
+      );
+  let bullets =
+    (...texts: string[]) =>
+    (docs: DocsModel) =>
+      docs.setBulletedList(MAIN_TAB, texts);
   it.each<[string, (docs: DocsModel) => void, string, string, string]>([
     ["split-around-empties", paragraphs("ab"), "ab", "a\n\n\n\n\n\nb", "a\n\n\n\n\n\nb\n"],
     ["merge", paragraphs("a", "b"), "a\n\nb", "ab", "ab\n"],
@@ -951,8 +1034,13 @@ describe("Google Doc list edits", () => {
     ["empty-list-gap", bullets("a", "b"), "- a\n- b", "- a\n\n\n\n- b", "- a\n\n\n\n- b\n"],
     ["end-list", bullets("a", "b"), "- a\n- b", "- a\n\nb", "- a\n\nb\n"],
     ["split-list-item", bullets("ab"), "- ab", "- a\n\nb", "- a\n\nb\n"],
-    ["split-heading", docs => docs.setParagraphs(MAIN_TAB, [{ text: "Hx", namedStyleType: "HEADING_1" }]),
-      "# Hx", "# H\n\nx", "# H\n\nx\n"],
+    [
+      "split-heading",
+      (docs) => docs.setParagraphs(MAIN_TAB, [{ text: "Hx", namedStyleType: "HEADING_1" }]),
+      "# Hx",
+      "# H\n\nx",
+      "# H\n\nx\n",
+    ],
     ["make-list", paragraphs("a", "b", "c"), "a\n\nb\n\nc", "- a\n- b\n- c", "- a\n- b\n- c\n"],
   ])("applies the %s paragraph structure it previews", async (facet, setup, from, to, expected) => {
     let docs = new DocsModel();
@@ -970,7 +1058,12 @@ describe("Google Doc list edits", () => {
   it.each<[string, (docs: DocsModel) => void, string, string]>([
     ["heading", styled("HEADING_1"), "Notes", "# Plan\n\nNotes\n"],
     ["title", styled("TITLE"), "Notes", "# Plan\n\nNotes\n"],
-    ["numbered-list", docs => docs.setNumberedList(MAIN_TAB, ["one"]), "Notes", "1. one\n\nNotes\n"],
+    [
+      "numbered-list",
+      (docs) => docs.setNumberedList(MAIN_TAB, ["one"]),
+      "Notes",
+      "1. one\n\nNotes\n",
+    ],
     ["bulleted-list", bullets("one"), "a\n\nb", "- one\n\na\n\nb\n"],
     ["list-continuation", bullets("one"), "- two", "- one\n- two\n"],
   ])("appends after a %s as previewed", async (name, setup, markdown, expected) => {
@@ -1006,9 +1099,7 @@ describe("Google Doc list edits", () => {
     docs.setNumberedList(MAIN_TAB, ["First", "Second"]);
     docs.interruptList(MAIN_TAB, 1);
     docs.install();
-    let actionId = await hooks().submitReplace(
-      "join-list", "Second", "1. Second",
-    );
+    let actionId = await hooks().submitReplace("join-list", "Second", "1. Second");
     let preview = await hooks().readContent("join-list");
 
     expect(preview).toBe("1. First\n1. Second\n");
@@ -1020,9 +1111,7 @@ describe("Google Doc list edits", () => {
     let docs = new DocsModel();
     docs.setNumberedList(MAIN_TAB, ["First", "Second"]);
     docs.install();
-    let actionId = await hooks().submitReplace(
-      "leave-list", "1. Second", "Second",
-    );
+    let actionId = await hooks().submitReplace("leave-list", "1. Second", "Second");
     let preview = await hooks().readContent("leave-list");
 
     expect(preview).toBe("1. First\n\nSecond\n");
@@ -1035,9 +1124,7 @@ describe("Google Doc list edits", () => {
     let docs = new DocsModel();
     docs.setBulletedList(MAIN_TAB, ["First", "Second"]);
     docs.install();
-    let actionId = await hooks().submitReplace(
-      "change-list-type", "- First", "1. First",
-    );
+    let actionId = await hooks().submitReplace("change-list-type", "- First", "1. First");
     let preview = await hooks().readContent("change-list-type");
 
     expect(preview).toBe("1. First\n\n- Second\n");
@@ -1067,9 +1154,7 @@ describe("Google Doc write receipts", () => {
     docs.install();
     let link = "[link](https://en.wikipedia.org/wiki/Function_\\(mathematics\\))";
     let firstId = await hooks().submitReplace("escaped-link-replay", "target", link);
-    let secondId = await hooks().submitReplace(
-      "escaped-link-replay", link, `${link} after`,
-    );
+    let secondId = await hooks().submitReplace("escaped-link-replay", link, `${link} after`);
 
     expect(await hooks().applyAction("escaped-link-replay", firstId)).toBeNull();
     expect(await hooks().applyAction("escaped-link-replay", secondId)).toBeNull();
@@ -1188,9 +1273,10 @@ describe("Google Doc write receipts", () => {
 
   it("invalidates a canonical no-op after its target vanishes", async () => {
     let docs = new DocsModel();
-    docs.setBody(MAIN_TAB, buildTab([{ runs: [
-      { text: "x", style: { italic: true } }, "\n",
-    ] }]).body);
+    docs.setBody(
+      MAIN_TAB,
+      buildTab([{ runs: [{ text: "x", style: { italic: true } }, "\n"] }]).body,
+    );
     docs.install();
     let facet = "canonical-no-op-invalidation";
     await hooks().submitReplace(facet, "*x*", String.raw`\*x\*`);
@@ -1211,9 +1297,9 @@ describe("Google Doc write receipts", () => {
     docs.setLinkedText(MAIN_TAB, "a]b", "https://e.com");
     docs.install();
 
-    await expect(Promise.resolve(
-      hooks().submitReplace("split-linked-escape", "]b", "x]b"),
-    )).rejects.toThrow("replaceText: Markdown escape syntax cannot be edited partially");
+    await expect(
+      Promise.resolve(hooks().submitReplace("split-linked-escape", "]b", "x]b")),
+    ).rejects.toThrow("replaceText: Markdown escape syntax cannot be edited partially");
     expect(await hooks().lastActionDescription).toBe("");
   });
 
@@ -1243,9 +1329,10 @@ describe("Google Doc write receipts", () => {
 
   it("applies the replacement its approval shows for literal escapes", async () => {
     let docs = new DocsModel();
-    docs.setBody(MAIN_TAB, buildTab([{ runs: [
-      { text: "x", style: { italic: true } }, "\n",
-    ] }]).body);
+    docs.setBody(
+      MAIN_TAB,
+      buildTab([{ runs: [{ text: "x", style: { italic: true } }, "\n"] }]).body,
+    );
     docs.install();
     let facet = "literal-markdown-approval";
     let actionId = await hooks().submitReplace(facet, "*x*", String.raw`\*x\*`);
@@ -1277,7 +1364,9 @@ describe("Google Doc write receipts", () => {
     docs.setParagraphs(MAIN_TAB, [{ text: "Subtitle", namedStyleType: "SUBTITLE" }]);
     docs.install();
     let actionId = await hooks().submitReplace(
-      "subtitle-expansion", "*Subtitle*", "*first*\n\nsecond",
+      "subtitle-expansion",
+      "*Subtitle*",
+      "*first*\n\nsecond",
     );
 
     expect(await hooks().readContent("subtitle-expansion")).toBe("*first*\n\nsecond\n");
@@ -1307,7 +1396,9 @@ describe("Google Doc write receipts", () => {
     ]);
     docs.install();
     let actionId = await hooks().submitReplace(
-      "styled-rewrite", "# Old\n\nBody", "# New\n\nChanged",
+      "styled-rewrite",
+      "# Old\n\nBody",
+      "# New\n\nChanged",
     );
 
     expect(await hooks().applyAction("styled-rewrite", actionId)).toBeNull();
@@ -1361,7 +1452,9 @@ describe("Google Doc write receipts", () => {
     docs.install();
     await hooks().submitAppend("formatted-link-append", "**[x](https://e.com)**");
     await hooks().submitReplace(
-      "formatted-link-append", "[**x**](https://e.com)", "[**y**](https://e.com)",
+      "formatted-link-append",
+      "[**x**](https://e.com)",
+      "[**y**](https://e.com)",
     );
 
     expect(await hooks().readContent("formatted-link-append")).toBe(
@@ -1374,17 +1467,19 @@ describe("Google Doc write receipts", () => {
     docs.setText(MAIN_TAB, "base");
     docs.install();
     let facet = "legacy-append-rendering";
-    await hooks().applyStorage(facet, [{
-      kind: "put",
-      key: "pending:action:1",
-      value: {
-        type: "appendText",
-        documentId: "doc-1",
-        tabId: MAIN_TAB,
-        submittedAt: 0,
-        markdown: String.raw`\* literal`,
+    await hooks().applyStorage(facet, [
+      {
+        kind: "put",
+        key: "pending:action:1",
+        value: {
+          type: "appendText",
+          documentId: "doc-1",
+          tabId: MAIN_TAB,
+          submittedAt: 0,
+          markdown: String.raw`\* literal`,
+        },
       },
-    }]);
+    ]);
 
     expect(await hooks().readContent(facet)).toBe("base\n");
   });
@@ -1396,9 +1491,7 @@ describe("Google Doc write receipts", () => {
     let markdown = "abcdef ".repeat(10_000);
 
     let actionId = await hooks().submitAppend(facet, markdown);
-    let storedLength = await hooks().storedValueJsonLength(
-      facet, `pending:action:${actionId}`,
-    );
+    let storedLength = await hooks().storedValueJsonLength(facet, `pending:action:${actionId}`);
 
     expect(storedLength).toBeLessThan(markdown.length + 512);
     await hooks().rejectAction(facet, actionId);
@@ -1408,9 +1501,9 @@ describe("Google Doc write receipts", () => {
     let docs = new DocsModel();
     docs.install();
 
-    await expect(Promise.resolve(
-      hooks().submitAppend("oversized-append", "é".repeat(600_000)),
-    )).rejects.toThrow(/1048576-byte safe submission limit/);
+    await expect(
+      Promise.resolve(hooks().submitAppend("oversized-append", "é".repeat(600_000))),
+    ).rejects.toThrow(/1048576-byte safe submission limit/);
     expect(docs.documentFetches).toBe(0);
     expect(await hooks().lastActionDescription).toBe("");
   });
@@ -1419,9 +1512,11 @@ describe("Google Doc write receipts", () => {
     let docs = new DocsModel();
     docs.install();
 
-    await expect(Promise.resolve(hooks().submitReplace(
-      "oversized-replacement", "x".repeat(600_000), "y".repeat(600_000),
-    ))).rejects.toThrow(/1048576-byte safe submission limit/);
+    await expect(
+      Promise.resolve(
+        hooks().submitReplace("oversized-replacement", "x".repeat(600_000), "y".repeat(600_000)),
+      ),
+    ).rejects.toThrow(/1048576-byte safe submission limit/);
     expect(docs.documentFetches).toBe(0);
     expect(await hooks().lastActionDescription).toBe("");
   });
@@ -1430,9 +1525,9 @@ describe("Google Doc write receipts", () => {
     let docs = new DocsModel();
     docs.install();
 
-    await expect(Promise.resolve(
-      hooks().submitAppend("complex-append", "*x* ".repeat(2_501)),
-    )).rejects.toThrow(/5000-formatting-token complexity limit/);
+    await expect(
+      Promise.resolve(hooks().submitAppend("complex-append", "*x* ".repeat(2_501))),
+    ).rejects.toThrow(/5000-formatting-token complexity limit/);
     expect(docs.documentFetches).toBe(0);
     expect(await hooks().lastActionDescription).toBe("");
   });
@@ -1506,7 +1601,9 @@ describe("Google Doc write receipts", () => {
     let firstId = await hooks().submitAppend("trailing-empty-append", "added");
     let content = await hooks().readContent("trailing-empty-append");
     let secondId = await hooks().submitReplace(
-      "trailing-empty-append", content.trimEnd(), "changed",
+      "trailing-empty-append",
+      content.trimEnd(),
+      "changed",
     );
 
     expect(await hooks().applyAction("trailing-empty-append", firstId)).toBeNull();
@@ -1575,9 +1672,7 @@ describe("Google Doc write receipts", () => {
     docs.install();
     let actionId = await hooks().submitAppend("duplicates", "first");
 
-    expect(await hooks().applyAction("duplicates", actionId)).toMatch(
-      /multiple write markers/,
-    );
+    expect(await hooks().applyAction("duplicates", actionId)).toMatch(/multiple write markers/);
     expect(docs.contentBatches).toBe(0);
 
     docs.clearMarkers();
@@ -1659,8 +1754,7 @@ describe("Google Doc write receipts", () => {
     docs.ambiguousContentResponses = 1;
     docs.install();
     let actionId = await hooks().submitAppend("lost-response", "first");
-    expect(await hooks().applyAction("lost-response", actionId))
-      .toMatch(/content response lost/);
+    expect(await hooks().applyAction("lost-response", actionId)).toMatch(/content response lost/);
     expect(docs.markers.size).toBe(1);
 
     // Past the snapshot TTL, so the next read refetches the document -- which holds the append
@@ -1714,8 +1808,9 @@ describe("Google Doc metadata", () => {
     expect(await hooks().readMetadata("metadata-read-only")).toBe(first);
 
     docs.driveModifiedTime = "2026-01-02T04:00:00Z";
-    expect(await hooks().readMetadata("metadata-read-only"))
-      .toBe(new Date("2026-01-02T04:00:00Z").valueOf());
+    expect(await hooks().readMetadata("metadata-read-only")).toBe(
+      new Date("2026-01-02T04:00:00Z").valueOf(),
+    );
   });
 
   it("holds the modification time steady when Drive metadata is not granted", async () => {
@@ -1737,20 +1832,22 @@ describe("Google Doc metadata", () => {
     ["an outage", "metadata-drive-outage", { status: 500 }],
     ["a quota refusal", "metadata-drive-quota", { status: 403, reason: "userRateLimitExceeded" }],
     ["a malformed reply", "metadata-drive-malformed", "malformed"],
-  ] as const)("fails a metadata read rather than dating a document from %s", async (
-    _case, facetName, failure,
-  ) => {
-    let docs = new DocsModel();
-    docs.editable = false;
-    docs.driveFailure = failure;
-    docs.install();
+  ] as const)(
+    "fails a metadata read rather than dating a document from %s",
+    async (_case, facetName, failure) => {
+      let docs = new DocsModel();
+      docs.editable = false;
+      docs.driveFailure = failure;
+      docs.install();
 
-    await expect(Promise.resolve(hooks().readMetadata(facetName))).rejects.toThrow();
+      await expect(Promise.resolve(hooks().readMetadata(facetName))).rejects.toThrow();
 
-    docs.driveFailure = null;
-    expect(await hooks().readMetadata(facetName))
-      .toBe(new Date("2026-01-02T03:04:05Z").valueOf());
-  });
+      docs.driveFailure = null;
+      expect(await hooks().readMetadata(facetName)).toBe(
+        new Date("2026-01-02T03:04:05Z").valueOf(),
+      );
+    },
+  );
 });
 
 // Google withholds revisionId from a caller without edit access, which is the ordinary case for
@@ -1825,11 +1922,12 @@ describe("Google Doc tab isolation", () => {
   it("submits nothing for an omitted or unknown tab", async () => {
     let docs = nestedDocs();
 
-    await expect(Promise.resolve(hooks().submitAppend("tabs-selector", "added")))
-      .rejects.toThrow(/tabId is required for documents with multiple tabs/);
-    await expect(Promise.resolve(
-      hooks().submitReplace("tabs-selector", "shared", "changed", "ghost"),
-    )).rejects.toThrow(/no tab with ID "ghost"/);
+    await expect(Promise.resolve(hooks().submitAppend("tabs-selector", "added"))).rejects.toThrow(
+      /tabId is required for documents with multiple tabs/,
+    );
+    await expect(
+      Promise.resolve(hooks().submitReplace("tabs-selector", "shared", "changed", "ghost")),
+    ).rejects.toThrow(/no tab with ID "ghost"/);
 
     expect(docs.contentBatches).toBe(0);
     expect(docs.text("metrics")).toBe("shared");
@@ -1840,23 +1938,32 @@ describe("Google Doc tab isolation", () => {
   const GENERIC_READ = "Read the content of one tab of the document.";
 
   it.each([
-    ["an omitted tab", () => hooks().submitAppend("tabs-write-oracle", "added"),
-      /tabId is required for documents with multiple tabs/],
-    ["an unknown tab", () => hooks().submitAppend("tabs-write-oracle", "added", "ghost"),
-      /no tab with ID "ghost"/],
-    ["unmatched text",
+    [
+      "an omitted tab",
+      () => hooks().submitAppend("tabs-write-oracle", "added"),
+      /tabId is required for documents with multiple tabs/,
+    ],
+    [
+      "an unknown tab",
+      () => hooks().submitAppend("tabs-write-oracle", "added", "ghost"),
+      /no tab with ID "ghost"/,
+    ],
+    [
+      "unmatched text",
       () => hooks().submitReplace("tabs-write-oracle", "absent", "changed", "metrics"),
-      /was not found in the current simulated tab/],
-  ] as const)("authorizes a generic observation when an edit fails on %s", async (
-    _case, submit, message,
-  ) => {
-    let docs = nestedDocs();
+      /was not found in the current simulated tab/,
+    ],
+  ] as const)(
+    "authorizes a generic observation when an edit fails on %s",
+    async (_case, submit, message) => {
+      let docs = nestedDocs();
 
-    await expect(Promise.resolve(submit())).rejects.toThrow(message);
+      await expect(Promise.resolve(submit())).rejects.toThrow(message);
 
-    expect(await hooks().lastObservations).toEqual([GENERIC_READ]);
-    expect(docs.contentBatches).toBe(0);
-  });
+      expect(await hooks().lastObservations).toEqual([GENERIC_READ]);
+      expect(docs.contentBatches).toBe(0);
+    },
+  );
 
   it("is not suppressed by a same-named write marker in another tab", async () => {
     vi.spyOn(crypto, "randomUUID").mockReturnValue("fixed-write-id");
@@ -1878,11 +1985,13 @@ describe("Google Doc tab isolation", () => {
     docs.removeTab("metrics");
     expect(await hooks().applyAction("tabs-deleted", actionId)).toBe(
       'appendText: no tab with ID "metrics" exists in this document. ' +
-      "Call listTabs() to refresh the tab list.");
+        "Call listTabs() to refresh the tab list.",
+    );
 
     // Approving it again must not report success for a write that never happened, and must not
     // decay into "unknown action" either — rejecting is the way out.
-    let repeated = "Pending Google Doc edit could not be applied: " +
+    let repeated =
+      "Pending Google Doc edit could not be applied: " +
       'appendText: no tab with ID "metrics" exists in this document. ' +
       "Call listTabs() to refresh the tab list.";
     expect(await hooks().applyAction("tabs-deleted", actionId)).toBe(repeated);
@@ -1953,8 +2062,13 @@ describe("Google Doc tab isolation", () => {
 
 function tabSnapshot(tabId: string, title: string) {
   return {
-    tabId, title, index: 0, nestingLevel: 0,
-    markdown: "shared\n", sourceMap: { blocks: [], protectedRanges: [] }, bodyEndIndex: 8,
+    tabId,
+    title,
+    index: 0,
+    nestingLevel: 0,
+    markdown: "shared\n",
+    sourceMap: { blocks: [], protectedRanges: [] },
+    bodyEndIndex: 8,
     committedWriteIds: [],
   };
 }
@@ -1988,13 +2102,15 @@ describe("Google Doc edits stored before tab support", () => {
     let grown = { ...snapshot, tabs: [...snapshot.tabs, tabSnapshot("second", "Second")] };
     expect(() => googleDocActionTab(grown, storedAppend)).toThrow(
       "Pending Google Doc edit predates tab support and the document has gained tabs since, " +
-      "so the tab it was approved against is unknown. Reject it and retry on a selected tab.");
+        "so the tab it was approved against is unknown. Reject it and retry on a selected tab.",
+    );
   });
 
   it("refuses a vanished tab rather than retargeting to the first", () => {
     expect(() => googleDocActionTab(snapshot, { ...storedAppend, tabId: "ghost" })).toThrow(
       'appendText: no tab with ID "ghost" exists in this document. ' +
-      "Call listTabs() to refresh the tab list.");
+        "Call listTabs() to refresh the tab list.",
+    );
   });
 
   it("resolves a record that names a live tab", () => {
@@ -2023,10 +2139,12 @@ describe("creating a Google Doc", () => {
         implementsRevert: false,
       },
     });
-    expect(await hooks().describe("create-doc"))
-      .toMatchObject({ title: "Plan", url: "https://docs.google.com/document/" });
+    expect(await hooks().describe("create-doc")).toMatchObject({
+      title: "Plan",
+      url: "https://docs.google.com/document/",
+    });
     expect(await hooks().readContent("create-doc")).toBe("\n");
-    expect((await hooks().listTabs("create-doc")).map(tab => tab.id)).toEqual(["t.0"]);
+    expect((await hooks().listTabs("create-doc")).map((tab) => tab.id)).toEqual(["t.0"]);
     let actionId = await hooks().submitAppend("create-doc", "added");
     expect(await hooks().readContent("create-doc")).toBe("added\n");
     expect(await hooks().applyAction("create-doc", actionId)).toMatch(/doesn't exist yet/);
@@ -2038,12 +2156,15 @@ describe("creating a Google Doc", () => {
 
     // The model's only tab is "tab-1", so the edit replays only if it was moved off "t.0".
     expect(await hooks().readContent("create-doc")).toBe("added\n");
-    expect(await hooks().describe("create-doc"))
-      .toMatchObject({ title: "Test document", url: CREATED_DOC_URL });
+    expect(await hooks().describe("create-doc")).toMatchObject({
+      title: "Test document",
+      url: CREATED_DOC_URL,
+    });
     expect(await hooks().applyAction("create-doc", actionId)).toBeNull();
     expect(docs.text()).toBe("added");
-    expect(await hooks().applyCreation("create-doc"))
-      .toEqual({ error: "This Google Doc already exists." });
+    expect(await hooks().applyCreation("create-doc")).toEqual({
+      error: "This Google Doc already exists.",
+    });
   });
 
   it("moves an edit queued after creation, before the restart, onto the created tab", async () => {
@@ -2051,8 +2172,9 @@ describe("creating a Google Doc", () => {
     docs.install();
     await hooks().createResource("create-doc-late-edit", DOC_PATTERN, "Plan");
 
-    expect(await hooks().applyCreation("create-doc-late-edit"))
-      .toEqual({ resourceUrl: CREATED_DOC_URL });
+    expect(await hooks().applyCreation("create-doc-late-edit")).toEqual({
+      resourceUrl: CREATED_DOC_URL,
+    });
     let actionId = await hooks().submitAppend("create-doc-late-edit", "late");
     await hooks().adoptCreated("create-doc-late-edit");
 
@@ -2066,8 +2188,12 @@ describe("creating a Google Doc", () => {
     docs.install();
     await hooks().createResource("create-doc-retry", DOC_PATTERN, "Plan");
 
-    expect(await hooks().applyCreation("create-doc-retry")).toEqual({ resourceUrl: CREATED_DOC_URL });
-    expect(await hooks().applyCreation("create-doc-retry")).toEqual({ resourceUrl: CREATED_DOC_URL });
+    expect(await hooks().applyCreation("create-doc-retry")).toEqual({
+      resourceUrl: CREATED_DOC_URL,
+    });
+    expect(await hooks().applyCreation("create-doc-retry")).toEqual({
+      resourceUrl: CREATED_DOC_URL,
+    });
     expect(docs.creates).toHaveLength(1);
   });
 
@@ -2094,9 +2220,12 @@ describe("creating a Google Doc", () => {
     docs.install();
     await hooks().createResource("create-doc-readback", DOC_PATTERN, "Plan");
 
-    expect(await hooks().applyCreation("create-doc-readback"))
-      .toEqual({ error: "Google Docs get document failed [http=404]" });
-    expect(await hooks().applyCreation("create-doc-readback")).toEqual({ resourceUrl: CREATED_DOC_URL });
+    expect(await hooks().applyCreation("create-doc-readback")).toEqual({
+      error: "Google Docs get document failed [http=404]",
+    });
+    expect(await hooks().applyCreation("create-doc-readback")).toEqual({
+      resourceUrl: CREATED_DOC_URL,
+    });
     expect(docs.creates).toHaveLength(1);
   });
 
@@ -2106,9 +2235,12 @@ describe("creating a Google Doc", () => {
     docs.install();
     await hooks().createResource("create-doc-refused", DOC_PATTERN, "Plan");
 
-    expect(await hooks().applyCreation("create-doc-refused"))
-      .toEqual({ error: "Google Docs create document failed [http=403]" });
-    expect(await hooks().applyCreation("create-doc-refused")).toEqual({ resourceUrl: CREATED_DOC_URL });
+    expect(await hooks().applyCreation("create-doc-refused")).toEqual({
+      error: "Google Docs create document failed [http=403]",
+    });
+    expect(await hooks().applyCreation("create-doc-refused")).toEqual({
+      resourceUrl: CREATED_DOC_URL,
+    });
     expect(docs.creates).toHaveLength(2);
   });
 
@@ -2120,8 +2252,9 @@ describe("creating a Google Doc", () => {
     await hooks().createResource("create-doc-approvers", DOC_PATTERN, "Plan");
 
     expect(await hooks().applyCreation("create-doc-approvers", "user-a")).toHaveProperty("error");
-    expect(await hooks().applyCreation("create-doc-approvers", "user-b"))
-      .toEqual({ resourceUrl: CREATED_DOC_URL });
+    expect(await hooks().applyCreation("create-doc-approvers", "user-b")).toEqual({
+      resourceUrl: CREATED_DOC_URL,
+    });
     expect(docs.creates).toHaveLength(1);
     await hooks().adoptCreated("create-doc-approvers");
     await hooks().readContent("create-doc-approvers");
