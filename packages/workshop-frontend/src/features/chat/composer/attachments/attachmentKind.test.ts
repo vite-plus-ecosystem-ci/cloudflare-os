@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { attachmentKind } from "./attachmentKind";
 
 describe("attachmentKind", () => {
@@ -10,9 +10,9 @@ describe("attachmentKind", () => {
     expect(attachmentKind("text/csv")).toBe("spreadsheet");
     expect(attachmentKind("text/x-python")).toBe("code");
     expect(attachmentKind("text/plain")).toBe("text");
-    expect(attachmentKind(
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )).toBe("document");
+    expect(
+      attachmentKind("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ).toBe("document");
   });
 
   it("falls back to the extension for untyped files", () => {

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { PresenceParticipant, PresenceSubscriber } from "@gadgets/workshop-shared/api";
 import { type Harness, startHarness } from "../src/harness.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
@@ -57,17 +57,24 @@ it("reports collaborator presence and removes it when the capability closes", as
   using recorderStub = stubFor(recorder);
   using _subscription = await workspace.subscribeToPresence(recorderStub);
   await waitFor("the initial presence roster", async () =>
-    recorder.participants.size >= 2 ? true : null);
+    recorder.participants.size >= 2 ? true : null,
+  );
 
-  expect([...recorder.participants.values()]).toEqual(expect.arrayContaining([
-    expect.objectContaining({ user: expect.objectContaining({ id: ownerName }), role: "build" }),
-    expect.objectContaining({ user: expect.objectContaining({ id: collaboratorName }), role: "build" }),
-  ]));
+  expect([...recorder.participants.values()]).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ user: expect.objectContaining({ id: ownerName }), role: "build" }),
+      expect.objectContaining({
+        user: expect.objectContaining({ id: collaboratorName }),
+        role: "build",
+      }),
+    ]),
+  );
 
   collaboratorWorkspace[Symbol.dispose]();
   await waitFor("the disconnected collaborator to leave presence", async () =>
-    [...recorder.participants.values()].some(entry => entry.user.id === collaboratorName)
+    [...recorder.participants.values()].some((entry) => entry.user.id === collaboratorName)
       ? null
-      : true);
+      : true,
+  );
   await workspace.deleteSelf();
 });

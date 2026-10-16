@@ -6,7 +6,7 @@
 // built-in ones, latest first. Anything unrouted, or sent anywhere but X, fails the test.
 
 import { env, runInDurableObject } from "cloudflare:test";
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 import { generateNonce } from "@gadgets/gatekeeper-kit/connect-nonce";
 import type { StoredIdentity } from "../../src/x-credentials";
 import { getRedirectUri, scopesFor, type Env } from "../../src/x-env";
@@ -17,12 +17,25 @@ type WireLink = NonNullable<NonNullable<WirePost["entities"]>["urls"]>[number];
 
 export const API = "https://api.x.com";
 
-export type FakeRequest = { method: string; url: URL; headers: Headers; body?: string; form?: FormData };
-type Handler = (request: FakeRequest) => Response | Promise<Response> | undefined | Promise<Response | undefined>;
+export type FakeRequest = {
+  method: string;
+  url: URL;
+  headers: Headers;
+  body?: string;
+  form?: FormData;
+};
+type Handler = (
+  request: FakeRequest,
+) => Response | Promise<Response> | undefined | Promise<Response | undefined>;
 
 export function json(data: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(data), {
-    status: 200, ...init, headers: { "content-type": "application/json", ...(init.headers as Record<string, string> | undefined) },
+    status: 200,
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      ...(init.headers as Record<string, string> | undefined),
+    },
   });
 }
 
@@ -36,7 +49,11 @@ export function snowflakeAt(time: number): string {
 }
 
 export const ALICE: WireUser = {
-  id: "1001", username: "alice", name: "Alice", verified: false, protected: false,
+  id: "1001",
+  username: "alice",
+  name: "Alice",
+  verified: false,
+  protected: false,
   public_metrics: { followers_count: 10, following_count: 5, tweet_count: 3, listed_count: 0 },
 };
 export const BOB: WireUser = { id: "1002", username: "bob", name: "Bob", protected: false };
@@ -44,7 +61,11 @@ export const CAROL: WireUser = { id: "1003", username: "carol", name: "Carol", p
 
 export class FakeX {
   readonly requests: FakeRequest[] = [];
-  readonly users = new Map<string, WireUser>([[ALICE.id, ALICE], [BOB.id, BOB], [CAROL.id, CAROL]]);
+  readonly users = new Map<string, WireUser>([
+    [ALICE.id, ALICE],
+    [BOB.id, BOB],
+    [CAROL.id, CAROL],
+  ]);
   readonly posts = new Map<string, WirePost>();
   readonly lists = new Map<string, WireList>();
   readonly listMembers = new Map<string, Set<string>>();
@@ -71,7 +92,9 @@ export class FakeX {
   #routes: Array<{ method: string; pattern: RegExp; handler: Handler }> = [];
 
   install(): this {
-    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => this.#handle(input, init));
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) =>
+      this.#handle(input, init),
+    );
     return this;
   }
 
@@ -84,7 +107,7 @@ export class FakeX {
   /** Acts on the next matching request as X would, then loses the answer, as a reset connection does. */
   loseAnswer(method: string, pattern: RegExp): this {
     let lost = false;
-    return this.on(method, pattern, request => {
+    return this.on(method, pattern, (request) => {
       if (lost) return undefined;
       lost = true;
       this.#builtIn(request);
@@ -94,7 +117,9 @@ export class FakeX {
 
   /** How many recorded requests match. */
   count(method: string, pattern: RegExp): number {
-    return this.requests.filter(r => r.method === method && pattern.test(r.url.pathname + r.url.search)).length;
+    return this.requests.filter(
+      (r) => r.method === method && pattern.test(r.url.pathname + r.url.search),
+    ).length;
   }
 
   /** A fresh ID, as X issues them: a snowflake of the current time. */
@@ -105,13 +130,23 @@ export class FakeX {
   }
 
   /** Mints a token for `userId`, as a code exchange or refresh would. */
-  grant(userId: string): { access_token: string; refresh_token: string; expires_in: number; token_type: string; scope: string } {
+  grant(userId: string): {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    token_type: string;
+    scope: string;
+  } {
     const n = this.#nextGrant++;
     this.tokens.set(`access-${n}`, userId);
     this.tokens.set(`refresh-${n}`, userId);
     return {
-      access_token: `access-${n}`, refresh_token: `refresh-${n}`, expires_in: 7200, token_type: "bearer",
-      scope: "tweet.read users.read offline.access tweet.write like.read like.write bookmark.read bookmark.write " +
+      access_token: `access-${n}`,
+      refresh_token: `refresh-${n}`,
+      expires_in: 7200,
+      token_type: "bearer",
+      scope:
+        "tweet.read users.read offline.access tweet.write like.read like.write bookmark.read bookmark.write " +
         "follows.read follows.write mute.write list.read list.write media.write tweet.moderate.write",
     };
   }
@@ -120,10 +155,17 @@ export class FakeX {
   post(author: WireUser, text: string, extra: Partial<WirePost> = {}): WirePost {
     const id = extra.id ?? this.id();
     // X lists the handles a post mentions among its entities.
-    const mentions = [...text.matchAll(/(?:^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{1,15})/g)].map(match => ({ username: match[1] }));
+    const mentions = [...text.matchAll(/(?:^|[^A-Za-z0-9_@])@([A-Za-z0-9_]{1,15})/g)].map(
+      (match) => ({ username: match[1] }),
+    );
     const entities = { ...(mentions.length > 0 ? { mentions } : {}), ...extra.entities };
     const post: WirePost = {
-      id, text, author_id: author.id, conversation_id: id, created_at: new Date().toISOString(), ...extra,
+      id,
+      text,
+      author_id: author.id,
+      conversation_id: id,
+      created_at: new Date().toISOString(),
+      ...extra,
       ...(Object.keys(entities).length > 0 ? { entities } : {}),
     };
     this.posts.set(id, post);
@@ -133,11 +175,16 @@ export class FakeX {
   async #handle(input: string | URL | Request, init: RequestInit = {}): Promise<Response> {
     const request = input instanceof Request ? input : new Request(String(input), init);
     const url = new URL(request.url);
-    if (url.origin !== API) throw new Error(`fake X: ${request.method} ${url} was not sent to ${API}`);
+    if (url.origin !== API)
+      throw new Error(`fake X: ${request.method} ${url} was not sent to ${API}`);
     if (request.redirect !== "manual" && !url.pathname.startsWith("/2/oauth2/")) {
       throw new Error(`fake X: ${request.method} ${url} would follow redirects`);
     }
-    const recorded: FakeRequest = { method: request.method, url, headers: new Headers(request.headers) };
+    const recorded: FakeRequest = {
+      method: request.method,
+      url,
+      headers: new Headers(request.headers),
+    };
     if (request.headers.get("content-type")?.startsWith("multipart/form-data")) {
       recorded.form = await request.formData();
     } else if (request.body) {
@@ -172,7 +219,9 @@ export class FakeX {
 
     if (method === "GET" && path === "/2/users/me") return json({ data: this.users.get(me) });
     if (method === "GET" && (match = path.match(/^\/2\/users\/by\/username\/(\w+)$/))) {
-      const user = [...this.users.values()].find(candidate => candidate.username?.toLowerCase() === match![1].toLowerCase());
+      const user = [...this.users.values()].find(
+        (candidate) => candidate.username?.toLowerCase() === match![1].toLowerCase(),
+      );
       return user ? json({ data: this.#withStatus(me, user) }) : this.#notFound("user", match[1]);
     }
     if (method === "GET" && (match = path.match(/^\/2\/tweets\/(\d+)$/))) {
@@ -183,85 +232,153 @@ export class FakeX {
     if (method === "GET" && (match = path.match(/^\/2\/lists\/(\d+)$/))) {
       const list = this.lists.get(match[1]);
       if (!list || (list.private && list.owner_id !== me)) return this.#notFound("list", match[1]);
-      return json({ data: list, ...(this.#expands(url, "owner_id") ? { includes: { users: [this.users.get(list.owner_id ?? "")].filter(Boolean) } } : {}) });
+      return json({
+        data: list,
+        ...(this.#expands(url, "owner_id")
+          ? { includes: { users: [this.users.get(list.owner_id ?? "")].filter(Boolean) } }
+          : {}),
+      });
     }
     if (method === "GET" && (match = path.match(/^\/2\/users\/(\d+)$/))) {
       const user = this.users.get(match[1]);
       return user ? json({ data: this.#withStatus(me, user) }) : this.#notFound("user", match[1]);
     }
-    if (method === "GET" && (match = path.match(/^\/2\/users\/(\d+)\/(tweets|mentions|bookmarks|liked_tweets|timelines\/reverse_chronological)$/))) {
+    if (
+      method === "GET" &&
+      (match = path.match(
+        /^\/2\/users\/(\d+)\/(tweets|mentions|bookmarks|liked_tweets|timelines\/reverse_chronological)$/,
+      ))
+    ) {
       const [, userId, kind] = match;
       const since = Date.parse(url.searchParams.get("start_time") ?? "");
       const until = Date.parse(url.searchParams.get("end_time") ?? "");
       const sinceId = BigInt(url.searchParams.get("since_id") ?? "0");
-      const untilId = url.searchParams.has("until_id") ? BigInt(url.searchParams.get("until_id")!) : undefined;
-      const posts = [...this.posts.values()].filter(post => {
+      const untilId = url.searchParams.has("until_id")
+        ? BigInt(url.searchParams.get("until_id")!)
+        : undefined;
+      const posts = [...this.posts.values()].filter((post) => {
         const created = Date.parse(post.created_at ?? "");
         if (created < since || created > until) return false;
-        if (BigInt(post.id) <= sinceId || (untilId !== undefined && BigInt(post.id) >= untilId)) return false;
+        if (BigInt(post.id) <= sinceId || (untilId !== undefined && BigInt(post.id) >= untilId))
+          return false;
         switch (kind) {
-          case "tweets": return post.author_id === userId;
-          case "mentions": return post.text?.includes(`@${this.users.get(userId)?.username}`) ?? false;
-          case "bookmarks": return this.bookmarks.has(`${userId}:${post.id}`);
-          case "liked_tweets": return this.likes.has(`${userId}:${post.id}`);
-          default: return post.author_id !== userId && this.#visible(me, post);
+          case "tweets":
+            return post.author_id === userId;
+          case "mentions":
+            return post.text?.includes(`@${this.users.get(userId)?.username}`) ?? false;
+          case "bookmarks":
+            return this.bookmarks.has(`${userId}:${post.id}`);
+          case "liked_tweets":
+            return this.likes.has(`${userId}:${post.id}`);
+          default:
+            return post.author_id !== userId && this.#visible(me, post);
         }
       });
-      return this.#page(url, posts.toReversed(), "pagination_token", items => this.#includes(url, items).includes);
+      return this.#page(
+        url,
+        posts.toReversed(),
+        "pagination_token",
+        (items) => this.#includes(url, items).includes,
+      );
     }
     if (method === "GET" && path === "/2/tweets/search/recent") {
       const query = url.searchParams.get("query") ?? "";
       const replyTo = query.match(/^in_reply_to_tweet_id:(\d+)$/)?.[1];
       const conversation = query.match(/^conversation_id:(\d+)$/)?.[1];
-      const posts = [...this.posts.values()].filter(post => this.#visible(me, post) && (
-        replyTo ? (post.referenced_tweets ?? []).some(ref => ref.type === "replied_to" && ref.id === replyTo)
-          : conversation ? post.conversation_id === conversation
-            : post.text?.toLowerCase().includes(query.toLowerCase())));
-      return this.#page(url, posts.toReversed(), "next_token", items => this.#includes(url, items).includes);
+      const posts = [...this.posts.values()].filter(
+        (post) =>
+          this.#visible(me, post) &&
+          (replyTo
+            ? (post.referenced_tweets ?? []).some(
+                (ref) => ref.type === "replied_to" && ref.id === replyTo,
+              )
+            : conversation
+              ? post.conversation_id === conversation
+              : post.text?.toLowerCase().includes(query.toLowerCase())),
+      );
+      return this.#page(
+        url,
+        posts.toReversed(),
+        "next_token",
+        (items) => this.#includes(url, items).includes,
+      );
     }
     if (method === "GET" && (match = path.match(/^\/2\/users\/(\d+)\/(following|followers)$/))) {
       const [, userId, kind] = match;
-      const ids = [...this.following].map(pair => pair.split(":"))
-        .filter(([from, to]) => kind === "following" ? from === userId : to === userId)
-        .map(([from, to]) => kind === "following" ? to : from);
-      return this.#page(url, ids.flatMap(id => this.users.get(id) ?? []).map(user => this.#withStatus(me, user)), "pagination_token");
+      const ids = [...this.following]
+        .map((pair) => pair.split(":"))
+        .filter(([from, to]) => (kind === "following" ? from === userId : to === userId))
+        .map(([from, to]) => (kind === "following" ? to : from));
+      return this.#page(
+        url,
+        ids.flatMap((id) => this.users.get(id) ?? []).map((user) => this.#withStatus(me, user)),
+        "pagination_token",
+      );
     }
     if (method === "GET" && (match = path.match(/^\/2\/users\/(\d+)\/owned_lists$/))) {
-      const lists = [...this.lists.values()].filter(list => list.owner_id === match![1]);
-      return this.#page(url, lists, "pagination_token",
-        () => this.#expands(url, "owner_id") ? { users: [this.users.get(match![1])] } : undefined);
+      const lists = [...this.lists.values()].filter((list) => list.owner_id === match![1]);
+      return this.#page(url, lists, "pagination_token", () =>
+        this.#expands(url, "owner_id") ? { users: [this.users.get(match![1])] } : undefined,
+      );
     }
     if (method === "GET" && (match = path.match(/^\/2\/lists\/(\d+)\/members$/))) {
-      const members = [...this.listMembers.get(match[1]) ?? []].flatMap(id => this.users.get(id) ?? []);
+      const members = [...(this.listMembers.get(match[1]) ?? [])].flatMap(
+        (id) => this.users.get(id) ?? [],
+      );
       return this.#page(url, members, "pagination_token");
     }
     if (method === "GET" && (match = path.match(/^\/2\/lists\/(\d+)\/tweets$/))) {
       const members = this.listMembers.get(match[1]) ?? new Set<string>();
-      const posts = [...this.posts.values()].filter(post => members.has(post.author_id ?? ""));
-      return this.#page(url, posts.toReversed(), "pagination_token", items => this.#includes(url, items).includes);
+      const posts = [...this.posts.values()].filter((post) => members.has(post.author_id ?? ""));
+      return this.#page(
+        url,
+        posts.toReversed(),
+        "pagination_token",
+        (items) => this.#includes(url, items).includes,
+      );
     }
 
     // Writes, as the connected user.
     if (method === "POST" && path === "/2/tweets") {
-      const { text, reply, media } = body() as { text: string; reply?: { in_reply_to_tweet_id: string }; media?: { media_ids: string[] } };
-      const recent = [...this.posts.values()]
-        .find(post => post.author_id === me && (this.#sentTexts.get(post.id) ?? post.text) === text);
-      if (recent && text) return problem(403, "You are not allowed to create a Tweet with duplicate content.");
+      const { text, reply, media } = body() as {
+        text: string;
+        reply?: { in_reply_to_tweet_id: string };
+        media?: { media_ids: string[] };
+      };
+      const recent = [...this.posts.values()].find(
+        (post) => post.author_id === me && (this.#sentTexts.get(post.id) ?? post.text) === text,
+      );
+      if (recent && text)
+        return problem(403, "You are not allowed to create a Tweet with duplicate content.");
       const parent = reply ? this.posts.get(reply.in_reply_to_tweet_id) : undefined;
       if (reply && !parent) return problem(400, "The Tweet you are replying to has been deleted.");
       const author = this.users.get(me)!;
       const id = this.id();
-      const shortened = this.#shorten(text, `https://x.com/${author.username}/status/${id}/photo/1`, media?.media_ids);
+      const shortened = this.#shorten(
+        text,
+        `https://x.com/${author.username}/status/${id}/photo/1`,
+        media?.media_ids,
+      );
       // As X stores it: HTML-escaped, and a reply to another account led by that account's handle.
-      const replyingTo = parent && parent.author_id !== me ? `@${this.users.get(parent.author_id ?? "")?.username} ` : "";
-      const stored = replyingTo + shortened.text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+      const replyingTo =
+        parent && parent.author_id !== me
+          ? `@${this.users.get(parent.author_id ?? "")?.username} `
+          : "";
+      const stored =
+        replyingTo +
+        shortened.text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
       const post = this.post(author, stored, {
         id,
-        ...(parent ? {
-          conversation_id: parent.conversation_id, in_reply_to_user_id: parent.author_id,
-          referenced_tweets: [{ type: "replied_to", id: parent.id }],
-        } : {}),
-        ...(media ? { attachments: { media_keys: media.media_ids.map(mediaId => `3_${mediaId}`) } } : {}),
+        ...(parent
+          ? {
+              conversation_id: parent.conversation_id,
+              in_reply_to_user_id: parent.author_id,
+              referenced_tweets: [{ type: "replied_to", id: parent.id }],
+            }
+          : {}),
+        ...(media
+          ? { attachments: { media_keys: media.media_ids.map((mediaId) => `3_${mediaId}`) } }
+          : {}),
         ...(shortened.urls.length ? { entities: { urls: shortened.urls } } : {}),
       });
       this.#sentTexts.set(id, text);
@@ -276,20 +393,29 @@ export class FakeX {
     }
     if (method === "PUT" && (match = path.match(/^\/2\/tweets\/(\d+)\/hidden$/))) {
       const key = match[1];
-      if (body().hidden) this.hidden.add(key); else this.hidden.delete(key);
+      if (body().hidden) this.hidden.add(key);
+      else this.hidden.delete(key);
       return json({ data: { hidden: body().hidden } });
     }
     const toggles: Record<string, [Set<string>, string]> = {
-      likes: [this.likes, "tweet_id"], retweets: [this.reposts, "tweet_id"], bookmarks: [this.bookmarks, "tweet_id"],
-      following: [this.following, "target_user_id"], muting: [this.muting, "target_user_id"],
+      likes: [this.likes, "tweet_id"],
+      retweets: [this.reposts, "tweet_id"],
+      bookmarks: [this.bookmarks, "tweet_id"],
+      following: [this.following, "target_user_id"],
+      muting: [this.muting, "target_user_id"],
     };
-    if ((match = path.match(/^\/2\/users\/(\d+)\/(likes|retweets|bookmarks|following|muting)(?:\/(\d+))?$/))) {
+    if (
+      (match = path.match(
+        /^\/2\/users\/(\d+)\/(likes|retweets|bookmarks|following|muting)(?:\/(\d+))?$/,
+      ))
+    ) {
       const [, userId, kind, target] = match;
       if (userId !== me) return problem(403, "You can only act as yourself.");
       const [set, field] = toggles[kind];
       if (method === "POST") {
         const id = String(body()[field]);
-        if (field === "tweet_id" && !this.posts.has(id)) return problem(400, "The post was deleted.");
+        if (field === "tweet_id" && !this.posts.has(id))
+          return problem(400, "The post was deleted.");
         set.add(`${me}:${id}`);
         return json({ data: { [kind]: true } });
       }
@@ -299,10 +425,20 @@ export class FakeX {
       }
     }
     if (method === "POST" && path === "/2/lists") {
-      const { name, description, private: isPrivate } = body() as { name: string; description?: string; private?: boolean };
+      const {
+        name,
+        description,
+        private: isPrivate,
+      } = body() as { name: string; description?: string; private?: boolean };
       const id = this.id();
       this.lists.set(id, {
-        id, name, description: description ?? "", private: isPrivate === true, owner_id: me, member_count: 0, follower_count: 0,
+        id,
+        name,
+        description: description ?? "",
+        private: isPrivate === true,
+        owner_id: me,
+        member_count: 0,
+        follower_count: 0,
         created_at: new Date().toISOString(),
       });
       return json({ data: { id, name } });
@@ -341,20 +477,26 @@ export class FakeX {
   }
 
   #token(request: FakeRequest): Response {
-    if (request.headers.get("authorization") !== `Basic ${btoa("test-client-id:test-client-secret")}`) {
+    if (
+      request.headers.get("authorization") !== `Basic ${btoa("test-client-id:test-client-secret")}`
+    ) {
       return json({ error: "invalid_client" }, { status: 401 });
     }
     const form = new URLSearchParams(request.body);
     if (form.get("grant_type") === "authorization_code") {
       const user = this.codes.get(form.get("code") ?? "");
-      if (!user || !form.get("code_verifier")) return json({ error: "invalid_grant" }, { status: 400 });
+      if (!user || !form.get("code_verifier"))
+        return json({ error: "invalid_grant" }, { status: 400 });
       this.codes.delete(form.get("code")!);
       return json(this.grant(user));
     }
     const refreshToken = form.get("refresh_token") ?? "";
     const user = this.tokens.get(refreshToken);
     if (!user || this.spentRefreshTokens.has(refreshToken)) {
-      return json({ error: "invalid_request", error_description: "Value passed for the token was invalid." }, { status: 400 });
+      return json(
+        { error: "invalid_request", error_description: "Value passed for the token was invalid." },
+        { status: 400 },
+      );
     }
     this.spentRefreshTokens.add(refreshToken);
     return json(this.grant(user));
@@ -364,7 +506,11 @@ export class FakeX {
    * A post's text as X keeps it: each link replaced by a t.co link and listed in `entities.urls`
    * as written (a bare domain gaining `http://`), and attached media given a t.co link of its own.
    */
-  #shorten(text: string, mediaUrl: string, mediaIds: string[] = []): { text: string; urls: WireLink[] } {
+  #shorten(
+    text: string,
+    mediaUrl: string,
+    mediaIds: string[] = [],
+  ): { text: string; urls: WireLink[] } {
     const urls: WireLink[] = [];
     let shortened = text;
     for (const url of extractUrls(text)) {
@@ -382,14 +528,16 @@ export class FakeX {
 
   #visible(viewer: string, post: WirePost): boolean {
     const author = this.users.get(post.author_id ?? "");
-    return !author?.protected || author.id === viewer || this.following.has(`${viewer}:${author.id}`);
+    return (
+      !author?.protected || author.id === viewer || this.following.has(`${viewer}:${author.id}`)
+    );
   }
 
   #withStatus(viewer: string, user: WireUser): WireUser {
     const status = [
-      ...this.following.has(`${viewer}:${user.id}`) ? ["following"] : [],
-      ...this.following.has(`${user.id}:${viewer}`) ? ["followed_by"] : [],
-      ...this.muting.has(`${viewer}:${user.id}`) ? ["muting"] : [],
+      ...(this.following.has(`${viewer}:${user.id}`) ? ["following"] : []),
+      ...(this.following.has(`${user.id}:${viewer}`) ? ["followed_by"] : []),
+      ...(this.muting.has(`${viewer}:${user.id}`) ? ["muting"] : []),
     ];
     return { ...user, connection_status: status };
   }
@@ -401,13 +549,20 @@ export class FakeX {
 
   #includes(url: URL, posts: WirePost[]): { includes?: { users: WireUser[] } } {
     if (!this.#expands(url, "author_id")) return {};
-    const authors = new Set(posts.map(post => post.author_id));
-    return { includes: { users: [...authors].flatMap(id => this.users.get(id ?? "") ?? []) } };
+    const authors = new Set(posts.map((post) => post.author_id));
+    return { includes: { users: [...authors].flatMap((id) => this.users.get(id ?? "") ?? []) } };
   }
 
   #notFound(type: string, id: string): Response {
     return json({
-      errors: [{ resource_id: id, resource_type: type, type: "https://api.twitter.com/2/problems/resource-not-found", detail: "Not found" }],
+      errors: [
+        {
+          resource_id: id,
+          resource_type: type,
+          type: "https://api.twitter.com/2/problems/resource-not-found",
+          detail: "Not found",
+        },
+      ],
     });
   }
 
@@ -426,8 +581,13 @@ export class FakeX {
 
 export function identityOf(user: WireUser, extra: Partial<StoredIdentity> = {}): StoredIdentity {
   return {
-    id: user.id, username: user.username!, name: user.name!, protected: user.protected === true,
-    verified: user.verified === true, fetchedAt: Date.now(), ...extra,
+    id: user.id,
+    username: user.username!,
+    name: user.name!,
+    protected: user.protected === true,
+    verified: user.verified === true,
+    fetchedAt: Date.now(),
+    ...extra,
   };
 }
 
@@ -435,9 +595,15 @@ export function identityOf(user: WireUser, extra: Partial<StoredIdentity> = {}):
  * Seeds a connected account for `user` whose token X will accept and that needs no refresh, the
  * way a completed connect leaves one. Returns the account id.
  */
-export async function seedAccount(x: FakeX, user: WireUser = ALICE, options: {
-  expiresInMs?: number; scopes?: string[]; identity?: Partial<StoredIdentity>;
-} = {}): Promise<string> {
+export async function seedAccount(
+  x: FakeX,
+  user: WireUser = ALICE,
+  options: {
+    expiresInMs?: number;
+    scopes?: string[];
+    identity?: Partial<StoredIdentity>;
+  } = {},
+): Promise<string> {
   const grant = x.grant(user.id);
   const accountId = env.USER_ACCOUNT.newUniqueId();
   await runInDurableObject(env.USER_ACCOUNT.get(accountId), async (_instance, state) => {
@@ -462,7 +628,7 @@ export function accountStub(userObjectId: string) {
  */
 export async function reconnectAs(x: FakeX, userObjectId: string, user: WireUser) {
   const initiation = generateNonce();
-  return await runInDurableObject(accountStub(userObjectId), async instance => {
+  return await runInDurableObject(accountStub(userObjectId), async (instance) => {
     await instance.prepareReconnect(initiation, scopesFor());
     const flow = await instance.beginOAuthFlow(initiation, getRedirectUri(env as Env));
     if (!flow) throw new Error("the reconnect did not start");
@@ -484,6 +650,7 @@ export function unwrap<T>(outcome: { ok: T } | { error: string }): T {
 
 /** A forwarded call's failure message, failing the test when it succeeded. */
 export function failure(outcome: { ok: unknown } | { error: string }): string {
-  if (!("error" in outcome)) throw new Error(`expected a failure, got ${JSON.stringify(outcome.ok)}`);
+  if (!("error" in outcome))
+    throw new Error(`expected a failure, got ${JSON.stringify(outcome.ok)}`);
   return outcome.error;
 }

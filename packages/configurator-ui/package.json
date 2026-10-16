@@ -11,11 +11,10 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test:run": "vitest run --passWithNoTests"
+    "test:run": "vp test run --passWithNoTests"
   },
   "devDependencies": {
     "@gadgets/scripts": "workspace:*",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

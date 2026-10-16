@@ -5,7 +5,7 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import { isWorkerInput } from "../src/worker-inputs.js";
 
 const WORKSPACE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -27,7 +27,7 @@ it.each([
   "packages/gatekeeper-context/src/library-read.ts",
   "packages/gatekeeper-context/cloudflare.config.ts",
   "pnpm-lock.yaml",
-])("treats %s as a Worker input", path => {
+])("treats %s as a Worker input", (path) => {
   expect(isWorkerInput(inWorkspace(path))).toBe(true);
 });
 
@@ -44,6 +44,6 @@ it.each([
   "packages/typed-storage/node_modules/.bin/tsc",
   // Another package's tests reach the Worker through none of this.
   "packages/workshop-frontend/src/main.tsx",
-])("does not treat %s as a Worker input", path => {
+])("does not treat %s as a Worker input", (path) => {
   expect(isWorkerInput(inWorkspace(path))).toBe(false);
 });

@@ -1,9 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { ConversationConfiguratorValues } from "./conversation-configurator-types";
 
 vi.mock("@gadgets/configurator-ui", () => ({
-  h: (component: unknown, props: unknown, ...children: unknown[]) =>
-    ({ component, props: props ?? {}, children: children.flat() }),
+  h: (component: unknown, props: unknown, ...children: unknown[]) => ({
+    component,
+    props: props ?? {},
+    children: children.flat(),
+  }),
   Section: () => undefined,
   Field: () => undefined,
   Autocomplete: () => undefined,
@@ -13,8 +16,12 @@ const { default: conversation } = await import("./conversation-configurator-ui")
 const { default: workspace } = await import("./workspace-configurator-ui");
 
 const unusedUi = {
-  listWorkspaces: async () => { throw new Error("URL serialization must not query Slack."); },
-  listConversations: async () => { throw new Error("URL serialization must not query Slack."); },
+  listWorkspaces: async () => {
+    throw new Error("URL serialization must not query Slack.");
+  },
+  listConversations: async () => {
+    throw new Error("URL serialization must not query Slack.");
+  },
 };
 
 type RenderedNode = { props: Record<string, unknown>; children: unknown[] };
@@ -26,7 +33,11 @@ function control(tree: unknown, name: string): Record<string, unknown> {
   let node = tree as RenderedNode;
   if (node.props.name === name) return node.props;
   for (let child of node.children) {
-    try { return control(child, name); } catch { continue; }
+    try {
+      return control(child, name);
+    } catch {
+      continue;
+    }
   }
   throw new Error(`No control named ${name}.`);
 }
@@ -34,10 +45,15 @@ function control(tree: unknown, name: string): Record<string, unknown> {
 function render(values: ConversationConfiguratorValues) {
   let patches: Partial<ConversationConfiguratorValues>[] = [];
   let clearFields = vi.fn();
-  let setValues = vi.fn((patch: Partial<ConversationConfiguratorValues>) => void patches.push(patch));
+  let setValues = vi.fn(
+    (patch: Partial<ConversationConfiguratorValues>) => void patches.push(patch),
+  );
   let ui = { listWorkspaces: vi.fn(async () => []), listConversations: vi.fn(async () => []) };
   let tree = conversation.render({
-    values, setValues, clearFields, ui,
+    values,
+    setValues,
+    clearFields,
+    ui,
   });
   return { tree, patches, clearFields, setValues, ui };
 }
@@ -48,7 +64,9 @@ describe("Slack workspace selection", () => {
     let { tree, patches, clearFields, setValues } = render(values);
     (control(tree, "teamId").onChange as (value: string) => void)("TTWO");
     expect(clearFields).toHaveBeenCalledExactlyOnceWith("conversationId");
-    expect(clearFields.mock.invocationCallOrder[0]).toBeLessThan(setValues.mock.invocationCallOrder[0]);
+    expect(clearFields.mock.invocationCallOrder[0]).toBeLessThan(
+      setValues.mock.invocationCallOrder[0],
+    );
     expect(patches).toEqual([{ teamId: "TTWO", conversationId: null }]);
     expect(conversation.isReady({ values: { ...values, ...patches[0] } })).toBe(false);
   });
@@ -59,7 +77,9 @@ describe("Slack workspace selection", () => {
     await (picker.loadOptions as (query: string) => Promise<unknown>)("general");
     expect(ui.listConversations).toHaveBeenCalledWith("TTWO", "general");
     let other = render({ teamId: "TONE" });
-    await (control(other.tree, "conversationId").loadOptions as (query: string) => Promise<unknown>)("");
+    await (
+      control(other.tree, "conversationId").loadOptions as (query: string) => Promise<unknown>
+    )("");
     expect(other.ui.listConversations).toHaveBeenCalledWith("TONE", "");
   });
 
@@ -73,7 +93,9 @@ describe("Slack workspace selection", () => {
 
   it("keeps autocomplete names aligned with the runtime's seeded query keys", () => {
     let values = conversation.initialValuesFromResourceUrl({
-      resourceUrl: "https://app.slack.com/client/TTWO/CTWO", resourceUrlPattern: "", ui: unusedUi,
+      resourceUrl: "https://app.slack.com/client/TTWO/CTWO",
+      resourceUrlPattern: "",
+      ui: unusedUi,
     });
     let { tree } = render(values);
     // seedInitialValues seeds queryByName by value key; Autocomplete displays the query by name.
@@ -87,26 +109,39 @@ describe("Slack workspace selection", () => {
     let values = { teamId: "TTWO", conversationId: "CTWO" };
     let url = conversation.resourceUrl({ values, ui: unusedUi });
     expect(url).toBe("https://app.slack.com/client/TTWO/CTWO");
-    expect(conversation.initialValuesFromResourceUrl({ resourceUrl: url, resourceUrlPattern: "", ui: unusedUi }))
-        .toEqual(values);
-    expect(workspace.resourceUrl({ values: { teamId: "TTWO" }, ui: unusedUi }))
-        .toBe("https://app.slack.com/client/TTWO");
-    expect(workspace.initialValuesFromResourceUrl({
-      resourceUrl: "https://app.slack.com/client/TTWO", resourceUrlPattern: "", ui: unusedUi,
-    }))
-        .toEqual({ teamId: "TTWO" });
+    expect(
+      conversation.initialValuesFromResourceUrl({
+        resourceUrl: url,
+        resourceUrlPattern: "",
+        ui: unusedUi,
+      }),
+    ).toEqual(values);
+    expect(workspace.resourceUrl({ values: { teamId: "TTWO" }, ui: unusedUi })).toBe(
+      "https://app.slack.com/client/TTWO",
+    );
+    expect(
+      workspace.initialValuesFromResourceUrl({
+        resourceUrl: "https://app.slack.com/client/TTWO",
+        resourceUrlPattern: "",
+        ui: unusedUi,
+      }),
+    ).toEqual({ teamId: "TTWO" });
   });
 
   it("rejects enterprise IDs and missing workspace selections", () => {
     for (let teamId of ["EORG", "", undefined]) {
       expect(workspace.isReady({ values: { teamId } })).toBe(false);
       expect(conversation.isReady({ values: { teamId, conversationId: "CONE" } })).toBe(false);
-      expect(() => conversation.resourceUrl({ values: { teamId, conversationId: "CONE" }, ui: unusedUi }))
-          .toThrow("Choose a workspace");
+      expect(() =>
+        conversation.resourceUrl({ values: { teamId, conversationId: "CONE" }, ui: unusedUi }),
+      ).toThrow("Choose a workspace");
     }
-    expect(workspace.initialValuesFromResourceUrl({
-      resourceUrl: "https://app.slack.com/client/EORG", resourceUrlPattern: "", ui: unusedUi,
-    }))
-        .toEqual({});
+    expect(
+      workspace.initialValuesFromResourceUrl({
+        resourceUrl: "https://app.slack.com/client/EORG",
+        resourceUrlPattern: "",
+        ui: unusedUi,
+      }),
+    ).toEqual({});
   });
 });

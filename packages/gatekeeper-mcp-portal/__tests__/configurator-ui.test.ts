@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import type {
   McpServerConfiguratorRpc,
@@ -8,8 +8,11 @@ import type {
 // The real `h` and the controls throw: the sandbox runtime supplies them at load time. These tests
 // exercise the data flow in `render`, not the markup, so a plain tree is enough.
 vi.mock("@gadgets/configurator-ui", () => ({
-  h: (component: unknown, props: unknown, ...children: unknown[]) =>
-    ({ component, props, children }),
+  h: (component: unknown, props: unknown, ...children: unknown[]) => ({
+    component,
+    props,
+    children,
+  }),
   Section: "Section",
   Field: "Field",
   Autocomplete: "Autocomplete",
@@ -28,48 +31,71 @@ async function loadSpec() {
 }
 
 function propsFor(node: unknown, component: string): Record<string, unknown> {
-  const item = node as { component?: unknown; props?: Record<string, unknown>; children?: unknown[] };
+  const item = node as {
+    component?: unknown;
+    props?: Record<string, unknown>;
+    children?: unknown[];
+  };
   if (item?.component === component) return item.props ?? {};
   for (const child of item?.children ?? []) {
-    try { return propsFor(child, component); } catch {}
+    try {
+      return propsFor(child, component);
+    } catch {}
   }
   throw new Error(`${component} not found`);
 }
 
 // Drives `render` the way the host does: values in, `setValues` patches applied, render again.
 function harness(
-  spec: { render: (args: never) => unknown }, initial: Values, ui: McpServerConfiguratorRpc,
+  spec: { render: (args: never) => unknown },
+  initial: Values,
+  ui: McpServerConfiguratorRpc,
 ) {
   let values = { ...initial };
   return {
-    render: () => spec.render({
-      values,
-      setValues: (patch: Partial<Values>) => { values = { ...values, ...patch }; },
-      ui,
-    } as never),
-    get values() { return values; },
+    render: () =>
+      spec.render({
+        values,
+        setValues: (patch: Partial<Values>) => {
+          values = { ...values, ...patch };
+        },
+        ui,
+      } as never),
+    get values() {
+      return values;
+    },
   };
 }
 
-const portalValues = (server: string): Values =>
-  ({ server, mode: "all", tools: null, endpointKind: "portal" });
+const portalValues = (server: string): Values => ({
+  server,
+  mode: "all",
+  tools: null,
+  endpointKind: "portal",
+});
 
 let spec: Awaited<ReturnType<typeof loadSpec>>;
-beforeEach(async () => { spec = await loadSpec(); });
+beforeEach(async () => {
+  spec = await loadSpec();
+});
 
 // Every question this form asks depends on reaching the portal, so a failure has its own path.
 function unreachableRpc(): McpServerConfiguratorRpc {
   return {
     getEndpoint: async () => "https://gw.example.com/mcp",
-    listServerOptions: async () => { throw new Error("portal unreachable"); },
-    listToolOptions: async () => { throw new Error("portal unreachable"); },
+    listServerOptions: async () => {
+      throw new Error("portal unreachable");
+    },
+    listToolOptions: async () => {
+      throw new Error("portal unreachable");
+    },
   } as unknown as McpServerConfiguratorRpc;
 }
 
 function rpcWithServers(...serverIds: string[]): McpServerConfiguratorRpc {
   return {
     getEndpoint: async () => "https://gw.example.com/mcp",
-    listServerOptions: async () => serverIds.map(value => ({ value, title: value })),
+    listServerOptions: async () => serverIds.map((value) => ({ value, title: value })),
     listToolOptions: async () => [],
   } as unknown as McpServerConfiguratorRpc;
 }
@@ -81,9 +107,16 @@ describe("portal configurator", () => {
     // every tool of every system behind the portal, which is the one grant this connector refuses
     // to offer in a click.
     const ui = unreachableRpc();
-    const app = harness(spec, {
-      server: null, mode: "all", tools: null, endpointKind: "unknown",
-    }, ui);
+    const app = harness(
+      spec,
+      {
+        server: null,
+        mode: "all",
+        tools: null,
+        endpointKind: "unknown",
+      },
+      ui,
+    );
 
     app.render();
     await vi.waitFor(() => expect(app.values.endpointKind).toBe("unavailable"));
@@ -102,9 +135,16 @@ describe("portal configurator", () => {
       listServerOptions: async () => [],
       listToolOptions: async () => [],
     } as unknown as McpServerConfiguratorRpc;
-    const app = harness(spec, {
-      server: null, mode: "all", tools: null, endpointKind: "unknown",
-    }, ui);
+    const app = harness(
+      spec,
+      {
+        server: null,
+        mode: "all",
+        tools: null,
+        endpointKind: "unknown",
+      },
+      ui,
+    );
 
     app.render();
     await vi.waitFor(() => expect(app.values.endpointKind).toBe("empty"));
@@ -121,10 +161,10 @@ describe("portal configurator", () => {
       listServerOptions: async () => [{ value: "gitlab", title: "GitLab" }],
       listToolOptions: async () => [],
     } as unknown as McpServerConfiguratorRpc;
-    const values = await spec.initialValuesFromResourceUrl({
+    const values = (await spec.initialValuesFromResourceUrl({
       resourceUrl: "https://gw.example.com/mcp#server=jira&tool=jira_search",
       ui,
-    } as never) as Values;
+    } as never)) as Values;
 
     expect(values.server).toBeNull();
     expect(values.tools).toBeNull();
@@ -149,16 +189,20 @@ describe("a grant whose tool list is empty", () => {
 
   it("reopens pinned and empty rather than as a grant over everything", async () => {
     const loaded = await loadSpec();
-    const values = await loaded.initialValuesFromResourceUrl(
-      { resourceUrl: url, ui: rpcWithServers("linear") } as never) as Values;
+    const values = (await loaded.initialValuesFromResourceUrl({
+      resourceUrl: url,
+      ui: rpcWithServers("linear"),
+    } as never)) as Values;
     expect(values.mode).toBe("choose");
     expect(values.tools).toBeNull();
   });
 
   it("cannot be submitted until tools are actually chosen", async () => {
     const loaded = await loadSpec();
-    const values = await loaded.initialValuesFromResourceUrl(
-      { resourceUrl: url, ui: rpcWithServers("linear") } as never) as Values;
+    const values = (await loaded.initialValuesFromResourceUrl({
+      resourceUrl: url,
+      ui: rpcWithServers("linear"),
+    } as never)) as Values;
     expect(loaded.isReady({ values } as never)).toBe(false);
     expect(loaded.isReady({ values: { ...values, tools: " , , " } } as never)).toBe(false);
     expect(loaded.isReady({ values: { ...values, tools: "linear_search" } } as never)).toBe(true);
@@ -168,13 +212,15 @@ describe("a grant whose tool list is empty", () => {
 describe("tool-name transport", () => {
   it("round-trips tool names containing delimiters", async () => {
     const ui = rpcWithServers("linear");
-    const values = await spec.initialValuesFromResourceUrl({
-      resourceUrl: "https://gw.example.com/mcp#server=linear&tool=linear_a%2Cb&tool=linear_percent%25name",
+    const values = (await spec.initialValuesFromResourceUrl({
+      resourceUrl:
+        "https://gw.example.com/mcp#server=linear&tool=linear_a%2Cb&tool=linear_percent%25name",
       ui,
-    } as never) as Values;
+    } as never)) as Values;
     expect(values.tools).toBe("linear_a%2Cb,linear_percent%25name");
     await expect(spec.resourceUrl({ values, ui } as never)).resolves.toBe(
-      "https://gw.example.com/mcp#server=linear&tool=linear_a%2Cb&tool=linear_percent%25name");
+      "https://gw.example.com/mcp#server=linear&tool=linear_a%2Cb&tool=linear_percent%25name",
+    );
   });
 
   it("encodes server tool names before passing them to CheckboxList", async () => {
@@ -191,10 +237,10 @@ describe("a resource URL the form cannot decode", () => {
   // show nothing at all rather than let the grant be repaired.
   it("opens instead of throwing", async () => {
     const loaded = await loadSpec();
-    const values = await loaded.initialValuesFromResourceUrl({
+    const values = (await loaded.initialValuesFromResourceUrl({
       resourceUrl: "https://gw.example.com/mcp#server=%&tool=%",
       ui: rpcWithServers("linear"),
-    } as never) as Values;
+    } as never)) as Values;
     expect(values.server).toBeNull();
     expect(values.tools).toBeNull();
   });

@@ -4,13 +4,20 @@
 
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it } from "vitest";
-import type { ContextApi, ContextCollectionMetadata, EnabledCollectionInfo } from "../../src/context-types";
+import { describe, expect, it } from "vite-plus/test";
+import type {
+  ContextApi,
+  ContextCollectionMetadata,
+  EnabledCollectionInfo,
+} from "../../src/context-types";
 import { useSkillsNavigatorData } from "./useSkillsNavigatorData";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const collection = (id: string, source: EnabledCollectionInfo["source"]): EnabledCollectionInfo => ({
+const collection = (
+  id: string,
+  source: EnabledCollectionInfo["source"],
+): EnabledCollectionInfo => ({
   id,
   title: id,
   description: "",
@@ -26,9 +33,10 @@ const metadata = (id: string, source: "web" | "git"): ContextCollectionMetadata 
   created: new Date(),
   lastUpdated: new Date(),
   documentCount: 0,
-  content: source === "web"
-    ? { source }
-    : { source, remote: "", branch: "main", lastRefreshedAt: new Date() },
+  content:
+    source === "web"
+      ? { source }
+      : { source, remote: "", branch: "main", lastRefreshedAt: new Date() },
 });
 
 describe("useSkillsNavigatorData", () => {
@@ -80,12 +88,7 @@ describe("useSkillsNavigatorData", () => {
     });
 
     expect(writableIds).toEqual(["owned-web"]);
-    expect(manageableIds).toEqual([
-      "owned-web",
-      "owned-git",
-      "failed-web",
-      "metadata-failed-web",
-    ]);
+    expect(manageableIds).toEqual(["owned-web", "owned-git", "failed-web", "metadata-failed-web"]);
     expect(failedDocumentIds).toEqual(["failed-web"]);
     expect(loadedMetadata.has("failed-web")).toBe(true);
     expect(loadedMetadata.has("metadata-failed-web")).toBe(false);

@@ -3,10 +3,12 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type {
-  AuthenticatedApi, NotificationSubscriber, UserNotification,
+  AuthenticatedApi,
+  NotificationSubscriber,
+  UserNotification,
 } from "@gadgets/workshop-shared/api";
 import { NotificationBridge } from "./NotificationBridge";
 import { reportVisibleChat } from "./visibleChat";
@@ -26,7 +28,10 @@ const notification: UserNotification = {
 };
 
 const setVisibility = (visibilityState: DocumentVisibilityState) => {
-  Object.defineProperty(document, "visibilityState", { configurable: true, value: visibilityState });
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value: visibilityState,
+  });
   document.dispatchEvent(new Event("visibilitychange"));
 };
 
@@ -42,13 +47,17 @@ describe("NotificationBridge", () => {
     subscribeToNotifications: Mock<Subscribe>;
   };
 
-  const render = () => act(async () => root.render(
-    <NotificationBridge
-      authenticatedApi={authenticatedApi as unknown as RpcStub<AuthenticatedApi>} />,
-  ));
+  const render = () =>
+    act(async () =>
+      root.render(
+        <NotificationBridge
+          authenticatedApi={authenticatedApi as unknown as RpcStub<AuthenticatedApi>}
+        />,
+      ),
+    );
   // What capnweb does once the server drops its last reference to a subscriber.
-  const release = (index: number) => act(async () =>
-    (subscribers[index] as unknown as Disposable)[Symbol.dispose]());
+  const release = (index: number) =>
+    act(async () => (subscribers[index] as unknown as Disposable)[Symbol.dispose]());
 
   beforeEach(() => {
     addToast.mockClear();
@@ -58,7 +67,7 @@ describe("NotificationBridge", () => {
     dispose = vi.fn<() => void>();
     authenticatedApi = {
       registerNotificationDevice: vi.fn<(id: string) => Promise<void>>().mockResolvedValue(),
-      subscribeToNotifications: vi.fn<Subscribe>(subscriber => {
+      subscribeToNotifications: vi.fn<Subscribe>((subscriber) => {
         subscribers.push(subscriber);
         return Object.assign(Promise.resolve(), { [Symbol.dispose]: dispose });
       }),
@@ -86,8 +95,7 @@ describe("NotificationBridge", () => {
     expect(addToast).not.toHaveBeenCalled();
   });
 
-  it("subscribes again when the server drops a live subscription, not after unsubscribing",
-      async () => {
+  it("subscribes again when the server drops a live subscription, not after unsubscribing", async () => {
     await render();
     // A User DO reset releases the subscriber while the session lives on.
     await release(0);
@@ -107,7 +115,7 @@ describe("NotificationBridge", () => {
 
   it("does not retry a subscription that failed", async () => {
     using _ = vi.spyOn(console, "error").mockImplementation(() => {});
-    authenticatedApi.subscribeToNotifications.mockImplementationOnce(subscriber => {
+    authenticatedApi.subscribeToNotifications.mockImplementationOnce((subscriber) => {
       subscribers.push(subscriber);
       return Object.assign(Promise.reject(new Error("unavailable")), { [Symbol.dispose]: dispose });
     });
@@ -122,7 +130,9 @@ describe("NotificationBridge", () => {
     await act(() => subscribers[0].notify(notification));
     addToast.mock.calls[0][0].actions[0].onClick();
     expect(router.navigate).toHaveBeenCalledWith({
-      to: "/workspace/$id", params: { id: "workspace-1" }, search: { chat: 1, showChat: true },
+      to: "/workspace/$id",
+      params: { id: "workspace-1" },
+      search: { chat: 1, showChat: true },
     });
   });
 
@@ -143,10 +153,13 @@ describe("NotificationBridge", () => {
       webkit: { messageHandlers: { cloudflareOSNotificationReady: { postMessage } } },
     });
     await render();
-    await act(async () => window.dispatchEvent(new CustomEvent(
-      "cloudflare-os:notification-device-registration",
-      { detail: { deviceRegistrationId: "registration-1" } },
-    )));
+    await act(async () =>
+      window.dispatchEvent(
+        new CustomEvent("cloudflare-os:notification-device-registration", {
+          detail: { deviceRegistrationId: "registration-1" },
+        }),
+      ),
+    );
     expect(authenticatedApi.registerNotificationDevice).toHaveBeenCalledWith("registration-1");
     expect(postMessage).toHaveBeenCalledWith({ type: "ready" });
     Reflect.deleteProperty(window, "webkit");
@@ -178,7 +191,9 @@ describe("NotificationBridge", () => {
   it("does not redeem a versioned one-use registration again during an RPC reconnect", async () => {
     using _ = vi.spyOn(console, "error").mockImplementation(() => {});
     let failRegistration!: (reason: Error) => void;
-    const pending = new Promise<void>((_resolve, reject) => { failRegistration = reject; });
+    const pending = new Promise<void>((_resolve, reject) => {
+      failRegistration = reject;
+    });
     authenticatedApi.registerNotificationDevice.mockReturnValue(pending);
     const finished = vi.fn<(outcome: "ready" | "failed") => void>();
     Object.assign(window, {

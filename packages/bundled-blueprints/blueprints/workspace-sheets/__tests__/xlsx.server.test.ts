@@ -1,6 +1,9 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
-import { MutationQueue, SubscriberRegistry } from "@gadgets/bundled-blueprints/libraries/sync/server";
+import { describe, expect, it, vi } from "vite-plus/test";
+import {
+  MutationQueue,
+  SubscriberRegistry,
+} from "@gadgets/bundled-blueprints/libraries/sync/server";
 import { ExportHandler, Gadget } from "../files/server.ts";
 import type { Operation, SheetsDocument } from "../files/lib/protocol.ts";
 import { workbookToXlsx } from "../files/lib/xlsx.ts";
@@ -78,7 +81,9 @@ async function readZip(stream: ReadableStream<Uint8Array>) {
     expect(uint32(archive, localOffset + 22)).toBe(0);
     const localNameLength = uint16(archive, localOffset + 26);
     const localExtraLength = uint16(archive, localOffset + 28);
-    expect(decoder.decode(archive.subarray(localOffset + 30, localOffset + 30 + localNameLength))).toBe(name);
+    expect(
+      decoder.decode(archive.subarray(localOffset + 30, localOffset + 30 + localNameLength)),
+    ).toBe(name);
 
     const dataOffset = localOffset + 30 + localNameLength + localExtraLength;
     const compressed = archive.subarray(dataOffset, dataOffset + compressedSize);
@@ -91,11 +96,11 @@ async function readZip(stream: ReadableStream<Uint8Array>) {
     const bytes = await inflate(compressed);
     expect(bytes.byteLength).toBe(uncompressedSize);
     expect(crc32(bytes)).toBe(crc);
-    entries.set(name, {bytes, compressedSize, crc, flags, localOffset, method, uncompressedSize});
+    entries.set(name, { bytes, compressedSize, crc, flags, localOffset, method, uncompressedSize });
     offset += 46 + nameLength + extraLength + commentLength;
   }
   expect(offset).toBe(eocdOffset);
-  return {archive, entries};
+  return { archive, entries };
 }
 
 function text(entries: Map<string, ZipEntry>, name: string): string {
@@ -105,7 +110,7 @@ function text(entries: Map<string, ZipEntry>, name: string): string {
 }
 
 function cell(value: unknown, fmt: Record<string, unknown> | null = null) {
-  return {value, fmt, version: 1};
+  return { value, fmt, version: 1 };
 }
 
 function sheet(name: string, extra: Record<string, unknown> = {}) {
@@ -123,7 +128,9 @@ function sheet(name: string, extra: Record<string, unknown> = {}) {
 }
 
 function cellXml(xml: string, reference: string): string {
-  const match = new RegExp(`<c r="${reference}"[^>]*?/>|<c r="${reference}"[^>]*>[\\s\\S]*?</c>`).exec(xml);
+  const match = new RegExp(
+    `<c r="${reference}"[^>]*?/>|<c r="${reference}"[^>]*>[\\s\\S]*?</c>`,
+  ).exec(xml);
   expect(match, reference).not.toBeNull();
   return match![0];
 }
@@ -143,7 +150,9 @@ type Registry = Gadget["subscribers"];
 function stub<T extends object>(callbacks: T) {
   return {
     ...callbacks,
-    dup() { return this; },
+    dup() {
+      return this;
+    },
     onRpcBroken() {},
     [Symbol.dispose]: vi.fn(),
   };
@@ -152,21 +161,32 @@ function stub<T extends object>(callbacks: T) {
 // A registry holding `stubs`, with no presence hooks: these tests watch operations, not presence.
 function registryOf(...stubs: object[]): Registry {
   const registry = new SubscriberRegistry() as Registry;
-  for (const each of stubs) registry.add(each as never, {clientId: "", name: "", color: ""});
+  for (const each of stubs) registry.add(each as never, { clientId: "", name: "", color: "" });
   return registry;
 }
 
 // A Gadget over in-memory storage, for exercising the mutation queue without a Durable Object.
 function inMemoryGadget(subscribers: Registry = registryOf()) {
   const stored = new Map<string, unknown>([
-    ["meta", {revision: 0, title: "Test", sheetOrder: ["sheet"], sheets: {sheet: sheet("Sheet")}, lastModified: 0}],
+    [
+      "meta",
+      {
+        revision: 0,
+        title: "Test",
+        sheetOrder: ["sheet"],
+        sheets: { sheet: sheet("Sheet") },
+        lastModified: 0,
+      },
+    ],
     ["cells:sheet", {}],
   ]);
   return Object.assign(Object.create(Gadget.prototype), {
     ctx: {
       storage: {
         get: async (key: string) => stored.get(key),
-        put: async (key: string, value: unknown) => { stored.set(key, value); },
+        put: async (key: string, value: unknown) => {
+          stored.set(key, value);
+        },
         delete: async (key: string) => stored.delete(key),
       },
     },
@@ -176,7 +196,7 @@ function inMemoryGadget(subscribers: Registry = registryOf()) {
 }
 
 function setCell(ref: string, value: string, baseVersion = 0) {
-  return {senderId: "test", cellOps: [{sheetId: "sheet", ref, value, fmt: null, baseVersion}]};
+  return { senderId: "test", cellOps: [{ sheetId: "sheet", ref, value, fmt: null, baseVersion }] };
 }
 
 describe("streaming ZIP32", () => {
@@ -190,10 +210,12 @@ describe("streaming ZIP32", () => {
       },
     });
 
-    const {entries} = await readZip(createZip([
-      {name: "plain.txt", data: "hello"},
-      {name: "nested/utf8-\u2603.txt", data: chunks},
-    ]));
+    const { entries } = await readZip(
+      createZip([
+        { name: "plain.txt", data: "hello" },
+        { name: "nested/utf8-\u2603.txt", data: chunks },
+      ]),
+    );
 
     expect([...entries.keys()]).toEqual(["plain.txt", "nested/utf8-\u2603.txt"]);
     expect(text(entries, "plain.txt")).toBe("hello");
@@ -208,8 +230,11 @@ describe("streaming ZIP32", () => {
 
 describe("Workspace Sheets XLSX", () => {
   it("emits the required OOXML package and a valid blank worksheet for malformed state", async () => {
-    for (const document of [{}, {sheetOrder: ["empty"], sheets: {empty: sheet("")}, cells: {empty: {}}}]) {
-      const {entries} = await readZip(exportXlsx(document));
+    for (const document of [
+      {},
+      { sheetOrder: ["empty"], sheets: { empty: sheet("") }, cells: { empty: {} } },
+    ]) {
+      const { entries } = await readZip(exportXlsx(document));
       expect([...entries.keys()]).toEqual([
         "[Content_Types].xml",
         "_rels/.rels",
@@ -220,9 +245,13 @@ describe("Workspace Sheets XLSX", () => {
       ]);
       expect(text(entries, "[Content_Types].xml")).toContain("spreadsheetml.sheet.main+xml");
       expect(text(entries, "_rels/.rels")).toContain('Target="xl/workbook.xml"');
-      expect(text(entries, "xl/_rels/workbook.xml.rels")).toContain('Target="worksheets/sheet1.xml"');
+      expect(text(entries, "xl/_rels/workbook.xml.rels")).toContain(
+        'Target="worksheets/sheet1.xml"',
+      );
       expect(text(entries, "xl/_rels/workbook.xml.rels")).toContain('Target="styles.xml"');
-      expect(text(entries, "xl/workbook.xml")).toContain('<sheet name="Sheet" sheetId="1" r:id="rId1"/>');
+      expect(text(entries, "xl/workbook.xml")).toContain(
+        '<sheet name="Sheet" sheetId="1" r:id="rId1"/>',
+      );
       expect(text(entries, "xl/worksheets/sheet1.xml")).toContain("<sheetData></sheetData>");
     }
   });
@@ -243,24 +272,26 @@ describe("Workspace Sheets XLSX", () => {
         i: sheet("Q[1]"),
       },
       cells: {
-        a: {A1: cell("1")},
-        b: {A1: cell("2")},
+        a: { A1: cell("1") },
+        b: { A1: cell("2") },
         c: {
-          A1: cell('=\'Sales/Data\'!A1+sales_data!$A$1+"Sales/Data!A1"+History!A1+\'O\'\'Brien\'!A1'),
-          A2: cell("='[Book.xlsx]Data'!A1+[Other.xlsx]'Sales/Data'!A1+'Q[1]'!A1+" +
-              "'Sales/Data':'History'!A1+'Missing'!A1+'Sales/Data'!NOPE+foo'Sales/Data'!A1"),
+          A1: cell("='Sales/Data'!A1+sales_data!$A$1+\"Sales/Data!A1\"+History!A1+'O''Brien'!A1"),
+          A2: cell(
+            "='[Book.xlsx]Data'!A1+[Other.xlsx]'Sales/Data'!A1+'Q[1]'!A1+" +
+              "'Sales/Data':'History'!A1+'Missing'!A1+'Sales/Data'!NOPE+foo'Sales/Data'!A1",
+          ),
         },
         d: {},
         e: {},
-        f: {A1: cell("3")},
-        g: {A1: cell("4")},
-        h: {A1: cell("5")},
-        i: {A1: cell("6")},
+        f: { A1: cell("3") },
+        g: { A1: cell("4") },
+        h: { A1: cell("5") },
+        i: { A1: cell("6") },
       },
     };
-    const {entries} = await readZip(exportXlsx(document));
+    const { entries } = await readZip(exportXlsx(document));
     const workbook = text(entries, "xl/workbook.xml");
-    const names = [...workbook.matchAll(/<sheet name="([^"]*)"/g)].map(match => match[1]);
+    const names = [...workbook.matchAll(/<sheet name="([^"]*)"/g)].map((match) => match[1]);
     expect(names).toEqual([
       "Sales_Data",
       "sales_data (2)",
@@ -274,25 +305,29 @@ describe("Workspace Sheets XLSX", () => {
     ]);
     const worksheet = text(entries, "xl/worksheets/sheet3.xml");
     const formulaCell = cellXml(worksheet, "A1");
-    expect(formulaCell).toContain('<f>\'Sales_Data\'!A1+\'sales_data (2)\'!$A$1+"Sales/Data!A1"+\'History_\'!A1+\'O\'\'Brien\'!A1</f>');
+    expect(formulaCell).toContain(
+      "<f>'Sales_Data'!A1+'sales_data (2)'!$A$1+\"Sales/Data!A1\"+'History_'!A1+'O''Brien'!A1</f>",
+    );
     expect(formulaCell).not.toContain("<v>");
     expect(cellXml(worksheet, "A2")).toContain(
-        "<f>'_Book.xlsx_Data'!A1+[Other.xlsx]'Sales/Data'!A1+'Q_1_'!A1+" +
-        "'Sales/Data':'History'!A1+'Missing'!A1+'Sales/Data'!NOPE+foo'Sales/Data'!A1</f>");
+      "<f>'_Book.xlsx_Data'!A1+[Other.xlsx]'Sales/Data'!A1+'Q_1_'!A1+" +
+        "'Sales/Data':'History'!A1+'Missing'!A1+'Sales/Data'!NOPE+foo'Sales/Data'!A1</f>",
+    );
     expect(workbook).toContain('<calcPr calcId="0" fullCalcOnLoad="1"/>');
   });
 
   it("exports many maximum-length formulas with unterminated quoted names as text", async () => {
     const formula = "'".repeat(8191);
-    const cells = Object.fromEntries(Array.from({length: 64}, (_, index) => [
-      `A${index + 1}`,
-      cell("=" + formula),
-    ]));
-    const {entries} = await readZip(exportXlsx({
-      sheetOrder: ["formulas"],
-      sheets: {formulas: sheet("Formulas", {rows: 64, cols: 1})},
-      cells: {formulas: cells},
-    }));
+    const cells = Object.fromEntries(
+      Array.from({ length: 64 }, (_, index) => [`A${index + 1}`, cell("=" + formula)]),
+    );
+    const { entries } = await readZip(
+      exportXlsx({
+        sheetOrder: ["formulas"],
+        sheets: { formulas: sheet("Formulas", { rows: 64, cols: 1 }) },
+        cells: { formulas: cells },
+      }),
+    );
     const worksheet = text(entries, "xl/worksheets/sheet1.xml");
 
     expect(worksheet.split(`<t xml:space="preserve">=${formula}</t>`)).toHaveLength(65);
@@ -301,14 +336,17 @@ describe("Workspace Sheets XLSX", () => {
   it("does not lengthen maximum-size formulas when unquoted sheet names are unchanged", async () => {
     const value = "=data!A1" + "+0".repeat(4092);
     expect(value).toHaveLength(8192);
-    const {entries} = await readZip(exportXlsx({
-      sheetOrder: ["data", "formulas"],
-      sheets: {data: sheet("Data"), formulas: sheet("Formulas")},
-      cells: {data: {A1: cell("1")}, formulas: {A1: cell(value)}},
-    }));
+    const { entries } = await readZip(
+      exportXlsx({
+        sheetOrder: ["data", "formulas"],
+        sheets: { data: sheet("Data"), formulas: sheet("Formulas") },
+        cells: { data: { A1: cell("1") }, formulas: { A1: cell(value) } },
+      }),
+    );
 
-    expect(cellXml(text(entries, "xl/worksheets/sheet2.xml"), "A1"))
-      .toContain(`<f>${value.slice(1)}</f>`);
+    expect(cellXml(text(entries, "xl/worksheets/sheet2.xml"), "A1")).toContain(
+      `<f>${value.slice(1)}</f>`,
+    );
   });
 
   it("exports formulas as text when required rewrites exceed Excel's length limit", async () => {
@@ -316,40 +354,56 @@ describe("Workspace Sheets XLSX", () => {
     const future = "=IFS(TRUE,1)" + "+0".repeat(4090);
     expect(renamed).toHaveLength(8192);
     expect(future).toHaveLength(8192);
-    const {entries} = await readZip(exportXlsx({
-      sheetOrder: ["invalid", "collision", "formulas"],
-      sheets: {
-        invalid: sheet("A/B"),
-        collision: sheet("A_B"),
-        formulas: sheet("Formulas"),
-      },
-      cells: {invalid: {}, collision: {}, formulas: {A1: cell(renamed), A2: cell(future)}},
-    }));
+    const { entries } = await readZip(
+      exportXlsx({
+        sheetOrder: ["invalid", "collision", "formulas"],
+        sheets: {
+          invalid: sheet("A/B"),
+          collision: sheet("A_B"),
+          formulas: sheet("Formulas"),
+        },
+        cells: { invalid: {}, collision: {}, formulas: { A1: cell(renamed), A2: cell(future) } },
+      }),
+    );
     const worksheet = text(entries, "xl/worksheets/sheet3.xml");
 
-    expect(cellXml(worksheet, "A1"))
-      .toBe(`<c r="A1" t="inlineStr"><is><t xml:space="preserve">${renamed}</t></is></c>`);
-    expect(cellXml(worksheet, "A2"))
-      .toBe(`<c r="A2" t="inlineStr"><is><t xml:space="preserve">${future}</t></is></c>`);
+    expect(cellXml(worksheet, "A1")).toBe(
+      `<c r="A1" t="inlineStr"><is><t xml:space="preserve">${renamed}</t></is></c>`,
+    );
+    expect(cellXml(worksheet, "A2")).toBe(
+      `<c r="A2" t="inlineStr"><is><t xml:space="preserve">${future}</t></is></c>`,
+    );
   });
 
   it("prefixes OOXML future functions without changing strings, sheet references, or existing prefixes", async () => {
     const calls = [
-      "IFS(TRUE,1)", "IFNA(A1,0)", "XOR(TRUE,FALSE)", "SWITCH(1,1,1)",
-      'CONCAT("a","b")', 'TEXTJOIN(",",TRUE,A1)', "UNICHAR(65)", "UNICODE(A1)", "DAYS(2,1)",
+      "IFS(TRUE,1)",
+      "IFNA(A1,0)",
+      "XOR(TRUE,FALSE)",
+      "SWITCH(1,1,1)",
+      'CONCAT("a","b")',
+      'TEXTJOIN(",",TRUE,A1)',
+      "UNICHAR(65)",
+      "UNICODE(A1)",
+      "DAYS(2,1)",
     ];
     const suffix = '+"CONCAT("+CONCAT!A1+_xlfn.CONCAT(A1)+Table1[IFS(A1)]+Table1[CONCAT!A1]';
-    const {entries} = await readZip(exportXlsx({
-      sheetOrder: ["concat", "formulas"],
-      sheets: {concat: sheet("CONCAT"), formulas: sheet("Formulas")},
-      cells: {concat: {A1: cell("value")}, formulas: {
-        A1: cell("=" + calls.join("+") + suffix),
-        A2: cell("=SUM (1,2)+ifs\t(TRUE,1)+\"SUM (\"+A1 +1"),
-        A3: cell("="),
-        A4: cell("=  "),
-      }},
-    }));
-    const expected = calls.map(call => "_xlfn." + call).join("+") + suffix;
+    const { entries } = await readZip(
+      exportXlsx({
+        sheetOrder: ["concat", "formulas"],
+        sheets: { concat: sheet("CONCAT"), formulas: sheet("Formulas") },
+        cells: {
+          concat: { A1: cell("value") },
+          formulas: {
+            A1: cell("=" + calls.join("+") + suffix),
+            A2: cell('=SUM (1,2)+ifs\t(TRUE,1)+"SUM ("+A1 +1'),
+            A3: cell("="),
+            A4: cell("=  "),
+          },
+        },
+      }),
+    );
+    const expected = calls.map((call) => "_xlfn." + call).join("+") + suffix;
     const worksheet = text(entries, "xl/worksheets/sheet2.xml");
 
     expect(cellXml(worksheet, "A1")).toContain(`<f>${expected}</f>`);
@@ -360,36 +414,56 @@ describe("Workspace Sheets XLSX", () => {
   });
 
   it("exports formulas the grid tolerates but Excel would reject as text", async () => {
-    const invalid = ['=SUM(1,2', '="abc', "='Sheet!A1", "=(1))", "=Table1[A", "=A]1", '=SUM("a)",1'];
+    const invalid = [
+      "=SUM(1,2",
+      '="abc',
+      "='Sheet!A1",
+      "=(1))",
+      "=Table1[A",
+      "=A]1",
+      '=SUM("a)",1',
+    ];
     const valid = ['=SUM("(",")",""""")")', "='It''s'!A1+Table1[['#Header]]", "=(1+(2))"];
-    const cells = Object.fromEntries([...invalid, ...valid].map((value, index) => [`A${index + 1}`, cell(value)]));
-    const {entries} = await readZip(exportXlsx({
-      sheetOrder: ["sheet", "its"],
-      sheets: {sheet: sheet("Sheet"), its: sheet("It's")},
-      cells: {sheet: cells, its: {}},
-    }));
+    const cells = Object.fromEntries(
+      [...invalid, ...valid].map((value, index) => [`A${index + 1}`, cell(value)]),
+    );
+    const { entries } = await readZip(
+      exportXlsx({
+        sheetOrder: ["sheet", "its"],
+        sheets: { sheet: sheet("Sheet"), its: sheet("It's") },
+        cells: { sheet: cells, its: {} },
+      }),
+    );
     const worksheet = text(entries, "xl/worksheets/sheet1.xml");
 
     invalid.forEach((value, index) => {
-      expect(cellXml(worksheet, `A${index + 1}`)).toContain(`t="inlineStr"><is><t xml:space="preserve">${value}</t>`);
+      expect(cellXml(worksheet, `A${index + 1}`)).toContain(
+        `t="inlineStr"><is><t xml:space="preserve">${value}</t>`,
+      );
     });
     valid.forEach((value, index) => {
-      expect(cellXml(worksheet, `A${invalid.length + index + 1}`)).toContain(`<f>${value.slice(1)}</f>`);
+      expect(cellXml(worksheet, `A${invalid.length + index + 1}`)).toContain(
+        `<f>${value.slice(1)}</f>`,
+      );
     });
   });
 
   it("translates ERRORTYPE function tokens to Excel's ERROR.TYPE name", async () => {
-    const value = '=ERRORTYPE(NA())+"ERRORTYPE("+ERRORTYPE!A1+Table1[ERRORTYPE(A1)]+' +
+    const value =
+      '=ERRORTYPE(NA())+"ERRORTYPE("+ERRORTYPE!A1+Table1[ERRORTYPE(A1)]+' +
       "'ERRORTYPE'!ERRORTYPE(A1)+[Book.xlsx]Sheet1!ERRORTYPE(A1)+ERROR.TYPE(NA())";
-    const {entries} = await readZip(exportXlsx({
-      sheetOrder: ["errorType", "formulas"],
-      sheets: {errorType: sheet("ERRORTYPE"), formulas: sheet("Formulas")},
-      cells: {errorType: {A1: cell("value")}, formulas: {A1: cell(value)}},
-    }));
+    const { entries } = await readZip(
+      exportXlsx({
+        sheetOrder: ["errorType", "formulas"],
+        sheets: { errorType: sheet("ERRORTYPE"), formulas: sheet("Formulas") },
+        cells: { errorType: { A1: cell("value") }, formulas: { A1: cell(value) } },
+      }),
+    );
 
     expect(cellXml(text(entries, "xl/worksheets/sheet2.xml"), "A1")).toContain(
-        '<f>ERROR.TYPE(NA())+"ERRORTYPE("+ERRORTYPE!A1+Table1[ERRORTYPE(A1)]+' +
-        "'ERRORTYPE'!ERRORTYPE(A1)+[Book.xlsx]Sheet1!ERRORTYPE(A1)+ERROR.TYPE(NA())</f>");
+      '<f>ERROR.TYPE(NA())+"ERRORTYPE("+ERRORTYPE!A1+Table1[ERRORTYPE(A1)]+' +
+        "'ERRORTYPE'!ERRORTYPE(A1)+[Book.xlsx]Sheet1!ERRORTYPE(A1)+ERROR.TYPE(NA())</f>",
+    );
   });
 
   it("accepts an exactly maximum-size rewritten formula and rejects the next character", async () => {
@@ -397,39 +471,53 @@ describe("Workspace Sheets XLSX", () => {
     const overflow = "=ERRORTYPE(NA())" + "+0".repeat(4088);
     expect(exact).toHaveLength(8191);
     expect(overflow).toHaveLength(8192);
-    const {entries} = await readZip(exportXlsx({
-      sheetOrder: ["data"],
-      sheets: {data: sheet("Data")},
-      cells: {data: {A1: cell(exact), A2: cell(overflow)}},
-    }));
+    const { entries } = await readZip(
+      exportXlsx({
+        sheetOrder: ["data"],
+        sheets: { data: sheet("Data") },
+        cells: { data: { A1: cell(exact), A2: cell(overflow) } },
+      }),
+    );
     const worksheet = text(entries, "xl/worksheets/sheet1.xml");
     const exactXml = cellXml(worksheet, "A1");
 
     expect(exactXml).toContain("<f>+ERROR.TYPE(NA())");
     expect(exactXml).not.toContain("inlineStr");
-    expect(cellXml(worksheet, "A2"))
-      .toBe(`<c r="A2" t="inlineStr"><is><t xml:space="preserve">${overflow}</t></is></c>`);
+    expect(cellXml(worksheet, "A2")).toBe(
+      `<c r="A2" t="inlineStr"><is><t xml:space="preserve">${overflow}</t></is></c>`,
+    );
   });
 
   it("tracks apostrophe-escaped brackets in structured references", async () => {
-    const value = "=Table1[[A'[B]]+IFS(TRUE,1)+Table1[[A']B]]+CONCAT(A1)+Table1[[A'']]+XOR(TRUE,FALSE)";
-    const {entries} = await readZip(exportXlsx({
-      sheetOrder: ["data"],
-      sheets: {data: sheet("Data")},
-      cells: {data: {A1: cell(value)}},
-    }));
+    const value =
+      "=Table1[[A'[B]]+IFS(TRUE,1)+Table1[[A']B]]+CONCAT(A1)+Table1[[A'']]+XOR(TRUE,FALSE)";
+    const { entries } = await readZip(
+      exportXlsx({
+        sheetOrder: ["data"],
+        sheets: { data: sheet("Data") },
+        cells: { data: { A1: cell(value) } },
+      }),
+    );
 
-    expect(cellXml(text(entries, "xl/worksheets/sheet1.xml"), "A1"))
-      .toContain("<f>Table1[[A'[B]]+_xlfn.IFS(TRUE,1)+Table1[[A']B]]+_xlfn.CONCAT(A1)+Table1[[A'']]+_xlfn.XOR(TRUE,FALSE)</f>");
+    expect(cellXml(text(entries, "xl/worksheets/sheet1.xml"), "A1")).toContain(
+      "<f>Table1[[A'[B]]+_xlfn.IFS(TRUE,1)+Table1[[A']B]]+_xlfn.CONCAT(A1)+Table1[[A'']]+_xlfn.XOR(TRUE,FALSE)</f>",
+    );
   });
 
   it("prepares large duplicate sheet-name lists without quadratic suffix searches", async () => {
-    const sheetIds = Array.from({length: 15000}, (_, index) => `sheet-${index}`);
-    const metadata = Object.fromEntries(sheetIds.map((id, index) => [
-      id,
-      sheet("x".repeat(27) + Math.floor(index / 2).toString(36).padStart(4, "0")),
-    ]));
-    const stream = exportXlsx({sheetOrder: sheetIds, sheets: metadata, cells: {}});
+    const sheetIds = Array.from({ length: 15000 }, (_, index) => `sheet-${index}`);
+    const metadata = Object.fromEntries(
+      sheetIds.map((id, index) => [
+        id,
+        sheet(
+          "x".repeat(27) +
+            Math.floor(index / 2)
+              .toString(36)
+              .padStart(4, "0"),
+        ),
+      ]),
+    );
+    const stream = exportXlsx({ sheetOrder: sheetIds, sheets: metadata, cells: {} });
 
     await stream.cancel();
   });
@@ -442,8 +530,8 @@ describe("Workspace Sheets XLSX", () => {
         data: sheet("Data", {
           rows: 10,
           cols: 12,
-          colWidths: {0: 100, 10: 2000, 11: 92, 12: 150},
-          rowHeights: {1: 40, 9: 2000, 10: 80},
+          colWidths: { 0: 100, 10: 2000, 11: 92, 12: 150 },
+          rowHeights: { 1: 40, 9: 2000, 10: 80 },
           frozenRows: 2,
           frozenCols: 3,
         }),
@@ -458,18 +546,18 @@ describe("Workspace Sheets XLSX", () => {
           F1: cell("FALSE"),
           G1: cell("+$1,234.50"),
           H1: cell("-12.5%"),
-          I1: cell("42", {nf: "text"}),
+          I1: cell("42", { nf: "text" }),
           J1: cell("https://example.com"),
           K1: cell("==A1"),
-          L1: cell("2026-09-02", {nf: "date"}),
+          L1: cell("2026-09-02", { nf: "date" }),
           A10: cell('="_x0041_"'),
-          B10: cell("=A1", {nf: "text"}),
+          B10: cell("=A1", { nf: "text" }),
           C10: cell("last"),
           D10: cell("=[Book.xlsx]Data!A1+Jan:Data!A1"),
           E10: cell("   "),
           Z1: cell("outside declared columns"),
           M1: cell("'=A1"),
-          N1: cell("TRUE", {nf: "text"}),
+          N1: cell("TRUE", { nf: "text" }),
           A11: cell("outside declared rows"),
           XFD1048576: cell("last Excel cell"),
           A0: cell("bad"),
@@ -479,7 +567,7 @@ describe("Workspace Sheets XLSX", () => {
         },
       },
     };
-    const {entries} = await readZip(exportXlsx(document));
+    const { entries } = await readZip(exportXlsx(document));
     const xml = text(entries, "xl/worksheets/sheet1.xml");
 
     expect(xml).toContain('<dimension ref="A1:XFD1048576"/>');
@@ -489,7 +577,9 @@ describe("Workspace Sheets XLSX", () => {
     expect(xml).toContain('<col min="11" max="11" width="255" customWidth="1"/>');
     expect(xml).toContain('<row r="2" ht="30" customHeight="1">');
     expect(xml).toContain('<row r="10" ht="409" customHeight="1">');
-    expect(xml).toContain('<pane xSplit="3" ySplit="2" topLeftCell="D3" activePane="bottomRight" state="frozen"/>');
+    expect(xml).toContain(
+      '<pane xSplit="3" ySplit="2" topLeftCell="D3" activePane="bottomRight" state="frozen"/>',
+    );
     expect(cellXml(xml, "A1")).toContain('<t xml:space="preserve">  &lt;&amp;&gt;" \t\n</t>');
     expect(cellXml(xml, "B1")).toContain("_x005F_x0041__x0001__xFFFD__x000D_");
     expect(cellXml(xml, "B1")).toContain(String.fromCodePoint(0x1f642));
@@ -514,38 +604,44 @@ describe("Workspace Sheets XLSX", () => {
     expect(styleId(xml, "N1")).toBe(styleId(xml, "I1"));
     expect(cellXml(xml, "A11")).toContain("outside declared rows");
     expect(cellXml(xml, "XFD1048576")).toContain("last Excel cell");
-    for (const reference of ["A0", "a1", "XFE1", "A1048577"]) expect(xml).not.toContain(`r="${reference}"`);
+    for (const reference of ["A0", "a1", "XFE1", "A1048577"])
+      expect(xml).not.toContain(`r="${reference}"`);
   });
 
   it("batches worksheet XML while exporting the maximum stored cell count", async () => {
     const NativeCompressionStream = CompressionStream;
     let compressorWrites = 0;
-    vi.stubGlobal("CompressionStream", class {
-      readonly readable: ReadableStream<Uint8Array>;
-      readonly writable: WritableStream<Uint8Array>;
-      constructor(format: ConstructorParameters<typeof CompressionStream>[0]) {
-        const compressor = new NativeCompressionStream(format);
-        const counter = new TransformStream<Uint8Array, Uint8Array>({
-          transform(chunk, controller) {
-            ++compressorWrites;
-            controller.enqueue(chunk);
-          },
-        });
-        void counter.readable.pipeTo(compressor.writable);
-        this.readable = compressor.readable;
-        this.writable = counter.writable;
-      }
-    });
+    vi.stubGlobal(
+      "CompressionStream",
+      class {
+        readonly readable: ReadableStream<Uint8Array>;
+        readonly writable: WritableStream<Uint8Array>;
+        constructor(format: ConstructorParameters<typeof CompressionStream>[0]) {
+          const compressor = new NativeCompressionStream(format);
+          const counter = new TransformStream<Uint8Array, Uint8Array>({
+            transform(chunk, controller) {
+              ++compressorWrites;
+              controller.enqueue(chunk);
+            },
+          });
+          void counter.readable.pipeTo(compressor.writable);
+          this.readable = compressor.readable;
+          this.writable = counter.writable;
+        }
+      },
+    );
     const cells: Record<string, ReturnType<typeof cell>> = {};
     for (let index = 0; index < 200000; ++index) {
-      cells[String.fromCharCode(65 + index % 4) + (Math.floor(index / 4) + 1)] = cell("1");
+      cells[String.fromCharCode(65 + (index % 4)) + (Math.floor(index / 4) + 1)] = cell("1");
     }
     try {
-      const {entries} = await readZip(exportXlsx({
-        sheetOrder: ["dense"],
-        sheets: {dense: sheet("Dense", {rows: 50000, cols: 4})},
-        cells: {dense: cells},
-      }));
+      const { entries } = await readZip(
+        exportXlsx({
+          sheetOrder: ["dense"],
+          sheets: { dense: sheet("Dense", { rows: 50000, cols: 4 }) },
+          cells: { dense: cells },
+        }),
+      );
       const worksheet = text(entries, "xl/worksheets/sheet1.xml");
 
       expect(worksheet).toContain('<dimension ref="A1:D50000"/>');
@@ -559,26 +655,42 @@ describe("Workspace Sheets XLSX", () => {
 
   it("deduplicates styles while supporting every format field and number-format category", async () => {
     const formats = {
-      A1: {b: true}, B1: {i: true}, C1: {u: true}, D1: {s: true},
-      E1: {c: "#abc"}, F1: {bg: "#1234"}, G1: {a: "c"}, H1: {nf: "number", d: 3},
-      I1: {fs: 18}, J1: {wrap: true}, K1: {nf: "text"}, L1: {nf: "integer"},
-      M1: {nf: "currency"}, N1: {nf: "percent"}, O1: {nf: "scientific"},
-      P1: {nf: "date"}, Q1: {nf: "time"}, R1: {nf: "datetime"},
-      S1: {nf: "unknown"}, T1: {d: 4},
+      A1: { b: true },
+      B1: { i: true },
+      C1: { u: true },
+      D1: { s: true },
+      E1: { c: "#abc" },
+      F1: { bg: "#1234" },
+      G1: { a: "c" },
+      H1: { nf: "number", d: 3 },
+      I1: { fs: 18 },
+      J1: { wrap: true },
+      K1: { nf: "text" },
+      L1: { nf: "integer" },
+      M1: { nf: "currency" },
+      N1: { nf: "percent" },
+      O1: { nf: "scientific" },
+      P1: { nf: "date" },
+      Q1: { nf: "time" },
+      R1: { nf: "datetime" },
+      S1: { nf: "unknown" },
+      T1: { d: 4 },
     };
     const cells: Record<string, ReturnType<typeof cell>> = {};
     for (const [reference, fmt] of Object.entries(formats)) cells[reference] = cell("1", fmt);
-    const repeated = {b: true, bg: "#112233", a: "r"};
+    const repeated = { b: true, bg: "#112233", a: "r" };
     cells.A2 = cell("same", repeated);
-    cells.B2 = cell("same", {...repeated});
-    cells.C2 = cell("", {...repeated});
-    cells.D2 = cell("eight digit", {c: "#abcdef12"});
+    cells.B2 = cell("same", { ...repeated });
+    cells.C2 = cell("", { ...repeated });
+    cells.D2 = cell("eight digit", { c: "#abcdef12" });
 
-    const {entries} = await readZip(exportXlsx({
-      sheetOrder: ["styles"],
-      sheets: {styles: sheet("Styles", {rows: 2, cols: 20})},
-      cells: {styles: cells},
-    }));
+    const { entries } = await readZip(
+      exportXlsx({
+        sheetOrder: ["styles"],
+        sheets: { styles: sheet("Styles", { rows: 2, cols: 20 }) },
+        cells: { styles: cells },
+      }),
+    );
     const worksheet = text(entries, "xl/worksheets/sheet1.xml");
     const styles = text(entries, "xl/styles.xml");
 
@@ -595,10 +707,17 @@ describe("Workspace Sheets XLSX", () => {
     expect(styles).toContain('wrapText="1"');
     expect(styles).toContain('<sz val="13.5"/>');
     for (const code of [
-      "#,##0.000", "#,##0", '&quot;$&quot;#,##0.00;-&quot;$&quot;#,##0.00',
-      "#,##0.00%", "0.00E+00", "mm/dd/yyyy", "h:mm:ss AM/PM",
-      "mm/dd/yyyy h:mm:ss AM/PM", "0.0000",
-    ]) expect(styles).toContain(`formatCode="${code}"`);
+      "#,##0.000",
+      "#,##0",
+      "&quot;$&quot;#,##0.00;-&quot;$&quot;#,##0.00",
+      "#,##0.00%",
+      "0.00E+00",
+      "mm/dd/yyyy",
+      "h:mm:ss AM/PM",
+      "mm/dd/yyyy h:mm:ss AM/PM",
+      "0.0000",
+    ])
+      expect(styles).toContain(`formatCode="${code}"`);
     expect(styleId(worksheet, "S1")).toBeUndefined();
     expect(styleId(worksheet, "A2")).toBe(styleId(worksheet, "B2"));
     expect(styleId(worksheet, "B2")).toBe(styleId(worksheet, "C2"));
@@ -606,31 +725,41 @@ describe("Workspace Sheets XLSX", () => {
   });
 
   it("writes row-only, column-only, and combined frozen panes", async () => {
-    const {entries} = await readZip(exportXlsx({
-      sheetOrder: ["rows", "columns", "both"],
-      sheets: {
-        rows: sheet("Rows", {frozenRows: 2}),
-        columns: sheet("Columns", {frozenCols: 3}),
-        both: sheet("Both", {frozenRows: 4, frozenCols: 5}),
-      },
-      cells: {rows: {}, columns: {}, both: {}},
-    }));
-    expect(text(entries, "xl/worksheets/sheet1.xml")).toContain('ySplit="2" topLeftCell="A3" activePane="bottomLeft"');
-    expect(text(entries, "xl/worksheets/sheet2.xml")).toContain('xSplit="3" topLeftCell="D1" activePane="topRight"');
-    expect(text(entries, "xl/worksheets/sheet3.xml")).toContain('xSplit="5" ySplit="4" topLeftCell="F5" activePane="bottomRight"');
+    const { entries } = await readZip(
+      exportXlsx({
+        sheetOrder: ["rows", "columns", "both"],
+        sheets: {
+          rows: sheet("Rows", { frozenRows: 2 }),
+          columns: sheet("Columns", { frozenCols: 3 }),
+          both: sheet("Both", { frozenRows: 4, frozenCols: 5 }),
+        },
+        cells: { rows: {}, columns: {}, both: {} },
+      }),
+    );
+    expect(text(entries, "xl/worksheets/sheet1.xml")).toContain(
+      'ySplit="2" topLeftCell="A3" activePane="bottomLeft"',
+    );
+    expect(text(entries, "xl/worksheets/sheet2.xml")).toContain(
+      'xSplit="3" topLeftCell="D1" activePane="topRight"',
+    );
+    expect(text(entries, "xl/worksheets/sheet3.xml")).toContain(
+      'xSplit="5" ySplit="4" topLeftCell="F5" activePane="bottomRight"',
+    );
   });
 
   it("fails clearly before generating more fill styles than Excel supports", () => {
     const cells: Record<string, ReturnType<typeof cell>> = {};
     for (let index = 0; index < 255; ++index) {
-      const reference = String.fromCharCode(65 + index % 26) + (Math.floor(index / 26) + 1);
-      cells[reference] = cell("", {bg: `#${index.toString(16).padStart(6, "0")}`});
+      const reference = String.fromCharCode(65 + (index % 26)) + (Math.floor(index / 26) + 1);
+      cells[reference] = cell("", { bg: `#${index.toString(16).padStart(6, "0")}` });
     }
-    expect(() => exportXlsx({
-      sheetOrder: ["styles"],
-      sheets: {styles: sheet("Styles", {rows: 10, cols: 26})},
-      cells: {styles: cells},
-    })).toThrow("XLSX fill count exceeds Excel's limit of 256");
+    expect(() =>
+      exportXlsx({
+        sheetOrder: ["styles"],
+        sheets: { styles: sheet("Styles", { rows: 10, cols: 26 }) },
+        cells: { styles: cells },
+      }),
+    ).toThrow("XLSX fill count exceeds Excel's limit of 256");
   });
 
   it("ignores v5-only metadata while exporting ordinary and materialized pivot cells", async () => {
@@ -639,16 +768,16 @@ describe("Workspace Sheets XLSX", () => {
       sheets: {
         v5: {
           ...sheet("V5"),
-          filter: {range: "A1:B4"},
-          charts: [{type: "bar"}],
-          comments: {A1: "note"},
-          pivot: {source: "A1:B4", destination: "D1"},
+          filter: { range: "A1:B4" },
+          charts: [{ type: "bar" }],
+          comments: { A1: "note" },
+          pivot: { source: "A1:B4", destination: "D1" },
         },
       },
       cells: {
         v5: {
-          A1: {...cell("ordinary"), comment: "ignored"},
-          D1: cell("Pivot total", {b: true}),
+          A1: { ...cell("ordinary"), comment: "ignored" },
+          D1: cell("Pivot total", { b: true }),
           D2: cell("125"),
         },
       },
@@ -657,35 +786,35 @@ describe("Workspace Sheets XLSX", () => {
       comments: {},
       pivot: {},
     };
-    const {entries} = await readZip(exportXlsx(document));
+    const { entries } = await readZip(exportXlsx(document));
     const worksheet = text(entries, "xl/worksheets/sheet1.xml");
     expect(cellXml(worksheet, "A1")).toContain("ordinary");
     expect(cellXml(worksheet, "D1")).toContain("Pivot total");
     expect(cellXml(worksheet, "D2")).toContain("<v>125</v>");
     expect(worksheet).not.toContain("autoFilter");
-    expect([...entries.keys()].some(name => /chart|comment|pivot/i.test(name))).toBe(false);
+    expect([...entries.keys()].some((name) => /chart|comment|pivot/i.test(name))).toBe(false);
   });
 });
 
 describe("Workspace Sheets document snapshots", () => {
   it("completes a queued document read before beginning the next mutation", async () => {
-    const {promise: readReleased, resolve: releaseRead} = Promise.withResolvers<void>();
-    const {promise: readStarted, resolve: markReadStarted} = Promise.withResolvers<void>();
+    const { promise: readReleased, resolve: releaseRead } = Promise.withResolvers<void>();
+    const { promise: readStarted, resolve: markReadStarted } = Promise.withResolvers<void>();
     const order: string[] = [];
     const fixture = Object.assign(Object.create(Gadget.prototype), {
       mutations: new MutationQueue(),
-      loadMeta: vi.fn(async () => ({revision: 1})),
+      loadMeta: vi.fn(async () => ({ revision: 1 })),
       assembleDocument: vi.fn(async () => {
         order.push("read started");
         markReadStarted();
         await readReleased;
         order.push("read completed");
-        return {revision: 1};
+        return { revision: 1 };
       }),
       applyOperationLocked: vi.fn(async () => {
         order.push("write started");
         order.push("write completed");
-        return {result: {status: "applied"}};
+        return { result: { status: "applied" } };
       }),
     });
 
@@ -696,25 +825,31 @@ describe("Workspace Sheets document snapshots", () => {
     expect(fixture.applyOperationLocked).not.toHaveBeenCalled();
 
     releaseRead();
-    await expect(read).resolves.toEqual({revision: 1});
-    await expect(write).resolves.toEqual({status: "applied"});
+    await expect(read).resolves.toEqual({ revision: 1 });
+    await expect(write).resolves.toEqual({ status: "applied" });
     expect(order).toEqual(["read started", "read completed", "write started", "write completed"]);
   });
 
   it("lets a subscriber callback read and write the document without holding up the save", async () => {
     const subscribers = registryOf();
     const fixture = inMemoryGadget(subscribers);
-    const events: {revision: number}[] = [];
-    const documents: {revision: number; cells: Record<string, Record<string, {value: string}>>}[] = [];
-    const {promise: callbacksFinished, resolve: finishCallbacks} = Promise.withResolvers<void>();
-    subscribers.add(stub({
-      operation: vi.fn(async (event: {revision: number}) => {
-        events.push(event);
-        documents.push(await fixture.getDocument());
-        if (event.revision === 1) await fixture.applyOperation(setCell("B1", "from callback"));
-        else finishCallbacks();
-      }),
-    }) as never, {clientId: "", name: "", color: ""});
+    const events: { revision: number }[] = [];
+    const documents: {
+      revision: number;
+      cells: Record<string, Record<string, { value: string }>>;
+    }[] = [];
+    const { promise: callbacksFinished, resolve: finishCallbacks } = Promise.withResolvers<void>();
+    subscribers.add(
+      stub({
+        operation: vi.fn(async (event: { revision: number }) => {
+          events.push(event);
+          documents.push(await fixture.getDocument());
+          if (event.revision === 1) await fixture.applyOperation(setCell("B1", "from callback"));
+          else finishCallbacks();
+        }),
+      }) as never,
+      { clientId: "", name: "", color: "" },
+    );
 
     const result = await fixture.applyOperation(setCell("A1", "committed"));
     expect(result.status).toBe("applied");
@@ -722,7 +857,7 @@ describe("Workspace Sheets document snapshots", () => {
     expect(events).toHaveLength(1);
 
     await callbacksFinished;
-    expect(events.map(event => event.revision)).toEqual([1, 2]);
+    expect(events.map((event) => event.revision)).toEqual([1, 2]);
     expect(events[0]).not.toHaveProperty("status");
     expect(events[0]).not.toHaveProperty("conflicts");
     expect(documents[0].revision).toBe(1);
@@ -731,8 +866,12 @@ describe("Workspace Sheets document snapshots", () => {
   });
 
   it("drops and disposes a subscriber whose callback fails, and does not wait on one that hangs", async () => {
-    const failing = stub({operation: vi.fn(async () => { throw new Error("broken"); })});
-    const hung = stub({operation: vi.fn(() => new Promise(() => {}))});
+    const failing = stub({
+      operation: vi.fn(async () => {
+        throw new Error("broken");
+      }),
+    });
+    const hung = stub({ operation: vi.fn(() => new Promise(() => {})) });
     const fixture = inMemoryGadget(registryOf(failing, hung));
 
     const result = await fixture.applyOperation(setCell("A1", "value"));
@@ -745,11 +884,11 @@ describe("Workspace Sheets document snapshots", () => {
   });
 
   it("does not broadcast unchanged or conflicting-only operations", async () => {
-    const subscriber = stub({operation: vi.fn()});
+    const subscriber = stub({ operation: vi.fn() });
     const fixture = inMemoryGadget(registryOf(subscriber));
     await fixture.applyOperation(setCell("A1", "first"));
     const conflict = await fixture.applyOperation(setCell("A1", "stale", 0));
-    const unchanged = await fixture.applyOperation({senderId: "test", cellOps: []});
+    const unchanged = await fixture.applyOperation({ senderId: "test", cellOps: [] });
 
     expect(conflict.status).toBe("conflict");
     expect(conflict.conflicts).toHaveLength(1);
@@ -759,14 +898,17 @@ describe("Workspace Sheets document snapshots", () => {
 
   it("registers a subscriber and takes its snapshot inside the mutation queue", async () => {
     const fixture = inMemoryGadget();
-    const newcomer = {presence: vi.fn(), operation: vi.fn(), onRpcBroken: vi.fn()};
-    const {promise: writeReleased, resolve: releaseWrite} = Promise.withResolvers<void>();
+    const newcomer = { presence: vi.fn(), operation: vi.fn(), onRpcBroken: vi.fn() };
+    const { promise: writeReleased, resolve: releaseWrite } = Promise.withResolvers<void>();
     const original = fixture.applyOperationLocked.bind(fixture);
-    fixture.applyOperationLocked = async (operation: Operation) => { await writeReleased; return original(operation); };
+    fixture.applyOperationLocked = async (operation: Operation) => {
+      await writeReleased;
+      return original(operation);
+    };
 
     const writing = fixture.applyOperation(setCell("A1", "before subscribe"));
-    const callback = {dup: vi.fn(() => newcomer)};
-    const subscribing = fixture.subscribe(callback as never, {clientId: "newcomer"});
+    const callback = { dup: vi.fn(() => newcomer) };
+    const subscribing = fixture.subscribe(callback as never, { clientId: "newcomer" });
     await Promise.resolve();
     expect(callback.dup).not.toHaveBeenCalled();
 
@@ -783,12 +925,14 @@ describe("Workspace Sheets document snapshots", () => {
     const fixture = inMemoryGadget();
     const loadMeta = fixture.loadMeta.bind(fixture);
     fixture.loadMeta = vi.fn(loadMeta).mockRejectedValueOnce(new Error("storage unavailable"));
-    const callback = {dup: vi.fn()};
+    const callback = { dup: vi.fn() };
 
     await expect(fixture.subscribe(callback as never)).rejects.toThrow("storage unavailable");
     expect(callback.dup).not.toHaveBeenCalled();
     expect(fixture.subscribers.size).toBe(0);
-    await expect(fixture.applyOperation(setCell("A1", "still works"))).resolves.toMatchObject({status: "applied"});
+    await expect(fixture.applyOperation(setCell("A1", "still works"))).resolves.toMatchObject({
+      status: "applied",
+    });
   });
 });
 
@@ -796,22 +940,29 @@ describe("Workspace Sheets cell formatting", () => {
   it("keeps only string colours, dropping a value whose string form merely looks like one", async () => {
     const fixture = inMemoryGadget();
     // Deliberately not a CellFmt: a colour that is not a string, and a key the protocol does not have.
-    const fmt = {c: ["#abc"], bg: "#123456", b: true, a: "c", fs: 12, x: true} as never;
-    await fixture.applyOperation({senderId: "test", cellOps: [{sheetId: "sheet", ref: "A1", value: "v", fmt, baseVersion: 0}]});
+    const fmt = { c: ["#abc"], bg: "#123456", b: true, a: "c", fs: 12, x: true } as never;
+    await fixture.applyOperation({
+      senderId: "test",
+      cellOps: [{ sheetId: "sheet", ref: "A1", value: "v", fmt, baseVersion: 0 }],
+    });
 
     const document = await fixture.getDocument();
-    expect(document.cells.sheet.A1.fmt).toEqual({bg: "#123456", b: true, a: "c", fs: 12});
+    expect(document.cells.sheet.A1.fmt).toEqual({ bg: "#123456", b: true, a: "c", fs: 12 });
   });
 });
 
 describe("Workspace Sheets export formats", () => {
   it("reserves one of 32 slots for XLSX and applies the same CSV eligibility rules at export", async () => {
-    const ids = Array.from({length: 40}, (_, index) => `sheet-${index}`);
+    const ids = Array.from({ length: 40 }, (_, index) => `sheet-${index}`);
     const longId = "x".repeat(125);
     const sheetOrder = [ids[0], ids[0], longId, ...ids.slice(1)];
-    const sheets = Object.fromEntries([...ids, longId].map(id => [id, sheet(id)]));
-    const document = {sheetOrder, sheets, cells: Object.fromEntries(Object.keys(sheets).map(id => [id, {}]))};
-    const gadget = {getDocument: vi.fn(async () => document)};
+    const sheets = Object.fromEntries([...ids, longId].map((id) => [id, sheet(id)]));
+    const document = {
+      sheetOrder,
+      sheets,
+      cells: Object.fromEntries(Object.keys(sheets).map((id) => [id, {}])),
+    };
+    const gadget = { getDocument: vi.fn(async () => document) };
 
     const formats = await handler().getExportFormats(gadget as never);
     expect(formats).toHaveLength(32);
@@ -822,9 +973,9 @@ describe("Workspace Sheets export formats", () => {
       contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       fileExtension: ".xlsx",
     });
-    expect(new Set(formats.map(format => format.id)).size).toBe(32);
-    expect(formats.some(format => format.id === `csv:${longId}`)).toBe(false);
-    expect(formats.some(format => format.id === "csv:sheet-39")).toBe(false);
+    expect(new Set(formats.map((format) => format.id)).size).toBe(32);
+    expect(formats.some((format) => format.id === `csv:${longId}`)).toBe(false);
+    expect(formats.some((format) => format.id === "csv:sheet-39")).toBe(false);
     await expect(handler().export(gadget as never, "csv:sheet-39")).rejects.toThrow("unavailable");
     await expect(handler().export(gadget as never, "pdf")).rejects.toThrow("Unsupported");
   });
@@ -832,21 +983,25 @@ describe("Workspace Sheets export formats", () => {
   it("retains raw-value CSV behavior and materializes state before returning an XLSX stream", async () => {
     const document = {
       sheetOrder: ["one"],
-      sheets: {one: sheet("One", {rows: 2, cols: 3})},
-      cells: {one: {
-        A1: cell("a,b"),
-        C1: cell('say "hi"'),
-        B2: cell("=SUM(A1:A2)"),
-      }},
+      sheets: { one: sheet("One", { rows: 2, cols: 3 }) },
+      cells: {
+        one: {
+          A1: cell("a,b"),
+          C1: cell('say "hi"'),
+          B2: cell("=SUM(A1:A2)"),
+        },
+      },
     };
-    const gadget = {getDocument: vi.fn(async () => document)};
+    const gadget = { getDocument: vi.fn(async () => document) };
     const csv = await handler().export(gadget as never, "csv:one");
     expect(await new Response(csv).text()).toBe('"a,b",,"say ""hi"""\r\n,=SUM(A1:A2),\r\n');
 
     const xlsx = await handler().export(gadget as never, "xlsx");
     expect(gadget.getDocument).toHaveBeenCalledTimes(2);
-    gadget.getDocument.mockImplementation(async () => { throw new Error("borrowed capability reused"); });
-    const {entries} = await readZip(xlsx);
+    gadget.getDocument.mockImplementation(async () => {
+      throw new Error("borrowed capability reused");
+    });
+    const { entries } = await readZip(xlsx);
     expect(cellXml(text(entries, "xl/worksheets/sheet1.xml"), "B2")).toContain("<f>SUM(A1:A2)</f>");
   });
 });

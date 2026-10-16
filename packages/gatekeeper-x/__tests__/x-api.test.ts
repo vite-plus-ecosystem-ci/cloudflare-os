@@ -1,13 +1,31 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
-  XApi, XApiError, XCreditsError, XRateLimitError, XTransportError, billableResources, isOutcomeUnknown,
-  isXAuthError, pageQuery, requireData, requirePage, requireResult, xTime,
+  XApi,
+  XApiError,
+  XCreditsError,
+  XRateLimitError,
+  XTransportError,
+  billableResources,
+  isOutcomeUnknown,
+  isXAuthError,
+  pageQuery,
+  requireData,
+  requirePage,
+  requireResult,
+  xTime,
 } from "../src/x-api";
 
 function respond(status: number, body?: unknown, headers: Record<string, string> = {}): void {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(
-    body === undefined ? null : typeof body === "string" ? body : JSON.stringify(body),
-    { status, headers })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          body === undefined ? null : typeof body === "string" ? body : JSON.stringify(body),
+          { status, headers },
+        ),
+    ),
+  );
 }
 
 async function failure(promise: Promise<unknown>): Promise<unknown> {
@@ -24,10 +42,17 @@ afterEach(() => vi.unstubAllGlobals());
 describe("XApi requests", () => {
   it("sends the bearer token and only the query values given", async () => {
     respond(200, { data: [] });
-    await new XApi("token-1").get("/2/users/1/tweets", { max_results: 5, pagination_token: undefined });
+    await new XApi("token-1").get("/2/users/1/tweets", {
+      max_results: 5,
+      pagination_token: undefined,
+    });
     const [url, init] = vi.mocked(fetch).mock.calls[0];
     expect(url).toBe("https://api.x.com/2/users/1/tweets?max_results=5");
-    expect(init).toMatchObject({ method: "GET", redirect: "manual", headers: { Authorization: "Bearer token-1" } });
+    expect(init).toMatchObject({
+      method: "GET",
+      redirect: "manual",
+      headers: { Authorization: "Bearer token-1" },
+    });
   });
 
   it("posts JSON", async () => {
@@ -52,7 +77,9 @@ describe("XApi requests", () => {
 
   it("refuses an upload that names no media", async () => {
     respond(200, { data: {} });
-    expect(await failure(new XApi("t").uploadImage(new Uint8Array([1]), "image/png"))).toBeInstanceOf(XApiError);
+    expect(
+      await failure(new XApi("t").uploadImage(new Uint8Array([1]), "image/png")),
+    ).toBeInstanceOf(XApiError);
   });
 });
 
@@ -69,7 +96,10 @@ describe("XApi failures", () => {
   it("reads exhausted credits as such, whatever the status", async () => {
     respond(402, { title: "Payment Required" });
     expect(await failure(new XApi("t").get("/2/users/me"))).toBeInstanceOf(XCreditsError);
-    respond(429, { type: "https://api.twitter.com/2/problems/usage-capped", title: "Usage capped" });
+    respond(429, {
+      type: "https://api.twitter.com/2/problems/usage-capped",
+      title: "Usage capped",
+    });
     expect(await failure(new XApi("t").get("/2/users/me"))).toBeInstanceOf(XCreditsError);
   });
 
@@ -81,7 +111,9 @@ describe("XApi failures", () => {
     const duplicate = await failure(new XApi("t").post("/2/tweets", { text: "x" }));
     expect(isXAuthError(duplicate)).toBe(false);
     expect((duplicate as XApiError).isDuplicate).toBe(true);
-    expect((duplicate as Error).message).toBe("X: You are not allowed to create a Tweet with duplicate content.");
+    expect((duplicate as Error).message).toBe(
+      "X: You are not allowed to create a Tweet with duplicate content.",
+    );
   });
 
   it("never follows a redirect", async () => {
@@ -91,14 +123,23 @@ describe("XApi failures", () => {
   });
 
   it("reads a lost answer as an unknown outcome", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("network connection lost"); }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("network connection lost");
+      }),
+    );
     const lost = await failure(new XApi("t").post("/2/tweets", { text: "x" }));
     expect(lost).toBeInstanceOf(XTransportError);
     expect(isOutcomeUnknown(lost)).toBe(true);
     respond(503, "upstream unavailable");
-    expect(isOutcomeUnknown(await failure(new XApi("t").post("/2/tweets", { text: "x" })))).toBe(true);
+    expect(isOutcomeUnknown(await failure(new XApi("t").post("/2/tweets", { text: "x" })))).toBe(
+      true,
+    );
     respond(400, { detail: "bad" });
-    expect(isOutcomeUnknown(await failure(new XApi("t").post("/2/tweets", { text: "x" })))).toBe(false);
+    expect(isOutcomeUnknown(await failure(new XApi("t").post("/2/tweets", { text: "x" })))).toBe(
+      false,
+    );
   });
 
   it("reads a success that is not JSON as an answer it couldn't read", async () => {
@@ -109,24 +150,51 @@ describe("XApi failures", () => {
 
 describe("requireData", () => {
   it("reads X's in-band errors as not found or not visible", () => {
-    expect(() => requireData({ errors: [{ type: "https://api.twitter.com/2/problems/resource-not-found" }] }, "post"))
-      .toThrow(expect.objectContaining({ status: 404, message: "X has no post with that ID, or it was deleted." }));
-    expect(() => requireData({ errors: [{ type: "https://api.twitter.com/2/problems/not-authorized-for-resource" }] }, "post"))
-      .toThrow(expect.objectContaining({ status: 403 }));
+    expect(() =>
+      requireData(
+        { errors: [{ type: "https://api.twitter.com/2/problems/resource-not-found" }] },
+        "post",
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        status: 404,
+        message: "X has no post with that ID, or it was deleted.",
+      }),
+    );
+    expect(() =>
+      requireData(
+        { errors: [{ type: "https://api.twitter.com/2/problems/not-authorized-for-resource" }] },
+        "post",
+      ),
+    ).toThrow(expect.objectContaining({ status: 403 }));
     expect(requireData({ data: { id: "1" } }, "post")).toEqual({ id: "1" });
   });
 });
 
 describe("requirePage", () => {
   it("fails a page X answered with errors in place of rows, in X's words", () => {
-    expect(() => requirePage({ errors: [{ title: "Internal Error", detail: "Something went wrong.", type: "about:blank" }] }))
-      .toThrow(expect.objectContaining({ message: "X: Something went wrong." }));
-    expect(() => requirePage({ errors: [{ type: "https://api.twitter.com/2/problems/resource-not-found", detail: "No such List." }] }))
-      .toThrow(expect.objectContaining({ status: 404, message: "X: No such List." }));
+    expect(() =>
+      requirePage({
+        errors: [{ title: "Internal Error", detail: "Something went wrong.", type: "about:blank" }],
+      }),
+    ).toThrow(expect.objectContaining({ message: "X: Something went wrong." }));
+    expect(() =>
+      requirePage({
+        errors: [
+          {
+            type: "https://api.twitter.com/2/problems/resource-not-found",
+            detail: "No such List.",
+          },
+        ],
+      }),
+    ).toThrow(expect.objectContaining({ status: 404, message: "X: No such List." }));
   });
 
   it("keeps a page with rows, whatever partial errors come with them, and an empty one", () => {
-    const partial = { data: [{ id: "1" }], errors: [{ type: "https://api.twitter.com/2/problems/resource-not-found" }] };
+    const partial = {
+      data: [{ id: "1" }],
+      errors: [{ type: "https://api.twitter.com/2/problems/resource-not-found" }],
+    };
     expect(requirePage(partial)).toBe(partial);
     expect(requirePage({ meta: { result_count: 0 } })).toEqual({ meta: { result_count: 0 } });
   });
@@ -134,24 +202,51 @@ describe("requirePage", () => {
 
 describe("requireResult", () => {
   it("fails a write X answered with errors in place of its result, to try again unless X refused it", () => {
-    expect(() => requireResult({ errors: [{ title: "Internal Error", detail: "Something went wrong.", type: "about:blank" }] }))
-      .toThrow(expect.objectContaining({ status: 502, message: "X: Something went wrong." }));
-    expect(() => requireResult({ errors: [{ type: "https://api.twitter.com/2/problems/resource-not-found", detail: "No such post." }] }))
-      .toThrow(expect.objectContaining({ status: 404 }));
-    const done = { data: { liked: true }, errors: [{ type: "https://api.twitter.com/2/problems/resource-not-found" }] };
+    expect(() =>
+      requireResult({
+        errors: [{ title: "Internal Error", detail: "Something went wrong.", type: "about:blank" }],
+      }),
+    ).toThrow(expect.objectContaining({ status: 502, message: "X: Something went wrong." }));
+    expect(() =>
+      requireResult({
+        errors: [
+          {
+            type: "https://api.twitter.com/2/problems/resource-not-found",
+            detail: "No such post.",
+          },
+        ],
+      }),
+    ).toThrow(expect.objectContaining({ status: 404 }));
+    const done = {
+      data: { liked: true },
+      errors: [{ type: "https://api.twitter.com/2/problems/resource-not-found" }],
+    };
     expect(requireResult(done)).toBe(done);
   });
 });
 
 describe("helpers", () => {
   it("clamps page sizes into each endpoint's bounds", () => {
-    expect(pageQuery(5, undefined, { min: 10, max: 100 }, "next_token")).toEqual({ max_results: 10 });
-    expect(pageQuery(500, "abc", { min: 1, max: 100 })).toEqual({ max_results: 100, pagination_token: "abc" });
-    expect(pageQuery(20, "abc", { min: 10, max: 100 }, "next_token")).toEqual({ max_results: 20, next_token: "abc" });
+    expect(pageQuery(5, undefined, { min: 10, max: 100 }, "next_token")).toEqual({
+      max_results: 10,
+    });
+    expect(pageQuery(500, "abc", { min: 1, max: 100 })).toEqual({
+      max_results: 100,
+      pagination_token: "abc",
+    });
+    expect(pageQuery(20, "abc", { min: 10, max: 100 }, "next_token")).toEqual({
+      max_results: 20,
+      next_token: "abc",
+    });
   });
 
   it("counts what X bills: rows and expanded users and posts", () => {
-    expect(billableResources({ data: [{}, {}], includes: { users: [{ id: "1" }], tweets: [{ id: "2" }] } })).toBe(4);
+    expect(
+      billableResources({
+        data: [{}, {}],
+        includes: { users: [{ id: "1" }], tweets: [{ id: "2" }] },
+      }),
+    ).toBe(4);
     expect(billableResources({ data: { id: "1" } })).toBe(1);
     expect(billableResources({ errors: [{}] })).toBe(0);
   });
