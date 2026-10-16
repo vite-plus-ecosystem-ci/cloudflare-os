@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { listUrl, parseListRef, parsePostRef, parseUsernameRef, parseXUrl, postUrl, profileUrl } from "../src/x-urls";
+import { describe, expect, it } from "vite-plus/test";
+import {
+  listUrl,
+  parseListRef,
+  parsePostRef,
+  parseUsernameRef,
+  parseXUrl,
+  postUrl,
+  profileUrl,
+} from "../src/x-urls";
 
 describe("parseXUrl", () => {
   it.each([
@@ -63,7 +71,7 @@ describe("parseXUrl", () => {
     "javascript:alert(1)",
     "not a url",
     "",
-  ])("names nothing for %j", url => {
+  ])("names nothing for %j", (url) => {
     expect(parseXUrl(url)).toBeNull();
   });
 });

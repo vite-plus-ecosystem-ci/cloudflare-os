@@ -3,12 +3,17 @@
 // even after the binding changes. Drives the real runAgent against a real OverseerImpl, with pi's
 // faux provider standing in for the model.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import {
-  createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall, getCurrentSystemPrompt,
-  type Context, type TranscriptContext,
+  createFauxCore,
+  fauxAssistantMessage,
+  fauxText,
+  fauxToolCall,
+  getCurrentSystemPrompt,
+  type Context,
+  type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import type { AiChatAuthorInfo, AiChatMessage, AiToolCall } from "@gadgets/workshop-shared/api";
 import type { OverseerDurableObject } from "../src/overseer.js";
@@ -31,7 +36,7 @@ async function withImpl(fn: (impl: any) => Promise<void>): Promise<void> {
     let impl = (instance as unknown as { impl: any }).impl;
     // Gatekeeper descriptions come from the gatekeeper's facet; name the target instead.
     impl.describeGatekeeper = async (name: string, gatekeeper: { id: number }) =>
-        `${name} is gatekeeper ${gatekeeper.id}`;
+      `${name} is gatekeeper ${gatekeeper.id}`;
     await fn(impl);
   });
 }
@@ -42,52 +47,80 @@ function seedWorkspace(impl: any): void {
   impl.storage.gatekeepers.put({ id: 5, resourceTitle: "App DB", class: {} as any });
   impl.storage.gatekeepers.put({ id: 6, resourceTitle: "Other DB", class: {} as any });
   impl.storage.gadgets.put({
-    type: "gadget", id: 100, title: "App", created: new Date(0), bindingName: "APP",
+    type: "gadget",
+    id: 100,
+    title: "App",
+    created: new Date(0),
+    bindingName: "APP",
     bindings: { DB: { target: 5 } },
   });
   impl.storage.gadgets.put({
-    type: "gadget", id: 101, title: "Other", created: new Date(0), bindingName: "OTHER",
+    type: "gadget",
+    id: 101,
+    title: "Other",
+    created: new Date(0),
+    bindingName: "OTHER",
     bindings: { DB: { target: 6 } },
   });
-  impl.storage.chatMeta.put(
-      { id: CHAT_ID, title: "Chat", started: new Date(0), lastActive: new Date(0) });
+  impl.storage.chatMeta.put({
+    id: CHAT_ID,
+    title: "Chat",
+    started: new Date(0),
+    lastActive: new Date(0),
+  });
   impl.storage.chats.put({
-    chatId: CHAT_ID, sequence: impl.nextChatSequence(CHAT_ID), timestamp: new Date(0),
-    author: OWNER, type: "message", message: "Hi",
+    chatId: CHAT_ID,
+    sequence: impl.nextChatSequence(CHAT_ID),
+    timestamp: new Date(0),
+    author: OWNER,
+    type: "message",
+    message: "Hi",
   });
 }
 
 // Runs one agent turn whose model answers each step with the next scripted response, returning
 // the context the model saw at each step.
 async function runScriptedTurn(
-    impl: any, steps: ReturnType<typeof fauxAssistantMessage>[]): Promise<Context[]> {
+  impl: any,
+  steps: ReturnType<typeof fauxAssistantMessage>[],
+): Promise<Context[]> {
   let faux = createFauxCore({ models: [{ id: "faux-model" }] });
   let contexts: Context[] = [];
-  faux.setResponses(steps.map(step => (context: TranscriptContext) => {
-    // pi carries the prompt in the transcript's system messages; replay them into one string.
-    contexts.push({
-      systemPrompt: getCurrentSystemPrompt(context.messages),
-      messages: structuredClone(context.messages),
-    });
-    return step;
-  }));
-  await runAgent(impl, { model: faux.getModel(), stream: faux.stream }, CHAT_ID,
-      { type: "agent", id: "faux-model", name: "Faux" }, new AbortController().signal, OWNER,
-      { provider: "cloudflare", model: "faux-model", apiToken: "" } as any);
+  faux.setResponses(
+    steps.map((step) => (context: TranscriptContext) => {
+      // pi carries the prompt in the transcript's system messages; replay them into one string.
+      contexts.push({
+        systemPrompt: getCurrentSystemPrompt(context.messages),
+        messages: structuredClone(context.messages),
+      });
+      return step;
+    }),
+  );
+  await runAgent(
+    impl,
+    { model: faux.getModel(), stream: faux.stream },
+    CHAT_ID,
+    { type: "agent", id: "faux-model", name: "Faux" },
+    new AbortController().signal,
+    OWNER,
+    { provider: "cloudflare", model: "faux-model", apiToken: "" } as any,
+  );
   return contexts;
 }
 
 function describeCalls(impl: any): Extract<AiToolCall, { toolName: "describeBinding" }>[] {
   return ([...impl.storage.chats.list()] as AiChatMessage[])
-      .flatMap(msg => msg.type === "message" ? msg.toolCalls ?? [] : [])
-      .filter(call => call.toolName === "describeBinding");
+    .flatMap((msg) => (msg.type === "message" ? (msg.toolCalls ?? []) : []))
+    .filter((call) => call.toolName === "describeBinding");
 }
 
 // The text of each tool result the model was shown, in order.
 function toolResultTexts(context: Context): string[] {
-  return context.messages.flatMap(message => message.role === "toolResult"
-      ? [message.content.map(part => part.type === "text" ? part.text : "").join("")]
-      : []);
+  return context.messages.flatMap((message) =>
+    message.role === "toolResult"
+      ? [message.content.map((part) => (part.type === "text" ? part.text : "")).join("")]
+      : [],
+  );
 }
 
 const CALLS = [
@@ -102,89 +135,107 @@ const CALLS = [
 // Appends a user message, so another turn can be run.
 function addUserMessage(impl: any, message: string): void {
   impl.storage.chats.put({
-    chatId: CHAT_ID, sequence: impl.nextChatSequence(CHAT_ID),
+    chatId: CHAT_ID,
+    sequence: impl.nextChatSequence(CHAT_ID),
     // Workers clocks don't advance without I/O, and timestamps are indexed uniquely per chat.
     timestamp: new Date(Date.now() + 60_000),
-    author: OWNER, type: "message", message,
+    author: OWNER,
+    type: "message",
+    message,
   });
 }
 
 // Runs a turn making every call in CALLS, returning the context of its final step.
 async function runDescribeTurn(impl: any): Promise<Context> {
   let contexts = await runScriptedTurn(impl, [
-    fauxAssistantMessage(CALLS.map(input => fauxToolCall("describeBinding", input)),
-        { stopReason: "toolUse" }),
+    fauxAssistantMessage(
+      CALLS.map((input) => fauxToolCall("describeBinding", input)),
+      { stopReason: "toolUse" },
+    ),
     fauxAssistantMessage(fauxText("Done.")),
   ]);
   return contexts[1];
 }
 
 describe("describeBinding", () => {
-  it("describes bindings in a gadget's env and records the descriptions",
-      () => withImpl(async impl => {
-    seedWorkspace(impl);
+  it("describes bindings in a gadget's env and records the descriptions", () =>
+    withImpl(async (impl) => {
+      seedWorkspace(impl);
 
-    let context = await runDescribeTurn(impl);
+      let context = await runDescribeTurn(impl);
 
-    // The system prompt points the agent at the tool for the binding it can't reach by name.
-    expect(context.systemPrompt).toContain(
+      // The system prompt points the agent at the tool for the binding it can't reach by name.
+      expect(context.systemPrompt).toContain(
         `* DB: Other DB — (no binding for this in your env; describeBinding with ` +
-        `\`gadget: "OTHER"\` describes it)`);
-    expect(context.systemPrompt).toContain("* DB: App DB — in your env as `env.DB`");
+          `\`gadget: "OTHER"\` describes it)`,
+      );
+      expect(context.systemPrompt).toContain("* DB: App DB — in your env as `env.DB`");
 
-    let texts = toolResultTexts(context);
-    expect(texts[0]).toBe("env.DB is gatekeeper 5");
-    expect(texts[1]).toBe("env.DB (in gadget OTHER's env) is gatekeeper 6");
-    expect(texts[2]).toContain("Binding: env.GIT (in gadget OTHER's env)");
-    expect(texts[3]).toContain("Binding: env.GADGET (in gadget OTHER's env)");
-    expect(texts[3]).toContain(`the Gadget "Other"`);
+      let texts = toolResultTexts(context);
+      expect(texts[0]).toBe("env.DB is gatekeeper 5");
+      expect(texts[1]).toBe("env.DB (in gadget OTHER's env) is gatekeeper 6");
+      expect(texts[2]).toContain("Binding: env.GIT (in gadget OTHER's env)");
+      expect(texts[3]).toContain("Binding: env.GADGET (in gadget OTHER's env)");
+      expect(texts[3]).toContain(`the Gadget "Other"`);
 
-    let calls = describeCalls(impl);
-    expect(calls.map(call => call.output)).toEqual([...texts.slice(0, 4), undefined, undefined]);
-    expect(calls[4].error).toMatch(/Gadget OTHER has no binding named "MISSING"/);
-    expect(calls[5].error).toMatch(/There is no gadget named "NOPE" in your env/);
-  }));
+      let calls = describeCalls(impl);
+      expect(calls.map((call) => call.output)).toEqual([
+        ...texts.slice(0, 4),
+        undefined,
+        undefined,
+      ]);
+      expect(calls[4].error).toMatch(/Gadget OTHER has no binding named "MISSING"/);
+      expect(calls[5].error).toMatch(/There is no gadget named "NOPE" in your env/);
+    }));
 
-  it("replays recorded descriptions without describing again", () => withImpl(async impl => {
-    seedWorkspace(impl);
-    let live = await runDescribeTurn(impl);
+  it("replays recorded descriptions without describing again", () =>
+    withImpl(async (impl) => {
+      seedWorkspace(impl);
+      let live = await runDescribeTurn(impl);
 
-    // Rebind OTHER's DB, and make describing any gatekeeper fail: replay must return exactly
-    // what was recorded.
-    impl.storage.gatekeepers.put({ id: 7, resourceTitle: "New DB", class: {} as any });
-    impl.storage.gadgets.put({
-      type: "gadget", id: 101, title: "Other", created: new Date(0), bindingName: "OTHER",
-      bindings: { DB: { target: 7 } },
-    });
-    impl.describeGatekeeper = async () => { throw new Error("replay described a gatekeeper"); };
-    addUserMessage(impl, "Again");
+      // Rebind OTHER's DB, and make describing any gatekeeper fail: replay must return exactly
+      // what was recorded.
+      impl.storage.gatekeepers.put({ id: 7, resourceTitle: "New DB", class: {} as any });
+      impl.storage.gadgets.put({
+        type: "gadget",
+        id: 101,
+        title: "Other",
+        created: new Date(0),
+        bindingName: "OTHER",
+        bindings: { DB: { target: 7 } },
+      });
+      impl.describeGatekeeper = async () => {
+        throw new Error("replay described a gatekeeper");
+      };
+      addUserMessage(impl, "Again");
 
-    let replayed = await runScriptedTurn(impl, [fauxAssistantMessage(fauxText("Done."))]);
+      let replayed = await runScriptedTurn(impl, [fauxAssistantMessage(fauxText("Done."))]);
 
-    expect(toolResultTexts(replayed[0])).toEqual(toolResultTexts(live));
-  }));
+      expect(toolResultTexts(replayed[0])).toEqual(toolResultTexts(live));
+    }));
 
-  it("elides descriptions from logs that predate recording them", () => withImpl(async impl => {
-    seedWorkspace(impl);
-    await runDescribeTurn(impl);
+  it("elides descriptions from logs that predate recording them", () =>
+    withImpl(async (impl) => {
+      seedWorkspace(impl);
+      await runDescribeTurn(impl);
 
-    // Strip the recorded descriptions, as in a log persisted before they were recorded.
-    for (let msg of [...impl.storage.chats.list()] as AiChatMessage[]) {
-      if (msg.type !== "message" || !msg.toolCalls) continue;
-      for (let call of msg.toolCalls) {
-        if (call.toolName === "describeBinding") delete call.output;
+      // Strip the recorded descriptions, as in a log persisted before they were recorded.
+      for (let msg of [...impl.storage.chats.list()] as AiChatMessage[]) {
+        if (msg.type !== "message" || !msg.toolCalls) continue;
+        for (let call of msg.toolCalls) {
+          if (call.toolName === "describeBinding") delete call.output;
+        }
+        impl.storage.chats.put(msg);
       }
-      impl.storage.chats.put(msg);
-    }
-    addUserMessage(impl, "Again");
+      addUserMessage(impl, "Again");
 
-    let replayed = await runScriptedTurn(impl, [fauxAssistantMessage(fauxText("Done."))]);
+      let replayed = await runScriptedTurn(impl, [fauxAssistantMessage(fauxText("Done."))]);
 
-    let texts = toolResultTexts(replayed[0]);
-    for (let text of texts.slice(0, 4)) {
-      expect(text).toMatch(/no longer available\. Call describeBinding again/);
-    }
-    // Failed calls replay their recorded errors as before.
-    expect(texts[4]).toMatch(/Gadget OTHER has no binding named "MISSING"/);
-  }));
+      let texts = toolResultTexts(replayed[0]);
+      for (let text of texts.slice(0, 4)) {
+        expect(text).toMatch(/no longer available\. Call describeBinding again/);
+      }
+      // Failed calls replay their recorded errors as before.
+      expect(texts[4]).toMatch(/Gadget OTHER has no binding named "MISSING"/);
+    }));
 });

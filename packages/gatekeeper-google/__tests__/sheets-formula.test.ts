@@ -1,11 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  STRUCTURE_SENSITIVE_FUNCTIONS, canonicalFormula, compactFormula, refusedFunction, rewriteFormula,
-  structureSensitive, tokenize, type FormulaReference, type RewriteStep,
+  STRUCTURE_SENSITIVE_FUNCTIONS,
+  canonicalFormula,
+  compactFormula,
+  refusedFunction,
+  rewriteFormula,
+  structureSensitive,
+  tokenize,
+  type FormulaReference,
+  type RewriteStep,
 } from "../src/sheets-formula";
 import { columnNumber, findSheet } from "../src/sheets-model";
 import {
-  FORMULA_CANONICALIZATION, FORMULA_SHEETS, SHEET_TITLE_QUOTING, WHITESPACE_DRIFT, sheet,
+  FORMULA_CANONICALIZATION,
+  FORMULA_SHEETS,
+  SHEET_TITLE_QUOTING,
+  WHITESPACE_DRIFT,
+  sheet,
 } from "./sheets-fixture";
 
 const sheets = FORMULA_SHEETS.map((title, id) => sheet(id, title));
@@ -22,9 +33,16 @@ describe("Sheets formula tokens", () => {
   it("joins back into the formula", () => {
     for (let formula of [
       ...FORMULA_CANONICALIZATION.map(([entered]) => entered),
-      '=IF(A1="x""y", \'Unclosed', "=\"unterminated", "=1E5+.5*2A1", "=#REF!+A1:B",
+      '=IF(A1="x""y", \'Unclosed',
+      '="unterminated',
+      "=1E5+.5*2A1",
+      "=#REF!+A1:B",
     ]) {
-      expect(tokenize(formula).map(token => token.text).join("")).toBe(formula);
+      expect(
+        tokenize(formula)
+          .map((token) => token.text)
+          .join(""),
+      ).toBe(formula);
     }
   });
 
@@ -38,9 +56,15 @@ describe("Sheets formula tokens", () => {
       { text: "x.y!C1", sheet: "x.y" },
     ]);
     // Calls, names and sheet titles that look like cells are not references.
-    expect(references("=LOG10(A1B2) + AB12!C3 + TRUE")).toEqual([{ text: "AB12!C3", sheet: "AB12" }]);
+    expect(references("=LOG10(A1B2) + AB12!C3 + TRUE")).toEqual([
+      { text: "AB12!C3", sheet: "AB12" },
+    ]);
     // Nor are calls with whitespace before their parenthesis.
-    expect(references("=LOG10 (A1) + atan2\n(B1, C1)")).toEqual([{ text: "A1" }, { text: "B1" }, { text: "C1" }]);
+    expect(references("=LOG10 (A1) + atan2\n(B1, C1)")).toEqual([
+      { text: "A1" },
+      { text: "B1" },
+      { text: "C1" },
+    ]);
     expect(references('="A1:B2"')).toEqual([]);
   });
 });
@@ -50,7 +74,7 @@ describe("Sheets refused functions", () => {
 
   it("finds each in any case, nested and inside LAMBDA", () => {
     for (let name of REFUSED) {
-      let mixed = [...name].map((c, i) => i % 2 ? c.toLowerCase() : c).join("");
+      let mixed = [...name].map((c, i) => (i % 2 ? c.toLowerCase() : c)).join("");
       for (let typed of [name, name.toLowerCase(), mixed]) {
         expect(refusedFunction(`=${typed}("https://example.com")`), typed).toBe(name);
         expect(refusedFunction(`=IF(A1, SUM(1, ${typed}("u", 1)), 0)`), typed).toBe(name);
@@ -64,8 +88,9 @@ describe("Sheets refused functions", () => {
     expect(refusedFunction('="IMPORTRANGE(""x"")"')).toBeUndefined();
     expect(refusedFunction("='IMAGE'!A1 + 'importxml'!B2:C3")).toBeUndefined();
     expect(refusedFunction("=IMAGE!A1 + importrange!A1:B2")).toBeUndefined();
-    expect(refusedFunction("=IMAGES(A1) + MYIMAGE(1) + IMPORTRANGES(2) + NORM.DIST(1, 0, 1, TRUE)"))
-      .toBeUndefined();
+    expect(
+      refusedFunction("=IMAGES(A1) + MYIMAGE(1) + IMPORTRANGES(2) + NORM.DIST(1, 0, 1, TRUE)"),
+    ).toBeUndefined();
     expect(refusedFunction("=SUM(A1:B2)")).toBeUndefined();
   });
 
@@ -100,7 +125,9 @@ describe("Sheets canonical formulas", () => {
   });
 
   it("leaves string literals, names and whitespace as typed", () => {
-    expect(canonicalFormula('=concat( "b3:a2", sales!b3 )', titleOf)).toBe('=concat( "b3:a2", Sales!B3 )');
+    expect(canonicalFormula('=concat( "b3:a2", sales!b3 )', titleOf)).toBe(
+      '=concat( "b3:a2", Sales!B3 )',
+    );
     expect(canonicalFormula("=myFn(a1)", titleOf)).toBe("=myFn(A1)");
   });
 
@@ -113,7 +140,9 @@ describe("Sheets canonical formulas", () => {
   });
 
   it("leaves references to a sheet the grid lacks as typed", () => {
-    expect(canonicalFormula("=Nope!b3:a2 + sales!b3:a2", titleOf)).toBe("=Nope!b3:a2 + Sales!A2:B3");
+    expect(canonicalFormula("=Nope!b3:a2 + sales!b3:a2", titleOf)).toBe(
+      "=Nope!b3:a2 + Sales!A2:B3",
+    );
   });
 
   it("orders only unanchored corners, and keeps whole rows and columns as typed", () => {
@@ -126,7 +155,9 @@ describe("Sheets canonical formulas", () => {
   it("quotes a matched title as Google does", () => {
     let probe = [sheet(0, "Probe Tab"), sheet(1, "A1")];
     let probeTitle = (name: string) => findSheet(probe, name)?.title;
-    expect(canonicalFormula("='probe tab'!a1 + 'a1'!b2", probeTitle)).toBe("='Probe Tab'!A1 + 'A1'!B2");
+    expect(canonicalFormula("='probe tab'!a1 + 'a1'!b2", probeTitle)).toBe(
+      "='Probe Tab'!A1 + 'A1'!B2",
+    );
   });
 });
 
@@ -134,23 +165,49 @@ describe("Sheets compact formulas", () => {
   it("drops whitespace outside string literals and sheet titles", () => {
     let [stored, later] = WHITESPACE_DRIFT;
     expect(compactFormula(stored)).toBe(compactFormula(later));
-    expect(compactFormula("=IF( A1 , \"a  b\" , 'Probe Tab'!A1 )")).toBe("=IF(A1,\"a  b\",'Probe Tab'!A1)");
+    expect(compactFormula("=IF( A1 , \"a  b\" , 'Probe Tab'!A1 )")).toBe(
+      "=IF(A1,\"a  b\",'Probe Tab'!A1)",
+    );
   });
 });
 
-const insertRows = (title: string, before: number, count = 1): RewriteStep =>
-  ({ kind: "insert", title, axis: "rows", start: before - 1, count });
-const deleteRows = (title: string, first: number, last = first): RewriteStep =>
-  ({ kind: "delete", title, axis: "rows", start: first - 1, count: last - first + 1 });
-const insertColumns = (title: string, before: string, count = 1): RewriteStep =>
-  ({ kind: "insert", title, axis: "columns", start: columnNumber(before) - 1, count });
+const insertRows = (title: string, before: number, count = 1): RewriteStep => ({
+  kind: "insert",
+  title,
+  axis: "rows",
+  start: before - 1,
+  count,
+});
+const deleteRows = (title: string, first: number, last = first): RewriteStep => ({
+  kind: "delete",
+  title,
+  axis: "rows",
+  start: first - 1,
+  count: last - first + 1,
+});
+const insertColumns = (title: string, before: string, count = 1): RewriteStep => ({
+  kind: "insert",
+  title,
+  axis: "columns",
+  start: columnNumber(before) - 1,
+  count,
+});
 const deleteColumns = (title: string, first: string, last = first): RewriteStep => ({
-  kind: "delete", title, axis: "columns",
-  start: columnNumber(first) - 1, count: columnNumber(last) - columnNumber(first) + 1,
+  kind: "delete",
+  title,
+  axis: "columns",
+  start: columnNumber(first) - 1,
+  count: columnNumber(last) - columnNumber(first) + 1,
 });
 
 /** A formula, a step, the text Google wrote after it, and whether its cells changed or broke. */
-type Rewrite = [formula: string, step: RewriteStep, text: string, cellsChanged: boolean, broken?: boolean];
+type Rewrite = [
+  formula: string,
+  step: RewriteStep,
+  text: string,
+  cellsChanged: boolean,
+  broken?: boolean,
+];
 
 /** Formulas on the sheet "Rw" whose rows or columns change, and the text Google wrote after. */
 const ON_SHEET: Rewrite[] = [
@@ -267,17 +324,25 @@ const DUPLICATE: RewriteStep = { kind: "duplicate", title: "F", newTitle: "F cop
 const UNCHANGED = { cellsChanged: false, broken: false };
 
 describe("Sheets formulas through structural changes", () => {
-  it.each(ON_SHEET)("rewrites %s on the sheet through %j", (formula, step, text, cellsChanged, broken = false) => {
-    expect(rewriteFormula(formula, step, true)).toEqual({ text, cellsChanged, broken });
-  });
+  it.each(ON_SHEET)(
+    "rewrites %s on the sheet through %j",
+    (formula, step, text, cellsChanged, broken = false) => {
+      expect(rewriteFormula(formula, step, true)).toEqual({ text, cellsChanged, broken });
+    },
+  );
 
-  it.each(ELSEWHERE)("rewrites %s through %j", (formula, step, text, cellsChanged, broken = false) => {
-    expect(rewriteFormula(formula, step, false)).toEqual({ text, cellsChanged, broken });
-  });
+  it.each(ELSEWHERE)(
+    "rewrites %s through %j",
+    (formula, step, text, cellsChanged, broken = false) => {
+      expect(rewriteFormula(formula, step, false)).toEqual({ text, cellsChanged, broken });
+    },
+  );
 
   it("leaves the name of a function called with whitespace before its parenthesis", () => {
-    expect(rewriteFormula("=LOG10 (A1) + ATAN2 (B1, 1)", insertRows("F", 1), true))
-      .toEqual({ text: "=LOG10 (A2) + ATAN2 (B2, 1)", ...UNCHANGED });
+    expect(rewriteFormula("=LOG10 (A1) + ATAN2 (B1, 1)", insertRows("F", 1), true)).toEqual({
+      text: "=LOG10 (A2) + ATAN2 (B2, 1)",
+      ...UNCHANGED,
+    });
     expect(canonicalFormula("=log10 (a1)", titleOf)).toBe("=log10 (A1)");
   });
 
@@ -286,28 +351,42 @@ describe("Sheets formulas through structural changes", () => {
     for (let [formula, step, text, cellsChanged, broken = false] of SINGLE_REFERENCES) {
       let body = formula.slice(1);
       let after = text === "=#REF!" ? text : `=Rw!${text.slice(1)}`;
-      expect(rewriteFormula(`=Rw!${body}`, step, false), formula).toEqual({ text: after, cellsChanged, broken });
-      expect(rewriteFormula(`='rw'!${body}`, step, false).text, formula)
-        .toBe(text === "=#REF!" ? text : `='rw'!${text.slice(1)}`);
+      expect(rewriteFormula(`=Rw!${body}`, step, false), formula).toEqual({
+        text: after,
+        cellsChanged,
+        broken,
+      });
+      expect(rewriteFormula(`='rw'!${body}`, step, false).text, formula).toBe(
+        text === "=#REF!" ? text : `='rw'!${text.slice(1)}`,
+      );
     }
   });
 
   it("leaves unqualified references off the sheet, and references to other sheets, as they are", () => {
     for (let [formula, step] of ON_SHEET) {
-      expect(rewriteFormula(formula, step, false), formula).toEqual({ text: formula, ...UNCHANGED });
+      expect(rewriteFormula(formula, step, false), formula).toEqual({
+        text: formula,
+        ...UNCHANGED,
+      });
     }
     for (let [formula, step] of SINGLE_REFERENCES) {
       let other = `=Sales!${formula.slice(1)}`;
       expect(rewriteFormula(other, step, true), other).toEqual({ text: other, ...UNCHANGED });
     }
-    expect(rewriteFormula("=SUM(A1:A3, Rw!A1:A3)", deleteRows("Rw", 1), false))
-      .toEqual({ text: "=SUM(A1:A3, Rw!A1:A2)", cellsChanged: true, broken: false });
+    expect(rewriteFormula("=SUM(A1:A3, Rw!A1:A3)", deleteRows("Rw", 1), false)).toEqual({
+      text: "=SUM(A1:A3, Rw!A1:A2)",
+      cellsChanged: true,
+      broken: false,
+    });
   });
 
   it("moves anchored corners, either end of a range typed bottom-up, and long column names", () => {
     expect(rewriteFormula("=$A$2:$B$5", deleteRows("Rw", 3), true).text).toBe("=$A$2:$B$4");
-    expect(rewriteFormula("=B3:A2", insertRows("Rw", 3), true))
-      .toEqual({ text: "=B4:A2", cellsChanged: true, broken: false });
+    expect(rewriteFormula("=B3:A2", insertRows("Rw", 3), true)).toEqual({
+      text: "=B4:A2",
+      cellsChanged: true,
+      broken: false,
+    });
     expect(rewriteFormula("=$A$1:A2", deleteRows("Rw", 2), true).text).toBe("=$A$1:A1");
     expect(rewriteFormula("=A:C", insertColumns("Rw", "AA", 2), true).text).toBe("=A:C");
     expect(rewriteFormula("=Z1", insertColumns("Rw", "A", 2), true).text).toBe("=AB1");
@@ -318,37 +397,63 @@ describe("Sheets formulas through structural changes", () => {
     for (let step of [insertRows("Rw", 1), deleteRows("Rw", 1, 5), deleteColumns("Rw", "A", "C")]) {
       expect(rewriteFormula(formula, step, true)).toEqual({ text: formula, ...UNCHANGED });
     }
-    expect(rewriteFormula('="Rw!A1"', { kind: "rename", from: "Rw", to: "X" }, true).text).toBe('="Rw!A1"');
+    expect(rewriteFormula('="Rw!A1"', { kind: "rename", from: "Rw", to: "X" }, true).text).toBe(
+      '="Rw!A1"',
+    );
   });
 
   it("quotes a renamed sheet as Google quotes it, to and from quoted titles", () => {
-    expect(rewriteFormula("='Probe Tab'!A1:B2 + 'probe tab'!C3", { kind: "rename", from: "Probe Tab", to: "Sales" }, false))
-      .toEqual({ text: "=Sales!A1:B2 + Sales!C3", ...UNCHANGED });
-    expect(rewriteFormula("='It''s'!A1 + Rw!A1", { kind: "rename", from: "It's", to: "Rw 2" }, false).text)
-      .toBe("='Rw 2'!A1 + Rw!A1");
+    expect(
+      rewriteFormula(
+        "='Probe Tab'!A1:B2 + 'probe tab'!C3",
+        { kind: "rename", from: "Probe Tab", to: "Sales" },
+        false,
+      ),
+    ).toEqual({ text: "=Sales!A1:B2 + Sales!C3", ...UNCHANGED });
+    expect(
+      rewriteFormula("='It''s'!A1 + Rw!A1", { kind: "rename", from: "It's", to: "Rw 2" }, false)
+        .text,
+    ).toBe("='Rw 2'!A1 + Rw!A1");
     for (let [title, quoted] of Object.entries(SHEET_TITLE_QUOTING)) {
-      expect(rewriteFormula("=rw!B2:C3", { kind: "rename", from: "Rw", to: title }, false).text, title)
-        .toBe(`=${quoted}!B2:C3`);
+      expect(
+        rewriteFormula("=rw!B2:C3", { kind: "rename", from: "Rw", to: title }, false).text,
+        title,
+      ).toBe(`=${quoted}!B2:C3`);
     }
     // An unqualified reference follows its sheet whatever its title.
     expect(rewriteFormula("=A1", { kind: "rename", from: "Rw", to: "X" }, true).text).toBe("=A1");
   });
 
   it("points a copy's references to the sheet copied at the copy, and nothing else", () => {
-    expect(rewriteFormula("=F!B1", DUPLICATE, true)).toEqual({ text: "='F copy'!B1", ...UNCHANGED });
-    expect(rewriteFormula("=B1 + Rw!A1 + f!C2:C", DUPLICATE, true).text).toBe("=B1 + Rw!A1 + 'F copy'!C2:C");
+    expect(rewriteFormula("=F!B1", DUPLICATE, true)).toEqual({
+      text: "='F copy'!B1",
+      ...UNCHANGED,
+    });
+    expect(rewriteFormula("=B1 + Rw!A1 + f!C2:C", DUPLICATE, true).text).toBe(
+      "=B1 + Rw!A1 + 'F copy'!C2:C",
+    );
     expect(rewriteFormula("=F!B1", DUPLICATE, false)).toEqual({ text: "=F!B1", ...UNCHANGED });
   });
 
   it("breaks references to a deleted sheet, unqualified ones on it included", () => {
     let step: RewriteStep = { kind: "deleteSheet", title: "Rw" };
-    expect(rewriteFormula("=A1", step, true)).toEqual({ text: "=A1", cellsChanged: true, broken: true });
-    expect(rewriteFormula("=A1 + Sales!A1", step, false)).toEqual({ text: "=A1 + Sales!A1", ...UNCHANGED });
+    expect(rewriteFormula("=A1", step, true)).toEqual({
+      text: "=A1",
+      cellsChanged: true,
+      broken: true,
+    });
+    expect(rewriteFormula("=A1 + Sales!A1", step, false)).toEqual({
+      text: "=A1 + Sales!A1",
+      ...UNCHANGED,
+    });
   });
 
   it("reads error literals as single tokens", () => {
-    expect(tokenize("=#REF!+#DIV/0!&#n/a").filter(token => token.kind === "error").map(token => token.text))
-      .toEqual(["#REF!", "#DIV/0!", "#n/a"]);
+    expect(
+      tokenize("=#REF!+#DIV/0!&#n/a")
+        .filter((token) => token.kind === "error")
+        .map((token) => token.text),
+    ).toEqual(["#REF!", "#DIV/0!", "#n/a"]);
   });
 });
 
@@ -369,7 +474,9 @@ describe("Sheets structure-sensitive formulas", () => {
   });
 
   it("leaves calls, constants, references, error literals and strings alone", () => {
-    expect(structureSensitive("=SUM(A1:B2) + IF(TRUE, 1, false) + NORM.DIST(1, 0, 1, TRUE)")).toBe(false);
+    expect(structureSensitive("=SUM(A1:B2) + IF(TRUE, 1, false) + NORM.DIST(1, 0, 1, TRUE)")).toBe(
+      false,
+    );
     expect(structureSensitive("='It''s'!A1 + Sales!B2:B + #REF! + #N/A + #DIV/0!")).toBe(false);
     expect(structureSensitive('="ROW(" & "MyRange"')).toBe(false);
   });

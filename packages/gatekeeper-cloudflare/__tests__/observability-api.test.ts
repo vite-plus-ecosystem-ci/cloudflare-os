@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   CloudflareObservabilityApi,
   observabilityFieldKey,
@@ -100,19 +100,24 @@ describe("scopeObservabilityFilters", () => {
     const depthThree: ObservabilityFilter = {
       kind: "group",
       filterCombination: "and",
-      filters: [{
-        kind: "group",
-        filterCombination: "and",
-        filters: [{
+      filters: [
+        {
           kind: "group",
           filterCombination: "and",
-          filters: [leaf],
-        }],
-      }],
+          filters: [
+            {
+              kind: "group",
+              filterCombination: "and",
+              filters: [leaf],
+            },
+          ],
+        },
+      ],
     };
 
-    expect(() => scopeObservabilityFilters("api-worker", depthThree))
-      .toThrow("Filter nesting is too deep");
+    expect(() => scopeObservabilityFilters("api-worker", depthThree)).toThrow(
+      "Filter nesting is too deep",
+    );
   });
 });
 
@@ -120,17 +125,20 @@ describe("CloudflareObservabilityApi", () => {
   it("serializes a scoped events query with an outer AND", async () => {
     let requestUrl = "";
     let requestBody: unknown;
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      requestUrl = String(input);
-      requestBody = JSON.parse(String(init?.body));
-      return Response.json({
-        success: true,
-        result: {
-          statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
-          events: { count: 1, events: [] },
-        },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        requestUrl = String(input);
+        requestBody = JSON.parse(String(init?.body));
+        return Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
+            events: { count: 1, events: [] },
+          },
+        });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
     const from = new Date("2026-08-14T09:00:00Z");
     const to = new Date("2026-08-14T10:00:00Z");
@@ -141,8 +149,20 @@ describe("CloudflareObservabilityApi", () => {
         kind: "group",
         filterCombination: "or",
         filters: [
-          { kind: "filter", key: "$metadata.level", operation: "eq", type: "string", value: "error" },
-          { kind: "filter", key: "$metadata.statusCode", operation: "gte", type: "number", value: 500 },
+          {
+            kind: "filter",
+            key: "$metadata.level",
+            operation: "eq",
+            type: "string",
+            value: "error",
+          },
+          {
+            kind: "filter",
+            key: "$metadata.statusCode",
+            operation: "gte",
+            type: "number",
+            value: 500,
+          },
         ],
       },
     });
@@ -167,19 +187,29 @@ describe("CloudflareObservabilityApi", () => {
 
   it("loads trace detail through the events view without weakening Worker scope", async () => {
     let requestBody: { parameters: { filters: unknown[] } } | undefined;
-    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-      requestBody = JSON.parse(String(init?.body)) as typeof requestBody;
-      return Response.json({
-        success: true,
-        result: {
-          statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
-          events: { count: 1, events: [{
-            dataset: "cloudflare-workers", timestamp: 1, source: {},
-            $metadata: { id: "event", service: "api-worker" },
-          }] },
-        },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        requestBody = JSON.parse(String(init?.body)) as typeof requestBody;
+        return Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
+            events: {
+              count: 1,
+              events: [
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 1,
+                  source: {},
+                  $metadata: { id: "event", service: "api-worker" },
+                },
+              ],
+            },
+          },
+        });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
     const trace = await api.getTrace("trace-id", {
@@ -202,12 +232,14 @@ describe("CloudflareObservabilityApi", () => {
     vi.stubGlobal("fetch", fetchSpy);
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
-    await expect(api.listEvents({
-      timeframe: {
-        from: new Date("2026-08-01T00:00:00Z"),
-        to: new Date("2026-08-09T00:00:00Z"),
-      },
-    })).rejects.toThrow("seven days");
+    await expect(
+      api.listEvents({
+        timeframe: {
+          from: new Date("2026-08-01T00:00:00Z"),
+          to: new Date("2026-08-09T00:00:00Z"),
+        },
+      }),
+    ).rejects.toThrow("seven days");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -216,12 +248,14 @@ describe("CloudflareObservabilityApi", () => {
     vi.stubGlobal("fetch", fetchSpy);
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
-    await expect(api.listEvents({
-      timeframe: {
-        from: new Date("2026-08-01T00:00:00Z"),
-        to: new Date("2026-08-02T00:00:00Z"),
-      },
-    })).rejects.toThrow("retention");
+    await expect(
+      api.listEvents({
+        timeframe: {
+          from: new Date("2026-08-01T00:00:00Z"),
+          to: new Date("2026-08-02T00:00:00Z"),
+        },
+      }),
+    ).rejects.toThrow("retention");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -235,33 +269,47 @@ describe("CloudflareObservabilityApi", () => {
   });
 
   it("rejects malformed successful envelopes with a typed error", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ success: true, result: null })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ success: true, result: null })),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
-    const error = await api.listEvents().catch(caught => caught);
+    const error = await api.listEvents().catch((caught) => caught);
     expect(error).toMatchObject({ status: 502 });
     expect(String(error)).toContain("invalid Workers Observability response");
   });
 
   it("rejects malformed view payloads with a typed error", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
-        events: { events: "not-an-array" },
-      },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
+            events: { events: "not-an-array" },
+          },
+        }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
     await expect(api.listEvents()).rejects.toMatchObject({ status: 502 });
   });
 
   it("rejects non-finite query statistics", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(
-      '{"success":true,"result":{"statistics":{"elapsed":1e400,"rows_read":1,"bytes_read":10},' +
-      '"events":{"events":[]}}}',
-      { headers: { "content-type": "application/json" } },
-    )));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            '{"success":true,"result":{"statistics":{"elapsed":1e400,"rows_read":1,"bytes_read":10},' +
+              '"events":{"events":[]}}}',
+            { headers: { "content-type": "application/json" } },
+          ),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
     await expect(api.listEvents()).rejects.toMatchObject({ status: 502 });
@@ -284,10 +332,17 @@ describe("CloudflareObservabilityApi", () => {
   it("retries a timeout while reading the response body", async () => {
     const timeout = new Error("timed out while reading");
     timeout.name = "TimeoutError";
-    const fetchSpy = vi.fn()
-      .mockResolvedValueOnce(new Response(new ReadableStream({
-        pull(controller) { controller.error(timeout); },
-      })))
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          new ReadableStream({
+            pull(controller) {
+              controller.error(timeout);
+            },
+          }),
+        ),
+      )
       .mockResolvedValueOnce(Response.json({ success: true, result: [] }));
     vi.stubGlobal("fetch", fetchSpy);
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
@@ -300,9 +355,15 @@ describe("CloudflareObservabilityApi", () => {
   });
 
   it("rejects an oversized response before buffering it", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", {
-      headers: { "content-length": String(3 * 1024 * 1024) },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("{}", {
+            headers: { "content-length": String(3 * 1024 * 1024) },
+          }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
     await expect(api.listKeys()).rejects.toThrow("response is too large");
@@ -315,25 +376,30 @@ describe("CloudflareObservabilityApi", () => {
     // query, which does honour filters.
     const bodies: unknown[] = [];
     const urls: string[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      urls.push(String(input));
-      bodies.push(JSON.parse(String(init?.body)));
-      return Response.json({
-        success: true,
-        result: {
-          statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
-          events: {
-            count: 1,
-            events: [{
-              dataset: "cloudflare-workers",
-              timestamp: 1,
-              source: { route: "/health" },
-              $metadata: { id: "e1", service: "api-worker", level: "info" },
-            }],
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        urls.push(String(input));
+        bodies.push(JSON.parse(String(init?.body)));
+        return Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
+            events: {
+              count: 1,
+              events: [
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 1,
+                  source: { route: "/health" },
+                  $metadata: { id: "e1", service: "api-worker", level: "info" },
+                },
+              ],
+            },
           },
-        },
-      });
-    }));
+        });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
     const timeframe = {
       from: new Date("2026-08-14T09:00:00Z"),
@@ -361,38 +427,64 @@ describe("CloudflareObservabilityApi", () => {
     // The field names come from walking the sampled events, so only this Worker's fields appear --
     // reported under the name each field is *indexed* under, which for the caller's own log payload
     // is the bare name rather than the `source.` path the event envelope returns it at.
-    expect(keys).toEqual(expect.arrayContaining([
-      expect.objectContaining({ key: "$metadata.service", type: "string" }),
-      expect.objectContaining({ key: "route", type: "string" }),
-    ]));
-    expect(keys.map(entry => entry.key)).not.toContain("source.route");
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "$metadata.service", type: "string" }),
+        expect.objectContaining({ key: "route", type: "string" }),
+      ]),
+    );
+    expect(keys.map((entry) => entry.key)).not.toContain("source.route");
     expect(values).toEqual([expect.objectContaining({ value: "api-worker" })]);
   });
 
   it("filters foreign events from Worker-scoped invocations and cursors", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 3, bytes_read: 30 },
-        invocations: {
-          mixed: [
-            { dataset: "cloudflare-workers", timestamp: 1, source: { secret: "foreign" }, $metadata: { id: "foreign-cursor", service: "other-worker" } },
-            { dataset: "cloudflare-workers", timestamp: 2, source: {}, $metadata: { id: "own-cursor", service: "api-worker" } },
-          ],
-          foreign: [
-            { dataset: "cloudflare-workers", timestamp: 3, source: {}, $metadata: { id: "last-foreign", service: "other-worker" } },
-          ],
-        },
-      },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 3, bytes_read: 30 },
+            invocations: {
+              mixed: [
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 1,
+                  source: { secret: "foreign" },
+                  $metadata: { id: "foreign-cursor", service: "other-worker" },
+                },
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 2,
+                  source: {},
+                  $metadata: { id: "own-cursor", service: "api-worker" },
+                },
+              ],
+              foreign: [
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 3,
+                  source: {},
+                  $metadata: { id: "last-foreign", service: "other-worker" },
+                },
+              ],
+            },
+          },
+        }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
     const page = await api.listInvocations();
 
-    expect(page.invocations).toEqual([{
-      requestId: "mixed",
-      events: [expect.objectContaining({ $metadata: expect.objectContaining({ id: "own-cursor" }) })],
-    }]);
+    expect(page.invocations).toEqual([
+      {
+        requestId: "mixed",
+        events: [
+          expect.objectContaining({ $metadata: expect.objectContaining({ id: "own-cursor" }) }),
+        ],
+      },
+    ]);
     // The cursor is the provider's own position -- the oldest event it returned, foreign or not.
     // Deriving it from the surviving events instead would stall pagination the moment a page came
     // back entirely foreign: the cursor would be null and the caller would stop early, hiding its own
@@ -413,16 +505,34 @@ describe("CloudflareObservabilityApi", () => {
   });
 
   it("drops foreign events returned by a Worker-scoped trace query", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 2, bytes_read: 20 },
-        events: { count: 2, events: [
-          { dataset: "cloudflare-workers", timestamp: 1, source: {}, $metadata: { id: "own", service: "api-worker" } },
-          { dataset: "cloudflare-workers", timestamp: 2, source: { secret: "foreign" }, $metadata: { id: "foreign", service: "other-worker" } },
-        ] },
-      },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 2, bytes_read: 20 },
+            events: {
+              count: 2,
+              events: [
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 1,
+                  source: {},
+                  $metadata: { id: "own", service: "api-worker" },
+                },
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 2,
+                  source: { secret: "foreign" },
+                  $metadata: { id: "foreign", service: "other-worker" },
+                },
+              ],
+            },
+          },
+        }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
     const trace = await api.getTrace("trace-id");
@@ -436,16 +546,34 @@ describe("CloudflareObservabilityApi", () => {
     // A foreign event proves the filter was not applied, which makes the provider's count a count of
     // the whole account's matching telemetry -- the volume a Worker binding must not learn. The
     // events are still returned, because those we filtered ourselves.
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 9000, bytes_read: 90000 },
-        events: { count: 5000, events: [
-          { dataset: "cloudflare-workers", timestamp: 1, source: {}, $metadata: { id: "own", service: "api-worker" } },
-          { dataset: "cloudflare-workers", timestamp: 2, source: {}, $metadata: { id: "foreign", service: "other-worker" } },
-        ] },
-      },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 9000, bytes_read: 90000 },
+            events: {
+              count: 5000,
+              events: [
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 1,
+                  source: {},
+                  $metadata: { id: "own", service: "api-worker" },
+                },
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 2,
+                  source: {},
+                  $metadata: { id: "foreign", service: "other-worker" },
+                },
+              ],
+            },
+          },
+        }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
     const page = await api.listEvents();
@@ -463,15 +591,28 @@ describe("CloudflareObservabilityApi", () => {
   it("reports the provider count when the scope filter was honoured", async () => {
     // The counterpart to the test above: withholding the count whenever a Worker binding is in play
     // would lose a genuinely useful figure on the normal path.
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
-        events: { count: 42, events: [
-          { dataset: "cloudflare-workers", timestamp: 1, source: {}, $metadata: { id: "own", service: "api-worker" } },
-        ] },
-      },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
+            events: {
+              count: 42,
+              events: [
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 1,
+                  source: {},
+                  $metadata: { id: "own", service: "api-worker" },
+                },
+              ],
+            },
+          },
+        }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
     expect((await api.listEvents()).count).toBe(42);
@@ -479,16 +620,34 @@ describe("CloudflareObservabilityApi", () => {
 
   it("keeps reporting the provider count for an account-scoped binding", async () => {
     // No Worker scope means no filter to ignore, so there is nothing to distrust.
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 2, bytes_read: 20 },
-        events: { count: 7, events: [
-          { dataset: "cloudflare-workers", timestamp: 1, source: {}, $metadata: { id: "a", service: "one" } },
-          { dataset: "cloudflare-workers", timestamp: 2, source: {}, $metadata: { id: "b", service: "two" } },
-        ] },
-      },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 2, bytes_read: 20 },
+            events: {
+              count: 7,
+              events: [
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 1,
+                  source: {},
+                  $metadata: { id: "a", service: "one" },
+                },
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 2,
+                  source: {},
+                  $metadata: { id: "b", service: "two" },
+                },
+              ],
+            },
+          },
+        }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
     const page = await api.listEvents();
@@ -498,13 +657,19 @@ describe("CloudflareObservabilityApi", () => {
   });
 
   it("turns non-JSON provider failures into body-safe typed errors", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>secret upstream page</html>", {
-      status: 502,
-      headers: { "content-type": "text/html", "retry-after": "0" },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("<html>secret upstream page</html>", {
+            status: 502,
+            headers: { "content-type": "text/html", "retry-after": "0" },
+          }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
-    const error = await api.listKeys().catch(caught => caught);
+    const error = await api.listKeys().catch((caught) => caught);
 
     expect(error).toMatchObject({ status: 502 });
     expect(String(error)).toContain("status 502");
@@ -512,21 +677,32 @@ describe("CloudflareObservabilityApi", () => {
   });
 
   it("maps malformed successful JSON responses to a gateway error", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("not json", { status: 200 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("not json", { status: 200 })),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
     await expect(api.listKeys()).rejects.toMatchObject({ status: 502 });
   });
 
   it("joins bounded provider errors without exposing arbitrary response fields", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: false,
-      errors: [{ message: "first" }, { message: "second" }],
-      debug: "secret",
-    }, { status: 400 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          {
+            success: false,
+            errors: [{ message: "first" }, { message: "second" }],
+            debug: "secret",
+          },
+          { status: 400 },
+        ),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
-    const error = await api.listKeys().catch(caught => caught);
+    const error = await api.listKeys().catch((caught) => caught);
     expect(String(error)).toContain("first; second");
     expect(String(error)).not.toContain("secret");
   });
@@ -535,16 +711,24 @@ describe("CloudflareObservabilityApi", () => {
     // The message may quote a caller-supplied filter value back at us. Filter values are kept out of
     // the audit trail on purpose (see `summarizeFilter`), so the request log names the codes instead
     // and the message travels only to the caller who caused it.
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: false,
-      errors: [
-        { code: 7003, message: "Could not route to /accounts/tenant-secret/..." },
-        { code: 7000, message: "No route for that URI" },
-      ],
-    }, { status: 400 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          {
+            success: false,
+            errors: [
+              { code: 7003, message: "Could not route to /accounts/tenant-secret/..." },
+              { code: 7000, message: "No route for that URI" },
+            ],
+          },
+          { status: 400 },
+        ),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
-    const error = await api.listKeys().catch(caught => caught);
+    const error = await api.listKeys().catch((caught) => caught);
     expect(error).toBeInstanceOf(CloudflareObservabilityApiError);
     expect(error.codes).toEqual([7003, 7000]);
     expect(String(error)).toContain("No route for that URI");
@@ -555,14 +739,24 @@ describe("CloudflareObservabilityApi", () => {
     // code -- which Cloudflare does return -- fell through to `{ error }` and was logged in full,
     // stack included. The message must still reach the caller who caused it; only the log withholds.
     const warnings: unknown[] = [];
-    vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => void warnings.push(...args));
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: false,
-      errors: [{ message: "invalid filter value: alice@example.com" }],
-    }, { status: 400 })));
+    vi.spyOn(console, "warn").mockImplementation(
+      (...args: unknown[]) => void warnings.push(...args),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          {
+            success: false,
+            errors: [{ message: "invalid filter value: alice@example.com" }],
+          },
+          { status: 400 },
+        ),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
-    const error = await api.listKeys().catch(caught => caught);
+    const error = await api.listKeys().catch((caught) => caught);
 
     expect(error.codes).toEqual([]);
     expect(error.fromProvider).toBe(true);
@@ -578,35 +772,62 @@ describe("CloudflareObservabilityApi", () => {
     // The counterpart: withholding is scoped to provider text, so a transport failure -- whose
     // message we author -- must still be logged, or the fix would have blinded the audit trail.
     const warnings: unknown[] = [];
-    vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => void warnings.push(...args));
-    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("network down"); }));
+    vi.spyOn(console, "warn").mockImplementation(
+      (...args: unknown[]) => void warnings.push(...args),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("network down");
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
     // A transport failure earns a retry, whose backoff has to be driven under fake timers.
-    const pending = api.listKeys().catch(caught => caught);
+    const pending = api.listKeys().catch((caught) => caught);
     await vi.runAllTimersAsync();
     const error = await pending;
 
     expect(error.fromProvider).toBe(false);
-    expect(JSON.stringify(warnings)).toContain("Could not reach the Cloudflare Workers Observability API.");
+    expect(JSON.stringify(warnings)).toContain(
+      "Could not reach the Cloudflare Workers Observability API.",
+    );
   });
 
   it("bounds the codes it retains", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: false,
-      errors: Array.from({ length: 9 }, (_, index) => ({ code: index, message: `m${index}` })),
-    }, { status: 400 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          {
+            success: false,
+            errors: Array.from({ length: 9 }, (_, index) => ({
+              code: index,
+              message: `m${index}`,
+            })),
+          },
+          { status: 400 },
+        ),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
-    const error = await api.listKeys().catch(caught => caught);
+    const error = await api.listKeys().catch((caught) => caught);
     expect(error.codes).toEqual([0, 1, 2]);
   });
 
   it("retries one transient read then returns the result", async () => {
-    const fetchSpy = vi.fn()
-      .mockResolvedValueOnce(Response.json({ success: false }, {
-        status: 503, headers: { "retry-after": "0" },
-      }))
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json(
+          { success: false },
+          {
+            status: 503,
+            headers: { "retry-after": "0" },
+          },
+        ),
+      )
       .mockResolvedValueOnce(Response.json({ success: true, result: [] }));
     vi.stubGlobal("fetch", fetchSpy);
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
@@ -618,9 +839,15 @@ describe("CloudflareObservabilityApi", () => {
   it("does not retry when the provider asks for longer than the budget allows", async () => {
     // A 429 with a long `Retry-After` cannot be satisfied inside a request: retrying sooner only earns
     // a second 429, and honouring it would hold an agent past any useful deadline. Fail fast instead.
-    const fetchSpy = vi.fn(async () => Response.json({ success: false }, {
-      status: 429, headers: { "retry-after": "30" },
-    }));
+    const fetchSpy = vi.fn(async () =>
+      Response.json(
+        { success: false },
+        {
+          status: 429,
+          headers: { "retry-after": "30" },
+        },
+      ),
+    );
     vi.stubGlobal("fetch", fetchSpy);
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
@@ -639,10 +866,13 @@ describe("CloudflareObservabilityApi", () => {
 
   it("sends the access token as a bearer credential and nothing else", async () => {
     let headers: Headers | undefined;
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      headers = new Headers(init?.headers);
-      return Response.json({ success: true, result: [] });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        headers = new Headers(init?.headers);
+        return Response.json({ success: true, result: [] });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "the-token", ACCOUNT_ID);
 
     await api.listKeys();
@@ -658,10 +888,13 @@ describe("CloudflareObservabilityApi", () => {
   it("reads the token per request, so a refresh takes effect without a new binding", async () => {
     const tokens = ["first", "second"];
     const seen: (string | null)[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      seen.push(new Headers(init?.headers).get("authorization"));
-      return Response.json({ success: true, result: [] });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        seen.push(new Headers(init?.headers).get("authorization"));
+        return Response.json({ success: true, result: [] });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => tokens.shift() ?? null, ACCOUNT_ID);
 
     await api.listKeys();
@@ -674,10 +907,13 @@ describe("CloudflareObservabilityApi", () => {
     // The inverse of the derived-discovery case: with nothing to constrain, the provider's own `keys`
     // and `values` endpoints are both correct and far cheaper than sampling events.
     const urls: string[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-      urls.push(String(input));
-      return Response.json({ success: true, result: [] });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        urls.push(String(input));
+        return Response.json({ success: true, result: [] });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
     await api.listKeys();
@@ -693,19 +929,26 @@ describe("CloudflareObservabilityApi", () => {
     // `keys`/`values` ignore the `filters` array, so answering a filtered discovery call from them
     // would silently widen it back to the whole account and mislead the agent about its own data.
     const urls: string[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-      urls.push(String(input));
-      return Response.json({
-        success: true,
-        result: {
-          statistics: { elapsed: 0.01, rows_read: 0, bytes_read: 0 },
-          events: { count: 0, events: [] },
-        },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        urls.push(String(input));
+        return Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 0, bytes_read: 0 },
+            events: { count: 0, events: [] },
+          },
+        });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
     const filter: ObservabilityFilter = {
-      kind: "filter", key: "$metadata.level", operation: "eq", type: "string", value: "error",
+      kind: "filter",
+      key: "$metadata.level",
+      operation: "eq",
+      type: "string",
+      value: "error",
     };
 
     await api.listKeys({ filter });
@@ -725,18 +968,25 @@ describe("CloudflareObservabilityApi", () => {
 
   it("requests calculation series only when explicitly requested or given granularity", async () => {
     const bodies: Array<{ chart?: boolean; ignoreSeries?: boolean; granularity?: number }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-      bodies.push(JSON.parse(String(init?.body)) as typeof bodies[number]);
-      return Response.json({
-        success: true,
-        result: {
-          statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10, abr_level: 2 },
-          calculations: [{
-            calculation: "count", aggregates: [{ value: 10, count: 5, interval: 2, sampleInterval: 4 }], series: [],
-          }],
-        },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        bodies.push(JSON.parse(String(init?.body)) as (typeof bodies)[number]);
+        return Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10, abr_level: 2 },
+            calculations: [
+              {
+                calculation: "count",
+                aggregates: [{ value: 10, count: 5, interval: 2, sampleInterval: 4 }],
+                series: [],
+              },
+            ],
+          },
+        });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
     const aggregateOnly = await api.calculate({ calculations: [{ operator: "count" }] });
@@ -747,7 +997,10 @@ describe("CloudflareObservabilityApi", () => {
     expect(bodies[1]).toMatchObject({ chart: true, ignoreSeries: false });
     expect(bodies[2]).toMatchObject({ chart: true, ignoreSeries: false, granularity: 20 });
     expect(aggregateOnly.statistics.abrLevel).toBe(2);
-    expect(aggregateOnly.calculations[0].aggregates[0]).toMatchObject({ interval: 2, sampleInterval: 4 });
+    expect(aggregateOnly.calculations[0].aggregates[0]).toMatchObject({
+      interval: 2,
+      sampleInterval: 4,
+    });
   });
 
   it("constrains a Worker-scoped calculation to that Worker", async () => {
@@ -756,26 +1009,35 @@ describe("CloudflareObservabilityApi", () => {
     // So the injected `$metadata.service` filter is the *only* thing keeping a Worker binding's
     // aggregate from summarizing the whole account, and it is asserted here for that reason.
     let requestBody: { parameters: { filters: unknown[] } } | undefined;
-    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-      requestBody = JSON.parse(String(init?.body));
-      return Response.json({
-        success: true,
-        result: {
-          statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
-          calculations: [{
-            calculation: "count",
-            aggregates: [{ value: 10, count: 5, interval: 2, sampleInterval: 4 }],
-            series: [],
-          }],
-        },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        requestBody = JSON.parse(String(init?.body));
+        return Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
+            calculations: [
+              {
+                calculation: "count",
+                aggregates: [{ value: 10, count: 5, interval: 2, sampleInterval: 4 }],
+                series: [],
+              },
+            ],
+          },
+        });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
     await api.calculate({
       calculations: [{ operator: "count" }],
       filter: {
-        kind: "filter", key: "$metadata.level", operation: "eq", type: "string", value: "error",
+        kind: "filter",
+        key: "$metadata.level",
+        operation: "eq",
+        type: "string",
+        value: "error",
       },
     });
 
@@ -790,23 +1052,33 @@ describe("CloudflareObservabilityApi", () => {
     // A caller that groups by `$metadata.service` must not thereby widen the query: the injected
     // condition still has to be present, so the only group that can come back is this Worker's.
     let requestBody: { parameters: { filters: unknown[]; groupBys?: unknown } } | undefined;
-    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-      requestBody = JSON.parse(String(init?.body));
-      return Response.json({
-        success: true,
-        result: {
-          statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
-          calculations: [{
-            calculation: "count",
-            aggregates: [{
-              value: 10, count: 5, interval: 2, sampleInterval: 4,
-              groups: [{ key: "$metadata.service", value: "api-worker" }],
-            }],
-            series: [],
-          }],
-        },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        requestBody = JSON.parse(String(init?.body));
+        return Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
+            calculations: [
+              {
+                calculation: "count",
+                aggregates: [
+                  {
+                    value: 10,
+                    count: 5,
+                    interval: 2,
+                    sampleInterval: 4,
+                    groups: [{ key: "$metadata.service", value: "api-worker" }],
+                  },
+                ],
+                series: [],
+              },
+            ],
+          },
+        });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
     await api.calculate({
@@ -819,107 +1091,155 @@ describe("CloudflareObservabilityApi", () => {
     ]);
     // The group-by really was sent, so the filter above is what keeps the result to one service
     // rather than the group-by having been quietly dropped.
-    expect(requestBody?.parameters.groupBys)
-      .toEqual([{ value: "$metadata.service", type: "string" }]);
+    expect(requestBody?.parameters.groupBys).toEqual([
+      { value: "$metadata.service", type: "string" },
+    ]);
   });
 
   it("rejects a calculation response missing the arrays its type guarantees", async () => {
     // `aggregates` and `series` are non-optional, so passing this through would hand the agent an
     // object whose type promises arrays that are absent -- a raw TypeError inside gadget code where a
     // typed 502 belongs. This exact payload used to be accepted.
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 1 },
-        calculations: [{ calculation: "count" }],
-      },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 1 },
+            calculations: [{ calculation: "count" }],
+          },
+        }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
-    await expect(api.calculate({ calculations: [{ operator: "count" }] }))
-      .rejects.toMatchObject({ status: 502 });
+    await expect(api.calculate({ calculations: [{ operator: "count" }] })).rejects.toMatchObject({
+      status: 502,
+    });
   });
 
   it("rejects non-numeric aggregate leaves", async () => {
     // The agent formats and reasons over these as numbers.
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 1 },
-        calculations: [{
-          calculation: "count",
-          aggregates: [{ value: "12", count: 1, interval: 1, sampleInterval: 1 }],
-          series: [],
-        }],
-      },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 1 },
+            calculations: [
+              {
+                calculation: "count",
+                aggregates: [{ value: "12", count: 1, interval: 1, sampleInterval: 1 }],
+                series: [],
+              },
+            ],
+          },
+        }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
-    await expect(api.calculate({ calculations: [{ operator: "count" }] }))
-      .rejects.toMatchObject({ status: 502 });
+    await expect(api.calculate({ calculations: [{ operator: "count" }] })).rejects.toMatchObject({
+      status: 502,
+    });
   });
 
   it("rejects a malformed series bucket", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 1 },
-        calculations: [{
-          calculation: "count",
-          aggregates: [],
-          series: [{ time: "2026-08-17T00:00:00Z", data: [{ value: 1 }] }],
-        }],
-      },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 1 },
+            calculations: [
+              {
+                calculation: "count",
+                aggregates: [],
+                series: [{ time: "2026-08-17T00:00:00Z", data: [{ value: 1 }] }],
+              },
+            ],
+          },
+        }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
-    await expect(api.calculate({ calculations: [{ operator: "count" }] }))
-      .rejects.toMatchObject({ status: 502 });
+    await expect(api.calculate({ calculations: [{ operator: "count" }] })).rejects.toMatchObject({
+      status: 502,
+    });
   });
 
   it("keeps validated group identity on aggregates", async () => {
     // `groups` is how a caller tells which slice an aggregate belongs to, so it is narrowed rather
     // than passed through -- and it has to survive that narrowing intact.
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 1 },
-        calculations: [{
-          calculation: "count",
-          alias: "hits",
-          aggregates: [{
-            value: 3, count: 3, interval: 1, sampleInterval: 1,
-            groups: [{ key: "$metadata.service", value: "api-worker" }],
-          }],
-          series: [{
-            time: "2026-08-17T00:00:00Z",
-            data: [{ value: 1, count: 1, interval: 1, sampleInterval: 1 }],
-          }],
-        }],
-      },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 1 },
+            calculations: [
+              {
+                calculation: "count",
+                alias: "hits",
+                aggregates: [
+                  {
+                    value: 3,
+                    count: 3,
+                    interval: 1,
+                    sampleInterval: 1,
+                    groups: [{ key: "$metadata.service", value: "api-worker" }],
+                  },
+                ],
+                series: [
+                  {
+                    time: "2026-08-17T00:00:00Z",
+                    data: [{ value: 1, count: 1, interval: 1, sampleInterval: 1 }],
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
     const result = await api.calculate({ calculations: [{ operator: "count" }] });
 
     expect(result.calculations[0].alias).toBe("hits");
-    expect(result.calculations[0].aggregates[0].groups)
-      .toEqual([{ key: "$metadata.service", value: "api-worker" }]);
+    expect(result.calculations[0].aggregates[0].groups).toEqual([
+      { key: "$metadata.service", value: "api-worker" },
+    ]);
     expect(result.calculations[0].series[0].data[0].value).toBe(1);
   });
 
   it("drops unknown properties from a calculation response", async () => {
     // Same reason the request side rebuilds field-by-field: extra properties survive RPC validation,
     // and this is a trust boundary.
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 1 },
-        calculations: [{
-          calculation: "count", aggregates: [], series: [], internalCursor: "secret",
-        }],
-      },
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 1 },
+            calculations: [
+              {
+                calculation: "count",
+                aggregates: [],
+                series: [],
+                internalCursor: "secret",
+              },
+            ],
+          },
+        }),
+      ),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID);
 
     const result = await api.calculate({ calculations: [{ operator: "count" }] });
@@ -929,25 +1249,28 @@ describe("CloudflareObservabilityApi", () => {
 
   it("paginates trace events to a bounded result", async () => {
     let page = 0;
-    vi.stubGlobal("fetch", vi.fn(async () => {
-      page++;
-      const count = page === 1 ? 100 : 1;
-      return Response.json({
-        success: true,
-        result: {
-          statistics: { elapsed: 0.01, rows_read: count, bytes_read: count * 10 },
-          events: {
-            count: 101,
-            events: Array.from({ length: count }, (_, index) => ({
-              dataset: "cloudflare-workers",
-              timestamp: index,
-              source: {},
-              $metadata: { id: `event-${page}-${index}`, service: "api-worker" },
-            })),
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        page++;
+        const count = page === 1 ? 100 : 1;
+        return Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: count, bytes_read: count * 10 },
+            events: {
+              count: 101,
+              events: Array.from({ length: count }, (_, index) => ({
+                dataset: "cloudflare-workers",
+                timestamp: index,
+                source: {},
+                $metadata: { id: `event-${page}-${index}`, service: "api-worker" },
+              })),
+            },
           },
-        },
-      });
-    }));
+        });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
     const trace = await api.getTrace("trace-id");
@@ -960,28 +1283,38 @@ describe("CloudflareObservabilityApi", () => {
 
   it("continues trace pagination when response filtering shortens a full provider page", async () => {
     let page = 0;
-    vi.stubGlobal("fetch", vi.fn(async () => {
-      page++;
-      const events = page === 1
-        ? Array.from({ length: 100 }, (_, index) => ({
-            dataset: "cloudflare-workers", timestamp: index, source: {},
-            $metadata: {
-              id: `event-1-${index}`,
-              service: index === 99 ? "other-worker" : "api-worker",
-            },
-          }))
-        : [{
-            dataset: "cloudflare-workers", timestamp: 101, source: {},
-            $metadata: { id: "event-2-0", service: "api-worker" },
-          }];
-      return Response.json({
-        success: true,
-        result: {
-          statistics: { elapsed: 0.01, rows_read: events.length, bytes_read: 10 },
-          events: { count: 101, events },
-        },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        page++;
+        const events =
+          page === 1
+            ? Array.from({ length: 100 }, (_, index) => ({
+                dataset: "cloudflare-workers",
+                timestamp: index,
+                source: {},
+                $metadata: {
+                  id: `event-1-${index}`,
+                  service: index === 99 ? "other-worker" : "api-worker",
+                },
+              }))
+            : [
+                {
+                  dataset: "cloudflare-workers",
+                  timestamp: 101,
+                  source: {},
+                  $metadata: { id: "event-2-0", service: "api-worker" },
+                },
+              ];
+        return Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: events.length, bytes_read: 10 },
+            events: { count: 101, events },
+          },
+        });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
     const trace = await api.getTrace("trace-id");
@@ -993,19 +1326,23 @@ describe("CloudflareObservabilityApi", () => {
   });
 
   it("does not mark an exact full trace page as truncated when the total is known", async () => {
-    const fetchSpy = vi.fn(async () => Response.json({
-      success: true,
-      result: {
-        statistics: { elapsed: 0.01, rows_read: 100, bytes_read: 1000 },
-        events: {
-          count: 100,
-          events: Array.from({ length: 100 }, (_, index) => ({
-            dataset: "cloudflare-workers", timestamp: index, source: {},
-            $metadata: { id: `event-${index}`, service: "api-worker" },
-          })),
+    const fetchSpy = vi.fn(async () =>
+      Response.json({
+        success: true,
+        result: {
+          statistics: { elapsed: 0.01, rows_read: 100, bytes_read: 1000 },
+          events: {
+            count: 100,
+            events: Array.from({ length: 100 }, (_, index) => ({
+              dataset: "cloudflare-workers",
+              timestamp: index,
+              source: {},
+              $metadata: { id: `event-${index}`, service: "api-worker" },
+            })),
+          },
         },
-      },
-    }));
+      }),
+    );
     vi.stubGlobal("fetch", fetchSpy);
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
@@ -1041,16 +1378,19 @@ describe("indexed field names", () => {
 
   function stubEvents(): { bodies: unknown[] } {
     const bodies: unknown[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-      bodies.push(JSON.parse(String(init?.body)));
-      return Response.json({
-        success: true,
-        result: {
-          statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
-          events: { count: 1, events: [eventWithLogFields] },
-        },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
+            events: { count: 1, events: [eventWithLogFields] },
+          },
+        });
+      }),
+    );
     return { bodies };
   }
 
@@ -1069,12 +1409,18 @@ describe("indexed field names", () => {
     stubEvents();
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
-    const keys = (await api.listKeys()).map(entry => entry.key);
+    const keys = (await api.listKeys()).map((entry) => entry.key);
 
-    expect(keys).toEqual(expect.arrayContaining([
-      "event", "component", "level", "exception.name", "$metadata.service",
-    ]));
-    expect(keys.filter(key => key.startsWith("source."))).toEqual([]);
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        "event",
+        "component",
+        "level",
+        "exception.name",
+        "$metadata.service",
+      ]),
+    );
+    expect(keys.filter((key) => key.startsWith("source."))).toEqual([]);
   });
 
   it("finds values for a field discovered under its indexed name", async () => {
@@ -1084,9 +1430,12 @@ describe("indexed field names", () => {
     // The exact round trip that failed: discover `event`, then ask for its values.
     const values = await api.listValues("event", "string");
 
-    expect(values).toEqual([expect.objectContaining({
-      key: "event", value: "user_do.reset.surfaced",
-    })]);
+    expect(values).toEqual([
+      expect.objectContaining({
+        key: "event",
+        value: "user_do.reset.surfaced",
+      }),
+    ]);
   });
 
   it("accepts the envelope path as an alias when reading values", async () => {
@@ -1097,9 +1446,12 @@ describe("indexed field names", () => {
     // under the indexed name so the two spellings cannot diverge in later calls.
     const values = await api.listValues("source.event", "string");
 
-    expect(values).toEqual([expect.objectContaining({
-      key: "event", value: "user_do.reset.surfaced",
-    })]);
+    expect(values).toEqual([
+      expect.objectContaining({
+        key: "event",
+        value: "user_do.reset.surfaced",
+      }),
+    ]);
   });
 
   it("rewrites a caller filter's envelope paths before sending them", async () => {
@@ -1112,7 +1464,13 @@ describe("indexed field names", () => {
         filterCombination: "and",
         filters: [
           { kind: "filter", key: "source.event", operation: "eq", type: "string", value: "x" },
-          { kind: "filter", key: "$metadata.level", operation: "eq", type: "string", value: "warn" },
+          {
+            kind: "filter",
+            key: "$metadata.level",
+            operation: "eq",
+            type: "string",
+            value: "warn",
+          },
         ],
       },
     });
@@ -1137,16 +1495,19 @@ describe("indexed field names", () => {
 
   it("rewrites envelope paths in calculations and group-bys", async () => {
     const bodies: unknown[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-      bodies.push(JSON.parse(String(init?.body)));
-      return Response.json({
-        success: true,
-        result: {
-          statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
-          calculations: [],
-        },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return Response.json({
+          success: true,
+          result: {
+            statistics: { elapsed: 0.01, rows_read: 1, bytes_read: 10 },
+            calculations: [],
+          },
+        });
+      }),
+    );
     const api = new CloudflareObservabilityApi(async () => "token", ACCOUNT_ID, "api-worker");
 
     await api.calculate({
@@ -1164,11 +1525,21 @@ describe("indexed field names", () => {
 
   it("keeps a scope filter alongside a rewritten caller key", () => {
     const filter: ObservabilityFilter = {
-      kind: "filter", key: "source.event", operation: "eq", type: "string", value: "x",
+      kind: "filter",
+      key: "source.event",
+      operation: "eq",
+      type: "string",
+      value: "x",
     };
 
     expect(scopeObservabilityFilters("api-worker", filter)).toEqual([
-      { kind: "filter", key: "$metadata.service", operation: "eq", type: "string", value: "api-worker" },
+      {
+        kind: "filter",
+        key: "$metadata.service",
+        operation: "eq",
+        type: "string",
+        value: "api-worker",
+      },
       { kind: "filter", key: "event", operation: "eq", type: "string", value: "x" },
     ]);
   });

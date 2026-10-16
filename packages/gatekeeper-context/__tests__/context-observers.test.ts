@@ -1,9 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { ObserverKv } from "@gadgets/gatekeeper-kit/observers";
 import type { GatekeeperUserVerifier } from "@gadgets/workshop-shared/gatekeeper";
-import {
-  CONTEXT_OBSERVER_DENIED, contextObserverStrategy,
-} from "../src/context-observers.js";
+import { CONTEXT_OBSERVER_DENIED, contextObserverStrategy } from "../src/context-observers.js";
 
 function makeKv(): ObserverKv & { map: Map<string, unknown> } {
   let map = new Map<string, unknown>();
@@ -22,7 +20,7 @@ function verifier(allowed: string[]) {
   let user = {
     async hasCollectionsAccess(sharingDomain: string, collectionIds: string[]) {
       calls.push({ sharingDomain, collectionIds });
-      return collectionIds.map(id => allowed.includes(id));
+      return collectionIds.map((id) => allowed.includes(id));
     },
   } as unknown as Fetcher<GatekeeperUserVerifier>;
   return { user, calls };
@@ -35,8 +33,9 @@ describe("contextObserverStrategy", () => {
       kv.put("observedCollection:private", legacy);
       let strategy = contextObserverStrategy(kv, "workshop.example");
 
-      await expect(strategy.addObserver("denied", verifier([]).user))
-        .rejects.toThrow(CONTEXT_OBSERVER_DENIED);
+      await expect(strategy.addObserver("denied", verifier([]).user)).rejects.toThrow(
+        CONTEXT_OBSERVER_DENIED,
+      );
       let allowed = verifier(["private"]);
       await strategy.addObserver("allowed", allowed.user);
       expect(allowed.calls).toEqual([

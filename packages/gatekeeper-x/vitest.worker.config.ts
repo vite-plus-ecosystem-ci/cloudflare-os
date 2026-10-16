@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 /**
  * The workerd project: the account Durable Object's credentials and identity, and the gatekeeper
@@ -17,9 +17,7 @@ export default defineConfig({
         // Kept in step with wrangler.jsonc; a drift here tests a runtime we do not deploy.
         compatibilityDate: "2026-09-04",
         compatibilityFlags: ["allow_irrevocable_stub_storage", "nodejs_als"],
-        modulesRules: [
-          { type: "Text", include: ["**/*.txt", "**/*.svg"] },
-        ],
+        modulesRules: [{ type: "Text", include: ["**/*.txt", "**/*.svg"] }],
         durableObjects: {
           USER_ACCOUNT: { className: "UserAccount", useSQLite: true },
           X_GATEKEEPER: { className: "XGatekeeperImpl", useSQLite: true },
@@ -35,6 +33,11 @@ export default defineConfig({
     }),
   ],
   test: {
+    // Vitest v4 compatibility: preserve mock call history.
+    // Remove after tests no longer rely on calls from setup or earlier tests.
+    // https://release-v1-3-0-viteplus-dev.voidzero-docs.workers.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
+    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
+    clearMocks: false,
     include: ["__tests__/workerd/*.test.ts"],
     // Asserts the pool actually started, rather than trusting a green run to mean workerd.
     setupFiles: ["../../scripts/assert-workerd.ts"],

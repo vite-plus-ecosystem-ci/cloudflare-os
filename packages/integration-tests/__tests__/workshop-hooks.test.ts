@@ -1,16 +1,29 @@
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type { BoundHookInfo, Overseer } from "@gadgets/workshop-shared/api";
 import type { HookTargetMetadata } from "@gadgets/workshop-shared/gatekeeper";
 import {
-  ADMIN_USERNAME, hookServer, startTestGatekeeperHarness, TEST_VENDOR_ID, testActionState,
-  testControl, type Harness,
+  ADMIN_USERNAME,
+  hookServer,
+  startTestGatekeeperHarness,
+  TEST_VENDOR_ID,
+  testActionState,
+  testControl,
+  type Harness,
 } from "../src/harness.js";
 import { SCRIPTED_MODEL_ID, scriptedModelRouter } from "../src/mock-model.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 import {
-  accountLabel, connect, listConnectedAccounts, logIn, nextUsernames, restartWorkspace, signUp,
-  streamGeneration, waitFor, waitForIdleChat,
+  accountLabel,
+  connect,
+  listConnectedAccounts,
+  logIn,
+  nextUsernames,
+  restartWorkspace,
+  signUp,
+  streamGeneration,
+  waitFor,
+  waitForIdleChat,
 } from "../src/rpc-client.js";
 
 // Serial: the admin test flips deployment-wide gatekeeper policy.
@@ -57,15 +70,23 @@ type ArmedHooks = Disposable & {
 /** A workspace whose HOOKED gadget watched `${username}:${name}` for each name, all public calls. */
 async function armHooks(prefix: string, names: string[]): Promise<ArmedHooks> {
   const [username] = nextUsernames(prefix);
-  const keys = Object.fromEntries(names.map(name => [name, `${username}:${name}`]));
+  const keys = Object.fromEntries(names.map((name) => [name, `${username}:${name}`]));
   const model = models.script([
     {
       toolCalls: [
-        { id: "create", name: "createGadget", arguments: { title: "Hooked", bindingName: "HOOKED" } },
+        {
+          id: "create",
+          name: "createGadget",
+          arguments: { title: "Hooked", bindingName: "HOOKED" },
+        },
         {
           id: "write",
           name: "writeFile",
-          arguments: { workpiece: "HOOKED", filename: "server.js", content: hookServer("TEST_AMBIENT") },
+          arguments: {
+            workpiece: "HOOKED",
+            filename: "server.js",
+            content: hookServer("TEST_AMBIENT"),
+          },
         },
         {
           id: "bind",
@@ -76,7 +97,11 @@ async function armHooks(prefix: string, names: string[]): Promise<ArmedHooks> {
     },
     { text: "Built." },
     {
-      toolCall: { id: "watch", name: "executeCode", arguments: { code: watchCode(Object.values(keys)) } },
+      toolCall: {
+        id: "watch",
+        name: "executeCode",
+        arguments: { code: watchCode(Object.values(keys)) },
+      },
     },
     { text: "Watching." },
   ]);
@@ -86,8 +111,11 @@ async function armHooks(prefix: string, names: string[]): Promise<ArmedHooks> {
   const api = stack.use(await signUp(publicApi, username));
   await api.addModel(model.userModel.profile, model.userModel.config);
   await api.provisionAmbientAccount(TEST_VENDOR_ID);
-  const account = await waitFor("the ambient account", async () =>
-    (await listConnectedAccounts(api)).find(a => a.vendorId === TEST_VENDOR_ID) ?? null);
+  const account = await waitFor(
+    "the ambient account",
+    async () =>
+      (await listConnectedAccounts(api)).find((a) => a.vendorId === TEST_VENDOR_ID) ?? null,
+  );
   const ws = stack.use(await api.newGadget());
   const { id: workspaceId } = await ws.getMetadata();
 
@@ -101,12 +129,14 @@ async function armHooks(prefix: string, names: string[]): Promise<ArmedHooks> {
   expect(model.remainingSteps()).toBe(0);
 
   const listed = await ws.listHooks();
-  expect(listed.map(hook => hook.enabled)).toEqual(names.map(() => false));
-  const hooks = Object.fromEntries(names.map(name => {
-    const hook = listed.find(h => h.description.title === `Test hook ${keys[name]}`);
-    if (!hook) throw new Error(`No hook listed for ${keys[name]}`);
-    return [name, hook];
-  }));
+  expect(listed.map((hook) => hook.enabled)).toEqual(names.map(() => false));
+  const hooks = Object.fromEntries(
+    names.map((name) => {
+      const hook = listed.find((h) => h.description.title === `Test hook ${keys[name]}`);
+      if (!hook) throw new Error(`No hook listed for ${keys[name]}`);
+      return [name, hook];
+    }),
+  );
 
   const resources = stack.move();
   return {
@@ -139,7 +169,9 @@ it("an enabled hook fires into a restarted workspace; disabled and deleted hooks
   expect((await hookState(keys.removed)).disableCount).toBe(1);
 
   let restarted = false;
-  ws.onRpcBroken(() => { restarted = true; });
+  ws.onRpcBroken(() => {
+    restarted = true;
+  });
   const generation = await streamGeneration(ws);
   await restartWorkspace(harness.url, ws);
   await waitFor("the workspace restart", async () => restarted || null);
@@ -152,15 +184,17 @@ it("an enabled hook fires into a restarted workspace; disabled and deleted hooks
   expect(await fire(keys.live, 101)).toEqual({ fired: true });
   expect(await fire(keys.paused, 102)).toEqual(DEAD_HOOK);
   expect(await fire(keys.removed, 103)).toEqual(DEAD_HOOK);
-  expect((await actionState(label)).pending.map(action => action.value)).toEqual([101]);
+  expect((await actionState(label)).pending.map((action) => action.value)).toEqual([101]);
   const { entries: observations } = await reopened.listActions({ filter: "observation" });
-  expect(observations.map(({ description }) => description.title))
-      .toEqual([`Hook ${keys.live} requested 101`]);
+  expect(observations.map(({ description }) => description.title)).toEqual([
+    `Hook ${keys.live} requested 101`,
+  ]);
 
   const { entries } = await reopened.listActions({ filter: "pending" });
   expect(entries).toEqual([
     expect.objectContaining({
-      type: "action", description: expect.objectContaining({ title: "Set the test value to 101" }),
+      type: "action",
+      description: expect.objectContaining({ title: "Set the test value to 101" }),
     }),
   ]);
   await reopened.approveAction(entries[0].id);
@@ -169,7 +203,12 @@ it("an enabled hook fires into a restarted workspace; disabled and deleted hooks
 
 it("an administratively disabled gatekeeper's hook refuses to fire", async () => {
   using armed = await armHooks("hookadmin", ["admin"]);
-  const { label, ws, keys: { admin: key }, hooks } = armed;
+  const {
+    label,
+    ws,
+    keys: { admin: key },
+    hooks,
+  } = armed;
   await ws.enableHook(hooks.admin.id);
 
   using publicApi = connect(harness.url);
@@ -178,12 +217,14 @@ it("an administratively disabled gatekeeper's hook refuses to fire", async () =>
   if (!admin) throw new Error("The admin user has no AdminApi");
   try {
     await admin.setGatekeeperMode(TEST_VENDOR_ID, "disabled");
-    expect(await fire(key, 201)).toEqual({ error: expect.stringContaining("Gatekeeper is disabled.") });
+    expect(await fire(key, 201)).toEqual({
+      error: expect.stringContaining("Gatekeeper is disabled."),
+    });
     expect((await actionState(label)).pending).toEqual([]);
   } finally {
     await admin.setGatekeeperMode(TEST_VENDOR_ID, "optional");
   }
 
   expect(await fire(key, 202)).toEqual({ fired: true });
-  expect((await actionState(label)).pending.map(action => action.value)).toEqual([202]);
+  expect((await actionState(label)).pending.map((action) => action.value)).toEqual([202]);
 });

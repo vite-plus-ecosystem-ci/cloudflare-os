@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { ComposerAttachmentTray } from "./ComposerAttachmentTray";
 import type { ComposerAttachment } from "./useComposerAttachments";
 
@@ -23,7 +23,10 @@ let container: HTMLElement | undefined;
 
 const render = (
   attachments: ComposerAttachment[],
-  { disabled = false, onRemove = () => {} }: { disabled?: boolean; onRemove?: (id: string) => void } = {},
+  {
+    disabled = false,
+    onRemove = () => {},
+  }: { disabled?: boolean; onRemove?: (id: string) => void } = {},
 ) => {
   container = document.createElement("div");
   document.body.append(container);
@@ -87,7 +90,12 @@ describe("ComposerAttachmentTray", () => {
 
   it("hides the content of an uploading card but still announces it", () => {
     const view = render([
-      attachment({ name: "photo.png", mimeType: "image/png", previewUrl: "blob:photo", uploadState: "uploading" }),
+      attachment({
+        name: "photo.png",
+        mimeType: "image/png",
+        previewUrl: "blob:photo",
+        uploadState: "uploading",
+      }),
     ]);
 
     expect(view.querySelector("img")).toBeNull();
@@ -96,7 +104,12 @@ describe("ComposerAttachmentTray", () => {
 
   it("reports a failed upload next to the file name, replacing any image preview", () => {
     const view = render([
-      attachment({ name: "photo.png", mimeType: "image/png", previewUrl: "blob:photo", uploadState: "error" }),
+      attachment({
+        name: "photo.png",
+        mimeType: "image/png",
+        previewUrl: "blob:photo",
+        uploadState: "error",
+      }),
     ]);
 
     expect(view.querySelector("img")).toBeNull();

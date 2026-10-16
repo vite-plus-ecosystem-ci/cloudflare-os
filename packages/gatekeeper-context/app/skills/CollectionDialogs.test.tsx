@@ -3,7 +3,7 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { Toasty } from "@cloudflare/kumo";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { ContextApi, ContextCollectionMetadata } from "../../src/context-types";
 import { DEFAULT_COLLECTION_ICON } from "../components/CollectionIconPicker";
 import { CreateCollectionDialog } from "./CreateCollectionDialog";
@@ -34,11 +34,15 @@ const setInputValue = (input: HTMLInputElement, value: string) => {
   input.dispatchEvent(new Event("input", { bubbles: true }));
 };
 
-const button = (label: string) => [...document.querySelectorAll<HTMLButtonElement>("button")]
-  .find((candidate) => candidate.textContent?.includes(label));
+const button = (label: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>("button")].find((candidate) =>
+    candidate.textContent?.includes(label),
+  );
 
-const radio = (label: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="radio"]')]
-  .find((candidate) => candidate.closest("label")?.textContent?.includes(label));
+const radio = (label: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((candidate) =>
+    candidate.closest("label")?.textContent?.includes(label),
+  );
 
 const collectionSummary = (id: string, title: string) => ({
   id,
@@ -105,9 +109,10 @@ describe("collection dialogs", () => {
     );
 
     act(() => {
-      setInputValue(document.querySelector<HTMLInputElement>(
-        'input[placeholder^="A short name"]',
-      )!, "Engineering");
+      setInputValue(
+        document.querySelector<HTMLInputElement>('input[placeholder^="A short name"]')!,
+        "Engineering",
+      );
     });
     act(() => radio("Git mirror")?.click());
     act(() => radio("Everyone")?.click());
@@ -161,7 +166,9 @@ describe("collection dialogs", () => {
     await act(async () => Promise.resolve());
     expect(button("Create token")).toBeDefined();
 
-    act(() => setInputValue(document.querySelector<HTMLInputElement>('input[value="main"]')!, "release"));
+    act(() =>
+      setInputValue(document.querySelector<HTMLInputElement>('input[value="main"]')!, "release"),
+    );
     await act(async () => {
       button("Save changes")?.click();
       await Promise.resolve();
@@ -182,10 +189,12 @@ describe("collection dialogs", () => {
       />,
     );
 
-    act(() => setInputValue(
-      document.querySelector<HTMLInputElement>('input[placeholder^="A short name"]')!,
-      " engineering ",
-    ));
+    act(() =>
+      setInputValue(
+        document.querySelector<HTMLInputElement>('input[placeholder^="A short name"]')!,
+        " engineering ",
+      ),
+    );
 
     expect(document.body.textContent).toContain("A collection with this name already exists.");
     expect(button("Add collection")?.disabled).toBe(true);
@@ -221,7 +230,12 @@ describe("collection dialogs", () => {
       />,
     );
 
-    act(() => setInputValue(document.querySelector<HTMLInputElement>('input[aria-label="Name"]')!, "marketing"));
+    act(() =>
+      setInputValue(
+        document.querySelector<HTMLInputElement>('input[aria-label="Name"]')!,
+        "marketing",
+      ),
+    );
 
     expect(document.body.textContent).toContain("A collection with this name already exists.");
     expect(button("Save changes")?.disabled).toBe(true);

@@ -5,7 +5,7 @@
 // resource the parser makes of it; and every configurator's resource URL resolves back to the
 // resource it configures, naming what the user entered.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { resolveRequestedResource } from "@gadgets/workshop-shared/gatekeeper";
 import accountConfigurator from "../src/configurator/x-account-configurator-ui.js";
 import listConfigurator from "../src/configurator/x-list-configurator-ui.js";
@@ -15,9 +15,14 @@ import { ACCOUNT_URL, ALL_RESOURCES, RESOURCES, kindOfPattern } from "../src/x-e
 import { parseUsernameRef, parseXUrl } from "../src/x-urls";
 
 // None of these configurators may ask the gatekeeper anything to build or pre-fill a URL.
-const ui = new Proxy({}, {
-  get(_target, property) { throw new Error(`the configurator must not call ui.${String(property)}`); },
-}) as never;
+const ui = new Proxy(
+  {},
+  {
+    get(_target, property) {
+      throw new Error(`the configurator must not call ui.${String(property)}`);
+    },
+  },
+) as never;
 
 function resolvedKind(url: string): string | undefined {
   const result = resolveRequestedResource(ALL_RESOURCES, url);
@@ -46,12 +51,19 @@ const PROFILES = [
   "https://twitter.com/Jack_Dorsey",
   "https://www.x.com/jack",
   "https://mobile.x.com/jack",
-  ...["with_replies", "media", "highlights", "articles", "followers", "following", "verified_followers"]
-    .map(tab => `https://x.com/jack/${tab}`),
+  ...[
+    "with_replies",
+    "media",
+    "highlights",
+    "articles",
+    "followers",
+    "following",
+    "verified_followers",
+  ].map((tab) => `https://x.com/jack/${tab}`),
 ];
 
 describe("URLs resolve to the resource the parser makes of them", () => {
-  it.each([...POSTS, ...LISTS, ...PROFILES])("%s", url => {
+  it.each([...POSTS, ...LISTS, ...PROFILES])("%s", (url) => {
     const parsed = parseXUrl(url);
     expect(parsed).not.toBeNull();
     expect(resolvedKind(url)).toBe(parsed!.kind);
@@ -69,12 +81,18 @@ describe("URLs resolve to the resource the parser makes of them", () => {
     // resource; the parser behind getGatekeeperClassFor refuses the binding, and so does the form.
     for (const url of ["https://x.com/home", "https://x.com/explore", "https://x.com/settings"]) {
       expect(parseXUrl(url)).toBeNull();
-      expect(profileConfigurator.isReady!({ values: { username: new URL(url).pathname.slice(1) } })).toBe(false);
+      expect(
+        profileConfigurator.isReady!({ values: { username: new URL(url).pathname.slice(1) } }),
+      ).toBe(false);
     }
   });
 
   it("matches nothing of X's on other hosts", () => {
-    for (const url of ["https://docs.x.com/jack", "https://developer.x.com/en/docs", "https://example.com/jack/status/20"]) {
+    for (const url of [
+      "https://docs.x.com/jack",
+      "https://developer.x.com/en/docs",
+      "https://example.com/jack/status/20",
+    ]) {
       expect(resolvedKind(url)).toBe("account");
       expect(parseXUrl(url)).toBeNull();
     }
@@ -90,7 +108,7 @@ describe("the account configurator", () => {
 });
 
 describe("the post configurator", () => {
-  it.each([...POSTS, "20"])("binds the post %s names", async input => {
+  it.each([...POSTS, "20"])("binds the post %s names", async (input) => {
     expect(postConfigurator.isReady!({ values: { postUrl: input } })).toBe(true);
     const url = await postConfigurator.resourceUrl({ values: { postUrl: input }, ui });
     expect(parseXUrl(url)).toEqual({ kind: "post", postId: "20" });
@@ -101,25 +119,43 @@ describe("the post configurator", () => {
     for (const input of POSTS) {
       const url = await postConfigurator.resourceUrl({ values: { postUrl: input }, ui });
       const values = await postConfigurator.initialValuesFromResourceUrl!({
-        resourceUrl: url, resourceUrlPattern: RESOURCES.post.urlPattern, ui,
+        resourceUrl: url,
+        resourceUrlPattern: RESOURCES.post.urlPattern,
+        ui,
       });
       expect(await postConfigurator.resourceUrl({ values, ui })).toBe(url);
     }
   });
 
-  it.each(["", "https://x.com/jack", "https://x.com/i/lists/1234", "https://docs.x.com/jack/status/20", "abc"])(
-    "isn't ready for %j", input => {
-      expect(postConfigurator.isReady!({ values: { postUrl: input } })).toBe(false);
-    });
+  it.each([
+    "",
+    "https://x.com/jack",
+    "https://x.com/i/lists/1234",
+    "https://docs.x.com/jack/status/20",
+    "abc",
+  ])("isn't ready for %j", (input) => {
+    expect(postConfigurator.isReady!({ values: { postUrl: input } })).toBe(false);
+  });
 });
 
 describe("the profile configurator", () => {
   const inputs = [
-    "jack", "@jack", "Jack_Dorsey", "https://x.com/jack", "https://twitter.com/jack/media", "@this_handle_is_too_long",
-    "home", "@settings", "https://x.com/jack/status/20", "https://x.com/jack/likes", "has space", "", "@",
+    "jack",
+    "@jack",
+    "Jack_Dorsey",
+    "https://x.com/jack",
+    "https://twitter.com/jack/media",
+    "@this_handle_is_too_long",
+    "home",
+    "@settings",
+    "https://x.com/jack/status/20",
+    "https://x.com/jack/likes",
+    "has space",
+    "",
+    "@",
   ];
 
-  it.each(inputs)("agrees with the server about %j", async input => {
+  it.each(inputs)("agrees with the server about %j", async (input) => {
     let expected: string | null;
     try {
       expected = parseUsernameRef(input);
@@ -136,9 +172,12 @@ describe("the profile configurator", () => {
 
   it("is pre-filled by the runtime from the pattern's username group", async () => {
     for (const url of PROFILES) {
-      const username = new URLPattern(RESOURCES.profile.urlPattern).exec(url.replace(/\/$/, ""))?.pathname.groups.username;
+      const username = new URLPattern(RESOURCES.profile.urlPattern).exec(url.replace(/\/$/, ""))
+        ?.pathname.groups.username;
       expect(parseXUrl(url)).toEqual({ kind: "profile", username });
-      expect(await profileConfigurator.resourceUrl({ values: { username }, ui })).toBe(`https://x.com/${username}`);
+      expect(await profileConfigurator.resourceUrl({ values: { username }, ui })).toBe(
+        `https://x.com/${username}`,
+      );
     }
   });
 });
@@ -153,7 +192,8 @@ describe("the List configurator", () => {
 
   it("is pre-filled by the runtime from the pattern's listId group", () => {
     for (const url of LISTS) {
-      const listId = new URLPattern(RESOURCES.list.urlPattern).exec(url.replace(/\/$/, ""))?.pathname.groups.listId;
+      const listId = new URLPattern(RESOURCES.list.urlPattern).exec(url.replace(/\/$/, ""))
+        ?.pathname.groups.listId;
       expect(listId).toBe("1234");
     }
   });
