@@ -15,7 +15,7 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test:run": "vitest run && vitest run -c vitest.browser.config.ts"
+    "test:run": "vp test run && vp test run -c vitest.browser.config.ts"
   },
   "dependencies": {
     "@cloudflare/kumo": "^2.14.0",

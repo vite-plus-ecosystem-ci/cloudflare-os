@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-plugin";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 import deployed from "./cloudflare.config.ts";
 
 const { compatibilityDate, compatibilityFlags } = deployed.worker;

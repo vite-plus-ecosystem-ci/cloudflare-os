@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { GatekeeperUser, GatekeeperUserVerifier } from "@gadgets/workshop-shared/gatekeeper";
 import { UserDurableObject } from "../src/user.js";
 
@@ -15,9 +15,8 @@ function makeUserWithAccount(vendorId: string) {
   Object.assign(user, {
     storage: {
       connectedAccounts: {
-        get: (accountId: number) => accountId === 7
-          ? { id: accountId, account, vendorId }
-          : undefined,
+        get: (accountId: number) =>
+          accountId === 7 ? { id: accountId, account, vendorId } : undefined,
       },
     },
   });
@@ -43,7 +42,8 @@ describe("UserDurableObject.getVerifier", () => {
     const { user, verifierRequests } = makeUserWithAccount("linear");
 
     await expect(user.getVerifier(7, "notion")).rejects.toThrow(
-        "Invalid account selection for this service.");
+      "Invalid account selection for this service.",
+    );
     expect(verifierRequests()).toBe(0);
   });
 });

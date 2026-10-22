@@ -6,9 +6,17 @@
 // Durable Object stub.
 
 import { env, runInDurableObject } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { getRedirectUri, withAccountApi, type Env } from "../../src/gitlab-env.js";
-import { FakeGitLab, hooks, json, seedAccount, stageReconnect, tokenResponse, unwrap } from "./fake-gitlab.js";
+import {
+  FakeGitLab,
+  hooks,
+  json,
+  seedAccount,
+  stageReconnect,
+  tokenResponse,
+  unwrap,
+} from "./fake-gitlab.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -24,12 +32,18 @@ function accountStub(userObjectId: string) {
   return env.USER_ACCOUNT.get(env.USER_ACCOUNT.idFromString(userObjectId));
 }
 
-type StoredGrant = { accessToken: string; refreshToken: string; expiresAt: number; scopes: string[] };
+type StoredGrant = {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  scopes: string[];
+};
 
 /** The grant record the kit keeps (see storage-schema.md). */
 async function storedGrant(userObjectId: string): Promise<StoredGrant | undefined> {
   return await runInDurableObject(accountStub(userObjectId), async (_instance, state) =>
-    state.storage.kv.get<StoredGrant>("credentials"));
+    state.storage.kv.get<StoredGrant>("credentials"),
+  );
 }
 
 /**
@@ -37,9 +51,12 @@ async function storedGrant(userObjectId: string): Promise<StoredGrant | undefine
  * N, after `beforeAnswering` has run; refresh token `refresh-N` with grant N + 10, and the seeded
  * `test-refresh` as already redeemed. Returns the revoked tokens.
  */
-function fakeOAuth(beforeAnswering: (code: string) => Promise<void> = async () => {}, gitlab = new FakeGitLab()): string[] {
+function fakeOAuth(
+  beforeAnswering: (code: string) => Promise<void> = async () => {},
+  gitlab = new FakeGitLab(),
+): string[] {
   const revoked: string[] = [];
-  gitlab.on("POST", /^\/oauth\/token/, async request => {
+  gitlab.on("POST", /^\/oauth\/token/, async (request) => {
     const form = new URLSearchParams(request.body);
     const code = form.get("code");
     if (code !== null) {
@@ -50,7 +67,7 @@ function fakeOAuth(beforeAnswering: (code: string) => Promise<void> = async () =
     if (refreshToken === "test-refresh") return json({ error: "invalid_grant" }, { status: 400 });
     return json(tokenResponse(Number(refreshToken.slice("refresh-".length)) + 10));
   });
-  gitlab.on("POST", /^\/oauth\/revoke/, request => {
+  gitlab.on("POST", /^\/oauth\/revoke/, (request) => {
     revoked.push(new URLSearchParams(request.body).get("token")!);
     return json({});
   });
@@ -70,7 +87,7 @@ describe("UserAccount.getAccessToken", () => {
   it("refreshes an expiring token, persisting the rotated pair before returning", async () => {
     const gitlab = new FakeGitLab();
     let redemptions = 0;
-    gitlab.on("POST", /^\/oauth\/token/, request => {
+    gitlab.on("POST", /^\/oauth\/token/, (request) => {
       redemptions += 1;
       const form = new URLSearchParams(request.body);
       expect(form.get("grant_type")).toBe("refresh_token");
@@ -83,12 +100,16 @@ describe("UserAccount.getAccessToken", () => {
     });
     gitlab.install();
 
-    const id = await seedAccount({ expiresInMs: 10_000 });  // inside the 60s safety window
+    const id = await seedAccount({ expiresInMs: 10_000 }); // inside the 60s safety window
     expect(await token(id)).toBe("access-1");
     expect(redemptions).toBe(1);
 
     const grant = await storedGrant(id);
-    expect(grant).toMatchObject({ accessToken: "access-1", refreshToken: "refresh-1", scopes: ["api", "write_repository"] });
+    expect(grant).toMatchObject({
+      accessToken: "access-1",
+      refreshToken: "refresh-1",
+      scopes: ["api", "write_repository"],
+    });
     expect(grant!.expiresAt).toBeGreaterThan(Date.now() + 7000 * 1000);
     // The pre-kit keys went with the migration.
     await runInDurableObject(accountStub(id), async (_instance, state) => {
@@ -106,7 +127,7 @@ describe("UserAccount.getAccessToken", () => {
     gitlab.on("POST", /^\/oauth\/token/, async () => {
       redemptions += 1;
       // Hold the exchange open so every caller is waiting when the first one completes.
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
       return json(tokenResponse(redemptions));
     });
     gitlab.install();
@@ -128,12 +149,16 @@ describe("UserAccount.getAccessToken", () => {
 
     const id = await seedAccount({ expiresInMs: 0 });
     await hooks().installCallback(id);
-    await expect(unwrap(await hooks().userDescribe(id))).rejects.toThrow(/expired or been revoked. Please reconnect/);
+    await expect(unwrap(await hooks().userDescribe(id))).rejects.toThrow(
+      /expired or been revoked. Please reconnect/,
+    );
     // The death is stored with the grant, not just remembered: much later -- or after a restart
     // of the object -- the dead token is still not sent again.
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(Date.now() + 10 * 60 * 1000);
-    await expect(unwrap(await hooks().userDescribe(id))).rejects.toThrow(/expired or been revoked. Please reconnect/);
+    await expect(unwrap(await hooks().userDescribe(id))).rejects.toThrow(
+      /expired or been revoked. Please reconnect/,
+    );
     expect(redemptions).toBe(1);
     expect(await hooks().expiredNotices(id)).toBe(1);
     // The dead pair is left in place: a reconnect replaces it, and nothing else should.
@@ -145,24 +170,37 @@ describe("UserAccount.getAccessToken", () => {
 
   it.each([
     ["a 5xx", () => new Response("bad gateway", { status: 502 })],
-    ["an Access login redirect", () => new Response(null, {
-      status: 302, headers: { location: "https://team.cloudflareaccess.com/cdn-cgi/access/login/gitlab-api.example.com" },
-    })],
-  ])("treats %s from the token endpoint as transient: the grant survives, and the next request asks again", async (_label, answer) => {
-    const gitlab = new FakeGitLab();
-    let attempts = 0;
-    gitlab.on("POST", /^\/oauth\/token/, () => ++attempts === 1 ? answer() : json(tokenResponse(1)));
-    gitlab.install();
+    [
+      "an Access login redirect",
+      () =>
+        new Response(null, {
+          status: 302,
+          headers: {
+            location:
+              "https://team.cloudflareaccess.com/cdn-cgi/access/login/gitlab-api.example.com",
+          },
+        }),
+    ],
+  ])(
+    "treats %s from the token endpoint as transient: the grant survives, and the next request asks again",
+    async (_label, answer) => {
+      const gitlab = new FakeGitLab();
+      let attempts = 0;
+      gitlab.on("POST", /^\/oauth\/token/, () =>
+        ++attempts === 1 ? answer() : json(tokenResponse(1)),
+      );
+      gitlab.install();
 
-    const id = await seedAccount({ expiresInMs: 0 });
-    await hooks().installCallback(id);
-    await expect(token(id)).rejects.toThrow(/Could not refresh GitLab credentials/);
-    expect(await hooks().expiredNotices(id)).toBe(0);
-    expect((await storedGrant(id))?.refreshToken).toBe("test-refresh");
-    // No cooldown replays the failure: a retry straight after is a fresh request.
-    expect(await token(id)).toBe("access-1");
-    expect(attempts).toBe(2);
-  });
+      const id = await seedAccount({ expiresInMs: 0 });
+      await hooks().installCallback(id);
+      await expect(token(id)).rejects.toThrow(/Could not refresh GitLab credentials/);
+      expect(await hooks().expiredNotices(id)).toBe(0);
+      expect((await storedGrant(id))?.refreshToken).toBe("test-refresh");
+      // No cooldown replays the failure: a retry straight after is a fresh request.
+      expect(await token(id)).toBe("access-1");
+      expect(attempts).toBe(2);
+    },
+  );
 
   it("still serves a stub-era grant that has no scopes record, reporting it as no scopes", async () => {
     new FakeGitLab().install();
@@ -178,10 +216,11 @@ describe("UserAccount.reportTokenRejected", () => {
     // token A and was still in flight when A was refreshed comes back 401. That is a fact about
     // A, which is gone, and says nothing about the account: same grant, healthy new token.
     const gitlab = new FakeGitLab();
-    gitlab.on("POST", /^\/oauth\/token/, request =>
+    gitlab.on("POST", /^\/oauth\/token/, (request) =>
       new URLSearchParams(request.body).get("refresh_token") === "test-refresh"
         ? json(tokenResponse(1))
-        : json({ error: "invalid_grant" }, { status: 400 }));
+        : json({ error: "invalid_grant" }, { status: 400 }),
+    );
     gitlab.install();
     const id = await seedAccount({ expiresInMs: 0 });
     await hooks().installCallback(id);
@@ -218,7 +257,7 @@ describe("UserAccount.reportTokenRejected", () => {
 
   it("re-arms when a reconnect replaces the grant, so the replacement's own death is announced", async () => {
     const gitlab = new FakeGitLab();
-    gitlab.on("POST", /^\/oauth\/token/, request => {
+    gitlab.on("POST", /^\/oauth\/token/, (request) => {
       const code = new URLSearchParams(request.body).get("code");
       return code === null
         ? json({ error: "invalid_grant" }, { status: 400 })
@@ -230,7 +269,7 @@ describe("UserAccount.reportTokenRejected", () => {
     expect(await hooks().reportTokenRejected(id, "test-token")).toBe("expired");
     expect(await hooks().expiredNotices(id)).toBe(1);
 
-    await runInDurableObject(accountStub(id), async account => {
+    await runInDurableObject(accountStub(id), async (account) => {
       await account.commitReconnect(await stageReconnect(account, "code-1"));
     });
     expect(await token(id)).toBe("access-1");
@@ -243,7 +282,12 @@ describe("withAccountApi", () => {
   const ADA = { id: 1, username: "ada", name: "Ada", web_url: "https://gitlab.example.com/ada" };
 
   function readUser(userObjectId: string, options: { replayable?: true } = {}) {
-    return withAccountApi(env as Env, accountStub(userObjectId), api => api.getCurrentUser(), options);
+    return withAccountApi(
+      env as Env,
+      accountStub(userObjectId),
+      (api) => api.getCurrentUser(),
+      options,
+    );
   }
 
   /**
@@ -260,7 +304,7 @@ describe("withAccountApi", () => {
       issued += 1;
       return json({ ...tokenResponse(issued), expires_in: issued === 1 ? 30 : 7200 });
     });
-    gitlab.on("GET", /^\/api\/v4\/user$/, async request => {
+    gitlab.on("GET", /^\/api\/v4\/user$/, async (request) => {
       if (request.headers.get("authorization") !== "Bearer access-1") return json(ADA);
       asked.resolve();
       await released.promise;
@@ -302,9 +346,11 @@ describe("withAccountApi", () => {
   function refusingSeededToken(refresh: () => Response): FakeGitLab {
     const gitlab = new FakeGitLab();
     gitlab.on("POST", /^\/oauth\/token/, refresh);
-    gitlab.on("GET", /^\/api\/v4\/user$/, request => request.headers.get("authorization") === "Bearer test-token"
-      ? json({ message: "401 Unauthorized" }, { status: 401 })
-      : json(ADA));
+    gitlab.on("GET", /^\/api\/v4\/user$/, (request) =>
+      request.headers.get("authorization") === "Bearer test-token"
+        ? json({ message: "401 Unauthorized" }, { status: 401 })
+        : json(ADA),
+    );
     gitlab.install();
     return gitlab;
   }
@@ -326,7 +372,9 @@ describe("withAccountApi", () => {
     const gitlab = refusingSeededToken(() => json({ error: "invalid_grant" }, { status: 400 }));
     const id = await seedAccount();
     await hooks().installCallback(id);
-    await expect(readUser(id, { replayable: true })).rejects.toThrow(/expired or been revoked. Please reconnect/);
+    await expect(readUser(id, { replayable: true })).rejects.toThrow(
+      /expired or been revoked. Please reconnect/,
+    );
     expect(await hooks().expiredNotices(id)).toBe(1);
     await expect(token(id)).rejects.toThrow(/expired/);
     expect(gitlab.count("GET", /^\/api\/v4\/user$/)).toBe(1);
@@ -341,9 +389,10 @@ describe("UserAccount.commitReconnect", () => {
     // user's -- over the grant the owner confirmed last.
     const id = await seedAccount();
     await hooks().installCallback(id);
-    await runInDurableObject(accountStub(id), async account => {
-      const revoked = fakeOAuth(async code => {
-        if (code === "code-1") await account.commitReconnect(await stageReconnect(account, "code-2"));
+    await runInDurableObject(accountStub(id), async (account) => {
+      const revoked = fakeOAuth(async (code) => {
+        if (code === "code-1")
+          await account.commitReconnect(await stageReconnect(account, "code-2"));
       });
       const overtaken = await stageReconnect(account, "code-1");
       await expect(account.commitReconnect(overtaken)).rejects.toThrow(/reconnected again/);
@@ -358,9 +407,14 @@ describe("UserAccount.commitReconnect", () => {
     const id = await seedAccount({ refreshToken: "refresh-0", expiresInMs: 0 });
     await hooks().installCallback(id);
     fakeOAuth();
-    const stageId = await runInDurableObject(accountStub(id), async account => await stageReconnect(account, "code-1"));
+    const stageId = await runInDurableObject(
+      accountStub(id),
+      async (account) => await stageReconnect(account, "code-1"),
+    );
     expect(await token(id)).toBe("access-10");
-    await runInDurableObject(accountStub(id), async account => { await account.commitReconnect(stageId); });
+    await runInDurableObject(accountStub(id), async (account) => {
+      await account.commitReconnect(stageId);
+    });
     expect(await token(id)).toBe("access-1");
   });
 
@@ -371,7 +425,7 @@ describe("UserAccount.commitReconnect", () => {
     await hooks().installCallback(id);
     fakeOAuth();
     await expect(token(id)).rejects.toThrow(/refused the refresh token/);
-    await runInDurableObject(accountStub(id), async account => {
+    await runInDurableObject(accountStub(id), async (account) => {
       await account.commitReconnect(await stageReconnect(account, "code-1"));
     });
     expect(await token(id)).toBe("access-1");
@@ -397,13 +451,15 @@ describe("UserAccount.acceptAuthCode", () => {
         await instance.revoke();
         return json(tokenResponse(7));
       });
-      gitlab.on("POST", /^\/oauth\/revoke/, request => {
+      gitlab.on("POST", /^\/oauth\/revoke/, (request) => {
         revoked.push(new URLSearchParams(request.body).get("token")!);
         return json({});
       });
       gitlab.install();
 
-      await expect(instance.acceptAuthCode("code", flow!.oauthNonce)).rejects.toThrow(/disconnected while it was being authorized/);
+      await expect(instance.acceptAuthCode("code", flow!.oauthNonce)).rejects.toThrow(
+        /disconnected while it was being authorized/,
+      );
       expect(revoked.toSorted()).toEqual(["access-7", "refresh-7"]);
       // Nothing is left behind: no grant, no stage, no key at all.
       expect([...state.storage.kv.list()]).toEqual([]);
@@ -418,14 +474,25 @@ describe("UserAccount.acceptAuthCode", () => {
     await runInDurableObject(env.USER_ACCOUNT.get(accountId), async (instance, state) => {
       // This pool cannot mint the decorated account entrypoint (see `TestUser`); its undecorated
       // twin stands in.
-      Object.defineProperty(state.exports, "GatekeeperUserImpl", { value: Reflect.get(state.exports, "TestUser") });
+      Object.defineProperty(state.exports, "GatekeeperUserImpl", {
+        value: Reflect.get(state.exports, "TestUser"),
+      });
       const flow = await instance.beginOAuthFlow("initiation", getRedirectUri(env));
       const gitlab = new FakeGitLab();
-      gitlab.on("GET", /^\/api\/v4\/user$/, request => request.headers.get("authorization") === "Bearer access-7"
-        ? json({ message: "401 Unauthorized" }, { status: 401 })
-        : json({ id: 1, username: "ada", name: "Ada", web_url: "https://gitlab.example.com/ada" }));
+      gitlab.on("GET", /^\/api\/v4\/user$/, (request) =>
+        request.headers.get("authorization") === "Bearer access-7"
+          ? json({ message: "401 Unauthorized" }, { status: 401 })
+          : json({
+              id: 1,
+              username: "ada",
+              name: "Ada",
+              web_url: "https://gitlab.example.com/ada",
+            }),
+      );
       const revoked = fakeOAuth(undefined, gitlab);
-      await expect(instance.acceptAuthCode("code-7", flow!.oauthNonce)).rejects.toThrow(/Workshop unreachable/);
+      await expect(instance.acceptAuthCode("code-7", flow!.oauthNonce)).rejects.toThrow(
+        /Workshop unreachable/,
+      );
       expect(revoked.toSorted()).toEqual(["access-17", "refresh-17"]);
     });
   });
@@ -436,13 +503,13 @@ describe("a refresh overtaken while in flight", () => {
   function overtakenRefresh(overtake: () => Promise<void>): string[] {
     const gitlab = new FakeGitLab();
     const revoked: string[] = [];
-    gitlab.on("POST", /^\/oauth\/token/, async request => {
+    gitlab.on("POST", /^\/oauth\/token/, async (request) => {
       const code = new URLSearchParams(request.body).get("code");
       if (code !== null) return json(tokenResponse(Number(code.slice("code-".length))));
       await overtake();
       return json(tokenResponse(1));
     });
-    gitlab.on("POST", /^\/oauth\/revoke/, request => {
+    gitlab.on("POST", /^\/oauth\/revoke/, (request) => {
       revoked.push(new URLSearchParams(request.body).get("token")!);
       return json({});
     });
@@ -455,8 +522,10 @@ describe("a refresh overtaken while in flight", () => {
     // The disconnect revokes the pair it finds, which the refresh has already rotated out on
     // GitLab. The pair the refresh brings back is the one still live, and nobody is left to use it.
     const id = await seedAccount({ expiresInMs: 0 });
-    await runInDurableObject(accountStub(id), async instance => {
-      const revoked = overtakenRefresh(async () => { await instance.revoke(); });
+    await runInDurableObject(accountStub(id), async (instance) => {
+      const revoked = overtakenRefresh(async () => {
+        await instance.revoke();
+      });
       await expect(instance.getAccessToken()).rejects.toThrow(/disconnected while refreshing/);
       expect(revoked.toSorted()).toEqual(["access-1", "refresh-1", "test-refresh", "test-token"]);
     });
@@ -467,7 +536,7 @@ describe("a refresh overtaken while in flight", () => {
     // authorization standing, so a mint is not revoked where a connection survives it.
     const id = await seedAccount({ expiresInMs: 0 });
     await hooks().installCallback(id);
-    await runInDurableObject(accountStub(id), async instance => {
+    await runInDurableObject(accountStub(id), async (instance) => {
       const revoked = overtakenRefresh(async () => {
         await instance.commitReconnect(await stageReconnect(instance, "code-2"));
       });
@@ -494,11 +563,13 @@ describe("GatekeeperUserImpl.ensureResources", () => {
       const id = await seedAccount({ scopes });
       await hooks().installCallback(id);
       const result = await unwrap(await hooks().userEnsureResources(id, PATTERNS));
-      expect(result.url, JSON.stringify(scopes)).toMatch(new RegExp(`^http://localhost:8787/gatekeeper/gitlab/${id}/[0-9a-f]+$`));
+      expect(result.url, JSON.stringify(scopes)).toMatch(
+        new RegExp(`^http://localhost:8787/gatekeeper/gitlab/${id}/[0-9a-f]+$`),
+      );
       // The URL starts a reconnect for the full scopes, whose grant is only staged: the handoff
       // names a stage for commitReconnect, and the live grant is untouched meanwhile.
       const initiationNonce = result.url!.split("/").pop()!;
-      await runInDurableObject(accountStub(id), async account => {
+      await runInDurableObject(accountStub(id), async (account) => {
         const flow = await account.beginOAuthFlow(initiationNonce, getRedirectUri(env));
         expect(flow?.scopes).toEqual(["api", "write_repository"]);
         const handoff = await account.acceptAuthCode("code-1", flow!.oauthNonce);
@@ -513,12 +584,16 @@ describe("GatekeeperUserImpl identity", () => {
   it("reports the confirmed primary email, and null when unconfirmed", async () => {
     const gitlab = new FakeGitLab();
     let confirmed = true;
-    gitlab.on("GET", /^\/api\/v4\/user$/, request => {
+    gitlab.on("GET", /^\/api\/v4\/user$/, (request) => {
       expect(request.headers.get("authorization")).toBe("Bearer test-token");
       return json({
-        id: 1, username: "ada", name: "Ada", web_url: "https://gitlab.example.com/ada",
+        id: 1,
+        username: "ada",
+        name: "Ada",
+        web_url: "https://gitlab.example.com/ada",
         avatar_url: "https://gitlab.example.com/a.png",
-        email: "ada@example.com", public_email: "",
+        email: "ada@example.com",
+        public_email: "",
         confirmed_at: confirmed ? "2024-01-01T00:00:00Z" : null,
       });
     });

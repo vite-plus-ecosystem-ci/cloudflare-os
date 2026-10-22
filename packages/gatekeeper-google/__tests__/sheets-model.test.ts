@@ -1,14 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  a1Of, cellName, columnLetters, columnNumber, findSheet, intersection, parseRange, quoteSheetTitle,
-  shownValue, validateRange,
+  a1Of,
+  cellName,
+  columnLetters,
+  columnNumber,
+  findSheet,
+  intersection,
+  parseRange,
+  quoteSheetTitle,
+  shownValue,
+  validateRange,
 } from "../src/sheets-model";
 import { CANONICAL_RANGES, SHEET_TITLE_QUOTING, TYPED_INPUT, rect, sheet } from "./sheets-fixture";
 
 describe("Sheets A1 ranges", () => {
   it("parses a range into its sheet title and zero-based, half-open cells", () => {
     expect(parseRange("'Sales 2026'!B3:D7")).toEqual({
-      sheet: "Sales 2026", rect: { startRow: 2, endRow: 7, startColumn: 1, endColumn: 4 },
+      sheet: "Sales 2026",
+      rect: { startRow: 2, endRow: 7, startColumn: 1, endColumn: 4 },
     });
     expect(parseRange("'It''s'!$A$1")).toEqual({ sheet: "It's", rect: rect(0, 0) });
     expect(parseRange("Sales!aa10")).toEqual({ sheet: "Sales", rect: rect(9, 26) });
@@ -25,7 +34,14 @@ describe("Sheets A1 ranges", () => {
   });
 
   it("names columns and cells as Google does", () => {
-    for (let [letters, column] of [["A", 0], ["Z", 25], ["AA", 26], ["AZ", 51], ["ZZ", 701], ["AAA", 702]] as const) {
+    for (let [letters, column] of [
+      ["A", 0],
+      ["Z", 25],
+      ["AA", 26],
+      ["AZ", 51],
+      ["ZZ", 701],
+      ["AAA", 702],
+    ] as const) {
       expect(columnLetters(column)).toBe(letters);
       expect(columnNumber(letters)).toBe(column + 1);
     }

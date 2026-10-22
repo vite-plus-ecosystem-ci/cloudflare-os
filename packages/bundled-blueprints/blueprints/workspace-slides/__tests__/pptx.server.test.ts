@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { deckToPptx } from "@gadgets/bundled-blueprints/libraries/pptx/server";
 import { crc32 } from "@gadgets/bundled-blueprints/libraries/zip/server";
 import { ExportHandler, Gadget } from "../files/server.ts";
@@ -7,7 +7,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 function commaSeparatedTerms(prefix: string, count: number): string {
-  return Array.from({length: count}, (_, index) => `${prefix}${index}`).join(",");
+  return Array.from({ length: count }, (_, index) => `${prefix}${index}`).join(",");
 }
 
 type ZipEntry = {
@@ -63,7 +63,7 @@ async function readZip(stream: ReadableStream<Uint8Array>): Promise<ParsedZip> {
   expect(uint16(archive, eocdOffset + 20)).toBe(0);
   expect(centralOffset + centralSize).toBe(eocdOffset);
 
-  const metadata: Array<Omit<ZipEntry, "bytes"> & {name: string}> = [];
+  const metadata: Array<Omit<ZipEntry, "bytes"> & { name: string }> = [];
   const seenNames = new Set<string>();
   let centralCursor = centralOffset;
   for (let index = 0; index < entryCount; ++index) {
@@ -88,14 +88,13 @@ async function readZip(stream: ReadableStream<Uint8Array>): Promise<ParsedZip> {
     expect(uint16(archive, centralCursor + 36)).toBe(0);
     expect(uint32(archive, centralCursor + 38)).toBe(0);
     const localOffset = uint32(archive, centralCursor + 42);
-    const name = decoder.decode(archive.subarray(
-      centralCursor + 46,
-      centralCursor + 46 + nameLength,
-    ));
+    const name = decoder.decode(
+      archive.subarray(centralCursor + 46, centralCursor + 46 + nameLength),
+    );
     expect(name.length).toBeGreaterThan(0);
     expect(seenNames.has(name), `duplicate ZIP entry ${name}`).toBe(false);
     seenNames.add(name);
-    metadata.push({name, compressedSize, crc, flags, localOffset, method, uncompressedSize});
+    metadata.push({ name, compressedSize, crc, flags, localOffset, method, uncompressedSize });
     centralCursor += 46 + nameLength;
   }
   expect(centralCursor).toBe(eocdOffset);
@@ -118,10 +117,9 @@ async function readZip(stream: ReadableStream<Uint8Array>): Promise<ParsedZip> {
     const localNameLength = uint16(archive, localCursor + 26);
     const localExtraLength = uint16(archive, localCursor + 28);
     expect(localExtraLength).toBe(0);
-    const localName = decoder.decode(archive.subarray(
-      localCursor + 30,
-      localCursor + 30 + localNameLength,
-    ));
+    const localName = decoder.decode(
+      archive.subarray(localCursor + 30, localCursor + 30 + localNameLength),
+    );
     expect(localName).toBe(entry.name);
 
     const dataOffset = localCursor + 30 + localNameLength;
@@ -131,17 +129,17 @@ async function readZip(stream: ReadableStream<Uint8Array>): Promise<ParsedZip> {
     expect(uint32(archive, descriptorOffset + 8)).toBe(entry.compressedSize);
     expect(uint32(archive, descriptorOffset + 12)).toBe(entry.uncompressedSize);
     localCursor = descriptorOffset + 16;
-    expect(localCursor).toBe(index + 1 < metadata.length
-      ? metadata[index + 1].localOffset
-      : centralOffset);
+    expect(localCursor).toBe(
+      index + 1 < metadata.length ? metadata[index + 1].localOffset : centralOffset,
+    );
 
     const bytes = await inflate(archive.subarray(dataOffset, descriptorOffset));
     expect(bytes.byteLength).toBe(entry.uncompressedSize);
     expect(crc32(bytes)).toBe(entry.crc);
-    entries.set(entry.name, {...entry, bytes});
+    entries.set(entry.name, { ...entry, bytes });
   }
   expect(localCursor).toBe(centralOffset);
-  return {archive, entries, names: metadata.map(entry => entry.name)};
+  return { archive, entries, names: metadata.map((entry) => entry.name) };
 }
 
 function partText(zip: ParsedZip, name: string): string {
@@ -180,7 +178,15 @@ function zlibStored(bytes: Uint8Array): Uint8Array {
   expect(bytes.byteLength).toBeLessThanOrEqual(0xffff);
   const length = bytes.byteLength;
   return concat(
-    new Uint8Array([0x78, 0x01, 0x01, length & 0xff, length >>> 8, ~length & 0xff, ~length >>> 8 & 0xff]),
+    new Uint8Array([
+      0x78,
+      0x01,
+      0x01,
+      length & 0xff,
+      length >>> 8,
+      ~length & 0xff,
+      (~length >>> 8) & 0xff,
+    ]),
     bytes,
     bigEndian32(adler32(bytes)),
   );
@@ -188,7 +194,12 @@ function zlibStored(bytes: Uint8Array): Uint8Array {
 
 function pngChunk(type: string, data: Uint8Array): Uint8Array {
   const typeBytes = encoder.encode(type);
-  return concat(bigEndian32(data.byteLength), typeBytes, data, bigEndian32(crc32(concat(typeBytes, data))));
+  return concat(
+    bigEndian32(data.byteLength),
+    typeBytes,
+    data,
+    bigEndian32(crc32(concat(typeBytes, data))),
+  );
 }
 
 function pngFixture(width: number, height: number, completeRaster = true): Uint8Array {
@@ -210,17 +221,32 @@ function pngFixture(width: number, height: number, completeRaster = true): Uint8
 
 function jpegFixture(width: number, height: number): Uint8Array {
   const app0 = new Uint8Array([
-    0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00,
-    0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+    0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01,
+    0x00, 0x00,
   ]);
   const frame = new Uint8Array([
-    0xff, 0xc0, 0x00, 0x11, 0x08,
-    height >>> 8, height & 0xff, width >>> 8, width & 0xff,
-    0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
+    0xff,
+    0xc0,
+    0x00,
+    0x11,
+    0x08,
+    height >>> 8,
+    height & 0xff,
+    width >>> 8,
+    width & 0xff,
+    0x03,
+    0x01,
+    0x11,
+    0x00,
+    0x02,
+    0x11,
+    0x00,
+    0x03,
+    0x11,
+    0x00,
   ]);
   const scan = new Uint8Array([
-    0xff, 0xda, 0x00, 0x0c, 0x03, 0x01, 0x00, 0x02, 0x11, 0x03, 0x11, 0x00, 0x3f, 0x00,
-    0x00,
+    0xff, 0xda, 0x00, 0x0c, 0x03, 0x01, 0x00, 0x02, 0x11, 0x03, 0x11, 0x00, 0x3f, 0x00, 0x00,
   ]);
   return concat(new Uint8Array([0xff, 0xd8]), app0, frame, scan, new Uint8Array([0xff, 0xd9]));
 }
@@ -239,8 +265,10 @@ function base64(bytes: Uint8Array): string {
     const hasC = offset + 2 < bytes.byteLength;
     const b = hasB ? bytes[offset + 1] : 0;
     const c = hasC ? bytes[offset + 2] : 0;
-    result += alphabet[a >>> 2] + alphabet[(a & 3) << 4 | b >>> 4] +
-      (hasB ? alphabet[(b & 15) << 2 | c >>> 6] : "=") +
+    result +=
+      alphabet[a >>> 2] +
+      alphabet[((a & 3) << 4) | (b >>> 4)] +
+      (hasB ? alphabet[((b & 15) << 2) | (c >>> 6)] : "=") +
       (hasC ? alphabet[c & 63] : "=");
   }
   return result;
@@ -250,12 +278,16 @@ function dataUrl(type: "png" | "jpeg", bytes: Uint8Array): string {
   return `data:image/${type};base64,${base64(bytes)}`;
 }
 
-function block(type: string, props: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) {
-  return {type, x: 0, y: 0, props, ...extra};
+function block(
+  type: string,
+  props: Record<string, unknown> = {},
+  extra: Record<string, unknown> = {},
+) {
+  return { type, x: 0, y: 0, props, ...extra };
 }
 
-function oneSlide(blocks: unknown[] = [], background: Record<string, unknown> = {inset: false}) {
-  return {slides: [{id: "slide", background, blocks}]};
+function oneSlide(blocks: unknown[] = [], background: Record<string, unknown> = { inset: false }) {
+  return { slides: [{ id: "slide", background, blocks }] };
 }
 
 function shapeByName(xml: string, name: string): string {
@@ -270,13 +302,15 @@ function occurrences(value: string, search: string): number {
 }
 
 function xmlAttributes(source: string): Record<string, string> {
-  return Object.fromEntries([...source.matchAll(/([\w:]+)="([^"]*)"/g)].map(match => [match[1], match[2]]));
+  return Object.fromEntries(
+    [...source.matchAll(/([\w:]+)="([^"]*)"/g)].map((match) => [match[1], match[2]]),
+  );
 }
 
 function shapeVerticalBounds(shape: string) {
   const offset = xmlAttributes(/<a:off ([^>]*)\/>/.exec(shape)![1]);
   const extent = xmlAttributes(/<a:ext ([^>]*)\/>/.exec(shape)![1]);
-  return {y: Number(offset.y), height: Number(extent.cy)};
+  return { y: Number(offset.y), height: Number(extent.cy) };
 }
 
 function relationshipSource(name: string): string {
@@ -303,7 +337,7 @@ function handler(): ExportHandler {
 }
 
 async function exportDeck(deck: unknown): Promise<ReadableStream<Uint8Array>> {
-  return handler().export({getDeck: async () => deck} as never, "pptx");
+  return handler().export({ getDeck: async () => deck } as never, "pptx");
 }
 
 describe("Workspace Slides PPTX package", () => {
@@ -312,14 +346,22 @@ describe("Workspace Slides PPTX package", () => {
     const jpeg = jpegFixture(2, 4);
     const deck = {
       slides: [
-        {id: "first", background: {inset: false}, blocks: [
-          block("title", {text: "First"}),
-          block("image", {src: dataUrl("png", png), alt: "PNG"}),
-        ]},
-        {id: "second", background: {inset: false}, blocks: [
-          block("title", {text: "Second"}),
-          block("image", {src: dataUrl("jpeg", jpeg), alt: "JPEG"}),
-        ]},
+        {
+          id: "first",
+          background: { inset: false },
+          blocks: [
+            block("title", { text: "First" }),
+            block("image", { src: dataUrl("png", png), alt: "PNG" }),
+          ],
+        },
+        {
+          id: "second",
+          background: { inset: false },
+          blocks: [
+            block("title", { text: "Second" }),
+            block("image", { src: dataUrl("jpeg", jpeg), alt: "JPEG" }),
+          ],
+        },
       ],
     };
     const zip = await readZip(deckToPptx(deck));
@@ -348,50 +390,66 @@ describe("Workspace Slides PPTX package", () => {
     ]);
 
     const contentTypes = partText(zip, "[Content_Types].xml");
-    const defaults = Object.fromEntries([...contentTypes.matchAll(/<Default\b([^>]*)\/>/g)]
-      .map(match => {
+    const defaults = Object.fromEntries(
+      [...contentTypes.matchAll(/<Default\b([^>]*)\/>/g)].map((match) => {
         const attributes = xmlAttributes(match[1]);
         return [attributes.Extension, attributes.ContentType];
-      }));
+      }),
+    );
     expect(defaults).toEqual({
       rels: "application/vnd.openxmlformats-package.relationships+xml",
       xml: "application/xml",
       png: "image/png",
       jpeg: "image/jpeg",
     });
-    const overrides = Object.fromEntries([...contentTypes.matchAll(/<Override\b([^>]*)\/>/g)]
-      .map(match => {
+    const overrides = Object.fromEntries(
+      [...contentTypes.matchAll(/<Override\b([^>]*)\/>/g)].map((match) => {
         const attributes = xmlAttributes(match[1]);
         return [attributes.PartName, attributes.ContentType];
-      }));
+      }),
+    );
     expect(overrides).toEqual({
       "/docProps/core.xml": "application/vnd.openxmlformats-package.core-properties+xml",
       "/docProps/app.xml": "application/vnd.openxmlformats-officedocument.extended-properties+xml",
-      "/ppt/presentation.xml": "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
-      "/ppt/presProps.xml": "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml",
-      "/ppt/viewProps.xml": "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml",
-      "/ppt/tableStyles.xml": "application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml",
-      "/ppt/slideMasters/slideMaster1.xml": "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml",
-      "/ppt/slideLayouts/slideLayout1.xml": "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml",
+      "/ppt/presentation.xml":
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+      "/ppt/presProps.xml":
+        "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml",
+      "/ppt/viewProps.xml":
+        "application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml",
+      "/ppt/tableStyles.xml":
+        "application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml",
+      "/ppt/slideMasters/slideMaster1.xml":
+        "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml",
+      "/ppt/slideLayouts/slideLayout1.xml":
+        "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml",
       "/ppt/theme/theme1.xml": "application/vnd.openxmlformats-officedocument.theme+xml",
-      "/ppt/slides/slide1.xml": "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
-      "/ppt/slides/slide2.xml": "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
+      "/ppt/slides/slide1.xml":
+        "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
+      "/ppt/slides/slide2.xml":
+        "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
     });
     for (const name of zip.names) {
       if (name === "[Content_Types].xml") continue;
       const extension = name.slice(name.lastIndexOf(".") + 1);
-      expect(overrides[`/${name}`] || defaults[extension], `content type for ${name}`).toBeDefined();
+      expect(
+        overrides[`/${name}`] || defaults[extension],
+        `content type for ${name}`,
+      ).toBeDefined();
     }
 
     const graph = new Map<string, string[]>();
-    for (const relationshipsName of zip.names.filter(name => name.endsWith(".rels"))) {
+    for (const relationshipsName of zip.names.filter((name) => name.endsWith(".rels"))) {
       const source = relationshipSource(relationshipsName);
       if (source) expect(zip.entries.has(source), `relationship owner ${source}`).toBe(true);
       const ids = new Set<string>();
       const targets: string[] = [];
       for (const match of partText(zip, relationshipsName).matchAll(/<Relationship\b([^>]*)\/>/g)) {
         const attributes = xmlAttributes(match[1]);
-        expect(ids.has(attributes.Id), `duplicate relationship ${attributes.Id} in ${relationshipsName}`).toBe(false);
+        expect(
+          ids.has(attributes.Id),
+          `duplicate relationship ${attributes.Id} in ${relationshipsName}`,
+        ).toBe(false);
         ids.add(attributes.Id);
         expect(attributes.TargetMode).toBeUndefined();
         expect(attributes.Target).not.toMatch(/^[a-z][a-z0-9+.-]*:/i);
@@ -400,7 +458,9 @@ describe("Workspace Slides PPTX package", () => {
         targets.push(target);
       }
       if (source) {
-        for (const reference of partText(zip, source).matchAll(/\br:(?:id|embed|link)="([^"]+)"/g)) {
+        for (const reference of partText(zip, source).matchAll(
+          /\br:(?:id|embed|link)="([^"]+)"/g,
+        )) {
           expect(ids.has(reference[1]), `${source} references ${reference[1]}`).toBe(true);
         }
       }
@@ -416,16 +476,24 @@ describe("Workspace Slides PPTX package", () => {
         queue.push(target);
       }
     }
-    for (const name of zip.names.filter(entryName => entryName !== "[Content_Types].xml" && !entryName.endsWith(".rels"))) {
+    for (const name of zip.names.filter(
+      (entryName) => entryName !== "[Content_Types].xml" && !entryName.endsWith(".rels"),
+    )) {
       expect(reached.has(name), `relationship graph reaches ${name}`).toBe(true);
     }
 
     const presentation = partText(zip, "ppt/presentation.xml");
-    expect(presentation).toContain('<p:sldId id="256" r:id="rId5"/><p:sldId id="257" r:id="rId6"/>');
+    expect(presentation).toContain(
+      '<p:sldId id="256" r:id="rId5"/><p:sldId id="257" r:id="rId6"/>',
+    );
     expect(presentation).toContain('<p:sldSz cx="12192000" cy="6858000" type="screen16x9"/>');
     const presentationRels = partText(zip, "ppt/_rels/presentation.xml.rels");
-    expect(presentationRels).toContain('Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"');
-    expect(presentationRels).toContain('Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide2.xml"');
+    expect(presentationRels).toContain(
+      'Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"',
+    );
+    expect(presentationRels).toContain(
+      'Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide2.xml"',
+    );
     // A usable grid: PowerPoint's default 1/12 inch, not the 85-inch spacing that broke snapping.
     expect(partText(zip, "ppt/viewProps.xml")).toContain('<p:gridSpacing cx="76200" cy="76200"/>');
   });
@@ -434,10 +502,18 @@ describe("Workspace Slides PPTX package", () => {
 describe("Workspace Slides PPTX rendering", () => {
   it("converts CSS pixels, assigns sequential IDs, and preserves expanded-block z-order", async () => {
     const deck = oneSlide([
-      block("shape", {fill: "#123456"}, {x: 1.25, y: 2.5, w: 3, h: 4}),
-      block("title", {text: "Sized", fontSize: 20, letterSpacing: "2px", lineHeight: 1.25}, {x: 5, y: 6, w: 100, h: 30}),
-      block("card", {eyebrow: "top", title: "Card", body: "Body"}, {x: 10, y: 20, w: 200, h: 160}),
-      block("shape", {fill: "#654321"}, {x: 30, y: 40, w: 50, h: 60}),
+      block("shape", { fill: "#123456" }, { x: 1.25, y: 2.5, w: 3, h: 4 }),
+      block(
+        "title",
+        { text: "Sized", fontSize: 20, letterSpacing: "2px", lineHeight: 1.25 },
+        { x: 5, y: 6, w: 100, h: 30 },
+      ),
+      block(
+        "card",
+        { eyebrow: "top", title: "Card", body: "Body" },
+        { x: 10, y: 20, w: 200, h: 160 },
+      ),
+      block("shape", { fill: "#654321" }, { x: 30, y: 40, w: 50, h: 60 }),
     ]);
     const zip = await readZip(deckToPptx(deck));
     const xml = partText(zip, "ppt/slides/slide1.xml");
@@ -453,35 +529,51 @@ describe("Workspace Slides PPTX rendering", () => {
     expect(title).not.toContain('typeface="Inter"');
     expect(title).toContain('<a:spcPct val="108696"/>'); // line-height 1.25 over Arial's natural 1.15.
 
-    const shapes = [...xml.matchAll(/<p:cNvPr id="(\d+)" name="([^"]*)"/g)]
-      .map(match => ({id: Number(match[1]), name: match[2]}));
+    const shapes = [...xml.matchAll(/<p:cNvPr id="(\d+)" name="([^"]*)"/g)].map((match) => ({
+      id: Number(match[1]),
+      name: match[2],
+    }));
     expect(shapes).toEqual([
-      {id: 1, name: ""},
-      {id: 2, name: "Block 1 shape"},
-      {id: 3, name: "Block 2 title"},
-      {id: 4, name: "Block 3 card surface"},
-      {id: 5, name: "Block 3 card eyebrow"},
-      {id: 6, name: "Block 3 card title"},
-      {id: 7, name: "Block 3 card body"},
-      {id: 8, name: "Block 4 shape"},
+      { id: 1, name: "" },
+      { id: 2, name: "Block 1 shape" },
+      { id: 3, name: "Block 2 title" },
+      { id: 4, name: "Block 3 card surface" },
+      { id: 5, name: "Block 3 card eyebrow" },
+      { id: 6, name: "Block 3 card title" },
+      { id: 7, name: "Block 3 card body" },
+      { id: 8, name: "Block 4 shape" },
     ]);
-    expect(new Set(shapes.map(shape => shape.id)).size).toBe(shapes.length);
+    expect(new Set(shapes.map((shape) => shape.id)).size).toBe(shapes.length);
   });
 
   it("keeps intrinsic labels on one line without changing authored positions", async () => {
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("sectionLabel", {text: "A LONG SECTION LABEL"}, {x: 36, y: 35}),
-      block("text", {text: "x ".repeat(60), fontSize: 19, lineHeight: 1.6}, {x: 36, y: 204, w: 760}),
-      block("text", {text: "Next block", fontSize: 19, lineHeight: 1.6}, {x: 36, y: 252, w: 760}),
-      block("tonePill", {text: "A LONG PILL LABEL"}, {x: 500, y: 35}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("sectionLabel", { text: "A LONG SECTION LABEL" }, { x: 36, y: 35 }),
+          block(
+            "text",
+            { text: "x ".repeat(60), fontSize: 19, lineHeight: 1.6 },
+            { x: 36, y: 204, w: 760 },
+          ),
+          block(
+            "text",
+            { text: "Next block", fontSize: 19, lineHeight: 1.6 },
+            { x: 36, y: 252, w: 760 },
+          ),
+          block("tonePill", { text: "A LONG PILL LABEL" }, { x: 500, y: 35 }),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     const label = shapeByName(xml, "Block 1 sectionLabel");
     expect(label).toContain('<a:bodyPr wrap="none"');
     // Sized from Arial's advance widths, since Google Slides ignores wrap="none" and breaks anything
     // wider than its box onto a second line: 20 tracked 10px semibold glyphs need about 121px.
-    expect(Number(/<a:ext cx="(\d+)"/.exec(label)![1])).toBeGreaterThanOrEqual(Math.round(115 * 10160));
+    expect(Number(/<a:ext cx="(\d+)"/.exec(label)![1])).toBeGreaterThanOrEqual(
+      Math.round(115 * 10160),
+    );
     expect(shapeByName(xml, "Block 2 text")).toContain('<a:bodyPr wrap="square"');
     expect(shapeByName(xml, "Block 2 text")).toContain('<a:off x="365760" y="2072640"/>');
     expect(shapeByName(xml, "Block 3 text")).toContain('<a:off x="365760" y="2560320"/>');
@@ -490,38 +582,74 @@ describe("Workspace Slides PPTX rendering", () => {
 
   it("renders every supported block type and its typography, fills, strokes, dashes, and radius", async () => {
     const blocks = [
-      block("sectionLabel", {text: "section"}),
-      block("text", {text: "Tracked", fontSize: 20, letterSpacing: "2px"}),
-      block("gadgetsMark", {size: "small"}),
+      block("sectionLabel", { text: "section" }),
+      block("text", { text: "Tracked", fontSize: 20, letterSpacing: "2px" }),
+      block("gadgetsMark", { size: "small" }),
       block("title", {
-        text: "HOT & cold HOT", highlight: "HOT", fontSize: 20,
-        weight: 700, color: "#112233", letterSpacing: "2px", lineHeight: 1.25,
+        text: "HOT & cold HOT",
+        highlight: "HOT",
+        fontSize: 20,
+        weight: 700,
+        color: "#112233",
+        letterSpacing: "2px",
+        lineHeight: 1.25,
       }),
-      block("subtitle", {text: "Subtitle", fontSize: 18}),
-      block("text", {text: "Aligned", fontSize: 16, align: "right", lineHeight: 2}),
-      block("bulletList", {text: "one\ntwo\nthree\nfour\nfive\nsix\nseven", treatment: "compact"}),
-      block("card", {eyebrow: "eye", title: "Card", body: "Body"}),
-      block("box", {title: "Box", body: "Body", dashed: true}),
-      block("tonePill", {tone: "ruby", text: "status"}),
-      block("divider", {color: "#112233", opacity: 0.25}, {w: 100, h: 2}),
-      block("shape", {
-        kind: "ellipse", fill: "#12345680", stroke: "#abcdef", strokeWidth: 2, opacity: 0.5,
-      }, {w: 100, h: 50}),
-      block("shape", {kind: "rect", fill: "#ffffff", radius: 10}, {w: 100, h: 50}),
-      block("image", {alt: "missing"}),
-      block("svg", {markup: "<svg><path/></svg>", background: "#fff4e6"}),
-      block("arrow", {x1: 10, y1: 20, x2: 100, y2: 50, color: "ruby", label: "go", dashed: true, width: 3}),
+      block("subtitle", { text: "Subtitle", fontSize: 18 }),
+      block("text", { text: "Aligned", fontSize: 16, align: "right", lineHeight: 2 }),
+      block("bulletList", {
+        text: "one\ntwo\nthree\nfour\nfive\nsix\nseven",
+        treatment: "compact",
+      }),
+      block("card", { eyebrow: "eye", title: "Card", body: "Body" }),
+      block("box", { title: "Box", body: "Body", dashed: true }),
+      block("tonePill", { tone: "ruby", text: "status" }),
+      block("divider", { color: "#112233", opacity: 0.25 }, { w: 100, h: 2 }),
+      block(
+        "shape",
+        {
+          kind: "ellipse",
+          fill: "#12345680",
+          stroke: "#abcdef",
+          strokeWidth: 2,
+          opacity: 0.5,
+        },
+        { w: 100, h: 50 },
+      ),
+      block("shape", { kind: "rect", fill: "#ffffff", radius: 10 }, { w: 100, h: 50 }),
+      block("image", { alt: "missing" }),
+      block("svg", { markup: "<svg><path/></svg>", background: "#fff4e6" }),
+      block("arrow", {
+        x1: 10,
+        y1: 20,
+        x2: 100,
+        y2: 50,
+        color: "ruby",
+        label: "go",
+        dashed: true,
+        width: 3,
+      }),
     ];
     const zip = await readZip(deckToPptx(oneSlide(blocks)));
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     for (const name of [
-      "Block 1 sectionLabel", "Block 2 text", "Block 3 gadgetsMark hexagon",
-      "Block 4 title", "Block 5 subtitle", "Block 6 text", "Block 7 bulletList",
-      "Block 8 card surface", "Block 9 box surface", "Block 10 tonePill",
-      "Block 11 divider", "Block 12 shape", "Block 13 shape", "Block 14 image",
+      "Block 1 sectionLabel",
+      "Block 2 text",
+      "Block 3 gadgetsMark hexagon",
+      "Block 4 title",
+      "Block 5 subtitle",
+      "Block 6 text",
+      "Block 7 bulletList",
+      "Block 8 card surface",
+      "Block 9 box surface",
+      "Block 10 tonePill",
+      "Block 11 divider",
+      "Block 12 shape",
+      "Block 13 shape",
+      "Block 14 image",
       "Block 16 arrow",
-    ]) expect(xml, name).toContain(`name="${name}"`);
+    ])
+      expect(xml, name).toContain(`name="${name}"`);
     expect(xml).not.toContain('name="Block 15 svg"');
 
     expect(shapeByName(xml, "Block 1 sectionLabel")).toContain(">SECTION</a:t>");
@@ -545,15 +673,19 @@ describe("Workspace Slides PPTX rendering", () => {
     expect(occurrences(bullets, '<a:buChar char="&#x25CF;"/>')).toBe(6);
     // The browser's dash is a fixed 6px; PowerPoint's preset scales with the stroke, so 6px is
     // expressed relative to the 1px border (600%) and to the 3px arrow (200%).
-    expect(shapeByName(xml, "Block 9 box surface")).toContain('<a:custDash><a:ds d="600000" sp="600000"/></a:custDash>');
+    expect(shapeByName(xml, "Block 9 box surface")).toContain(
+      '<a:custDash><a:ds d="600000" sp="600000"/></a:custDash>',
+    );
     // The pill is an intrinsic inline-block; the wrapper's w/h do not size it.
     expect(shapeByName(xml, "Block 10 tonePill")).toContain(`cy="${24 * 10160}"`);
     // A point-up hexagon: the preset (pointing sideways) laid out long-axis horizontal and rotated,
     // with the browser's 10-unit stroke scaled to the 48px icon.
     const hexagon = shapeByName(xml, "Block 3 gadgetsMark hexagon");
     expect(hexagon).toContain('<a:xfrm rot="5400000">');
-    expect(hexagon).toContain(`<a:ext cx="${Math.round(74 * 48 / 86 * 10160)}" cy="${Math.round(68 * 48 / 86 * 10160)}"/>`);
-    expect(hexagon).toContain(`<a:ln w="${Math.round(10 * 48 / 86 * 10160)}" cap="rnd">`);
+    expect(hexagon).toContain(
+      `<a:ext cx="${Math.round(((74 * 48) / 86) * 10160)}" cy="${Math.round(((68 * 48) / 86) * 10160)}"/>`,
+    );
+    expect(hexagon).toContain(`<a:ln w="${Math.round(((10 * 48) / 86) * 10160)}" cap="rnd">`);
     expect(hexagon).toContain("<a:round/>");
     expect(shapeByName(xml, "Block 10 tonePill")).toContain(">STATUS</a:t>");
     expect(shapeByName(xml, "Block 11 divider")).toContain('<a:alpha val="25000"/>');
@@ -561,7 +693,9 @@ describe("Workspace Slides PPTX rendering", () => {
     const ellipse = shapeByName(xml, "Block 12 shape");
     expect(ellipse).toContain('<a:prstGeom prst="ellipse">');
     expect(ellipse).toContain('<a:srgbClr val="123456"><a:alpha val="25098"/>');
-    expect(ellipse).toContain('<a:ln w="20320" cap="rnd"><a:solidFill><a:srgbClr val="ABCDEF"><a:alpha val="50000"/>');
+    expect(ellipse).toContain(
+      '<a:ln w="20320" cap="rnd"><a:solidFill><a:srgbClr val="ABCDEF"><a:alpha val="50000"/>',
+    );
     expect(shapeByName(xml, "Block 13 shape")).toContain('<a:gd name="adj" fmla="val 20000"/>');
     const arrow = shapeByName(xml, "Block 16 arrow");
     expect(arrow).toContain('<a:custDash><a:ds d="200000" sp="200000"/></a:custDash>');
@@ -571,9 +705,9 @@ describe("Workspace Slides PPTX rendering", () => {
 
   it("highlights terms in order across line breaks, as the browser's sequential wrapping does", async () => {
     const runs = async (text: string, highlight: string) => {
-      const zip = await readZip(deckToPptx(oneSlide([block("title", {text, highlight})])));
+      const zip = await readZip(deckToPptx(oneSlide([block("title", { text, highlight })])));
       const title = shapeByName(partText(zip, "ppt/slides/slide1.xml"), "Block 1 title");
-      return [...title.matchAll(/<a:br\/>|<a:r>([\s\S]*?)<\/a:r>/g)].map(match => {
+      return [...title.matchAll(/<a:br\/>|<a:r>([\s\S]*?)<\/a:r>/g)].map((match) => {
         if (match[0] === "<a:br/>") return "<br>";
         const run = /<a:t xml:space="preserve">([\s\S]*?)<\/a:t>/.exec(match[1])![1];
         return (match[1].includes('<a:srgbClr val="FF5F2E">') ? "*" : "") + run;
@@ -581,8 +715,13 @@ describe("Workspace Slides PPTX rendering", () => {
     };
     // A match inside an earlier highlight changes nothing; one across its edge ("ar & b") is
     // impossible once the browser has wrapped "bar" in a span.
-    expect(await runs("foo\nbar & baz", "foo\nbar, o\nb, baz, , ar & b"))
-      .toEqual(["*foo", "<br>", "*bar", " &amp; ", "*baz"]);
+    expect(await runs("foo\nbar & baz", "foo\nbar, o\nb, baz, , ar & b")).toEqual([
+      "*foo",
+      "<br>",
+      "*bar",
+      " &amp; ",
+      "*baz",
+    ]);
     expect(await runs("foobar", "foo,foobar")).toEqual(["*foo", "bar"]);
     expect(await runs("foobar", "foobar,foo")).toEqual(["*foobar"]);
   });
@@ -590,14 +729,22 @@ describe("Workspace Slides PPTX rendering", () => {
   it("normalizes and escapes text and attributes without losing whitespace or line breaks", async () => {
     const png = pngFixture(1, 1);
     const unusual = "  A & < > \" '\t\r\nB\rC\nD\u0001\ud800X\udc00 \ud83d\ude42  ";
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("text", {text: unusual}, {w: 400, h: 200}),
-      block("image", {
-        src: dataUrl("png", png),
-        alt: "A & < > \" '",
-        fit: "fill",
-      }, {w: 20, h: 20}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("text", { text: unusual }, { w: 400, h: 200 }),
+          block(
+            "image",
+            {
+              src: dataUrl("png", png),
+              alt: "A & < > \" '",
+              fit: "fill",
+            },
+            { w: 20, h: 20 },
+          ),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
     const text = shapeByName(xml, "Block 1 text");
 
@@ -607,22 +754,31 @@ describe("Workspace Slides PPTX rendering", () => {
     expect(text).toContain("\ud83d\ude42  ");
     expect(text).not.toContain("\u0001");
     expect(text).not.toContain("\r");
-    expect(shapeByName(xml, "Block 2 image")).toContain(
-      'descr="A &amp; &lt; &gt; &quot; &apos;"',
-    );
+    expect(shapeByName(xml, "Block 2 image")).toContain('descr="A &amp; &lt; &gt; &quot; &apos;"');
   });
 
   it("renders solid, inset, and cover backgrounds while omitting the former brand-bar SVG", async () => {
-    const brandBar = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 12" preserveAspectRatio="none">' +
+    const brandBar =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 12" preserveAspectRatio="none">' +
       '<defs><linearGradient id="g"><stop stop-color="#FF6633"/><stop offset=".5" stop-color="#F6821F"/>' +
       '<stop offset="1" stop-color="#FBAD41"/></linearGradient></defs><rect width="1200" height="12" fill="url(#g)"/></svg>';
-    const zip = await readZip(deckToPptx({slides: [
-      {id: "solid", background: {color: "#123456", inset: false}, blocks: [
-        block("svg", {markup: brandBar}, {x: 0, y: 663, w: 1200, h: 12}),
-      ]},
-      {id: "inset", background: {color: "#abcdef", inset: true}, blocks: []},
-      {id: "cover", background: {color: "#f6821f", inset: false, coverOrange: true}, blocks: []},
-    ]}));
+    const zip = await readZip(
+      deckToPptx({
+        slides: [
+          {
+            id: "solid",
+            background: { color: "#123456", inset: false },
+            blocks: [block("svg", { markup: brandBar }, { x: 0, y: 663, w: 1200, h: 12 })],
+          },
+          { id: "inset", background: { color: "#abcdef", inset: true }, blocks: [] },
+          {
+            id: "cover",
+            background: { color: "#f6821f", inset: false, coverOrange: true },
+            blocks: [],
+          },
+        ],
+      }),
+    );
     const solid = partText(zip, "ppt/slides/slide1.xml");
     const inset = partText(zip, "ppt/slides/slide2.xml");
     const cover = partText(zip, "ppt/slides/slide3.xml");
@@ -647,12 +803,28 @@ describe("Workspace Slides PPTX rendering", () => {
     expect([...jpeg.subarray(0, 2)]).toEqual([0xff, 0xd8]);
     expect([...jpeg.subarray(-2)]).toEqual([0xff, 0xd9]);
 
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("image", {src: dataUrl("png", png), fit: "contain", alt: "contain & image"}, {x: 10, y: 20, w: 200, h: 200}),
-      block("image", {src: dataUrl("png", png), fit: "cover", alt: "cover"}, {x: 300, y: 20, w: 100, h: 100}),
-      block("image", {src: dataUrl("jpeg", jpeg), fit: "fill", alt: "fill"}, {x: 500, y: 20, w: 100, h: 100}),
-    ])));
-    expect(zip.names.filter(name => name.startsWith("ppt/media/"))).toEqual([
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block(
+            "image",
+            { src: dataUrl("png", png), fit: "contain", alt: "contain & image" },
+            { x: 10, y: 20, w: 200, h: 200 },
+          ),
+          block(
+            "image",
+            { src: dataUrl("png", png), fit: "cover", alt: "cover" },
+            { x: 300, y: 20, w: 100, h: 100 },
+          ),
+          block(
+            "image",
+            { src: dataUrl("jpeg", jpeg), fit: "fill", alt: "fill" },
+            { x: 500, y: 20, w: 100, h: 100 },
+          ),
+        ]),
+      ),
+    );
+    expect(zip.names.filter((name) => name.startsWith("ppt/media/"))).toEqual([
       "ppt/media/image1.png",
       "ppt/media/image2.jpeg",
     ]);
@@ -675,7 +847,12 @@ describe("Workspace Slides PPTX rendering", () => {
     expect(fill).not.toContain("<a:srcRect");
 
     const relationships = partText(zip, "ppt/slides/_rels/slide1.xml.rels");
-    expect(occurrences(relationships, 'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"')).toBe(2);
+    expect(
+      occurrences(
+        relationships,
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"',
+      ),
+    ).toBe(2);
     expect(relationships).not.toContain("TargetMode");
   });
 
@@ -683,12 +860,16 @@ describe("Workspace Slides PPTX rendering", () => {
     const square = dataUrl("png", pngFixture(2, 2));
     const landscape = dataUrl("png", pngFixture(4, 2));
     const portrait = dataUrl("png", pngFixture(2, 4));
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("image", {src: square, fit: "contain", radius: 20}, {w: 100, h: 100}),
-      block("image", {src: landscape, radius: 20}, {w: 200, h: 100}),
-      block("image", {src: landscape, fit: "contain", radius: 20}, {w: 100, h: 100}),
-      block("image", {src: portrait, fit: "contain", radius: 20}, {w: 100, h: 100}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("image", { src: square, fit: "contain", radius: 20 }, { w: 100, h: 100 }),
+          block("image", { src: landscape, radius: 20 }, { w: 200, h: 100 }),
+          block("image", { src: landscape, fit: "contain", radius: 20 }, { w: 100, h: 100 }),
+          block("image", { src: portrait, fit: "contain", radius: 20 }, { w: 100, h: 100 }),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
     for (const index of [1, 2]) {
       const picture = shapeByName(xml, `Block ${index} image`);
@@ -701,17 +882,24 @@ describe("Workspace Slides PPTX rendering", () => {
   });
 
   it("uses placeholders for unavailable raster images and unknown blocks, but omits SVG", async () => {
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("image", {}),
-      block("image", {src: "https://example.com/image.png"}),
-      block("image", {src: "data:image/png;base64,AAAA"}),
-      block("image", {src: dataUrl("jpeg", jpegWithoutScan(2, 4))}),
-      block("image", {src: "data:image/gif;base64,R0lGODlh"}),
-      block("image", {src: `data:image/svg+xml;base64,${base64(encoder.encode("<svg/>"))}`}),
-      block("svg", {markup: "", background: "#fff4e6"}),
-      block("svg", {markup: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 1"><rect/></svg>', background: "#123456"}),
-      block("not-a-real-block", {}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("image", {}),
+          block("image", { src: "https://example.com/image.png" }),
+          block("image", { src: "data:image/png;base64,AAAA" }),
+          block("image", { src: dataUrl("jpeg", jpegWithoutScan(2, 4)) }),
+          block("image", { src: "data:image/gif;base64,R0lGODlh" }),
+          block("image", { src: `data:image/svg+xml;base64,${base64(encoder.encode("<svg/>"))}` }),
+          block("svg", { markup: "", background: "#fff4e6" }),
+          block("svg", {
+            markup: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 1"><rect/></svg>',
+            background: "#123456",
+          }),
+          block("not-a-real-block", {}),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     for (const placeholder of [
@@ -720,7 +908,8 @@ describe("Workspace Slides PPTX rendering", () => {
       "Malformed image data",
       "Unsupported or malformed image",
       "?: not-a-real-block",
-    ]) expect(xml).toContain(placeholder);
+    ])
+      expect(xml).toContain(placeholder);
     expect(occurrences(xml, "Malformed image data")).toBe(2);
     // SVG is absent whether supplied as an image data URL or as a native SVG block.
     expect(xml).not.toContain("SVG not included");
@@ -731,10 +920,10 @@ describe("Workspace Slides PPTX rendering", () => {
     expect(xml).not.toContain("<a:gradFill");
     expect(xml).not.toContain("<p:pic>");
     expect(xml).not.toContain("svgBlip");
-    expect(zip.names.some(name => name.startsWith("ppt/media/"))).toBe(false);
+    expect(zip.names.some((name) => name.startsWith("ppt/media/"))).toBe(false);
     expect(partText(zip, "[Content_Types].xml")).not.toContain("svg");
     expect(partText(zip, "ppt/slides/_rels/slide1.xml.rels")).not.toContain("/image");
-    for (const name of zip.names.filter(entryName => entryName.endsWith(".rels"))) {
+    for (const name of zip.names.filter((entryName) => entryName.endsWith(".rels"))) {
       expect(partText(zip, name)).not.toContain("TargetMode");
     }
   });
@@ -743,63 +932,100 @@ describe("Workspace Slides PPTX rendering", () => {
     const jpeg = jpegFixture(2, 4);
     // SOI and APP0 are the first 20 bytes; a 9000x9000 SOF0 ahead of the real one could carry the
     // dimensions a consumer trusts while the pixel limits were checked against the other.
-    const twoFrames = concat(jpeg.subarray(0, 20), new Uint8Array([
-      0xff, 0xc0, 0x00, 0x11, 0x08, 9_000 >>> 8, 9_000 & 0xff, 9_000 >>> 8, 9_000 & 0xff,
-      0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
-    ]), jpeg.subarray(20));
-    const zip = await readZip(deckToPptx(oneSlide([block("image", {src: dataUrl("jpeg", twoFrames)})])));
+    const twoFrames = concat(
+      jpeg.subarray(0, 20),
+      new Uint8Array([
+        0xff,
+        0xc0,
+        0x00,
+        0x11,
+        0x08,
+        9_000 >>> 8,
+        9_000 & 0xff,
+        9_000 >>> 8,
+        9_000 & 0xff,
+        0x03,
+        0x01,
+        0x11,
+        0x00,
+        0x02,
+        0x11,
+        0x00,
+        0x03,
+        0x11,
+        0x00,
+      ]),
+      jpeg.subarray(20),
+    );
+    const zip = await readZip(
+      deckToPptx(oneSlide([block("image", { src: dataUrl("jpeg", twoFrames) })])),
+    );
     expect(partText(zip, "ppt/slides/slide1.xml")).toContain("Malformed image data");
-    expect(zip.names.some(name => name.startsWith("ppt/media/"))).toBe(false);
+    expect(zip.names.some((name) => name.startsWith("ppt/media/"))).toBe(false);
   });
 
   it("omits SVG markup and SVG image data without parsing their contents", async () => {
     const largeMarkup = `<svg>${"<not-even-valid".repeat(100_000)}</svg>`;
     const largeDataUrl = `data:image/svg+xml;base64,${"?".repeat(1_000_000)}`;
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("svg", {markup: largeMarkup}),
-      block("image", {src: largeDataUrl}),
-      block("image", {src: "DATA:IMAGE/SVG+XML,<svg/>"}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("svg", { markup: largeMarkup }),
+          block("image", { src: largeDataUrl }),
+          block("image", { src: "DATA:IMAGE/SVG+XML,<svg/>" }),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     expect(xml).not.toContain('name="Block 1 svg"');
     expect(xml).not.toContain('name="Block 2 image"');
     expect(xml).not.toContain('name="Block 3 image"');
     expect(xml).not.toContain("SVG not included");
-    expect(zip.names.some(name => name.startsWith("ppt/media/"))).toBe(false);
+    expect(zip.names.some((name) => name.startsWith("ppt/media/"))).toBe(false);
   });
 
   it("consults the source cache before scanning a repeated raster source", () => {
     // One 4 MB source referenced from every block on a slide: scanned and decoded once, not per
     // reference (its padding makes it a malformed PNG, so the cached result is a placeholder).
     const unpadded = dataUrl("png", pngFixture(1, 1)).replace(/=+$/, "");
-    const source = unpadded + "A".repeat(4 * 1024 * 1024 + (4 - unpadded.length % 4) % 4);
+    const source = unpadded + "A".repeat(4 * 1024 * 1024 + ((4 - (unpadded.length % 4)) % 4));
     const started = performance.now();
-    deckToPptx(oneSlide(Array.from({length: 1000}, () => block("image", {src: source}))));
+    deckToPptx(oneSlide(Array.from({ length: 1000 }, () => block("image", { src: source }))));
     expect(performance.now() - started).toBeLessThan(2000);
   });
 
   it("emits schema-valid DrawingML for hairline dashes and rotated marks", async () => {
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("arrow", {x1: 0, y1: 0, x2: 100, y2: 0, dashed: true, width: 0.0001}),
-      block("gadgetsMark", {size: "small"}, {x: 48, y: 240}),
-      block("gadgetsMark", {size: "large"}, {x: 48.5, y: 240.25}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("arrow", { x1: 0, y1: 0, x2: 100, y2: 0, dashed: true, width: 0.0001 }),
+          block("gadgetsMark", { size: "small" }, { x: 48, y: 240 }),
+          block("gadgetsMark", { size: "large" }, { x: 48.5, y: 240.25 }),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     // A 1-EMU line's 6px dash is billions of percent; ST_PositivePercentage is a 32-bit integer.
-    expect(shapeByName(xml, "Block 1 arrow")).toContain('<a:custDash><a:ds d="2147483647" sp="2147483647"/></a:custDash>');
+    expect(shapeByName(xml, "Block 1 arrow")).toContain(
+      '<a:custDash><a:ds d="2147483647" sp="2147483647"/></a:custDash>',
+    );
     // The hexagon's rotated box is centred on half-EMU coordinates that must round to integers.
     expect(xml).not.toMatch(/\b(?:x|y|cx|cy)="-?\d+\.\d+"/);
   });
 
   it("sizes cards and boxes without authored dimensions to their content, like the browser", async () => {
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("card", {eyebrow: "eye", title: "Card", body: "Body"}, {x: 100, y: 100}),
-      block("box", {title: "Box", body: "Body copy"}, {x: 100, y: 400}),
-      block("box", {title: "Box"}, {x: 100, y: 500, w: 220}),
-      block("card", {eyebrow: "", title: "", body: "word ".repeat(400)}, {x: 1100, y: 0}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("card", { eyebrow: "eye", title: "Card", body: "Body" }, { x: 100, y: 100 }),
+          block("box", { title: "Box", body: "Body copy" }, { x: 100, y: 400 }),
+          block("box", { title: "Box" }, { x: 100, y: 500, w: 220 }),
+          block("card", { eyebrow: "", title: "", body: "word ".repeat(400) }, { x: 1100, y: 0 }),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     // Padding 20 around eyebrow (10px * 1.2 + 2), title (18 * 1.3 + 2) and body (15 * 1.5 + 2)
@@ -808,8 +1034,12 @@ describe("Workspace Slides PPTX rendering", () => {
     const card = shapeByName(xml, "Block 1 card surface");
     expect(card).toContain(`cy="${Math.round(cardHeight * 10160)}"`);
     // The title's -0.02em tracking is emitted in hundredths of a point (-29), and measured as such.
-    expect(card).toContain(`cx="${Math.round((40 + (2.278 * 18 - 3 * 0.29 / 0.8) * 1.02) * 10160)}"`);
-    expect(shapeByName(xml, "Block 1 card body")).toContain(`cy="${Math.round((22.5 + 2) * 10160)}"`);
+    expect(card).toContain(
+      `cx="${Math.round((40 + (2.278 * 18 - (3 * 0.29) / 0.8) * 1.02) * 10160)}"`,
+    );
+    expect(shapeByName(xml, "Block 1 card body")).toContain(
+      `cy="${Math.round((22.5 + 2) * 10160)}"`,
+    );
     // Padding 14 around title (16 * 1.3 + 2), the 6px margin and body (14 * 1.45 + 2).
     const box = shapeByName(xml, "Block 2 box surface");
     expect(box).toContain(`cy="${Math.round((28 + 22.8 + 6 + 22.3) * 10160)}"`);
@@ -823,14 +1053,22 @@ describe("Workspace Slides PPTX rendering", () => {
   });
 
   it("lays out blocks without authored sizes as the browser does", async () => {
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("title", {text: "word ".repeat(80), fontSize: 28}, {x: 36, y: 76}),
-      block("text", {text: "short\nlonger line", fontSize: 20}, {x: 100, y: 0}),
-      block("bulletList", {text: "a   b\tc\none"}, {x: 0, y: 300}),
-      block("arrow", {x2: 600, y2: 400, color: "ruby"}),
-      block("tonePill", {text: "STATUS"}, {x: 100, y: 100, w: 300, h: 100}),
-      block("box", {title: "Title", body: "Body copy that wraps onto several lines"}, {x: 100, y: 100, w: 220, h: 40}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("title", { text: "word ".repeat(80), fontSize: 28 }, { x: 36, y: 76 }),
+          block("text", { text: "short\nlonger line", fontSize: 20 }, { x: 100, y: 0 }),
+          block("bulletList", { text: "a   b\tc\none" }, { x: 0, y: 300 }),
+          block("arrow", { x2: 600, y2: 400, color: "ruby" }),
+          block("tonePill", { text: "STATUS" }, { x: 100, y: 100, w: 300, h: 100 }),
+          block(
+            "box",
+            { title: "Title", body: "Body copy that wraps onto several lines" },
+            { x: 100, y: 100, w: 220, h: 40 },
+          ),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     // width: auto shrink-to-fits up to the slide's right edge (1200 - x), never a fixed default.
@@ -841,7 +1079,9 @@ describe("Workspace Slides PPTX rendering", () => {
     // Items collapse inner whitespace like the browser's white-space: normal.
     expect(shapeByName(xml, "Block 3 bulletList")).toContain(">a b c</a:t>");
     // Omitted endpoints are absent SVG attributes, i.e. 0: from (0,0) to (600,400).
-    expect(shapeByName(xml, "Block 4 arrow")).toContain(`<a:off x="0" y="0"/><a:ext cx="${600 * 10160}" cy="${400 * 10160}"/>`);
+    expect(shapeByName(xml, "Block 4 arrow")).toContain(
+      `<a:off x="0" y="0"/><a:ext cx="${600 * 10160}" cy="${400 * 10160}"/>`,
+    );
     // The pill stays intrinsic despite the 300x100 wrapper.
     expect(shapeByName(xml, "Block 5 tonePill")).toContain(`cy="${24 * 10160}"`);
     expect(shapeByName(xml, "Block 5 tonePill")).not.toContain(`cx="${300 * 10160}"`);
@@ -849,13 +1089,15 @@ describe("Workspace Slides PPTX rendering", () => {
     const titleHeight = 16 * 1.3 + 2;
     const bodyHeight = 2 * 14 * 1.45 + 2;
     const contentHeight = titleHeight + 6 + bodyHeight;
-    expect(shapeByName(xml, "Block 6 box title")).toContain(`y="${Math.round((100 + (40 - contentHeight) / 2) * 10160)}"`);
+    expect(shapeByName(xml, "Block 6 box title")).toContain(
+      `y="${Math.round((100 + (40 - contentHeight) / 2) * 10160)}"`,
+    );
   });
 
   it("exports a safe blank slide for empty or malformed decks", async () => {
-    for (const value of [null, {}, {slides: []}, {slides: "not an array"}]) {
+    for (const value of [null, {}, { slides: [] }, { slides: "not an array" }]) {
       const zip = await readZip(deckToPptx(value));
-      expect(zip.names.filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))).toEqual([
+      expect(zip.names.filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))).toEqual([
         "ppt/slides/slide1.xml",
       ]);
       const xml = partText(zip, "ppt/slides/slide1.xml");
@@ -865,80 +1107,140 @@ describe("Workspace Slides PPTX rendering", () => {
   });
 
   it("sizes auto-height text by word wrapping with tracking, and lets consumers grow it", async () => {
-    const zip = await readZip(deckToPptx(oneSlide([
-      // Three words of ~55px in a 100px box: advance-width division says 2 lines, wrapping says 3.
-      block("text", {text: "wwww wwww wwww", fontSize: 19, lineHeight: 1.6}, {w: 100}),
-      // Two 44.5px words fit one 100px line untracked; 2px tracking pushes the second word down.
-      block("title", {text: "aaaa aaaa", fontSize: 20, letterSpacing: "2px"}, {w: 100}),
-      block("title", {text: "aaaa aaaa", fontSize: 20, letterSpacing: "0px"}, {w: 100}),
-      block("text", {text: "fixed"}, {w: 100, h: 40}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          // Three words of ~55px in a 100px box: advance-width division says 2 lines, wrapping says 3.
+          block("text", { text: "wwww wwww wwww", fontSize: 19, lineHeight: 1.6 }, { w: 100 }),
+          // Two 44.5px words fit one 100px line untracked; 2px tracking pushes the second word down.
+          block("title", { text: "aaaa aaaa", fontSize: 20, letterSpacing: "2px" }, { w: 100 }),
+          block("title", { text: "aaaa aaaa", fontSize: 20, letterSpacing: "0px" }, { w: 100 }),
+          block("text", { text: "fixed" }, { w: 100, h: 40 }),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     const wrapped = shapeByName(xml, "Block 1 text");
     expect(wrapped).toContain(`cy="${Math.round((3 * 19 * 1.6 + 2) * 10160)}"`);
     expect(wrapped).toContain("<a:spAutoFit/>");
-    expect(shapeByName(xml, "Block 2 title")).toContain(`cy="${Math.round((2 * 20 * 1.08 + 2) * 10160)}"`);
-    expect(shapeByName(xml, "Block 3 title")).toContain(`cy="${Math.round((20 * 1.08 + 2) * 10160)}"`);
+    expect(shapeByName(xml, "Block 2 title")).toContain(
+      `cy="${Math.round((2 * 20 * 1.08 + 2) * 10160)}"`,
+    );
+    expect(shapeByName(xml, "Block 3 title")).toContain(
+      `cy="${Math.round((20 * 1.08 + 2) * 10160)}"`,
+    );
     expect(shapeByName(xml, "Block 4 text")).toContain("<a:noAutofit/>");
   });
 
   it("accepts named and functional CSS colors and falls back for unknown ones", async () => {
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("shape", {fill: "red", stroke: "Navy", strokeWidth: 1}, {w: 10, h: 10}),
-      block("shape", {fill: "rgb(0, 128, 255)"}, {w: 10, h: 10}),
-      block("shape", {fill: "rgba(100% 0% 0% / 0.5)"}, {w: 10, h: 10}),
-      block("shape", {fill: "rebeccapurple"}, {w: 10, h: 10}),
-      block("text", {text: "fallback", color: "rgb(1,2)"}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("shape", { fill: "red", stroke: "Navy", strokeWidth: 1 }, { w: 10, h: 10 }),
+          block("shape", { fill: "rgb(0, 128, 255)" }, { w: 10, h: 10 }),
+          block("shape", { fill: "rgba(100% 0% 0% / 0.5)" }, { w: 10, h: 10 }),
+          block("shape", { fill: "rebeccapurple" }, { w: 10, h: 10 }),
+          block("text", { text: "fallback", color: "rgb(1,2)" }),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     const named = shapeByName(xml, "Block 1 shape");
     expect(named).toContain('<a:solidFill><a:srgbClr val="FF0000">');
     expect(named).toContain('<a:ln w="10160" cap="rnd"><a:solidFill><a:srgbClr val="000080">');
     expect(shapeByName(xml, "Block 2 shape")).toContain('<a:srgbClr val="0080FF">');
-    expect(shapeByName(xml, "Block 3 shape")).toContain('<a:srgbClr val="FF0000"><a:alpha val="50000"/>');
+    expect(shapeByName(xml, "Block 3 shape")).toContain(
+      '<a:srgbClr val="FF0000"><a:alpha val="50000"/>',
+    );
     expect(shapeByName(xml, "Block 4 shape")).toContain("<a:noFill/>");
     expect(shapeByName(xml, "Block 5 text")).toContain('<a:srgbClr val="000000">'); // the text default
   });
 
   it.each([
-    {label: "long title", eyebrow: "", title: "A long card heading that wraps over many lines. ".repeat(6), body: "Body", height: 100},
-    {label: "long eyebrow and multiline body", eyebrow: "A long eyebrow ".repeat(12), title: "Card title", body: "Body copy\n".repeat(10), height: 60},
-    {label: "empty title and long body", eyebrow: "Eyebrow", title: "", body: "Long body copy ".repeat(40), height: 100},
-    {label: "less height than padding", eyebrow: "Eyebrow", title: "Title", body: "Body", height: 24},
-  ])("keeps fixed-height card text inside its surface: $label", async ({eyebrow, title, body, height}) => {
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("card", {eyebrow, title, body}, {x: 100, y: 100, w: 280, h: height}),
-    ])));
-    const xml = partText(zip, "ppt/slides/slide1.xml");
-    const surface = shapeVerticalBounds(shapeByName(xml, "Block 1 card surface"));
-    expect(surface).toEqual({y: 100 * 10160, height: height * 10160});
-    const padding = Math.min(20, height / 2) * 10160;
-    let bottom = surface.y + padding;
-    for (const [part, text] of [["eyebrow", eyebrow], ["title", title], ["body", body]]) {
-      if (!text) continue;
-      const shape = shapeByName(xml, `Block 1 card ${part}`);
-      const box = shapeVerticalBounds(shape);
-      expect(box.y).toBeGreaterThanOrEqual(surface.y + padding);
-      expect(box.y).toBeGreaterThanOrEqual(bottom - 1);
-      expect(box.height).toBeGreaterThan(0);
-      // Independent coordinate rounding may add one EMU at a shared edge.
-      expect(box.y + box.height).toBeLessThanOrEqual(surface.y + surface.height - padding + 1);
-      expect(shape).toContain("<a:normAutofit/>");
-      const exportedText = [...shape.matchAll(/<a:br\/>|<a:t[^>]*>([^<]*)<\/a:t>/g)]
-        .map(match => match[1] ?? "\n").join("");
-      expect(exportedText).toBe(part === "eyebrow" ? text.trim().toUpperCase() : part === "title" ? text.trim() : text);
-      bottom = box.y + box.height;
-    }
-  });
+    {
+      label: "long title",
+      eyebrow: "",
+      title: "A long card heading that wraps over many lines. ".repeat(6),
+      body: "Body",
+      height: 100,
+    },
+    {
+      label: "long eyebrow and multiline body",
+      eyebrow: "A long eyebrow ".repeat(12),
+      title: "Card title",
+      body: "Body copy\n".repeat(10),
+      height: 60,
+    },
+    {
+      label: "empty title and long body",
+      eyebrow: "Eyebrow",
+      title: "",
+      body: "Long body copy ".repeat(40),
+      height: 100,
+    },
+    {
+      label: "less height than padding",
+      eyebrow: "Eyebrow",
+      title: "Title",
+      body: "Body",
+      height: 24,
+    },
+  ])(
+    "keeps fixed-height card text inside its surface: $label",
+    async ({ eyebrow, title, body, height }) => {
+      const zip = await readZip(
+        deckToPptx(
+          oneSlide([
+            block("card", { eyebrow, title, body }, { x: 100, y: 100, w: 280, h: height }),
+          ]),
+        ),
+      );
+      const xml = partText(zip, "ppt/slides/slide1.xml");
+      const surface = shapeVerticalBounds(shapeByName(xml, "Block 1 card surface"));
+      expect(surface).toEqual({ y: 100 * 10160, height: height * 10160 });
+      const padding = Math.min(20, height / 2) * 10160;
+      let bottom = surface.y + padding;
+      for (const [part, text] of [
+        ["eyebrow", eyebrow],
+        ["title", title],
+        ["body", body],
+      ]) {
+        if (!text) continue;
+        const shape = shapeByName(xml, `Block 1 card ${part}`);
+        const box = shapeVerticalBounds(shape);
+        expect(box.y).toBeGreaterThanOrEqual(surface.y + padding);
+        expect(box.y).toBeGreaterThanOrEqual(bottom - 1);
+        expect(box.height).toBeGreaterThan(0);
+        // Independent coordinate rounding may add one EMU at a shared edge.
+        expect(box.y + box.height).toBeLessThanOrEqual(surface.y + surface.height - padding + 1);
+        expect(shape).toContain("<a:normAutofit/>");
+        const exportedText = [...shape.matchAll(/<a:br\/>|<a:t[^>]*>([^<]*)<\/a:t>/g)]
+          .map((match) => match[1] ?? "\n")
+          .join("");
+        expect(exportedText).toBe(
+          part === "eyebrow" ? text.trim().toUpperCase() : part === "title" ? text.trim() : text,
+        );
+        bottom = box.y + box.height;
+      }
+    },
+  );
 
   it("collapses whitespace in inline-only props and shrinks card text to its surface", async () => {
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("box", {title: "One\ntwo", body: "line\n\n  break"}, {w: 220, h: 110}),
-      block("card", {eyebrow: "eye\nbrow", title: "Card\ttitle", body: "kept\nbreak"}, {w: 280, h: 260}),
-      block("sectionLabel", {text: "two\nlines"}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("box", { title: "One\ntwo", body: "line\n\n  break" }, { w: 220, h: 110 }),
+          block(
+            "card",
+            { eyebrow: "eye\nbrow", title: "Card\ttitle", body: "kept\nbreak" },
+            { w: 280, h: 260 },
+          ),
+          block("sectionLabel", { text: "two\nlines" }),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     const box = shapeByName(xml, "Block 1 box body");
@@ -956,16 +1258,22 @@ describe("Workspace Slides PPTX rendering", () => {
   });
 
   it("gives empty card and box titles no height, like the browser's empty element", async () => {
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("card", {eyebrow: "", title: "", body: "Body"}, {x: 0, y: 0, w: 280, h: 260}),
-      block("box", {title: "", body: "Body"}, {x: 0, y: 300, w: 220, h: 110}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("card", { eyebrow: "", title: "", body: "Body" }, { x: 0, y: 0, w: 280, h: 260 }),
+          block("box", { title: "", body: "Body" }, { x: 0, y: 300, w: 220, h: 110 }),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     expect(xml).not.toContain('name="Block 1 card title"');
     expect(xml).not.toContain('name="Block 2 box title"');
     // Card padding (20) plus the single remaining flex gap (12).
-    expect(shapeByName(xml, "Block 1 card body")).toContain(`<a:off x="${20 * 10160}" y="${32 * 10160}"/>`);
+    expect(shapeByName(xml, "Block 1 card body")).toContain(
+      `<a:off x="${20 * 10160}" y="${32 * 10160}"/>`,
+    );
     // Box body is vertically centred on its own height (14px line * 1.45 + 2, plus the 6px gap).
     const bodyHeight = 14 * 1.45 + 2;
     const bodyY = 300 + Math.max(14, (110 - (6 + bodyHeight)) / 2) + 6;
@@ -973,12 +1281,29 @@ describe("Workspace Slides PPTX rendering", () => {
   });
 
   it("clamps non-finite, negative, and extreme drawing geometry", async () => {
-    const zip = await readZip(deckToPptx(oneSlide([
-      block("shape", {fill: "#000000"}, {x: 1e300, y: -1e300, w: 1e300, h: -10}),
-      block("shape", {fill: "#ffffff"}, {x: Number.NaN, y: Number.POSITIVE_INFINITY, w: Number.NaN, h: Number.NEGATIVE_INFINITY}),
-      block("arrow", {x1: -10, y1: Number.NaN, x2: Number.POSITIVE_INFINITY, y2: 1e300}),
-      block("title", {text: "finite", fontSize: Number.POSITIVE_INFINITY}, {x: -25, y: -30, w: -1, h: -2}),
-    ])));
+    const zip = await readZip(
+      deckToPptx(
+        oneSlide([
+          block("shape", { fill: "#000000" }, { x: 1e300, y: -1e300, w: 1e300, h: -10 }),
+          block(
+            "shape",
+            { fill: "#ffffff" },
+            {
+              x: Number.NaN,
+              y: Number.POSITIVE_INFINITY,
+              w: Number.NaN,
+              h: Number.NEGATIVE_INFINITY,
+            },
+          ),
+          block("arrow", { x1: -10, y1: Number.NaN, x2: Number.POSITIVE_INFINITY, y2: 1e300 }),
+          block(
+            "title",
+            { text: "finite", fontSize: Number.POSITIVE_INFINITY },
+            { x: -25, y: -30, w: -1, h: -2 },
+          ),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     expect(shapeByName(xml, "Block 1 shape")).toContain(
@@ -999,23 +1324,47 @@ describe("Workspace Slides PPTX rendering", () => {
 
 describe("Workspace Slides PPTX resource limits", () => {
   it("reports actionable slide-count and blocks-per-slide errors", () => {
-    expect(() => deckToPptx({
-      slides: Array.from({length: 501}, () => ({blocks: []})),
-    })).toThrow("Deck has 501 slides; PowerPoint export supports at most 500");
-    expect(() => deckToPptx(oneSlide(Array.from({length: 1001}, () => null))))
-      .toThrow("Slide 1 has 1001 blocks; the export limit is 1000 per slide");
+    expect(() =>
+      deckToPptx({
+        slides: Array.from({ length: 501 }, () => ({ blocks: [] })),
+      }),
+    ).toThrow("Deck has 501 slides; PowerPoint export supports at most 500");
+    expect(() => deckToPptx(oneSlide(Array.from({ length: 1001 }, () => null)))).toThrow(
+      "Slide 1 has 1001 blocks; the export limit is 1000 per slide",
+    );
   });
 
   it("rejects every authored quota before invoking adapters or preparing earlier slides", () => {
-    const prepare = vi.fn(() => { throw new Error("prepared before quota validation"); });
-    const early = {get background() { return prepare(); }, blocks: [block("text", {text: "early"})]};
+    const prepare = vi.fn(() => {
+      throw new Error("prepared before quota validation");
+    });
+    const early = {
+      get background() {
+        return prepare();
+      },
+      blocks: [block("text", { text: "early" })],
+    };
     const adapt = vi.fn(() => undefined);
     const cases = [
-      {deck: {slides: [early, ...Array.from({length: 500}, () => ({blocks: []}))]}, message: "Deck has 501 slides"},
-      {deck: {slides: [early, {blocks: Array(1001).fill(null)}]}, message: "Slide 2 has 1001 blocks"},
-      {deck: {slides: [early, ...Array.from({length: 10}, () => ({blocks: Array(1000).fill(null)}))]}, message: "Deck has more than 10000 blocks"},
+      {
+        deck: { slides: [early, ...Array.from({ length: 500 }, () => ({ blocks: [] }))] },
+        message: "Deck has 501 slides",
+      },
+      {
+        deck: { slides: [early, { blocks: Array(1001).fill(null) }] },
+        message: "Slide 2 has 1001 blocks",
+      },
+      {
+        deck: {
+          slides: [
+            early,
+            ...Array.from({ length: 10 }, () => ({ blocks: Array(1000).fill(null) })),
+          ],
+        },
+        message: "Deck has more than 10000 blocks",
+      },
     ];
-    for (const {deck, message} of cases) {
+    for (const { deck, message } of cases) {
       expect(() => deckToPptx(deck, adapt)).toThrow(message);
       expect(adapt).not.toHaveBeenCalled();
       expect(prepare).not.toHaveBeenCalled();
@@ -1023,30 +1372,46 @@ describe("Workspace Slides PPTX resource limits", () => {
   });
 
   it("bounds adapted arrays across the whole deck before preparing blocks", () => {
-    const prepare = vi.fn(() => { throw new Error("prepared before adapted quota validation"); });
-    const expensive = {type: "text", get props() { return prepare(); }};
-    const replacement = Array.from({length: 2000}, () => expensive);
-    expect(() => deckToPptx(oneSlide([null, null]), () => replacement))
-      .toThrow("Slide 1 has more than 2000 adapted blocks, the PowerPoint export limit.");
-    expect(() => deckToPptx({slides: Array.from({length: 11}, () => ({blocks: [null]}))}, () => replacement))
-      .toThrow("Deck has more than 20000 adapted blocks, the PowerPoint export limit.");
+    const prepare = vi.fn(() => {
+      throw new Error("prepared before adapted quota validation");
+    });
+    const expensive = {
+      type: "text",
+      get props() {
+        return prepare();
+      },
+    };
+    const replacement = Array.from({ length: 2000 }, () => expensive);
+    expect(() => deckToPptx(oneSlide([null, null]), () => replacement)).toThrow(
+      "Slide 1 has more than 2000 adapted blocks, the PowerPoint export limit.",
+    );
+    expect(() =>
+      deckToPptx(
+        { slides: Array.from({ length: 11 }, () => ({ blocks: [null] })) },
+        () => replacement,
+      ),
+    ).toThrow("Deck has more than 20000 adapted blocks, the PowerPoint export limit.");
     expect(prepare).not.toHaveBeenCalled();
-    const oversized = Array.from({length: 2001});
-    Object.defineProperty(oversized, 0, {get: prepare});
-    expect(() => deckToPptx(oneSlide([null]), () => oversized))
-      .toThrow("Slide 1 has more than 2000 adapted blocks");
+    const oversized = Array.from({ length: 2001 });
+    Object.defineProperty(oversized, 0, { get: prepare });
+    expect(() => deckToPptx(oneSlide([null]), () => oversized)).toThrow(
+      "Slide 1 has more than 2000 adapted blocks",
+    );
     expect(prepare).not.toHaveBeenCalled();
   });
 
   it("exports adapter replacements in source z-order, preserving undefined and removing empty arrays", async () => {
-    const kept = block("text", {text: "kept"});
+    const kept = block("text", { text: "kept" });
     const replaced = block("custom", {});
     const removed = block("removed", {});
-    const zip = await readZip(deckToPptx(oneSlide([kept, replaced, removed, block("text", {text: "last"})]), source => {
-      if (source === removed) return [];
-      if (source === replaced) return [block("text", {text: "replacement"}), block("shape", {fill: "#123456"})];
-      return undefined;
-    }));
+    const zip = await readZip(
+      deckToPptx(oneSlide([kept, replaced, removed, block("text", { text: "last" })]), (source) => {
+        if (source === removed) return [];
+        if (source === replaced)
+          return [block("text", { text: "replacement" }), block("shape", { fill: "#123456" })];
+        return undefined;
+      }),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
     expect(shapeByName(xml, "Block 1 text")).toContain("kept</a:t>");
     expect(shapeByName(xml, "Block 2 text")).toContain("replacement</a:t>");
@@ -1058,29 +1423,36 @@ describe("Workspace Slides PPTX resource limits", () => {
   it("exports many references to one large text block without holding the deck text twice", async () => {
     // Structured-clone decks can alias one block object many times; the export must not build
     // per-character ropes over the resulting 7.9 MB of text.
-    const shared = block("text", {text: "lorem ipsum & dolor <sit> amet ".repeat(3_225)}, {w: 760});
+    const shared = block(
+      "text",
+      { text: "lorem ipsum & dolor <sit> amet ".repeat(3_225) },
+      { w: 760 },
+    );
     expect(String(shared.props.text).length).toBeGreaterThan(99_000);
-    const zip = await readZip(deckToPptx(oneSlide(Array.from({length: 79}, () => shared))));
+    const zip = await readZip(deckToPptx(oneSlide(Array.from({ length: 79 }, () => shared))));
     const xml = partText(zip, "ppt/slides/slide1.xml");
     expect(occurrences(xml, "&amp; dolor &lt;sit&gt; amet")).toBe(79 * 3_225);
   });
 
   it("reports aggregate text and line-break limits", () => {
     const largeText = "x".repeat(900_000);
-    expect(() => deckToPptx(oneSlide(Array.from({length: 9}, () =>
-      block("text", {text: largeText})))))
-      .toThrow("Deck text is too large for PowerPoint export (maximum 8000000 characters total)");
+    expect(() =>
+      deckToPptx(oneSlide(Array.from({ length: 9 }, () => block("text", { text: largeText })))),
+    ).toThrow("Deck text is too large for PowerPoint export (maximum 8000000 characters total)");
 
     const tenThousandLines = "x\n".repeat(10_000);
-    expect(() => deckToPptx(oneSlide(Array.from({length: 6}, () =>
-      block("text", {text: tenThousandLines})))))
-      .toThrow("Deck text has too many line breaks for PowerPoint export (maximum 50000 total)");
+    expect(() =>
+      deckToPptx(
+        oneSlide(Array.from({ length: 6 }, () => block("text", { text: tenThousandLines }))),
+      ),
+    ).toThrow("Deck text has too many line breaks for PowerPoint export (maximum 50000 total)");
   });
 
   it("bounds comma-separated highlight parsing before allocating every entry", () => {
     const entries = (count: number) => commaSeparatedTerms("t", count);
-    const title = (highlight: string) => oneSlide([block("title", {text: "t1", highlight})]);
-    const error = "Slide 1, block 1 has too many comma-separated title highlight entries (maximum 128)";
+    const title = (highlight: string) => oneSlide([block("title", { text: "t1", highlight })]);
+    const error =
+      "Slide 1, block 1 has too many comma-separated title highlight entries (maximum 128)";
     expect(() => deckToPptx(title(entries(128)))).not.toThrow();
     expect(() => deckToPptx(title(entries(129)))).toThrow(error);
     expect(() => deckToPptx(title(",".repeat(999_999)))).toThrow(error);
@@ -1088,39 +1460,53 @@ describe("Workspace Slides PPTX resource limits", () => {
 
   it("bounds highlight search work per title and per deck", () => {
     const terms = (count: number) => commaSeparatedTerms("term", count);
-    expect(() => deckToPptx(oneSlide([block("title", {text: "x".repeat(1_000_000), highlight: terms(9)})])))
-      .toThrow("Slide 1, block 1 title highlights are too complex for PowerPoint export.");
-    const titles = (count: number) => Array.from({length: count}, () =>
-      block("title", {text: "x".repeat(100_000), highlight: terms(64)}));
+    expect(() =>
+      deckToPptx(oneSlide([block("title", { text: "x".repeat(1_000_000), highlight: terms(9) })])),
+    ).toThrow("Slide 1, block 1 title highlights are too complex for PowerPoint export.");
+    const titles = (count: number) =>
+      Array.from({ length: count }, () =>
+        block("title", { text: "x".repeat(100_000), highlight: terms(64) }),
+      );
     expect(() => deckToPptx(oneSlide(titles(5)))).not.toThrow();
-    expect(() => deckToPptx(oneSlide(titles(6))))
-      .toThrow("Deck title highlights are too complex for PowerPoint export.");
+    expect(() => deckToPptx(oneSlide(titles(6)))).toThrow(
+      "Deck title highlights are too complex for PowerPoint export.",
+    );
   });
 
   it("bounds highlight text runs per title and per deck before creating the stream", () => {
-    expect(() => deckToPptx(oneSlide([block("title", {text: "ab".repeat(50_000), highlight: "a"})])))
-      .toThrow("Slide 1, block 1 title highlights would create too many PowerPoint text runs (maximum 4096 transitions)");
+    expect(() =>
+      deckToPptx(oneSlide([block("title", { text: "ab".repeat(50_000), highlight: "a" })])),
+    ).toThrow(
+      "Slide 1, block 1 title highlights would create too many PowerPoint text runs (maximum 4096 transitions)",
+    );
     const atLimit = "a" + "ba".repeat(2_048); // 4096 highlight transitions.
-    expect(() => deckToPptx(oneSlide([block("title", {text: atLimit, highlight: "a"})]))).not.toThrow();
-    expect(() => deckToPptx(oneSlide([block("title", {text: atLimit + "b", highlight: "a"})])))
-      .toThrow("(maximum 4096 transitions)");
-    const titles = (count: number) => Array.from({length: count}, () => block("title", {text: atLimit, highlight: "a"}));
+    expect(() =>
+      deckToPptx(oneSlide([block("title", { text: atLimit, highlight: "a" })])),
+    ).not.toThrow();
+    expect(() =>
+      deckToPptx(oneSlide([block("title", { text: atLimit + "b", highlight: "a" })])),
+    ).toThrow("(maximum 4096 transitions)");
+    const titles = (count: number) =>
+      Array.from({ length: count }, () => block("title", { text: atLimit, highlight: "a" }));
     expect(() => deckToPptx(oneSlide(titles(8)))).not.toThrow();
-    expect(() => deckToPptx(oneSlide(titles(9))))
-      .toThrow("Deck title highlights would create too many PowerPoint text runs (maximum 32768 transitions total)");
+    expect(() => deckToPptx(oneSlide(titles(9)))).toThrow(
+      "Deck title highlights would create too many PowerPoint text runs (maximum 32768 transitions total)",
+    );
   });
 
   it("rejects image dimensions beyond the declared raster limit", () => {
     const oversized = pngFixture(8_193, 1, false);
-    expect(() => deckToPptx(oneSlide([
-      block("image", {src: dataUrl("png", oversized)}),
-    ]))).toThrow("each image dimension must be at most 8192px");
+    expect(() =>
+      deckToPptx(oneSlide([block("image", { src: dataUrl("png", oversized) })])),
+    ).toThrow("each image dimension must be at most 8192px");
   });
 
   it("rejects aggregate image pixels before creating the stream", () => {
-    const images = Array.from({length: 5}, (_, index) => block("image", {
-      src: dataUrl("png", pngFixture(4_096, 4_092 + index, false)),
-    }));
+    const images = Array.from({ length: 5 }, (_, index) =>
+      block("image", {
+        src: dataUrl("png", pngFixture(4_096, 4_092 + index, false)),
+      }),
+    );
     expect(() => deckToPptx(oneSlide(images))).toThrow(
       "Deck images exceed the 67108864-pixel aggregate limit",
     );
@@ -1128,22 +1514,30 @@ describe("Workspace Slides PPTX resource limits", () => {
 });
 
 describe("Workspace Slides logo export", () => {
-  it.each([501, 1000])("exports %i authored dotted logos without counting expansion against source quotas", async count => {
-    const zip = await readZip(await exportDeck(oneSlide(Array.from({length: count}, () => block("logo", {})))));
-    const xml = partText(zip, "ppt/slides/slide1.xml");
-    expect(occurrences(xml, "Workspace</a:t>")).toBe(count);
-    expect(occurrences(xml, '<a:prstGeom prst="ellipse">')).toBe(count);
-    expect(xml).not.toContain("?: logo");
-  });
+  it.each([501, 1000])(
+    "exports %i authored dotted logos without counting expansion against source quotas",
+    async (count) => {
+      const zip = await readZip(
+        await exportDeck(oneSlide(Array.from({ length: count }, () => block("logo", {})))),
+      );
+      const xml = partText(zip, "ppt/slides/slide1.xml");
+      expect(occurrences(xml, "Workspace</a:t>")).toBe(count);
+      expect(occurrences(xml, '<a:prstGeom prst="ellipse">')).toBe(count);
+      expect(xml).not.toContain("?: logo");
+    },
+  );
 
   it("rejects 1001 authored logos", async () => {
-    await expect(exportDeck(oneSlide(Array.from({length: 1001}, () => block("logo", {})))))
-      .rejects.toThrow("Slide 1 has 1001 blocks; the export limit is 1000 per slide.");
+    await expect(
+      exportDeck(oneSlide(Array.from({ length: 1001 }, () => block("logo", {})))),
+    ).rejects.toThrow("Slide 1 has 1001 blocks; the export limit is 1000 per slide.");
   });
 
   it("exports 10000 authored logos as native wordmarks and dots, rejecting a 10001st source object", async () => {
-    const slides = Array.from({length: 10}, () => ({blocks: Array.from({length: 1000}, () => block("logo", {}))}));
-    const zip = await readZip(await exportDeck({slides}));
+    const slides = Array.from({ length: 10 }, () => ({
+      blocks: Array.from({ length: 1000 }, () => block("logo", {})),
+    }));
+    const zip = await readZip(await exportDeck({ slides }));
     let wordmarks = 0;
     let dots = 0;
     for (let i = 1; i <= 10; i++) {
@@ -1153,25 +1547,39 @@ describe("Workspace Slides logo export", () => {
     }
     expect(wordmarks).toBe(10000);
     expect(dots).toBe(10000);
-    await expect(exportDeck({slides: [...slides, {blocks: [block("logo", {})]}]}))
-      .rejects.toThrow("Deck has more than 10000 blocks, the PowerPoint export limit.");
-    await expect(exportDeck({slides: [...slides, {blocks: [block("shape", {kind: "rect", fill: "#123456"})]}]}))
-      .rejects.toThrow("Deck has more than 10000 blocks, the PowerPoint export limit.");
+    await expect(
+      exportDeck({ slides: [...slides, { blocks: [block("logo", {})] }] }),
+    ).rejects.toThrow("Deck has more than 10000 blocks, the PowerPoint export limit.");
+    await expect(
+      exportDeck({
+        slides: [...slides, { blocks: [block("shape", { kind: "rect", fill: "#123456" })] }],
+      }),
+    ).rejects.toThrow("Deck has more than 10000 blocks, the PowerPoint export limit.");
   });
 
   it("rejects wordmarks exceeding the aggregate text budget", async () => {
-    const huge = block("logo", {text: "x".repeat(1_000_000)});
-    await expect(exportDeck(oneSlide(Array.from({length: 9}, () => huge))))
-      .rejects.toThrow("Deck text is too large for PowerPoint export (maximum 8000000 characters total)");
+    const huge = block("logo", { text: "x".repeat(1_000_000) });
+    await expect(exportDeck(oneSlide(Array.from({ length: 9 }, () => huge)))).rejects.toThrow(
+      "Deck text is too large for PowerPoint export (maximum 8000000 characters total)",
+    );
   });
 
   it("preserves defaults, variants and collapsed whitespace in exported shapes", async () => {
-    const zip = await readZip(await exportDeck(oneSlide([
-      block("logo", {}, {x: 10, y: 20}),
-      block("logo", {text: "Work\n\t space ", variant: "light", accentDot: false, scale: "2"}),
-      block("logo", {text: "", scale: 0}, {x: 100, y: 0}),
-      block("logo", {text: 42, scale: "junk", accentDot: true}, {x: "5", y: null}),
-    ])));
+    const zip = await readZip(
+      await exportDeck(
+        oneSlide([
+          block("logo", {}, { x: 10, y: 20 }),
+          block("logo", {
+            text: "Work\n\t space ",
+            variant: "light",
+            accentDot: false,
+            scale: "2",
+          }),
+          block("logo", { text: "", scale: 0 }, { x: 100, y: 0 }),
+          block("logo", { text: 42, scale: "junk", accentDot: true }, { x: "5", y: null }),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
     const defaultWordmark = shapeByName(xml, "Block 1 text");
     expect(defaultWordmark).toContain("Workspace</a:t>");
@@ -1187,16 +1595,22 @@ describe("Workspace Slides logo export", () => {
   });
 
   it("renders through the generic blocks at the logo's previous geometry", async () => {
-    const zip = await readZip(await exportDeck(oneSlide([
-      block("logo", {text: "Workspace", variant: "dark", scale: 0.62}, {x: 1013, y: 40}),
-      block("sectionLabel", {text: "AFTER"}, {x: 36, y: 35}),
-    ])));
+    const zip = await readZip(
+      await exportDeck(
+        oneSlide([
+          block("logo", { text: "Workspace", variant: "dark", scale: 0.62 }, { x: 1013, y: 40 }),
+          block("sectionLabel", { text: "AFTER" }, { x: 36, y: 35 }),
+        ]),
+      ),
+    );
     const xml = partText(zip, "ppt/slides/slide1.xml");
 
     const wordmark = shapeByName(xml, "Block 1 text");
     // "Workspace" in Arial Bold is 5.335em; at 24px * 0.62 the box must hold it (Google Slides
     // ignores wrap="none" and breaks anything wider than its box onto a second line).
-    expect(Number(/<a:ext cx="(\d+)"/.exec(wordmark)![1])).toBeGreaterThanOrEqual(Math.round(5.335 * 24 * 0.62 * 10160));
+    expect(Number(/<a:ext cx="(\d+)"/.exec(wordmark)![1])).toBeGreaterThanOrEqual(
+      Math.round(5.335 * 24 * 0.62 * 10160),
+    );
     expect(wordmark).toContain('sz="1190" b="1" spc="-24"');
     expect(wordmark).toContain('<a:srgbClr val="000000">');
     expect(wordmark).toContain("<a:noAutofit/>");
@@ -1206,7 +1620,9 @@ describe("Workspace Slides logo export", () => {
     expect(wordmark).toContain('<a:spcPct val="100000"/>');
     const fontPx = 24 * 0.62;
     const baseline = 40 + fontPx * 0.83;
-    expect(wordmark).toContain(`<a:off x="${1013 * 10160}" y="${Math.round((baseline - fontPx * 0.905) * 10160)}"/>`);
+    expect(wordmark).toContain(
+      `<a:off x="${1013 * 10160}" y="${Math.round((baseline - fontPx * 0.905) * 10160)}"/>`,
+    );
     const dot = shapeByName(xml, "Block 2 shape");
     expect(dot).toContain('<a:prstGeom prst="ellipse">');
     expect(dot).toContain('<a:srgbClr val="F6821F">');
@@ -1216,7 +1632,9 @@ describe("Workspace Slides logo export", () => {
     expect(dotX).toBeCloseTo((1013 + (5.335 - 9 * 0.02) * fontPx + 3 * 0.62) * 10160, -2);
     expect(xml).toContain('name="Block 3 sectionLabel"');
     expect(xml.indexOf('name="Block 1 text"')).toBeLessThan(xml.indexOf('name="Block 2 shape"'));
-    expect(xml.indexOf('name="Block 2 shape"')).toBeLessThan(xml.indexOf('name="Block 3 sectionLabel"'));
+    expect(xml.indexOf('name="Block 2 shape"')).toBeLessThan(
+      xml.indexOf('name="Block 3 sectionLabel"'),
+    );
 
     // The renderer itself knows no logo: fed one directly, it shows the unknown-block marker.
     const raw = await readZip(deckToPptx(oneSlide([block("logo", {})])));
@@ -1230,31 +1648,46 @@ describe("Workspace Slides export handler", () => {
     const state = {
       storage: {
         get: async (key: string) => stored.get(key),
-        put: async (key: string, value: unknown) => { stored.set(key, value); },
+        put: async (key: string, value: unknown) => {
+          stored.set(key, value);
+        },
       },
     } as unknown as DurableObjectState;
     const gadget = new Gadget(state, {});
     const deck = await gadget.resetAll();
     const zip = await readZip(await handler().export(gadget, "pptx"));
-    const chartIndex = deck.slides.findIndex(slide => slide.id === "6a7e5ae2");
-    const iconsIndex = deck.slides.findIndex(slide => slide.id === "4f8c2d91");
+    const chartIndex = deck.slides.findIndex((slide) => slide.id === "6a7e5ae2");
+    const iconsIndex = deck.slides.findIndex((slide) => slide.id === "4f8c2d91");
     expect(chartIndex).toBeGreaterThanOrEqual(0);
     expect(iconsIndex).toBeGreaterThanOrEqual(0);
     const chart = partText(zip, `ppt/slides/slide${chartIndex + 1}.xml`);
-    for (const label of ["Quarterly adoption", "Q1", "Q2", "Q3", "Q4", "38", "57", "73", "91", "Connected source"]) {
+    for (const label of [
+      "Quarterly adoption",
+      "Q1",
+      "Q2",
+      "Q3",
+      "Q4",
+      "38",
+      "57",
+      "73",
+      "91",
+      "Connected source",
+    ]) {
       expect(chart).toContain(`${label}</a:t>`);
     }
     const icons = partText(zip, `ppt/slides/slide${iconsIndex + 1}.xml`);
     expect(icons).toContain("Click Edit</a:t>");
     expect(icons).toContain("Ask the agent</a:t>");
-    const nativeShapes = [...icons.matchAll(/<p:sp>[\s\S]*?<\/p:sp>/g)].map(match => match[0]);
+    const nativeShapes = [...icons.matchAll(/<p:sp>[\s\S]*?<\/p:sp>/g)].map((match) => match[0]);
     for (const [x, y, w, h] of [
       [63, 213, 28, 22], // Edit input frame.
       [659, 212, 28, 22], // Agent conversation frame.
-      [665, 221, 3, 3], [672, 221, 3, 3], [679, 221, 3, 3],
+      [665, 221, 3, 3],
+      [672, 221, 3, 3],
+      [679, 221, 3, 3],
     ]) {
       const offset = `<a:off x="${x * 10160}" y="${y * 10160}"/>`;
-      const shape = nativeShapes.find(candidate => candidate.includes(offset));
+      const shape = nativeShapes.find((candidate) => candidate.includes(offset));
       expect(shape).toContain(`<a:ext cx="${w * 10160}" cy="${h * 10160}"/>`);
       expect(shape).toContain("<a:prstGeom");
     }
@@ -1264,8 +1697,20 @@ describe("Workspace Slides export handler", () => {
 
   it("publishes the exact HTML, PDF, and PowerPoint export metadata", async () => {
     await expect(handler().getExportFormats()).resolves.toEqual([
-      {id: "html", label: "HTML", mode: "browser", contentType: "text/html", fileExtension: ".html"},
-      {id: "pdf", label: "PDF", mode: "browser", contentType: "application/pdf", fileExtension: ".pdf"},
+      {
+        id: "html",
+        label: "HTML",
+        mode: "browser",
+        contentType: "text/html",
+        fileExtension: ".html",
+      },
+      {
+        id: "pdf",
+        label: "PDF",
+        mode: "browser",
+        contentType: "application/pdf",
+        fileExtension: ".pdf",
+      },
       {
         id: "pptx",
         label: "PowerPoint",
@@ -1277,7 +1722,7 @@ describe("Workspace Slides export handler", () => {
   });
 
   it("rejects unknown IDs without reading the gadget", async () => {
-    const gadget = {getDeck: vi.fn()};
+    const gadget = { getDeck: vi.fn() };
     await expect(handler().export(gadget as never, "keynote")).rejects.toThrow(
       "Unsupported slides export format: keynote",
     );
@@ -1286,10 +1731,10 @@ describe("Workspace Slides export handler", () => {
 
   it("materializes the original deck before returning the PPTX stream", async () => {
     const deck = oneSlide([
-      block("title", {text: "Materialized before streaming"}),
-      block("logo", {text: "Brand"}, {x: 36, y: 56}),
+      block("title", { text: "Materialized before streaming" }),
+      block("logo", { text: "Brand" }, { x: 36, y: 56 }),
     ]);
-    const gadget = {getDeck: vi.fn(async () => deck)};
+    const gadget = { getDeck: vi.fn(async () => deck) };
     const stream = await handler().export(gadget as never, "pptx");
     expect(gadget.getDeck).toHaveBeenCalledTimes(1);
 

@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { forwardScrolls } from "./scrollForwarding.ts";
 
 const WHEEL_PAUSE_MS = 250;
@@ -10,24 +10,33 @@ let list: HTMLElement;
 beforeAll(() => forwardScrolls({ forwardScroll }));
 
 beforeEach(async () => {
-  document.body.innerHTML = '<p>Header</p><div style="height: 100px; overflow-y: auto"><div style="height: 1000px"></div></div>';
-  [header, list] = [document.body.children[0] as HTMLElement, document.body.children[1] as HTMLElement];
+  document.body.innerHTML =
+    '<p>Header</p><div style="height: 100px; overflow-y: auto"><div style="height: 1000px"></div></div>';
+  [header, list] = [
+    document.body.children[0] as HTMLElement,
+    document.body.children[1] as HTMLElement,
+  ];
   // A wheel gesture ends once the wheel pauses, so each test starts its own.
-  await new Promise(resolve => setTimeout(resolve, WHEEL_PAUSE_MS));
+  await new Promise((resolve) => setTimeout(resolve, WHEEL_PAUSE_MS));
   forwardScroll.mockClear();
 });
 
 /** Dispatches a wheel tick, returning whether the frame cancelled it. */
 const wheel = (target: Element, deltaY: number, init: WheelEventInit = {}) =>
-  !target.dispatchEvent(new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true, ...init }));
+  !target.dispatchEvent(
+    new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true, ...init }),
+  );
 
 const touch = (type: "touchstart" | "touchmove", target: Element, clientY: number) =>
-  target.dispatchEvent(new TouchEvent(type, {
-    bubbles: true, touches: [new Touch({ identifier: 1, target, clientX: 0, clientY })],
-  }));
+  target.dispatchEvent(
+    new TouchEvent(type, {
+      bubbles: true,
+      touches: [new Touch({ identifier: 1, target, clientX: 0, clientY })],
+    }),
+  );
 
 /** Settles once scrolls the frame forwards, sent once per animation frame, have reached the host. */
-const forwarded = () => new Promise(resolve => requestAnimationFrame(resolve));
+const forwarded = () => new Promise((resolve) => requestAnimationFrame(resolve));
 
 describe("scroll forwarding", () => {
   it("leaves a wheel gesture the list took to the list, even once it reaches its end", async () => {
@@ -58,7 +67,7 @@ describe("scroll forwarding", () => {
 
   it("gives the next wheel gesture to whatever is under the pointer then", async () => {
     wheel(header, 100);
-    await new Promise(resolve => setTimeout(resolve, WHEEL_PAUSE_MS));
+    await new Promise((resolve) => setTimeout(resolve, WHEEL_PAUSE_MS));
     expect(wheel(list, 100)).toBe(false);
 
     await forwarded();

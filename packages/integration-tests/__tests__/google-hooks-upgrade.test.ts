@@ -11,12 +11,19 @@
 // carry over, and that a delivery the old release was making when it was replaced resumes.
 
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { AuthenticatedApi, Overseer } from "@gadgets/workshop-shared/api";
 import { startHarness, type Harness } from "../src/harness.js";
 import { SCRIPTED_MODEL_ID, scriptedModelRouter } from "../src/mock-model.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
-import { connect, logIn, nextUsernames, signUp, waitFor, waitForIdleChat } from "../src/rpc-client.js";
+import {
+  connect,
+  logIn,
+  nextUsernames,
+  signUp,
+  waitFor,
+  waitForIdleChat,
+} from "../src/rpc-client.js";
 import { FakeGoogle, baseGoogleGatekeeper, upgradeGoogle } from "./google-fake.js";
 
 const google = new FakeGoogle();
@@ -26,7 +33,10 @@ let harness: Harness;
 
 beforeAll(async () => {
   network.install();
-  harness = await startHarness({ gatekeepers: [baseGoogleGatekeeper()], enableGadgetExecution: true });
+  harness = await startHarness({
+    gatekeepers: [baseGoogleGatekeeper()],
+    enableGadgetExecution: true,
+  });
 });
 
 afterAll(async () => {
@@ -62,11 +72,23 @@ export default async function(self, env) {
  * A workspace whose HOOKED gadget is bound to the inbox as GMAIL and to `space` as CHAT, with a
  * hook subscribed on each, built and subscribed through chat turns as the agent would.
  */
-async function subscribedWorkspace(api: RpcStub<AuthenticatedApi>, accountId: number, space: string) {
+async function subscribedWorkspace(
+  api: RpcStub<AuthenticatedApi>,
+  accountId: number,
+  space: string,
+) {
   const model = models.script([
-    { toolCall: { id: "server", name: "writeFile", arguments: {
-      workpiece: "HOOKED", filename: "server.js", content: HOOKED_SERVER,
-    } } },
+    {
+      toolCall: {
+        id: "server",
+        name: "writeFile",
+        arguments: {
+          workpiece: "HOOKED",
+          filename: "server.js",
+          content: HOOKED_SERVER,
+        },
+      },
+    },
     { text: "Built." },
     { toolCall: { id: "subscribe", name: "executeCode", arguments: { code: SUBSCRIBE } } },
     { text: "Subscribed." },
@@ -74,7 +96,10 @@ async function subscribedWorkspace(api: RpcStub<AuthenticatedApi>, accountId: nu
   await api.addModel(model.userModel.profile, model.userModel.config);
   const ws = await api.newGadget();
   using gmail = await ws.newGatekeeper(accountId, "https://mail.google.com/mail/");
-  using chat = await ws.newGatekeeper(accountId, `https://chat.google.com/room/${space.slice("spaces/".length)}`);
+  using chat = await ws.newGatekeeper(
+    accountId,
+    `https://chat.google.com/room/${space.slice("spaces/".length)}`,
+  );
   if (!gmail || !chat) throw new Error("Failed to connect Gmail and Chat");
   using hooked = await ws.createGadget("Hooked", undefined, "HOOKED");
   // Bound before the chat opens: a permanent edge seeds a new chat's env under its name.
@@ -90,7 +115,7 @@ async function subscribedWorkspace(api: RpcStub<AuthenticatedApi>, accountId: nu
   expect(model.remainingSteps()).toBe(0);
   const hooks = await ws.listHooks();
   const hookTitled = (title: string) => {
-    const hook = hooks.find(candidate => candidate.description.title === title);
+    const hook = hooks.find((candidate) => candidate.description.title === title);
     if (!hook) throw new Error(`No hook "${title}" among ${JSON.stringify(hooks)}`);
     return hook.id;
   };
@@ -107,14 +132,19 @@ async function delivered(ws: RpcStub<Overseer>) {
   const { entries } = await ws.listActions({ filter: "observation" });
   const oldestFirst = entries.toSorted((a, b) => a.id - b.id);
   return {
-    gmail: oldestFirst.flatMap(entry => /^New Gmail message: (.*)$/.exec(entry.description.title)?.slice(1) ?? []),
-    chat: oldestFirst.filter(entry => entry.description.title === "Receive a new Google Chat message")
-      .flatMap(entry => / from (Person \d+) /.exec(entry.description.description)?.slice(1) ?? []),
+    gmail: oldestFirst.flatMap(
+      (entry) => /^New Gmail message: (.*)$/.exec(entry.description.title)?.slice(1) ?? [],
+    ),
+    chat: oldestFirst
+      .filter((entry) => entry.description.title === "Receive a new Google Chat message")
+      .flatMap(
+        (entry) => / from (Person \d+) /.exec(entry.description.description)?.slice(1) ?? [],
+      ),
   };
 }
 
 /** Long enough for a delivery the gatekeeper wrongly starts to reach the workspace. */
-const settle = () => new Promise(resolve => setTimeout(resolve, 1_000));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 1_000));
 
 it("carries Gmail and Chat hooks, their deliveries and their Google state across the upgrade", async () => {
   using stack = new DisposableStack();
@@ -125,7 +155,12 @@ it("carries Gmail and Chat hooks, their deliveries and their Google state across
   // ── Under the release before this one ──────────────────────────────────────────────────────
   const before = stack.use(await signUp(stack.use(connect(harness.url)), username!));
   const account = await google.connect(harness, before, username!);
-  const { ws: wsBefore, workspaceId, gmailHook, chatHook } = await subscribedWorkspace(before, account.id, space);
+  const {
+    ws: wsBefore,
+    workspaceId,
+    gmailHook,
+    chatHook,
+  } = await subscribedWorkspace(before, account.id, space);
   stack.use(wsBefore);
   await wsBefore.enableHook(gmailHook);
   await wsBefore.enableHook(chatHook);
@@ -138,13 +173,16 @@ it("carries Gmail and Chat hooks, their deliveries and their Google state across
   expect(await google.pushChat(harness, subscription!, first)).toBe(204);
   await waitFor("the first messages to be delivered", async () => {
     const { gmail, chat } = await delivered(wsBefore);
-    return gmail.includes("First") && chat.includes("Person 1") || null;
+    return (gmail.includes("First") && chat.includes("Person 1")) || null;
   });
 
   // A Chat message the hook fails on, whose retry disabling the hook then cancels.
   const failing = google.chatMessage(space, 2, "fail on this");
   expect(await google.pushChat(harness, subscription!, failing)).toBe(204);
-  await waitFor("the failing message to be tried", async () => (await delivered(wsBefore)).chat.includes("Person 2") || null);
+  await waitFor(
+    "the failing message to be tried",
+    async () => (await delivered(wsBefore)).chat.includes("Person 2") || null,
+  );
   await wsBefore.disableHook(chatHook);
 
   // A Gmail message the old release is delivering when it is replaced.
@@ -165,16 +203,24 @@ it("carries Gmail and Chat hooks, their deliveries and their Google state across
   const ws = stack.use(await api.openGadget(workspaceId));
 
   // The delivery the upgrade cut off resumes, from the alarm the old release left set.
-  await waitFor("the cut-off delivery to resume", async () => (await delivered(ws)).gmail.includes("Second") || null);
+  await waitFor(
+    "the cut-off delivery to resume",
+    async () => (await delivered(ws)).gmail.includes("Second") || null,
+  );
 
   // New mail is read from where the old release's history cursor stopped, under its watch.
   google.arrive(mailbox, "Third");
   expect(await google.pushGmail(harness, mailbox)).toBe(204);
-  await waitFor("new mail to be delivered", async () => (await delivered(ws)).gmail.includes("Third") || null);
+  await waitFor(
+    "new mail to be delivered",
+    async () => (await delivered(ws)).gmail.includes("Third") || null,
+  );
   expect(google.historyReads.at(-1)).toBe(cursor);
 
   // The Chat hook disabled before the upgrade is still disabled, so a redelivery reaches no one.
-  expect((await ws.listHooks()).find(hook => hook.id === chatHook)).toMatchObject({ enabled: false });
+  expect((await ws.listHooks()).find((hook) => hook.id === chatHook)).toMatchObject({
+    enabled: false,
+  });
   expect(await google.pushChat(harness, subscription!, first)).toBe(204);
   // Enabled again, it is not handed again what it finished before the upgrade, delivered or
   // cancelled, but is handed what is new, through the subscription the old release made.
@@ -182,14 +228,26 @@ it("carries Gmail and Chat hooks, their deliveries and their Google state across
   expect(await google.pushChat(harness, subscription!, first)).toBe(204);
   expect(await google.pushChat(harness, subscription!, failing)).toBe(204);
   expect(await google.pushChat(harness, subscription!, google.chatMessage(space, 3))).toBe(204);
-  await waitFor("the new Chat message to be delivered", async () => (await delivered(ws)).chat.includes("Person 3") || null);
+  await waitFor(
+    "the new Chat message to be delivered",
+    async () => (await delivered(ws)).chat.includes("Person 3") || null,
+  );
   await settle();
   expect(await delivered(ws)).toEqual({
-    gmail: ["First", "Second", "Third"], chat: ["Person 1", "Person 2", "Person 3"],
+    gmail: ["First", "Second", "Third"],
+    chat: ["Person 1", "Person 2", "Person 3"],
   });
   // Neither the watch nor the subscription was made again.
-  expect(google.requests.filter(request => request === "POST gmail.googleapis.com/gmail/v1/users/me/watch")).toHaveLength(1);
-  expect(google.requests.filter(request => request === "POST workspaceevents.googleapis.com/v1/subscriptions")).toHaveLength(1);
+  expect(
+    google.requests.filter(
+      (request) => request === "POST gmail.googleapis.com/gmail/v1/users/me/watch",
+    ),
+  ).toHaveLength(1);
+  expect(
+    google.requests.filter(
+      (request) => request === "POST workspaceevents.googleapis.com/v1/subscriptions",
+    ),
+  ).toHaveLength(1);
 
   // Disconnecting the account drops its hooks, the Gmail one included, though the old release
   // never told the account of it: the mailbox's driver did at its first alarm after the upgrade.
@@ -200,6 +258,8 @@ it("carries Gmail and Chat hooks, their deliveries and their Google state across
   google.arrive(mailbox, "After");
   expect(await google.pushGmail(harness, mailbox)).toBe(204);
   await settle();
-  expect(harness.server.getLogs().filter(log => log.message.includes("gmail.hooks."))).toEqual([]);
+  expect(harness.server.getLogs().filter((log) => log.message.includes("gmail.hooks."))).toEqual(
+    [],
+  );
   expect((await delivered(ws)).gmail).not.toContain("After");
 });

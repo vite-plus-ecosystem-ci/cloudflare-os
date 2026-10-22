@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-plugin";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 /**
  * The workerd project: the account Durable Object's credentials and identity, and the gatekeeper
@@ -17,9 +17,7 @@ export default defineConfig({
         // Kept in step with wrangler.jsonc; a drift here tests a runtime we do not deploy.
         compatibilityDate: "2026-09-04",
         compatibilityFlags: ["allow_irrevocable_stub_storage", "nodejs_als"],
-        modulesRules: [
-          { type: "Text", include: ["**/*.txt", "**/*.svg"] },
-        ],
+        modulesRules: [{ type: "Text", include: ["**/*.txt", "**/*.svg"] }],
         durableObjects: {
           USER_ACCOUNT: { className: "UserAccount", useSQLite: true },
           X_GATEKEEPER: { className: "XGatekeeperImpl", useSQLite: true },

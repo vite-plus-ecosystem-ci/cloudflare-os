@@ -4,7 +4,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { RpcStub } from "capnweb";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Overseer } from "@gadgets/workshop-shared/api";
 
 const testState = vi.hoisted(() => ({
@@ -23,10 +23,7 @@ vi.mock("./prepareChatAttachment", () => ({
   }),
 }));
 
-import {
-  useComposerAttachments,
-  type ComposerAttachment,
-} from "./useComposerAttachments";
+import { useComposerAttachments, type ComposerAttachment } from "./useComposerAttachments";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -49,8 +46,8 @@ describe("useComposerAttachments", () => {
   });
 
   it("uploads raw blobs with message metadata and clears only sent attachments", async () => {
-    const uploadBlob = vi.fn<Overseer["uploadBlob"]>(
-      async () => (++testState.nextId).toString(16).padStart(40, "0"),
+    const uploadBlob = vi.fn<Overseer["uploadBlob"]>(async () =>
+      (++testState.nextId).toString(16).padStart(40, "0"),
     );
     const firstOverseer = {
       uploadBlob,
@@ -78,19 +75,17 @@ describe("useComposerAttachments", () => {
     root = createRoot(container);
     await act(async () => root!.render(<Harness />));
 
-    await act(async () => addFiles!([
-      new File(["one"], "one.txt", { type: "text/plain" }),
-    ]));
+    await act(async () => addFiles!([new File(["one"], "one.txt", { type: "text/plain" })]));
     await waitFor(() => attachments[0]?.uploadState === "ready");
     expect(uploadBlob).toHaveBeenCalledWith(Uint8Array.of(1, 2, 3, 4));
     expect(attachments[0].ref).toEqual({
-      oid: expect.stringMatching(/^[0-9a-f]{40}$/), mimeType: "text/plain", name: "one.txt",
+      oid: expect.stringMatching(/^[0-9a-f]{40}$/),
+      mimeType: "text/plain",
+      name: "one.txt",
     });
     const sentSnapshot = [...attachments];
 
-    await act(async () => addFiles!([
-      new File(["two"], "two.txt", { type: "text/plain" }),
-    ]));
+    await act(async () => addFiles!([new File(["two"], "two.txt", { type: "text/plain" })]));
     await waitFor(() => attachments.length === 2 && attachments[1].uploadState === "ready");
     act(() => clearSentAttachments!(sentSnapshot));
 
@@ -105,7 +100,10 @@ describe("useComposerAttachments", () => {
   it("ignores a blob upload that finishes after the composer unmounts", async () => {
     let finishUpload!: (oid: string) => void;
     const uploadBlob = vi.fn<Overseer["uploadBlob"]>(
-      () => new Promise((resolve) => { finishUpload = resolve; }),
+      () =>
+        new Promise((resolve) => {
+          finishUpload = resolve;
+        }),
     );
     const overseer = {
       uploadBlob,
@@ -123,9 +121,7 @@ describe("useComposerAttachments", () => {
     container = document.createElement("div");
     root = createRoot(container);
     await act(async () => root!.render(<Harness />));
-    await act(async () => addFiles([
-      new File(["one"], "one.txt", { type: "text/plain" }),
-    ]));
+    await act(async () => addFiles([new File(["one"], "one.txt", { type: "text/plain" })]));
     await waitFor(() => uploadBlob.mock.calls.length === 1);
 
     await act(async () => root!.unmount());

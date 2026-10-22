@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   composerDraftStorageKey,
   decorateComposerDraft,
@@ -52,21 +52,25 @@ describe("composer drafts", () => {
     const stored = serializeComposerDraft(
       text,
       [{ start: 4, length: "Q3 Plan".length, url: "https://example.com/q3" }],
-      [{
-        start: formatStart,
-        length: logoSlot.length + "Document".length,
-        noun: "Document",
-        icon: "fileText",
-      }],
+      [
+        {
+          start: formatStart,
+          length: logoSlot.length + "Document".length,
+          noun: "Document",
+          icon: "fileText",
+        },
+      ],
     );
 
     expect(stored.text).toBe("Use https://example.com/q3 to create a Document");
-    expect(stored.formats).toEqual([{
-      position: stored.text.indexOf("Document"),
-      length: "Document".length,
-      noun: "Document",
-      icon: "fileText",
-    }]);
+    expect(stored.formats).toEqual([
+      {
+        position: stored.text.indexOf("Document"),
+        length: "Document".length,
+        noun: "Document",
+        icon: "fileText",
+      },
+    ]);
   });
 
   it("decorates restored formats and adjusts later token positions", () => {
@@ -111,12 +115,14 @@ describe("composer drafts", () => {
     const stored = serializeComposerDraft(
       text,
       [{ start: 4, length: "Q3 Plan".length, url: "https://example.com/q3" }],
-      [{
-        start: formatStart,
-        length: logoSlot.length + "Document".length,
-        noun: "Document",
-        icon: "fileText",
-      }],
+      [
+        {
+          start: formatStart,
+          length: logoSlot.length + "Document".length,
+          noun: "Document",
+          icon: "fileText",
+        },
+      ],
       { start: commandStart, length: commandText.length, choice: deployCommand },
     );
 
@@ -133,10 +139,12 @@ describe("composer drafts", () => {
       length: commandText.length,
       choice: deployCommand,
     });
-    expect(restored.text.slice(
-      restored.command!.start,
-      restored.command!.start + restored.command!.length,
-    )).toBe(commandText);
+    expect(
+      restored.text.slice(
+        restored.command!.start,
+        restored.command!.start + restored.command!.length,
+      ),
+    ).toBe(commandText);
   });
 
   it("keeps a following format positioned after a restored slash command", () => {
@@ -146,29 +154,29 @@ describe("composer drafts", () => {
     const stored = serializeComposerDraft(
       `${commandText} then ${logoSlot}Document`,
       [],
-      [{
-        start: formatStart,
-        length: logoSlot.length + "Document".length,
-        noun: "Document",
-        icon: "fileText",
-      }],
-      {start: 0, length: commandText.length, choice: deployCommand},
+      [
+        {
+          start: formatStart,
+          length: logoSlot.length + "Document".length,
+          noun: "Document",
+          icon: "fileText",
+        },
+      ],
+      { start: 0, length: commandText.length, choice: deployCommand },
     );
 
     const restored = decorateComposerDraft(stored, ["data:doc"], logoSlot);
-    expect(restored.formats[0].start)
-      .toBe(commandText.length + " then ".length);
+    expect(restored.formats[0].start).toBe(commandText.length + " then ".length);
     expect(restored.text).toBe(`${commandText} then ${logoSlot}Document`);
   });
 
   it("round-trips the exact slash command provider selection", () => {
     const key = composerDraftStorageKey("user-a", "workspace:one:chat:2");
-    const stored = serializeComposerDraft(
-      "Please /deploy this",
-      [],
-      [],
-      { start: 7, length: 7, choice: deployCommand },
-    );
+    const stored = serializeComposerDraft("Please /deploy this", [], [], {
+      start: 7,
+      length: 7,
+      choice: deployCommand,
+    });
 
     writeComposerDraft(key, stored);
 
@@ -186,43 +194,52 @@ describe("composer drafts", () => {
 
   it("rejects stored format ranges that do not match the text", () => {
     const key = composerDraftStorageKey("user-a", "home");
-    sessionStorage.setItem(key, JSON.stringify({
-      ...draft,
-      formats: [{ position: 0, length: 8, noun: "Document", icon: "fileText" }],
-    }));
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        ...draft,
+        formats: [{ position: 0, length: 8, noun: "Document", icon: "fileText" }],
+      }),
+    );
 
     expect(readComposerDraft(key)).toBeUndefined();
   });
 
   it("rejects stored slash command metadata that does not match the text", () => {
     const key = composerDraftStorageKey("user-a", "home");
-    sessionStorage.setItem(key, JSON.stringify({
-      version: 1,
-      text: "Please /deploy this",
-      formats: [],
-      command: { position: 0, length: 7, choice: deployCommand },
-    }));
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        version: 1,
+        text: "Please /deploy this",
+        formats: [],
+        command: { position: 0, length: 7, choice: deployCommand },
+      }),
+    );
 
     expect(readComposerDraft(key)).toBeUndefined();
   });
 
   it("rejects a built-in command stored under a different name", () => {
     const key = composerDraftStorageKey("user-a", "home");
-    sessionStorage.setItem(key, JSON.stringify({
-      version: 1,
-      text: "/delete this",
-      formats: [],
-      command: {
-        position: 0,
-        length: 7,
-        choice: {
-          selection: { builtin: true, commandId: "compact" },
-          name: "delete",
-          description: "Misleading command",
-          providerLabel: "Workshop",
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        version: 1,
+        text: "/delete this",
+        formats: [],
+        command: {
+          position: 0,
+          length: 7,
+          choice: {
+            selection: { builtin: true, commandId: "compact" },
+            name: "delete",
+            description: "Misleading command",
+            providerLabel: "Workshop",
+          },
         },
-      },
-    }));
+      }),
+    );
 
     expect(readComposerDraft(key)).toBeUndefined();
   });
@@ -239,9 +256,15 @@ describe("composer drafts", () => {
 
   it("tolerates unavailable browser storage", () => {
     vi.stubGlobal("sessionStorage", {
-      getItem: () => { throw new Error("blocked"); },
-      setItem: () => { throw new Error("blocked"); },
-      removeItem: () => { throw new Error("blocked"); },
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+      removeItem: () => {
+        throw new Error("blocked");
+      },
     });
 
     expect(readComposerDraft("key")).toBeUndefined();

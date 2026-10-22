@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { ConfiguratorUISpec } from "../index.ts";
 import { defaultValuesFromResourceUrl, prefill } from "./prefill.ts";
 
@@ -20,14 +20,18 @@ describe("defaultValuesFromResourceUrl", () => {
   });
 
   it("decodes an encoded group and ignores a wildcard", () => {
-    expect(defaultValuesFromResourceUrl(
-      "https://docs.google.com/document/d/doc%2F1/edit",
-      "https://docs.google.com/document/d/:docId/*",
-    )).toEqual({ docId: "doc/1" });
+    expect(
+      defaultValuesFromResourceUrl(
+        "https://docs.google.com/document/d/doc%2F1/edit",
+        "https://docs.google.com/document/d/:docId/*",
+      ),
+    ).toEqual({ docId: "doc/1" });
   });
 
   it("returns nothing for a URL the pattern does not describe", () => {
-    expect(defaultValuesFromResourceUrl("https://drive.google.com/drive/my-drive", pattern)).toEqual({});
+    expect(
+      defaultValuesFromResourceUrl("https://drive.google.com/drive/my-drive", pattern),
+    ).toEqual({});
   });
 });
 
@@ -53,16 +57,24 @@ describe("prefill", () => {
   });
 
   it("asks the spec to map the URL when it can", async () => {
-    const mapped = spec({ initialValuesFromResourceUrl: async ({ resourceUrl }) => ({ mode: resourceUrl }) });
-    expect((await prefill(mapped, context, async () => initialResource)).values)
-      .toEqual({ folderId: null, mode: initialResource.resourceUrl });
+    const mapped = spec({
+      initialValuesFromResourceUrl: async ({ resourceUrl }) => ({ mode: resourceUrl }),
+    });
+    expect((await prefill(mapped, context, async () => initialResource)).values).toEqual({
+      folderId: null,
+      mode: initialResource.resourceUrl,
+    });
   });
 
   it("opens blank when there is no resource or it cannot be read", async () => {
     const blank = { values: { folderId: null, mode: "read" }, queries: {} };
     expect(await prefill(spec(), context, async () => null)).toEqual(blank);
     expect(await prefill(spec(), context, () => Promise.reject(new Error("gone")))).toEqual(blank);
-    const throwing = spec({ initialValuesFromResourceUrl: () => { throw new Error("unparseable"); } });
+    const throwing = spec({
+      initialValuesFromResourceUrl: () => {
+        throw new Error("unparseable");
+      },
+    });
     expect(await prefill(throwing, context, async () => initialResource)).toEqual(blank);
   });
 });
