@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { AiModelConfig } from "@gadgets/workshop-shared/api";
 import { loadAllChatHistory } from "../src/agent-session.js";
 import { type Harness, startHarness } from "../src/harness.js";
@@ -56,25 +56,32 @@ it("editing a model keeps its secrets usable without returning them", async () =
     extraHeaders: { "X-Provider-Secret": HEADER_SECRET, "X-Empty": "" },
   };
   await api.addModel(PROFILE, config);
-  const redacted = { ...config, apiToken: null, extraHeaders: { "X-Provider-Secret": null, "X-Empty": "" } };
+  const redacted = {
+    ...config,
+    apiToken: null,
+    extraHeaders: { "X-Provider-Secret": null, "X-Empty": "" },
+  };
   expect(await api.getModelConfig(PROFILE.id)).toEqual({ profile: PROFILE, config: redacted });
 
   const RENAMED = { ...PROFILE, name: "Renamed secret model" };
   await api.updateModel(RENAMED, { ...redacted, contextWindow: 1000 });
   expect(await api.listModels()).toContainEqual(RENAMED);
-  expect(await api.getModelConfig(PROFILE.id))
-      .toEqual({ profile: RENAMED, config: { ...redacted, contextWindow: 1000 } });
+  expect(await api.getModelConfig(PROFILE.id)).toEqual({
+    profile: RENAMED,
+    config: { ...redacted, contextWindow: 1000 },
+  });
 
-  await expect(api.updateModel(RENAMED,
-      { ...redacted, contextWindow: 1000, apiUrl: "https://attacker.test" }))
-      .rejects.toThrow(/since the provider or API URL changed/);
+  await expect(
+    api.updateModel(RENAMED, { ...redacted, contextWindow: 1000, apiUrl: "https://attacker.test" }),
+  ).rejects.toThrow(/since the provider or API URL changed/);
 
   using ws = await api.newGadget();
   const chatId = await ws.newChat("Prove the saved credentials work.", PROFILE.id);
   await waitForIdleChat(ws, chatId);
-  const history = await loadAllChatHistory(before => ws.getChatHistory(chatId, before));
-  expect(history.filter(message => message.type === "message" && message.author.type === "agent"))
-      .toEqual([expect.objectContaining({ message: "Secrets retained." })]);
+  const history = await loadAllChatHistory((before) => ws.getChatHistory(chatId, before));
+  expect(
+    history.filter((message) => message.type === "message" && message.author.type === "agent"),
+  ).toEqual([expect.objectContaining({ message: "Secrets retained." })]);
   expect(model.requests).toHaveLength(1);
   for (const request of providerRequests) {
     expect(request).toEqual({ authorization: `Bearer ${TOKEN}`, providerSecret: HEADER_SECRET });

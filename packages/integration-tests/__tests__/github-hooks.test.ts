@@ -4,7 +4,7 @@
 // the connection and disconnecting the account each clean up after it.
 
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { AuthenticatedApi, Overseer } from "@gadgets/workshop-shared/api";
 import { startHarness, type Harness } from "../src/harness.js";
 import { SCRIPTED_MODEL_ID, scriptedModelRouter } from "../src/mock-model.js";
@@ -54,11 +54,23 @@ export default async function(self, env) {
  * A workspace whose HOOKED gadget is bound to repository `repo` as GITHUB, and has subscribed a
  * hook there, built and subscribed through chat turns as the agent would.
  */
-async function subscribedWorkspace(api: RpcStub<AuthenticatedApi>, accountId: number, repo: string) {
+async function subscribedWorkspace(
+  api: RpcStub<AuthenticatedApi>,
+  accountId: number,
+  repo: string,
+) {
   const model = models.script([
-    { toolCall: { id: "server", name: "writeFile", arguments: {
-      workpiece: "HOOKED", filename: "server.js", content: TRIAGE_SERVER,
-    } } },
+    {
+      toolCall: {
+        id: "server",
+        name: "writeFile",
+        arguments: {
+          workpiece: "HOOKED",
+          filename: "server.js",
+          content: TRIAGE_SERVER,
+        },
+      },
+    },
     { text: "Built." },
     { toolCall: { id: "subscribe", name: "executeCode", arguments: { code: SUBSCRIBE } } },
     { text: "Subscribed." },
@@ -82,7 +94,7 @@ async function subscribedWorkspace(api: RpcStub<AuthenticatedApi>, accountId: nu
 }
 
 const pendingTitles = async (ws: RpcStub<Overseer>) =>
-  (await ws.listActions({ filter: "pending" })).entries.map(entry => entry.description.title);
+  (await ws.listActions({ filter: "pending" })).entries.map((entry) => entry.description.title);
 
 it("runs a hook from enabling, through a delivery and its approved write, to its removal", async () => {
   using stack = new DisposableStack();
@@ -96,24 +108,38 @@ it("runs a hook from enabling, through a delivery and its approved write, to its
 
   // Bound disabled: nothing changes on GitHub until the user enables it.
   const [hook] = await ws.listHooks();
-  expect(hook).toMatchObject({ enabled: false, description: { title: `Watch acme/${repo.name} on GitHub` } });
-  const ownWebhooks = () => [...github.webhooks.values()].filter(webhook => webhook.repo === repo.name);
+  expect(hook).toMatchObject({
+    enabled: false,
+    description: { title: `Watch acme/${repo.name} on GitHub` },
+  });
+  const ownWebhooks = () =>
+    [...github.webhooks.values()].filter((webhook) => webhook.repo === repo.name);
   expect(ownWebhooks()).toEqual([]);
   await ws.enableHook(hook!.id);
   const [webhook] = ownWebhooks();
   expect(webhook).toMatchObject({ events: ["issues"], active: true });
-  expect(webhook!.url).toMatch(/^https:\/\/workshop\.test\/gatekeeper\/github\/webhook\/[0-9a-f]{64}$/);
+  expect(webhook!.url).toMatch(
+    /^https:\/\/workshop\.test\/gatekeeper\/github\/webhook\/[0-9a-f]{64}$/,
+  );
 
   // A delivery signed with another secret is refused; GitHub's own runs the gadget, whose
   // comment waits for approval.
-  expect(await github.deliver(harness, "issues", github.issueEvent("opened", repo.name, 42),
-    { to: [{ ...webhook!, secret: "not-the-secret" }] })).toEqual([401]);
-  expect(await github.deliver(harness, "issues", github.issueEvent("opened", repo.name, 42))).toEqual([204]);
-  await waitFor("the hook's comment to wait for approval", async () =>
-    (await pendingTitles(ws)).includes("Comment on #42") || null);
+  expect(
+    await github.deliver(harness, "issues", github.issueEvent("opened", repo.name, 42), {
+      to: [{ ...webhook!, secret: "not-the-secret" }],
+    }),
+  ).toEqual([401]);
+  expect(
+    await github.deliver(harness, "issues", github.issueEvent("opened", repo.name, 42)),
+  ).toEqual([204]);
+  await waitFor(
+    "the hook's comment to wait for approval",
+    async () => (await pendingTitles(ws)).includes("Comment on #42") || null,
+  );
   const { entries: observations } = await ws.listActions({ filter: "observation" });
-  expect(observations.map(entry => entry.description.title))
-    .toContain(`GitHub issue #42 opened: Crash on start`);
+  expect(observations.map((entry) => entry.description.title)).toContain(
+    `GitHub issue #42 opened: Crash on start`,
+  );
   expect(github.comments).toEqual([]);
   const [comment] = (await ws.listActions({ filter: "pending" })).entries;
   await ws.approveAction(comment!.id);
@@ -122,18 +148,26 @@ it("runs a hook from enabling, through a delivery and its approved write, to its
   // Disabled, the hook's webhook goes, and a late delivery to it is refused.
   await ws.disableHook(hook!.id);
   expect(github.deletedWebhooks).toContain(webhook!.id);
-  expect(await github.deliver(harness, "issues", github.issueEvent("opened", repo.name, 43), { to: [webhook!] }))
-    .toEqual([404]);
+  expect(
+    await github.deliver(harness, "issues", github.issueEvent("opened", repo.name, 43), {
+      to: [webhook!],
+    }),
+  ).toEqual([404]);
 
   // Enabled again, then removed with the connection: its webhook goes again.
   await ws.enableHook(hook!.id);
   const [again] = ownWebhooks();
   await connection.remove();
   expect(await ws.listHooks()).toEqual([]);
-  await waitFor("the removed connection's webhook to be deleted", async () =>
-    github.deletedWebhooks.includes(again!.id) || null);
-  expect(await github.deliver(harness, "issues", github.issueEvent("opened", repo.name, 44), { to: [again!] }))
-    .toEqual([404]);
+  await waitFor(
+    "the removed connection's webhook to be deleted",
+    async () => github.deletedWebhooks.includes(again!.id) || null,
+  );
+  expect(
+    await github.deliver(harness, "issues", github.issueEvent("opened", repo.name, 44), {
+      to: [again!],
+    }),
+  ).toEqual([404]);
   expect(await pendingTitles(ws)).toEqual([]);
 
   // Disconnecting the account revokes its token.

@@ -3,7 +3,7 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { Toasty } from "@cloudflare/kumo";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { ContextApi, ContextCollectionMetadata } from "../../src/context-types";
 import { DEFAULT_COLLECTION_ICON } from "../components/CollectionIconPicker";
 import { CreateCollectionDialog } from "./CreateCollectionDialog";
@@ -35,11 +35,15 @@ const setInputValue = (input: HTMLInputElement, value: string) => {
   input.dispatchEvent(new Event("input", { bubbles: true }));
 };
 
-const button = (label: string) => [...document.querySelectorAll<HTMLButtonElement>("button")]
-  .find((candidate) => candidate.textContent?.includes(label));
+const button = (label: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>("button")].find((candidate) =>
+    candidate.textContent?.includes(label),
+  );
 
-const radio = (label: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="radio"]')]
-  .find((candidate) => candidate.closest("label")?.textContent?.includes(label));
+const radio = (label: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((candidate) =>
+    candidate.closest("label")?.textContent?.includes(label),
+  );
 
 describe("collection dialogs", () => {
   let container: HTMLDivElement | undefined;
@@ -97,9 +101,10 @@ describe("collection dialogs", () => {
     );
 
     act(() => {
-      setInputValue(document.querySelector<HTMLInputElement>(
-        'input[placeholder^="A short name"]',
-      )!, "Engineering");
+      setInputValue(
+        document.querySelector<HTMLInputElement>('input[placeholder^="A short name"]')!,
+        "Engineering",
+      );
     });
     act(() => radio("Git mirror")?.click());
     act(() => radio("Everyone")?.click());
@@ -152,7 +157,9 @@ describe("collection dialogs", () => {
     await act(async () => Promise.resolve());
     expect(button("Create token")).toBeDefined();
 
-    act(() => setInputValue(document.querySelector<HTMLInputElement>('input[value="main"]')!, "release"));
+    act(() =>
+      setInputValue(document.querySelector<HTMLInputElement>('input[value="main"]')!, "release"),
+    );
     await act(async () => {
       button("Save changes")?.click();
       await Promise.resolve();
@@ -161,32 +168,45 @@ describe("collection dialogs", () => {
     expect(updateContextCollection).toHaveBeenCalledWith("collection", { branch: "release" });
   });
 
-  it.each([false, true])("reconciles the library after confirming leave (cleanup rejects: %s)", async (rejectCleanup) => {
-    let membership = true;
-    const leaveContextCollection = vi.fn<ContextApi["leaveContextCollection"]>(async () => {
-      membership = false;
-      if (rejectCleanup) throw new Error("Access was changed, but Git tokens could not be revoked yet.");
-    });
-    mocks.api = { leaveContextCollection } as unknown as ContextApi;
-    const Parent = () => {
-      const [member, setMember] = React.useState(membership);
-      const [left, setLeft] = React.useState(false);
-      return <>
-        <p>{member ? "Member in library" : "No membership in library"}</p>
-        <p>{left ? "Leave succeeded" : "Leave not confirmed successful"}</p>
-        <LeaveCollectionDialog
-          collection={{ id: "collection", title: "Engineering" }}
-          onChanged={() => setMember(membership)}
-          onLeft={() => { setMember(membership); setLeft(true); }}
-          onClose={() => {}}
-        />
-      </>;
-    };
-    render(<Parent />);
-    expect(leaveContextCollection).not.toHaveBeenCalled();
-    await act(async () => button("Leave")?.click());
-    expect(document.body.textContent).toContain("No membership in library");
-    expect(document.body.textContent).toContain(rejectCleanup ? "Leave not confirmed successful" : "Leave succeeded");
-    expect(document.body.textContent?.includes("Git tokens could not be revoked yet")).toBe(rejectCleanup);
-  });
+  it.each([false, true])(
+    "reconciles the library after confirming leave (cleanup rejects: %s)",
+    async (rejectCleanup) => {
+      let membership = true;
+      const leaveContextCollection = vi.fn<ContextApi["leaveContextCollection"]>(async () => {
+        membership = false;
+        if (rejectCleanup)
+          throw new Error("Access was changed, but Git tokens could not be revoked yet.");
+      });
+      mocks.api = { leaveContextCollection } as unknown as ContextApi;
+      const Parent = () => {
+        const [member, setMember] = React.useState(membership);
+        const [left, setLeft] = React.useState(false);
+        return (
+          <>
+            <p>{member ? "Member in library" : "No membership in library"}</p>
+            <p>{left ? "Leave succeeded" : "Leave not confirmed successful"}</p>
+            <LeaveCollectionDialog
+              collection={{ id: "collection", title: "Engineering" }}
+              onChanged={() => setMember(membership)}
+              onLeft={() => {
+                setMember(membership);
+                setLeft(true);
+              }}
+              onClose={() => {}}
+            />
+          </>
+        );
+      };
+      render(<Parent />);
+      expect(leaveContextCollection).not.toHaveBeenCalled();
+      await act(async () => button("Leave")?.click());
+      expect(document.body.textContent).toContain("No membership in library");
+      expect(document.body.textContent).toContain(
+        rejectCleanup ? "Leave not confirmed successful" : "Leave succeeded",
+      );
+      expect(document.body.textContent?.includes("Git tokens could not be revoked yet")).toBe(
+        rejectCleanup,
+      );
+    },
+  );
 });

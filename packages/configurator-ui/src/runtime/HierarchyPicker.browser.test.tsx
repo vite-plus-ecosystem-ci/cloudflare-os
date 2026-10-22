@@ -6,8 +6,8 @@ import { FileIcon, FolderIcon } from "@phosphor-icons/react";
 import { act } from "preact/test-utils";
 import { useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import { page, userEvent } from "vitest/browser";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";
+import { page, userEvent } from "vite-plus/test/browser";
 import type {
   ConfiguratorUIHierarchyItem,
   ConfiguratorUIHierarchyPage,
@@ -27,7 +27,12 @@ type LoadItems = (request: ConfiguratorUIHierarchyRequest) => Promise<Configurat
 const ROOT = { id: "drive", title: "My Drive", selectable: true };
 
 const reports: Item = { id: "reports", title: "Reports", kind: "container" };
-const shared: Item = { id: "shared", title: "Shared with me", kind: "container", selectable: false };
+const shared: Item = {
+  id: "shared",
+  title: "Shared with me",
+  kind: "container",
+  selectable: false,
+};
 const budget: Item = { id: "budget", title: "Budget.xlsx", kind: "leaf" };
 const locked: Item = { id: "locked", title: "Locked.doc", kind: "leaf", selectable: false };
 const archive: Item = { id: "archive", title: "Archive", kind: "container" };
@@ -41,12 +46,14 @@ const TREE: Record<string, Item[]> = {
 };
 
 /** A source answering from {@link TREE}, and from `results` for a search. */
-const source = (results: Record<string, Item[]> = {}) => vi.fn<LoadItems>(async ({ parentId, query }) => ({
-  items: query ? results[query] ?? [] : TREE[parentId] ?? [],
-}));
+const source = (results: Record<string, Item[]> = {}) =>
+  vi.fn<LoadItems>(async ({ parentId, query }) => ({
+    items: query ? (results[query] ?? []) : (TREE[parentId] ?? []),
+  }));
 
 /** A click on an element Playwright would refuse to click because it is (aria-)disabled. */
-const forceClick = (locator: { element(): Element }) => act(() => (locator.element() as HTMLElement).click());
+const forceClick = (locator: { element(): Element }) =>
+  act(() => (locator.element() as HTMLElement).click());
 
 /** Settles once Preact has run the last render's effects, in a task its next animation frame queues. */
 const effectsFlushed = () => {
@@ -67,7 +74,13 @@ type HarnessProps = Omit<HierarchyPickerProps, "value" | "onChange" | "name" | "
 let setFromModule: (value: string | null) => void;
 
 /** The picker as a configurator holds it: its value follows `onChange`. */
-const Harness = ({ initial = null, onChange, root = ROOT, accepts = () => true, ...props }: HarnessProps) => {
+const Harness = ({
+  initial = null,
+  onChange,
+  root = ROOT,
+  accepts = () => true,
+  ...props
+}: HarnessProps) => {
   const [value, setValue] = useState<string | null>(initial);
   const [store] = useState(() => createConfiguratorStore({}));
   setFromModule = setValue;
@@ -101,9 +114,11 @@ const render = async (props: Partial<HarnessProps> & { loadItems: LoadItems }) =
 const list = () => page.getByRole("listbox");
 // Found by title alone: their accessible names add a row's subtitle or path.
 const option = (name: string) => page.getByRole("option", { name, exact: false });
-const crumb = (name: string) => page.getByRole("navigation", { name: "Location" }).getByRole("button", { name, exact: false });
+const crumb = (name: string) =>
+  page.getByRole("navigation", { name: "Location" }).getByRole("button", { name, exact: false });
 const crumbs = () => page.getByRole("navigation", { name: "Location" });
-const allOf = (title = "My Drive") => page.getByRole("button", { name: `All of ${title}`, exact: false });
+const allOf = (title = "My Drive") =>
+  page.getByRole("button", { name: `All of ${title}`, exact: false });
 
 afterEach(() => {
   act(() => root?.unmount());
@@ -121,8 +136,12 @@ describe("selection", () => {
     expect(onChange).not.toHaveBeenCalled();
 
     await userEvent.click(option("Everything in Reports"));
-    expect(onChange).toHaveBeenLastCalledWith("reports",
-      { id: "reports", title: "Reports", kind: "container", selectable: true });
+    expect(onChange).toHaveBeenLastCalledWith("reports", {
+      id: "reports",
+      title: "Reports",
+      kind: "container",
+      selectable: true,
+    });
     await expect.element(option("Everything in Reports")).toHaveAttribute("aria-selected", "true");
     await userEvent.click(option("Archive"));
     expect(onChange).toHaveBeenLastCalledWith(null, null);
@@ -137,16 +156,34 @@ describe("selection", () => {
 
   it("offers an open container under its own choice, or else as everything in it, with its icon", async () => {
     const icons = { space: <svg data-testid="space-icon" /> };
-    const choice = { title: "The whole Engineering space", subtitle: "Including pages added later" };
-    const engineering: Item = { id: "eng", title: "Engineering", kind: "container", icon: "space", choice };
-    const specs: Item = { id: "specs", title: "Specs", kind: "container", path: [{ ...engineering }] };
-    const loadItems = vi.fn<LoadItems>(async ({ parentId, query }) =>
-      ({ items: query ? [specs] : parentId === "drive" ? [engineering, reports] : [] }));
+    const choice = {
+      title: "The whole Engineering space",
+      subtitle: "Including pages added later",
+    };
+    const engineering: Item = {
+      id: "eng",
+      title: "Engineering",
+      kind: "container",
+      icon: "space",
+      choice,
+    };
+    const specs: Item = {
+      id: "specs",
+      title: "Specs",
+      kind: "container",
+      path: [{ ...engineering }],
+    };
+    const loadItems = vi.fn<LoadItems>(async ({ parentId, query }) => ({
+      items: query ? [specs] : parentId === "drive" ? [engineering, reports] : [],
+    }));
     await render({ loadItems, icons, searchPlaceholder: "Search Drive" });
-    const drawsSpace = () => option(choice.title).element().querySelector("[data-testid='space-icon']");
+    const drawsSpace = () =>
+      option(choice.title).element().querySelector("[data-testid='space-icon']");
 
     await userEvent.click(option("Engineering"));
-    await expect.element(option(choice.title)).toMatchTextContent(`${choice.title}${choice.subtitle}`);
+    await expect
+      .element(option(choice.title))
+      .toMatchTextContent(`${choice.title}${choice.subtitle}`);
     expect(drawsSpace()).not.toBeNull();
 
     await userEvent.click(crumb("My Drive"));
@@ -158,7 +195,9 @@ describe("selection", () => {
     await userEvent.fill(page.getByRole("searchbox", { name: "Search Drive" }), "specs");
     await userEvent.click(option("Specs"));
     await userEvent.click(crumb("Engineering"));
-    await expect.element(option(choice.title)).toMatchTextContent(`${choice.title}${choice.subtitle}`);
+    await expect
+      .element(option(choice.title))
+      .toMatchTextContent(`${choice.title}${choice.subtitle}`);
     expect(drawsSpace()).not.toBeNull();
   });
 
@@ -166,7 +205,10 @@ describe("selection", () => {
     const onChange = await render({ loadItems: source() });
 
     await userEvent.click(option("Budget.xlsx"));
-    expect(onChange).toHaveBeenLastCalledWith("budget", expect.objectContaining({ id: "budget", kind: "leaf" }));
+    expect(onChange).toHaveBeenLastCalledWith(
+      "budget",
+      expect.objectContaining({ id: "budget", kind: "leaf" }),
+    );
     await userEvent.click(option("Budget.xlsx"));
     await expect.element(option("Budget.xlsx")).toHaveAttribute("aria-selected", "true");
 
@@ -176,8 +218,12 @@ describe("selection", () => {
   });
 
   it("shows one selected row when a listing names the open container among its own nodes", async () => {
-    const loadItems = vi.fn<LoadItems>(async ({ parentId }) =>
-      ({ items: parentId === "reports" ? [{ ...reports, title: "Reports again" }, q1] : TREE[parentId] ?? [] }));
+    const loadItems = vi.fn<LoadItems>(async ({ parentId }) => ({
+      items:
+        parentId === "reports"
+          ? [{ ...reports, title: "Reports again" }, q1]
+          : (TREE[parentId] ?? []),
+    }));
     await render({ loadItems });
 
     await userEvent.click(option("Reports"));
@@ -193,15 +239,27 @@ describe("selection", () => {
 
     await userEvent.click(option("Reports"));
     await userEvent.click(allOf());
-    expect(onChange).toHaveBeenLastCalledWith("drive", { id: "drive", title: "My Drive", kind: "container", selectable: true });
+    expect(onChange).toHaveBeenLastCalledWith("drive", {
+      id: "drive",
+      title: "My Drive",
+      kind: "container",
+      selectable: true,
+    });
     await userEvent.click(option("Archive"));
     await expect.element(allOf()).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(option("Old.pdf"));
     await expect.element(allOf()).toHaveAttribute("aria-pressed", "false");
     expect(onChange).toHaveBeenCalledTimes(2);
 
-    await act(() => root!.render(
-      <Harness onChange={onChange} loadItems={loadItems} root={{ id: "team", title: "Team Drive" }} />));
+    await act(() =>
+      root!.render(
+        <Harness
+          onChange={onChange}
+          loadItems={loadItems}
+          root={{ id: "team", title: "Team Drive" }}
+        />,
+      ),
+    );
     await expect.element(list()).toHaveAccessibleName("Team Drive");
     expect(allOf("Team Drive").elements()).toHaveLength(0);
   });
@@ -235,7 +293,11 @@ describe("selection", () => {
   });
 
   it("never changes the selection while disabled", async () => {
-    const onChange = await render({ loadItems: source(), disabled: true, searchPlaceholder: "Search Drive" });
+    const onChange = await render({
+      loadItems: source(),
+      disabled: true,
+      searchPlaceholder: "Search Drive",
+    });
 
     await expect.element(option("Budget.xlsx")).toBeVisible();
     await forceClick(option("Budget.xlsx"));
@@ -243,7 +305,9 @@ describe("selection", () => {
     await forceClick(crumb("My Drive"));
     await forceClick(allOf());
     await act(() => {
-      option("Reports").element().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      option("Reports")
+        .element()
+        .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     });
     await expect.element(crumb("My Drive")).toBeDisabled();
     await expect.element(allOf()).toBeDisabled();
@@ -256,8 +320,11 @@ describe("selection", () => {
 describe("pre-fill", () => {
   it("opens a pre-filled leaf's parent and shows it selected, without changing the selection", async () => {
     const loadItems = source();
-    const loadItem = vi.fn(async (id: string): Promise<Item | null> =>
-      ({ ...q1, id, path: [{ id: "reports", title: "Reports" }] }));
+    const loadItem = vi.fn(async (id: string): Promise<Item | null> => ({
+      ...q1,
+      id,
+      path: [{ id: "reports", title: "Reports" }],
+    }));
     const onChange = await render({ loadItems, loadItem, initial: "q1" });
 
     await expect.element(option("Q1.pdf")).toHaveAttribute("aria-selected", "true");
@@ -268,20 +335,37 @@ describe("pre-fill", () => {
   });
 
   it.each([
-    ["the lookup fails", { loadItem: async (): Promise<Item | null> => { throw new Error("Drive is down."); } }],
+    [
+      "the lookup fails",
+      {
+        loadItem: async (): Promise<Item | null> => {
+          throw new Error("Drive is down.");
+        },
+      },
+    ],
     ["the lookup finds nothing", { loadItem: async (): Promise<Item | null> => null }],
     ["it cannot be connected", { loadItem: async (): Promise<Item | null> => locked }],
-    ["the lookup finds another node", {
-      loadItem: async (): Promise<Item | null> => ({ ...q1, id: "q1-copy", path: [{ id: "reports", title: "Reports" }] }),
-    }],
+    [
+      "the lookup finds another node",
+      {
+        loadItem: async (): Promise<Item | null> => ({
+          ...q1,
+          id: "q1-copy",
+          path: [{ id: "reports", title: "Reports" }],
+        }),
+      },
+    ],
     ["there is no lookup", {}],
-  ])("lets go of a pre-filled value it cannot show because %s, and stays at the root", async (_, props) => {
-    const onChange = await render({ loadItems: source(), initial: "q1", ...props });
+  ])(
+    "lets go of a pre-filled value it cannot show because %s, and stays at the root",
+    async (_, props) => {
+      const onChange = await render({ loadItems: source(), initial: "q1", ...props });
 
-    await expect.poll(() => onChange.mock.calls).toEqual([[null, null]]);
-    await expect.element(list()).toHaveAccessibleName("My Drive");
-    await expect.element(option("Reports")).toBeVisible();
-  });
+      await expect.poll(() => onChange.mock.calls).toEqual([[null, null]]);
+      await expect.element(list()).toHaveAccessibleName("My Drive");
+      await expect.element(option("Reports")).toBeVisible();
+    },
+  );
 
   it("shows a pre-filled root on its own choice", async () => {
     await render({ loadItems: source(), initial: "drive" });
@@ -293,7 +377,10 @@ describe("pre-fill", () => {
   it("lets go of a pre-filled root that cannot be connected, without looking it up", async () => {
     const loadItem = vi.fn(async (): Promise<Item | null> => null);
     const onChange = await render({
-      loadItems: source(), loadItem, initial: "drive", root: { id: "drive", title: "My Drive" },
+      loadItems: source(),
+      loadItem,
+      initial: "drive",
+      root: { id: "drive", title: "My Drive" },
     });
 
     await expect.poll(() => onChange.mock.calls).toEqual([[null, null]]);
@@ -313,25 +400,35 @@ describe("pre-fill", () => {
   it.each([
     ["on a later page of its folder", { path: [{ id: "reports", title: "Reports" }] }, "Reports"],
     ["looked up without a path", {}, "My Drive"],
-  ])("keeps a pre-filled leaf its listing does not show in view, %s", async (_, where, location) => {
-    const loadItems = vi.fn<LoadItems>(async ({ cursor }) =>
-      cursor ? { items: [q1] } : { items: [archive], nextCursor: "page-2" });
-    const onChange = await render({ loadItems, loadItem: async () => ({ ...q1, ...where }), initial: "q1" });
+  ])(
+    "keeps a pre-filled leaf its listing does not show in view, %s",
+    async (_, where, location) => {
+      const loadItems = vi.fn<LoadItems>(async ({ cursor }) =>
+        cursor ? { items: [q1] } : { items: [archive], nextCursor: "page-2" },
+      );
+      const onChange = await render({
+        loadItems,
+        loadItem: async () => ({ ...q1, ...where }),
+        initial: "q1",
+      });
 
-    await expect.element(option("Q1.pdf")).toHaveAttribute("aria-selected", "true");
-    await expect.element(list()).toHaveAccessibleName(location);
-    // Once the listing reaches it, it is listed once, where the listing puts it.
-    await userEvent.click(page.getByRole("button", { name: "Load more" }));
-    await expect.element(page.getByRole("button", { name: "Load more" })).not.toBeInTheDocument();
-    expect(option("Q1.pdf").elements()).toHaveLength(1);
-    await expect.element(option("Q1.pdf")).toHaveAttribute("aria-selected", "true");
-    expect(onChange).not.toHaveBeenCalled();
-  });
+      await expect.element(option("Q1.pdf")).toHaveAttribute("aria-selected", "true");
+      await expect.element(list()).toHaveAccessibleName(location);
+      // Once the listing reaches it, it is listed once, where the listing puts it.
+      await userEvent.click(page.getByRole("button", { name: "Load more" }));
+      await expect.element(page.getByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+      expect(option("Q1.pdf").elements()).toHaveLength(1);
+      await expect.element(option("Q1.pdf")).toHaveAttribute("aria-selected", "true");
+      expect(onChange).not.toHaveBeenCalled();
+    },
+  );
 
   it("keeps a pinned pre-filled leaf listed after the user chooses another row", async () => {
     const loadItems = vi.fn<LoadItems>(async () => ({ items: [budget], nextCursor: "page-2" }));
     const onChange = await render({
-      loadItems, loadItem: async () => ({ ...q1, path: [{ id: "reports", title: "Reports" }] }), initial: "q1",
+      loadItems,
+      loadItem: async () => ({ ...q1, path: [{ id: "reports", title: "Reports" }] }),
+      initial: "q1",
     });
 
     await userEvent.click(option("Budget.xlsx"));
@@ -341,7 +438,11 @@ describe("pre-fill", () => {
 
   it("abandons a pre-fill still being looked up when the user chooses the whole hierarchy", async () => {
     const lookup = Promise.withResolvers<Item | null>();
-    const onChange = await render({ loadItems: source(), loadItem: () => lookup.promise, initial: "q1" });
+    const onChange = await render({
+      loadItems: source(),
+      loadItem: () => lookup.promise,
+      initial: "q1",
+    });
 
     await userEvent.click(allOf());
     expect(onChange).toHaveBeenLastCalledWith("drive", expect.objectContaining({ id: "drive" }));
@@ -356,7 +457,10 @@ describe("pre-fill", () => {
     const lookup = Promise.withResolvers<Item | null>();
     const loadItems = source({ budget: [budget] });
     const onChange = await render({
-      loadItems, loadItem: () => lookup.promise, initial: "q1", searchPlaceholder: "Search Drive",
+      loadItems,
+      loadItem: () => lookup.promise,
+      initial: "q1",
+      searchPlaceholder: "Search Drive",
     });
 
     await userEvent.fill(page.getByRole("searchbox", { name: "Search Drive" }), "budget");
@@ -373,8 +477,11 @@ describe("pre-fill", () => {
 
 describe("a value the module sets", () => {
   it("is pre-filled afresh, wherever the user had browsed", async () => {
-    const loadItem = vi.fn(async (id: string): Promise<Item | null> =>
-      ({ ...q1, id, path: [{ id: "reports", title: "Reports" }] }));
+    const loadItem = vi.fn(async (id: string): Promise<Item | null> => ({
+      ...q1,
+      id,
+      path: [{ id: "reports", title: "Reports" }],
+    }));
     const onChange = await render({ loadItems: source(), loadItem });
 
     await userEvent.click(option("Shared with me"));
@@ -391,8 +498,15 @@ describe("a value the module sets", () => {
     await userEvent.click(option("Shared with me"));
     await expect.element(list()).toHaveAccessibleName("Shared with me");
 
-    await act(() => root!.render(
-      <Harness onChange={onChange} loadItems={loadItems} root={{ id: "team", title: "Team Drive" }} />));
+    await act(() =>
+      root!.render(
+        <Harness
+          onChange={onChange}
+          loadItems={loadItems}
+          root={{ id: "team", title: "Team Drive" }}
+        />,
+      ),
+    );
     await expect.element(list()).toHaveAccessibleName("Team Drive");
     expect(loadItems).toHaveBeenLastCalledWith({ parentId: "team", query: "", cursor: null });
   });
@@ -400,19 +514,25 @@ describe("a value the module sets", () => {
   it.each([
     ["declining every choice", null, () => false, 0],
     ["declining to let go", "budget", (next: string | null) => next !== null, 1],
-  ])("stays where the user took it when the module declines a change, %s", async (_, initial, accepts, lookups) => {
-    const loadItem = vi.fn(async (): Promise<Item | null> => ({ ...budget, path: [] }));
-    await render({ loadItems: source(), loadItem, initial, accepts });
+  ])(
+    "stays where the user took it when the module declines a change, %s",
+    async (_, initial, accepts, lookups) => {
+      const loadItem = vi.fn(async (): Promise<Item | null> => ({ ...budget, path: [] }));
+      await render({ loadItems: source(), loadItem, initial, accepts });
 
-    await userEvent.click(option("Reports"));
-    await userEvent.click(option("Q1.pdf"));
-    await expect.element(list()).toHaveAccessibleName("Reports");
-    expect(loadItem).toHaveBeenCalledTimes(lookups);
-  });
+      await userEvent.click(option("Reports"));
+      await userEvent.click(option("Q1.pdf"));
+      await expect.element(list()).toHaveAccessibleName("Reports");
+      expect(loadItem).toHaveBeenCalledTimes(lookups);
+    },
+  );
 
   it("shows a choice the module takes only after the user browsed on", async () => {
-    const loadItem = vi.fn(async (id: string): Promise<Item | null> =>
-      ({ ...q1, id, path: [{ id: "reports", title: "Reports" }] }));
+    const loadItem = vi.fn(async (id: string): Promise<Item | null> => ({
+      ...q1,
+      id,
+      path: [{ id: "reports", title: "Reports" }],
+    }));
     await render({ loadItems: source(), loadItem, accepts: () => false });
 
     await userEvent.click(option("Reports"));
@@ -426,9 +546,15 @@ describe("a value the module sets", () => {
 
   // A module may take a pick only after awaiting something, such as `ensureResources`.
   it("leaves the user's search alone when the module takes a pick a moment later", async () => {
-    const loadItem = vi.fn(async (): Promise<Item | null> => ({ ...q1, path: [{ id: "reports", title: "Reports" }] }));
+    const loadItem = vi.fn(async (): Promise<Item | null> => ({
+      ...q1,
+      path: [{ id: "reports", title: "Reports" }],
+    }));
     const onChange = await render({
-      loadItems: source({ q1: [q1] }), loadItem, searchPlaceholder: "Search Drive", accepts: () => false,
+      loadItems: source({ q1: [q1] }),
+      loadItem,
+      searchPlaceholder: "Search Drive",
+      accepts: () => false,
     });
     const search = page.getByRole("searchbox", { name: "Search Drive" });
 
@@ -477,9 +603,15 @@ describe("a value the module sets", () => {
   });
 
   it("goes back to a pick the module takes while the next search is being typed", async () => {
-    const loadItem = vi.fn(async (): Promise<Item | null> => ({ ...q1, path: [{ id: "reports", title: "Reports" }] }));
+    const loadItem = vi.fn(async (): Promise<Item | null> => ({
+      ...q1,
+      path: [{ id: "reports", title: "Reports" }],
+    }));
     await render({
-      loadItems: source({ q1: [q1] }), loadItem, searchPlaceholder: "Search Drive", accepts: () => false,
+      loadItems: source({ q1: [q1] }),
+      loadItem,
+      searchPlaceholder: "Search Drive",
+      accepts: () => false,
     });
     const search = page.getByRole("searchbox", { name: "Search Drive" });
     await userEvent.fill(search, "q1");
@@ -517,7 +649,9 @@ describe("loading", () => {
     await userEvent.click(crumb("My Drive"));
     await expect.poll(() => pending.drive).toBeDefined();
     await act(() => pending.drive!.resolve({ items: TREE.drive! }));
-    await act(() => lateReports.resolve({ items: [{ id: "stale", title: "Stale.pdf", kind: "leaf" }] }));
+    await act(() =>
+      lateReports.resolve({ items: [{ id: "stale", title: "Stale.pdf", kind: "leaf" }] }),
+    );
 
     await expect.element(option("Budget.xlsx")).toBeVisible();
     await expect.element(list()).toHaveAccessibleName("My Drive");
@@ -538,23 +672,34 @@ describe("loading", () => {
     const alpha: Item = { id: "alpha", title: "Alpha", kind: "leaf" };
     const mu: Item = { id: "mu", title: "Mu", kind: "leaf" };
     const loadItems = vi.fn<LoadItems>(async ({ cursor }) =>
-      cursor === "page-2" ? { items: [mu] } : { items: [zeta, alpha], nextCursor: "page-2" });
+      cursor === "page-2" ? { items: [mu] } : { items: [zeta, alpha], nextCursor: "page-2" },
+    );
     await render({ loadItems });
 
     await userEvent.click(page.getByRole("button", { name: "Load more" }));
     await expect.element(option("Mu")).toBeVisible();
     expect(loadItems).toHaveBeenLastCalledWith({ parentId: "drive", query: "", cursor: "page-2" });
-    expect(page.getByRole("option").elements().map(row => row.textContent)).toEqual(["Zeta", "Alpha", "Mu"]);
+    expect(
+      page
+        .getByRole("option")
+        .elements()
+        .map((row) => row.textContent),
+    ).toEqual(["Zeta", "Alpha", "Mu"]);
     expect(page.getByRole("button", { name: "Load more" }).elements()).toHaveLength(0);
   });
 
   it("refuses a page of more than 200 items rather than showing part of it, and retries", async () => {
-    const many = Array.from({ length: 201 }, (_, index): Item =>
-      ({ id: `file-${index}`, title: `File ${index}`, kind: "leaf" }));
+    const many = Array.from({ length: 201 }, (_, index): Item => ({
+      id: `file-${index}`,
+      title: `File ${index}`,
+      kind: "leaf",
+    }));
     const loadItems = vi.fn<LoadItems>(async () => ({ items: many }));
     await render({ loadItems });
 
-    await expect.element(page.getByText("The list returned more than 200 items in one page.")).toBeVisible();
+    await expect
+      .element(page.getByText("The list returned more than 200 items in one page."))
+      .toBeVisible();
     expect(page.getByRole("option").elements()).toHaveLength(0);
 
     loadItems.mockResolvedValueOnce({ items: [budget] });
@@ -564,7 +709,8 @@ describe("loading", () => {
 
   it("says why a location is unavailable, with Retry, without reporting it as a failure", async () => {
     vi.mocked(reportFrontendIssue).mockClear();
-    const loadItems = vi.fn<LoadItems>(async () => ({ items: [budget] }))
+    const loadItems = vi
+      .fn<LoadItems>(async () => ({ items: [budget] }))
       .mockRejectedValueOnce(new Error("Drive is down."))
       .mockResolvedValueOnce({ items: [], unavailable: "Allow access below, then select Retry." });
     await render({ loadItems });
@@ -574,18 +720,22 @@ describe("loading", () => {
     await userEvent.click(retry);
     await expect.element(page.getByText("Allow access below, then select Retry.")).toBeVisible();
     expect(reportFrontendIssue).toHaveBeenCalledExactlyOnceWith(
-      "configurator.hierarchy-load", new Error("Drive is down."));
+      "configurator.hierarchy-load",
+      new Error("Drive is down."),
+    );
 
     await userEvent.click(retry);
     await expect.element(option("Budget.xlsx")).toBeVisible();
   });
 
   it("moves focus from Retry or Load more to the first row it brings", async () => {
-    const loadItems = vi.fn<LoadItems>(async ({ cursor }) => {
-      if (cursor === "page-2") return { items: [q1], nextCursor: "page-3" };
-      if (cursor === "page-3") return { items: [{ id: "old", title: "Old.pdf", kind: "leaf" }] };
-      return { items: [budget], nextCursor: "page-2" };
-    }).mockRejectedValueOnce(new Error("Drive is down."));
+    const loadItems = vi
+      .fn<LoadItems>(async ({ cursor }) => {
+        if (cursor === "page-2") return { items: [q1], nextCursor: "page-3" };
+        if (cursor === "page-3") return { items: [{ id: "old", title: "Old.pdf", kind: "leaf" }] };
+        return { items: [budget], nextCursor: "page-2" };
+      })
+      .mockRejectedValueOnce(new Error("Drive is down."));
     await render({ loadItems });
     const loadMore = page.getByRole("button", { name: "Load more" });
 
@@ -607,10 +757,14 @@ describe("loading", () => {
   it.each([
     ["brings nothing", []],
     ["brings only rows already listed", [budget]],
-    ["names only the location it lists", [{ id: ROOT.id, title: ROOT.title, kind: "container" } satisfies Item]],
+    [
+      "names only the location it lists",
+      [{ id: ROOT.id, title: ROOT.title, kind: "container" } satisfies Item],
+    ],
   ])("moves focus from Load more to the row it followed when the last page %s", async (_, last) => {
     const loadItems = vi.fn<LoadItems>(async ({ cursor }) =>
-      cursor ? { items: last, nextCursor: null } : { items: [budget, q1], nextCursor: "page-2" });
+      cursor ? { items: last, nextCursor: null } : { items: [budget, q1], nextCursor: "page-2" },
+    );
     await render({ loadItems });
     const loadMore = page.getByRole("button", { name: "Load more" });
 
@@ -630,7 +784,9 @@ describe("loading", () => {
     }));
     await render({ loadItems });
 
-    await expect.element(page.getByRole("option", { name: "Invoicetxt.exe", exact: true })).toBeVisible();
+    await expect
+      .element(page.getByRole("option", { name: "Invoicetxt.exe", exact: true }))
+      .toBeVisible();
     expect(page.getByRole("option").elements()).toHaveLength(1);
     expect(list().element().textContent).not.toContain("\u202E");
   });
@@ -639,8 +795,13 @@ describe("loading", () => {
 describe("search", () => {
   it("opens a container found by search where its path says it lives", async () => {
     const deep: Item = {
-      id: "2024", title: "2024", kind: "container",
-      path: [{ id: "reports", title: "Reports" }, { id: "archive", title: "Archive" }],
+      id: "2024",
+      title: "2024",
+      kind: "container",
+      path: [
+        { id: "reports", title: "Reports" },
+        { id: "archive", title: "Archive" },
+      ],
     };
     const loadItems = source({ "20": [deep] });
     const onChange = await render({ loadItems, searchPlaceholder: "Search Drive" });
@@ -656,7 +817,8 @@ describe("search", () => {
     await expect.element(crumb("2024")).toHaveAttribute("aria-current", "location");
     await expect.element(option("Everything in 2024")).toBeVisible();
     // The breadcrumb renders before the effect that lists the new location runs.
-    await expect.poll(() => loadItems.mock.lastCall?.[0])
+    await expect
+      .poll(() => loadItems.mock.lastCall?.[0])
       .toEqual({ parentId: "2024", query: "", cursor: null });
     // Neither the search nor opening its hit chose anything.
     expect(onChange).not.toHaveBeenCalled();
@@ -667,7 +829,12 @@ describe("search", () => {
   });
 
   it("does not pretend a container found without a path is a child of the root", async () => {
-    const loose: Item = { id: "loose", title: "Loose", kind: "container", subtitle: "Owned by Kim" };
+    const loose: Item = {
+      id: "loose",
+      title: "Loose",
+      kind: "container",
+      subtitle: "Owned by Kim",
+    };
     await render({ loadItems: source({ loose: [loose] }), searchPlaceholder: "Search Drive" });
     const search = page.getByRole("searchbox", { name: "Search Drive" });
 
@@ -681,19 +848,34 @@ describe("search", () => {
   it("tells same-named results apart by where they live and what they say of themselves", async () => {
     const copies: Item[] = [
       { ...q1, subtitle: "Owned by Kim", path: [{ id: "reports", title: "Reports" }] },
-      { ...q1, id: "q1-old", subtitle: "Owned by Kim", path: [{ id: "reports", title: "Reports" }, { id: "archive", title: "Archive" }] },
+      {
+        ...q1,
+        id: "q1-old",
+        subtitle: "Owned by Kim",
+        path: [
+          { id: "reports", title: "Reports" },
+          { id: "archive", title: "Archive" },
+        ],
+      },
     ];
     await render({ loadItems: source({ q1: copies }), searchPlaceholder: "Search Drive" });
 
     await userEvent.fill(page.getByRole("searchbox", { name: "Search Drive" }), "q1");
     await expect.element(option("Reports · Owned by Kim")).toBeVisible();
-    expect(page.getByRole("option").elements().map(row => row.textContent))
-      .toEqual(["Q1.pdfReports · Owned by Kim", "Q1.pdfReports / Archive · Owned by Kim"]);
+    expect(
+      page
+        .getByRole("option")
+        .elements()
+        .map((row) => row.textContent),
+    ).toEqual(["Q1.pdfReports · Owned by Kim", "Q1.pdfReports / Archive · Owned by Kim"]);
   });
 
   it("chooses a leaf found by search, and lets go of it when the search changes", async () => {
     const hit: Item = { ...q1, path: [{ id: "reports", title: "Reports" }] };
-    const onChange = await render({ loadItems: source({ q1: [hit] }), searchPlaceholder: "Search Drive" });
+    const onChange = await render({
+      loadItems: source({ q1: [hit] }),
+      searchPlaceholder: "Search Drive",
+    });
     const search = page.getByRole("searchbox", { name: "Search Drive" });
 
     await userEvent.fill(search, "q1");
@@ -707,7 +889,10 @@ describe("search", () => {
   });
 
   it("chooses nothing from results the search being typed is about to replace", async () => {
-    const onChange = await render({ loadItems: source({ q1: [q1] }), searchPlaceholder: "Search Drive" });
+    const onChange = await render({
+      loadItems: source({ q1: [q1] }),
+      searchPlaceholder: "Search Drive",
+    });
     const search = page.getByRole("searchbox", { name: "Search Drive" });
     await userEvent.fill(search, "q1");
     await expect.element(option("Q1.pdf")).toBeVisible();
@@ -796,8 +981,12 @@ describe("keyboard", () => {
     expect(onChange).toHaveBeenLastCalledWith("q1", expect.objectContaining({ id: "q1" }));
     await userEvent.keyboard("{Home}");
     await userEvent.keyboard("{Enter}");
-    expect(onChange).toHaveBeenLastCalledWith("reports",
-      { id: "reports", title: "Reports", kind: "container", selectable: true });
+    expect(onChange).toHaveBeenLastCalledWith("reports", {
+      id: "reports",
+      title: "Reports",
+      kind: "container",
+      selectable: true,
+    });
 
     await userEvent.keyboard("{ArrowLeft}");
     expect(onChange).toHaveBeenLastCalledWith(null, null);
@@ -818,16 +1007,19 @@ describe("keyboard", () => {
   });
 
   it.each(["the search box", "a field outside the picker"])(
-    "leaves focus on %s when the user moves it there while an opened container loads", async target => {
+    "leaves focus on %s when the user moves it there while an opened container loads",
+    async (target) => {
       const listing = Promise.withResolvers<ConfiguratorUIHierarchyPage>();
       const loadItems = vi.fn<LoadItems>(async ({ parentId }) =>
-        parentId === "reports" ? listing.promise : { items: TREE[parentId] ?? [] });
+        parentId === "reports" ? listing.promise : { items: TREE[parentId] ?? [] },
+      );
       await render({ loadItems, searchPlaceholder: "Search Drive" });
       const field = document.body.appendChild(document.createElement("input"));
       onTestFinished(() => field.remove());
-      const elsewhere = target === "the search box"
-        ? page.getByRole("searchbox", { name: "Search Drive" }).element()
-        : field;
+      const elsewhere =
+        target === "the search box"
+          ? page.getByRole("searchbox", { name: "Search Drive" }).element()
+          : field;
 
       await userEvent.click(option("Reports"));
       await expect.element(list()).toHaveFocus();
@@ -836,12 +1028,14 @@ describe("keyboard", () => {
       await expect.element(option("Q1.pdf")).toBeVisible();
       await effectsFlushed();
       expect(document.activeElement).toBe(elsewhere);
-    });
+    },
+  );
 
   it("leaves focus in another frame the user moves it to while an opened container loads", async () => {
     const listing = Promise.withResolvers<ConfiguratorUIHierarchyPage>();
     const loadItems = vi.fn<LoadItems>(async ({ parentId }) =>
-      parentId === "reports" ? listing.promise : { items: TREE[parentId] ?? [] });
+      parentId === "reports" ? listing.promise : { items: TREE[parentId] ?? [] },
+    );
     await render({ loadItems });
     // Vitest's page around this test's frame stands in for the Workshop around a configurator's.
     const host = window.parent.document;
@@ -878,7 +1072,8 @@ describe("icons", () => {
     }));
     await render({ loadItems, icons });
 
-    const slot = (name: string) => option(name).element().querySelector<HTMLElement>("[aria-hidden='true']")!;
+    const slot = (name: string) =>
+      option(name).element().querySelector<HTMLElement>("[aria-hidden='true']")!;
     await expect.element(option("Budget")).toBeVisible();
     expect(slot("Budget").querySelector("[data-testid='sheet-icon']")).not.toBeNull();
     expect(slot("Budget").getAttribute("aria-hidden")).toBe("true");

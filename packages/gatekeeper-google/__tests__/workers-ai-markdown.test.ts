@@ -1,10 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  type AiFetcher, convertToMarkdown, type MarkdownConversion, MarkdownConversionError,
+  type AiFetcher,
+  convertToMarkdown,
+  type MarkdownConversion,
+  MarkdownConversionError,
 } from "../src/workers-ai-markdown";
 import {
-  BYTES, byteStream, conversionJson, decodeBase64, fakeAi, formatLastJson, markdownJson,
-  splitResponse, streamedResponse,
+  BYTES,
+  byteStream,
+  conversionJson,
+  decodeBase64,
+  fakeAi,
+  formatLastJson,
+  markdownJson,
+  splitResponse,
+  streamedResponse,
 } from "./workers-ai-fixture";
 
 const TO_MARKDOWN_URL = "https://workers-binding.ai/to-everything/markdown/transformer";
@@ -26,8 +36,11 @@ async function drain(conversion: MarkdownConversion): Promise<string> {
 
 /** The text a conversion answering `response` gives. */
 async function textOf(response: Response): Promise<string> {
-  let conversion =
-    await convertToMarkdown(fakeAi(response).ai, source(byteStream(BYTES).stream), OPTIONS);
+  let conversion = await convertToMarkdown(
+    fakeAi(response).ai,
+    source(byteStream(BYTES).stream),
+    OPTIONS,
+  );
   return drain(conversion);
 }
 
@@ -52,15 +65,19 @@ describe("convertToMarkdown's request", () => {
     expect(init.method).toBe("POST");
     expect(new Headers(init.headers).get("Content-Type")).toBe("application/json");
     expect(init.body).toBeInstanceOf(ReadableStream);
-    expect(json.files.map(({ name, mimeType }) => ({ name, mimeType })))
-      .toEqual([{ name: "doc.pdf", mimeType: "application/pdf" }]);
+    expect(json.files.map(({ name, mimeType }) => ({ name, mimeType }))).toEqual([
+      { name: "doc.pdf", mimeType: "application/pdf" },
+    ]);
     expect(decodeBase64(json.files[0]!.data)).toEqual(BYTES);
     expect(json.options).toEqual(OPTIONS);
   });
 
   it("encodes a source that arrives one byte at a time, and an empty and a one-byte one", async () => {
-    let cases: [Uint8Array, number[] | undefined][] =
-      [[BYTES, [1]], [new Uint8Array(), undefined], [Uint8Array.of(0xff), undefined]];
+    let cases: [Uint8Array, number[] | undefined][] = [
+      [BYTES, [1]],
+      [new Uint8Array(), undefined],
+      [Uint8Array.of(0xff), undefined],
+    ];
     for (let [bytes, sizes] of cases) {
       let { ai, sent } = fakeAi(streamedResponse(markdownJson("text")));
       await convertToMarkdown(ai, source(byteStream(bytes, sizes).stream), OPTIONS);
@@ -120,16 +137,29 @@ describe("convertToMarkdown's response", () => {
 
   it("reads the response only as the text is asked for, and cancels it with the conversion", async () => {
     let state = { pulls: 0, cancelled: false };
-    let body = new ReadableStream<Uint8Array>({
-      pull(controller) {
-        state.pulls++;
-        controller.enqueue(new TextEncoder().encode(
-          state.pulls === 1 ? '{"result":[{"format":"markdown","data":"' : `line ${state.pulls}\\n`));
+    let body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          state.pulls++;
+          controller.enqueue(
+            new TextEncoder().encode(
+              state.pulls === 1
+                ? '{"result":[{"format":"markdown","data":"'
+                : `line ${state.pulls}\\n`,
+            ),
+          );
+        },
+        cancel() {
+          state.cancelled = true;
+        },
       },
-      cancel() { state.cancelled = true; },
-    }, { highWaterMark: 0 });
+      { highWaterMark: 0 },
+    );
     let conversion = await convertToMarkdown(
-      fakeAi(new Response(body)).ai, source(byteStream(BYTES).stream), OPTIONS);
+      fakeAi(new Response(body)).ai,
+      source(byteStream(BYTES).stream),
+      OPTIONS,
+    );
     expect(state.pulls).toBeLessThanOrEqual(1);
 
     expect(await conversion.next()).toBe("line 2\n");
@@ -141,8 +171,13 @@ describe("convertToMarkdown's response", () => {
 
 describe("convertToMarkdown's failures", () => {
   it("fails with the service's status and code, never its text, on an HTTP error", async () => {
-    let { ai } = fakeAi(streamedResponse(
-      '{"errors":[{"message":"Error converting to markdown","code":6006}],"success":false}', 7, 400));
+    let { ai } = fakeAi(
+      streamedResponse(
+        '{"errors":[{"message":"Error converting to markdown","code":6006}],"success":false}',
+        7,
+        400,
+      ),
+    );
 
     let error = await failureOf(convertToMarkdown(ai, source(byteStream(BYTES).stream), OPTIONS));
 
@@ -154,13 +189,16 @@ describe("convertToMarkdown's failures", () => {
   it("fails with the binding's error when it throws", async () => {
     let thrown = new Error("binding failed");
     let error = await failureOf(
-      convertToMarkdown(fakeAi(thrown).ai, source(byteStream(BYTES).stream), OPTIONS));
+      convertToMarkdown(fakeAi(thrown).ai, source(byteStream(BYTES).stream), OPTIONS),
+    );
     expect(error.failure).toEqual({ error: thrown });
   });
 
   it.each([
-    ["names a format that is not text",
-      conversionJson({ format: "error", error: "Invalid PDF: Invalid PDF structure." })],
+    [
+      "names a format that is not text",
+      conversionJson({ format: "error", error: "Invalid PDF: Invalid PDF structure." }),
+    ],
     ["names an unknown format", markdownJson("text", "html")],
     ["ends before its JSON closes", '{"result":[{"format":"markdown","data":"partial'],
     ["ends without a format", '{"result":[{"data":"text"}],"success":true}'],

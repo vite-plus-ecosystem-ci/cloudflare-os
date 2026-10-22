@@ -6,14 +6,16 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { OFFICE_KINDS, type OfficeKind } from "../src/office-conversion";
 import { OFFICE_IMPORT_GRANT, RESOURCE_BY_KIND } from "../src/resources";
 import { nodes, text } from "./configurator-tree";
 
 vi.mock("@gadgets/configurator-ui", () => ({
   h: (component: unknown, props: unknown, ...children: unknown[]) => ({
-    component, props: props ?? {}, children,
+    component,
+    props: props ?? {},
+    children,
   }),
   Autocomplete: "Autocomplete",
   Button: "Button",
@@ -36,17 +38,27 @@ type KindCase = {
 
 const KIND_CASES: KindCase[] = [
   {
-    kind: "doc", file: "google-doc-configurator-ui.tsx", idField: "docId", urlPath: "document",
-    label: "docx", load: () => import("../src/configurator/google-doc-configurator-ui"),
+    kind: "doc",
+    file: "google-doc-configurator-ui.tsx",
+    idField: "docId",
+    urlPath: "document",
+    label: "docx",
+    load: () => import("../src/configurator/google-doc-configurator-ui"),
   },
   {
-    kind: "sheets", file: "google-sheets-configurator-ui.tsx", idField: "spreadsheetId",
-    urlPath: "spreadsheets", label: "xlsx",
+    kind: "sheets",
+    file: "google-sheets-configurator-ui.tsx",
+    idField: "spreadsheetId",
+    urlPath: "spreadsheets",
+    label: "xlsx",
     load: () => import("../src/configurator/google-sheets-configurator-ui"),
   },
   {
-    kind: "slides", file: "google-slides-configurator-ui.tsx", idField: "presentationId",
-    urlPath: "presentation", label: "pptx",
+    kind: "slides",
+    file: "google-slides-configurator-ui.tsx",
+    idField: "presentationId",
+    urlPath: "presentation",
+    label: "pptx",
     load: () => import("../src/configurator/google-slides-configurator-ui"),
   },
 ];
@@ -64,8 +76,9 @@ async function split(file: string): Promise<{ head: string; flow: string }> {
 }
 
 function headConstants(head: string): Record<string, string> {
-  return Object.fromEntries([...head.matchAll(/^const (\w+) = "([^"]*)";$/gm)]
-    .map(([, name, value]) => [name, value]));
+  return Object.fromEntries(
+    [...head.matchAll(/^const (\w+) = "([^"]*)";$/gm)].map(([, name, value]) => [name, value]),
+  );
 }
 
 describe("the shared Office conversion flow", () => {
@@ -80,31 +93,35 @@ describe("the shared Office conversion flow", () => {
     expect(flow).toContain(`const OFFICE_IMPORT_GRANT = ${JSON.stringify(OFFICE_IMPORT_GRANT)};`);
   });
 
-  it.each(KIND_CASES)("is specialised for $kind only by constants that match the gatekeeper", async (
-    { kind, file, idField, urlPath },
-  ) => {
-    const { head } = await split(file);
-    const constants = headConstants(head);
-    expect(constants.ID_FIELD).toBe(idField);
-    expect(RESOURCE_BY_KIND[kind].urlPattern)
-      .toBe(`https://docs.google.com/${urlPath}/d/:${idField}/*`);
-    expect(constants.URL_PATH).toBe(urlPath);
-    expect(constants.KIND_TITLE).toBe(OFFICE_KINDS[kind].resourceTitle);
-    // Nothing else in the head may vary the flow: just these constants and the listing call.
-    const code = head
-      .replace(/^import[\s\S]*?;$/gm, "")
-      .replace(/^const \w+ = "[^"]*";$/gm, "")
-      .replace(/^const loadFiles = \(ui: Rpc, query: string\) => ui\.\w+\(query\);$/m, "")
-      .trim();
-    expect(code).toBe("");
-  });
+  it.each(KIND_CASES)(
+    "is specialised for $kind only by constants that match the gatekeeper",
+    async ({ kind, file, idField, urlPath }) => {
+      const { head } = await split(file);
+      const constants = headConstants(head);
+      expect(constants.ID_FIELD).toBe(idField);
+      expect(RESOURCE_BY_KIND[kind].urlPattern).toBe(
+        `https://docs.google.com/${urlPath}/d/:${idField}/*`,
+      );
+      expect(constants.URL_PATH).toBe(urlPath);
+      expect(constants.KIND_TITLE).toBe(OFFICE_KINDS[kind].resourceTitle);
+      // Nothing else in the head may vary the flow: just these constants and the listing call.
+      const code = head
+        .replace(/^import[\s\S]*?;$/gm, "")
+        .replace(/^const \w+ = "[^"]*";$/gm, "")
+        .replace(/^const loadFiles = \(ui: Rpc, query: string\) => ui\.\w+\(query\);$/m, "")
+        .trim();
+      expect(code).toBe("");
+    },
+  );
 });
 
 type Spec = {
   initial: Record<string, string | null | undefined>;
   isReady(context: { values: Record<string, unknown> }): boolean;
   initialValuesFromResourceUrl(context: {
-    resourceUrl: string; resourceUrlPattern: string; ui: unknown;
+    resourceUrl: string;
+    resourceUrlPattern: string;
+    ui: unknown;
   }): Promise<Record<string, unknown>>;
   render(context: unknown): unknown;
 };
@@ -123,34 +140,48 @@ async function open({ load }: KindCase) {
   const ui = {
     inspectFile: vi.fn(async (_fileId: string): Promise<unknown> => ({ type: "native" })),
     hasConversionAccess: vi.fn(async () => false),
-    convertFile: vi.fn(async (_fileId: string, _opts?: { reuse?: string }): Promise<unknown> =>
-      ({ type: "needsAccess" })),
+    convertFile: vi.fn(async (_fileId: string, _opts?: { reuse?: string }): Promise<unknown> => ({
+      type: "needsAccess",
+    })),
   };
   const ensureResources = vi.fn(async (_patterns: string[]) => true);
   const context = () => ({
     values,
-    setValues: (patch: Record<string, unknown>) => { values = { ...values, ...patch }; },
+    setValues: (patch: Record<string, unknown>) => {
+      values = { ...values, ...patch };
+    },
     clearFields: (...names: string[]) => cleared.push(...names),
     ensureResources,
     ui,
   });
   const tree = () => spec.render(context());
-  const find = (component: string) => nodes(tree()).filter(node => node.component === component);
+  const find = (component: string) => nodes(tree()).filter((node) => node.component === component);
   return {
-    spec, ui, ensureResources, cleared, tree, find,
+    spec,
+    ui,
+    ensureResources,
+    cleared,
+    tree,
+    find,
     values: () => values,
     ready: () => spec.isReady({ values }),
     autocomplete: () => find("Autocomplete")[0].props,
-    notices: () => find("Notice").map(node => ({ tone: node.props.tone, text: text(node) })),
-    button: (label: string | RegExp) => find("Button").find(node =>
-      typeof label === "string" ? text(node) === label : label.test(text(node)))?.props,
+    notices: () => find("Notice").map((node) => ({ tone: node.props.tone, text: text(node) })),
+    button: (label: string | RegExp) =>
+      find("Button").find((node) =>
+        typeof label === "string" ? text(node) === label : label.test(text(node)),
+      )?.props,
   };
 }
 
 const settle = () => vi.advanceTimersByTimeAsync(0);
 
 const officeFile = (label: string, overrides: Record<string, unknown> = {}) => ({
-  type: "office", title: `Report.${label}`, label, canCopy: true, ...overrides,
+  type: "office",
+  title: `Report.${label}`,
+  label,
+  canCopy: true,
+  ...overrides,
 });
 
 beforeEach(() => {
@@ -162,7 +193,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
+describe.each(KIND_CASES)("the $kind configurator's Office flow", (testCase) => {
   const { idField, label, kind } = testCase;
   const title = OFFICE_KINDS[kind].resourceTitle;
 
@@ -202,11 +233,14 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
 
     expect(frame.ready()).toBe(false);
     expect(frame.values()[idField]).toBeNull();
-    expect(frame.notices()).toEqual([{
-      tone: undefined,
-      text: `Connecting makes a Google ${title} copy next to the original. The original is ` +
-        "unchanged, and later edits to it won't sync.",
-    }]);
+    expect(frame.notices()).toEqual([
+      {
+        tone: undefined,
+        text:
+          `Connecting makes a Google ${title} copy next to the original. The original is ` +
+          "unchanged, and later edits to it won't sync.",
+      },
+    ]);
     expect(frame.button("Convert")).toEqual(expect.objectContaining({ variant: "primary" }));
     expect(frame.button(/^Use the copy/)).toBeUndefined();
   });
@@ -226,21 +260,22 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
   it.each([
     ["a trashed file", "This file is in the Drive trash. Restore it before converting it."],
     ["a malformed ID", "Not a Google Drive file ID."],
-  ])("refuses %s the gatekeeper turns down, so its own ID never becomes connectable", async (
-    _case, message,
-  ) => {
-    const frame = await open(testCase);
-    frame.ui.inspectFile.mockResolvedValue({ type: "refused", message });
+  ])(
+    "refuses %s the gatekeeper turns down, so its own ID never becomes connectable",
+    async (_case, message) => {
+      const frame = await open(testCase);
+      frame.ui.inspectFile.mockResolvedValue({ type: "refused", message });
 
-    frame.autocomplete().onChange("source-1");
-    await settle();
+      frame.autocomplete().onChange("source-1");
+      await settle();
 
-    expect(frame.values()[idField]).toBeNull();
-    expect(frame.ready()).toBe(false);
-    expect(frame.notices()).toEqual([{ tone: "error", text: message }]);
-    expect(frame.find("Button")).toEqual([]);
-    expect(frame.autocomplete().value).toBe("source-1");
-  });
+      expect(frame.values()[idField]).toBeNull();
+      expect(frame.ready()).toBe(false);
+      expect(frame.notices()).toEqual([{ tone: "error", text: message }]);
+      expect(frame.find("Button")).toEqual([]);
+      expect(frame.autocomplete().value).toBe("source-1");
+    },
+  );
 
   it("refuses a pasted URL whose file the gatekeeper turns down", async () => {
     const frame = await open(testCase);
@@ -259,11 +294,14 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
   it("offers no Convert when the owner has turned off copying", async () => {
     const frame = await selectOffice({ canCopy: false });
 
-    expect(frame.notices()).toEqual([{
-      tone: "error",
-      text: "The owner of this file has turned off copying, so it can't be converted into a " +
-        `Google ${title} file.`,
-    }]);
+    expect(frame.notices()).toEqual([
+      {
+        tone: "error",
+        text:
+          "The owner of this file has turned off copying, so it can't be converted into a " +
+          `Google ${title} file.`,
+      },
+    ]);
     expect(frame.find("Button")).toEqual([]);
     expect(frame.ready()).toBe(false);
   });
@@ -271,14 +309,18 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
   it("still offers the copy made before once the owner has turned off copying", async () => {
     const convertedAt = new Date(XLSX_COPY);
     const frame = await selectOffice({
-      canCopy: false, existingCopy: { fileId: "copy-a", title: "Report", convertedAt },
+      canCopy: false,
+      existingCopy: { fileId: "copy-a", title: "Report", convertedAt },
     });
 
-    expect(frame.notices()).toEqual([{
-      tone: "error",
-      text: "The owner of this file has turned off copying, so it can't be converted again, but " +
-        "the copy made before can still be used.",
-    }]);
+    expect(frame.notices()).toEqual([
+      {
+        tone: "error",
+        text:
+          "The owner of this file has turned off copying, so it can't be converted again, but " +
+          "the copy made before can still be used.",
+      },
+    ]);
     expect(frame.button("Convert")).toBeUndefined();
     expect(frame.button(`Use the copy made on ${convertedAt.toLocaleDateString()}`)).toBeDefined();
     expect(frame.ready()).toBe(false);
@@ -287,7 +329,11 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
   it("asks for access from the click, then converts and connects the copy by its title", async () => {
     const frame = await selectOffice();
     frame.ui.convertFile.mockResolvedValue({
-      type: "converted", fileId: "copy-1", title: "Report", location: "besideOriginal", reused: false,
+      type: "converted",
+      fileId: "copy-1",
+      title: "Report",
+      location: "besideOriginal",
+      reused: false,
     });
 
     frame.button("Convert")!.onClick();
@@ -302,11 +348,14 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
     // The typed query is cleared so the field shows the copy's title, not the Office file's.
     expect(frame.cleared).toEqual([idField]);
     expect(frame.autocomplete().placeholder).toBe("Report");
-    expect(frame.notices()).toEqual([{
-      tone: undefined,
-      text: `Made the Google ${title} copy "Report" next to the original. The original is ` +
-        "unchanged, and later edits to it won't sync.",
-    }]);
+    expect(frame.notices()).toEqual([
+      {
+        tone: undefined,
+        text:
+          `Made the Google ${title} copy "Report" next to the original. The original is ` +
+          "unchanged, and later edits to it won't sync.",
+      },
+    ]);
   });
 
   it("waits for the pop-up's grant, polling, and says when the copy is in My Drive", async () => {
@@ -314,12 +363,18 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
     frame.ensureResources.mockResolvedValue(false);
     frame.ui.hasConversionAccess.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     frame.ui.convertFile.mockResolvedValue({
-      type: "converted", fileId: "copy-1", title: "Report", location: "myDrive", reused: false,
+      type: "converted",
+      fileId: "copy-1",
+      title: "Report",
+      location: "myDrive",
+      reused: false,
     });
 
     frame.button("Convert")!.onClick();
     await settle();
-    expect(frame.notices().map(notice => notice.text)).toContain("Waiting for access in the pop-up…");
+    expect(frame.notices().map((notice) => notice.text)).toContain(
+      "Waiting for access in the pop-up…",
+    );
     expect(frame.ui.convertFile).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(2_000);
@@ -331,24 +386,28 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
     expect(frame.ui.convertFile).toHaveBeenCalledTimes(1);
     expect(frame.values()[idField]).toBe("copy-1");
     expect(frame.notices()[0].text).toContain(
-      "in My Drive, because the original's folder could not take it");
+      "in My Drive, because the original's folder could not take it",
+    );
   });
 
   it("goes back to waiting when the gatekeeper says the pop-up's grant is not there yet", async () => {
     const frame = await selectOffice();
     frame.ensureResources.mockResolvedValue(false);
-    frame.ui.convertFile
-      .mockResolvedValueOnce({ type: "needsAccess" })
-      .mockResolvedValueOnce({
-        type: "converted", fileId: "copy-1", title: "Report", location: "besideOriginal",
-        reused: false,
-      });
+    frame.ui.convertFile.mockResolvedValueOnce({ type: "needsAccess" }).mockResolvedValueOnce({
+      type: "converted",
+      fileId: "copy-1",
+      title: "Report",
+      location: "besideOriginal",
+      reused: false,
+    });
     frame.ui.hasConversionAccess.mockResolvedValue(true);
 
     frame.button("Convert")!.onClick();
     await vi.advanceTimersByTimeAsync(2_000);
     expect(frame.ui.convertFile).toHaveBeenCalledTimes(1);
-    expect(frame.notices().map(notice => notice.text)).toContain("Waiting for access in the pop-up…");
+    expect(frame.notices().map((notice) => notice.text)).toContain(
+      "Waiting for access in the pop-up…",
+    );
 
     await vi.advanceTimersByTimeAsync(2_000);
     expect(frame.ui.convertFile).toHaveBeenCalledTimes(2);
@@ -368,8 +427,9 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
       tone: "error",
       text: "Google hasn't granted access to copy the file. Select Convert to try again.",
     });
-    expect(frame.notices().map(notice => notice.text))
-      .not.toContain("Waiting for access in the pop-up…");
+    expect(frame.notices().map((notice) => notice.text)).not.toContain(
+      "Waiting for access in the pop-up…",
+    );
     expect(frame.button("Convert")!.disabled).toBe(false);
     await vi.advanceTimersByTimeAsync(10_000);
     expect(frame.ui.hasConversionAccess).not.toHaveBeenCalled();
@@ -386,7 +446,8 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
     expect(frame.ui.hasConversionAccess).toHaveBeenCalledTimes(90);
     expect(frame.ui.convertFile).not.toHaveBeenCalled();
     expect(frame.notices()).toContainEqual({
-      tone: "error", text: "Access wasn't granted within 3 minutes. Select Convert to try again.",
+      tone: "error",
+      text: "Access wasn't granted within 3 minutes. Select Convert to try again.",
     });
     expect(frame.button("Convert")!.disabled).toBe(false);
     await vi.advanceTimersByTimeAsync(60_000);
@@ -408,13 +469,16 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
 
   it("shows a failed copy and lets Convert be tried again", async () => {
     const frame = await selectOffice();
-    frame.ui.convertFile.mockRejectedValue(new Error("Google Drive could not make the copy [http=500]."));
+    frame.ui.convertFile.mockRejectedValue(
+      new Error("Google Drive could not make the copy [http=500]."),
+    );
 
     frame.button("Convert")!.onClick();
     await settle();
 
     expect(frame.notices()).toContainEqual({
-      tone: "error", text: "Google Drive could not make the copy [http=500].",
+      tone: "error",
+      text: "Google Drive could not make the copy [http=500].",
     });
     expect(frame.button("Convert")!.disabled).toBe(false);
   });
@@ -422,17 +486,22 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
   it("looks again after a failed copy, and offers a copy Drive made despite the failure", async () => {
     const frame = await selectOffice();
     const convertedAt = new Date(XLSX_COPY);
-    frame.ui.convertFile.mockRejectedValue(new Error("Google Drive could not make the copy [http=500]."));
-    frame.ui.inspectFile.mockResolvedValue(officeFile(label, {
-      existingCopy: { fileId: "copy-lost", title: "Report", convertedAt },
-    }));
+    frame.ui.convertFile.mockRejectedValue(
+      new Error("Google Drive could not make the copy [http=500]."),
+    );
+    frame.ui.inspectFile.mockResolvedValue(
+      officeFile(label, {
+        existingCopy: { fileId: "copy-lost", title: "Report", convertedAt },
+      }),
+    );
 
     frame.button("Convert")!.onClick();
     await settle();
 
     expect(frame.ui.inspectFile).toHaveBeenCalledTimes(2);
     expect(frame.notices()).toContainEqual({
-      tone: "error", text: "Google Drive could not make the copy [http=500].",
+      tone: "error",
+      text: "Google Drive could not make the copy [http=500].",
     });
     expect(frame.button(`Use the copy made on ${convertedAt.toLocaleDateString()}`)).toBeDefined();
     expect(frame.ready()).toBe(false);
@@ -441,7 +510,8 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
   it("drops a copy that is gone when reusing it fails", async () => {
     const convertedAt = new Date(XLSX_COPY);
     const frame = await selectOffice({
-      canCopy: false, existingCopy: { fileId: "copy-a", title: "Report", convertedAt },
+      canCopy: false,
+      existingCopy: { fileId: "copy-a", title: "Report", convertedAt },
     });
     frame.ui.convertFile.mockRejectedValue(new Error("That copy is no longer available."));
     frame.ui.inspectFile.mockResolvedValue(officeFile(label, { canCopy: false }));
@@ -450,26 +520,32 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
     await settle();
 
     expect(frame.find("Button")).toEqual([]);
-    expect(frame.notices()).toEqual([{
-      tone: "error",
-      text: "The owner of this file has turned off copying, so it can't be converted into a " +
-        `Google ${title} file.`,
-    }]);
+    expect(frame.notices()).toEqual([
+      {
+        tone: "error",
+        text:
+          "The owner of this file has turned off copying, so it can't be converted into a " +
+          `Google ${title} file.`,
+      },
+    ]);
     expect(frame.ready()).toBe(false);
   });
 
   it("shows a failed copy at once, before looking at the file again", async () => {
     const frame = await selectOffice();
-    frame.ui.convertFile.mockRejectedValue(new Error("Google Drive could not make the copy [http=500]."));
+    frame.ui.convertFile.mockRejectedValue(
+      new Error("Google Drive could not make the copy [http=500]."),
+    );
     frame.ui.inspectFile.mockReturnValue(new Promise(() => {}));
 
     frame.button("Convert")!.onClick();
     await settle();
 
     expect(frame.notices()).toContainEqual({
-      tone: "error", text: "Google Drive could not make the copy [http=500].",
+      tone: "error",
+      text: "Google Drive could not make the copy [http=500].",
     });
-    expect(frame.notices().map(notice => notice.text)).not.toContain("Making the copy…");
+    expect(frame.notices().map((notice) => notice.text)).not.toContain("Making the copy…");
     expect(frame.button("Convert")!.disabled).toBe(false);
   });
 
@@ -479,7 +555,11 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
       existingCopy: { fileId: "copy-a", title: "Report", convertedAt },
     });
     frame.ui.convertFile.mockResolvedValue({
-      type: "converted", fileId: "copy-a", title: "Report", location: "besideOriginal", reused: true,
+      type: "converted",
+      fileId: "copy-a",
+      title: "Report",
+      location: "besideOriginal",
+      reused: true,
     });
 
     const reuse = frame.button(`Use the copy made on ${convertedAt.toLocaleDateString()}`);
@@ -494,13 +574,18 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
     expect(frame.values()[idField]).toBe("copy-a");
     expect(frame.notices()[0].text).toBe(
       `Using the Google ${title} copy "Report" made earlier, next to the original. Later edits to ` +
-      "the original won't sync.");
+        "the original won't sync.",
+    );
   });
 
   it("drops a conversion whose file was changed while it waited for access", async () => {
     const frame = await selectOffice();
     let grant!: (held: boolean) => void;
-    frame.ensureResources.mockReturnValue(new Promise(resolve => { grant = resolve; }));
+    frame.ensureResources.mockReturnValue(
+      new Promise((resolve) => {
+        grant = resolve;
+      }),
+    );
 
     frame.button("Convert")!.onClick();
     frame.ui.inspectFile.mockResolvedValue({ type: "native" });
@@ -532,13 +617,21 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
   it("drops a copy made after the selection was cleared with the field's clear button", async () => {
     const frame = await selectOffice();
     let finish!: (result: unknown) => void;
-    frame.ui.convertFile.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    frame.ui.convertFile.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
 
     frame.button("Convert")!.onClick();
     await settle();
     frame.autocomplete().onClear();
     finish({
-      type: "converted", fileId: "copy-1", title: "Report", location: "besideOriginal", reused: false,
+      type: "converted",
+      fileId: "copy-1",
+      title: "Report",
+      location: "besideOriginal",
+      reused: false,
     });
     await settle();
 
@@ -551,7 +644,11 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
   it("drops an inspection whose file was cleared before it answered", async () => {
     const frame = await open(testCase);
     let answer!: (inspection: unknown) => void;
-    frame.ui.inspectFile.mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
+    frame.ui.inspectFile.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
 
     frame.autocomplete().onChange("native-1");
     frame.autocomplete().onChange(null);
@@ -565,7 +662,11 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
   it("drops a pasted URL's inspection that a selection overtook", async () => {
     const frame = await open(testCase);
     let answer!: (inspection: unknown) => void;
-    frame.ui.inspectFile.mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
+    frame.ui.inspectFile.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
 
     const prefilled = frame.spec.initialValuesFromResourceUrl({
       resourceUrl: `https://docs.google.com/${testCase.urlPath}/d/source-1/edit`,
@@ -584,7 +685,11 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
   it("drops a copy made after a newer selection", async () => {
     const frame = await selectOffice();
     let finish!: (result: unknown) => void;
-    frame.ui.convertFile.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    frame.ui.convertFile.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
 
     frame.button("Convert")!.onClick();
     await settle();
@@ -592,7 +697,11 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
     frame.autocomplete().onChange("native-1");
     await settle();
     finish({
-      type: "converted", fileId: "copy-1", title: "Report", location: "besideOriginal", reused: false,
+      type: "converted",
+      fileId: "copy-1",
+      title: "Report",
+      location: "besideOriginal",
+      reused: false,
     });
     await settle();
 
@@ -616,7 +725,11 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
   it("drops an inspection that a newer selection overtook", async () => {
     const frame = await open(testCase);
     let answer!: (inspection: unknown) => void;
-    frame.ui.inspectFile.mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
+    frame.ui.inspectFile.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
 
     frame.autocomplete().onChange("source-1");
     frame.autocomplete().onChange("native-1");
@@ -640,9 +753,12 @@ describe.each(KIND_CASES)("the $kind configurator's Office flow", testCase => {
 
     expect(values).toEqual({});
     expect(frame.ui.inspectFile).toHaveBeenCalledWith("source-1");
-    expect(frame.autocomplete()).toEqual(expect.objectContaining({
-      value: "source-1", placeholder: `Report.${label}`,
-    }));
+    expect(frame.autocomplete()).toEqual(
+      expect.objectContaining({
+        value: "source-1",
+        placeholder: `Report.${label}`,
+      }),
+    );
     expect(frame.button("Convert")).toBeDefined();
   });
 

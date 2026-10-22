@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import { openAgentSession } from "../src/agent-session.js";
 import { startTestGatekeeperHarness, TEST_VENDOR_ID, type Harness } from "../src/harness.js";
 import { SCRIPTED_MODEL_ID, scriptedModelRouter } from "../src/mock-model.js";
@@ -24,15 +24,23 @@ afterAll(async () => {
 });
 
 const TARGET = "https://gadgets-test.example/restricted-web-fetch";
-const REFUSED = "This workspace has observed sensitive data. To prevent leaks, the workspace is " +
-    "prohibited from fetching from public web sites.";
+const REFUSED =
+  "This workspace has observed sensitive data. To prevent leaks, the workspace is " +
+  "prohibited from fetching from public web sites.";
 
 it("refuses a web fetch once the workspace has read restricted data", async () => {
   const model = models.script([
-    { toolCall: { id: "read-restricted", name: "executeCode", arguments: {
-      code: "export default async function(self, env) { " +
-          "console.log(await env.TEST_AMBIENT.readValue(true)); }",
-    } } },
+    {
+      toolCall: {
+        id: "read-restricted",
+        name: "executeCode",
+        arguments: {
+          code:
+            "export default async function(self, env) { " +
+            "console.log(await env.TEST_AMBIENT.readValue(true)); }",
+        },
+      },
+    },
     { toolCall: { id: "fetch-page", name: "webFetch", arguments: { url: TARGET } } },
     { text: "The page could not be fetched." },
   ]);
@@ -46,9 +54,14 @@ it("refuses a web fetch once the workspace has read restricted data", async () =
 
   expect(turn.outcome).toEqual({ status: "completed" });
   expect(model.requests).toHaveLength(3);
-  expect(model.requests[2]).toMatchObject({ messages: expect.arrayContaining([
-    expect.objectContaining(
-        { role: "tool", tool_call_id: "fetch-page", content: expect.stringContaining(REFUSED) }),
-  ]) });
+  expect(model.requests[2]).toMatchObject({
+    messages: expect.arrayContaining([
+      expect.objectContaining({
+        role: "tool",
+        tool_call_id: "fetch-page",
+        content: expect.stringContaining(REFUSED),
+      }),
+    ]),
+  });
   expect(network.getUnmockedCalls()).toEqual([]);
 });

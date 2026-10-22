@@ -1,7 +1,9 @@
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import {
-  getOpenGadgetErrorCode, OPEN_GADGET_ERROR_CODES, type AuthenticatedApi,
+  getOpenGadgetErrorCode,
+  OPEN_GADGET_ERROR_CODES,
+  type AuthenticatedApi,
 } from "@gadgets/workshop-shared/api";
 import { settleRestart, type Harness, startHarness } from "../src/harness.js";
 import { mockChatCompletion } from "../src/mock-model.js";
@@ -37,7 +39,9 @@ function username(): string {
 }
 
 async function rejectedOpen(
-    authenticated: RpcStub<AuthenticatedApi>, workspaceId: string): Promise<unknown> {
+  authenticated: RpcStub<AuthenticatedApi>,
+  workspaceId: string,
+): Promise<unknown> {
   try {
     using _workspace = await authenticated.openGadget(workspaceId);
   } catch (error) {
@@ -60,13 +64,15 @@ it.concurrent("lists workspace metadata after activity and removes it after dele
 
   const listed = await waitFor("the active workspace to appear in the user's list", async () => {
     const workspaces = await authenticated.listGadgets();
-    return workspaces.some(entry => entry.id === id) ? workspaces : null;
+    return workspaces.some((entry) => entry.id === id) ? workspaces : null;
   });
-  expect(listed).toContainEqual(expect.objectContaining({
-    id,
-    title: "Renamed Workspace",
-    pinned: true,
-  }));
+  expect(listed).toContainEqual(
+    expect.objectContaining({
+      id,
+      title: "Renamed Workspace",
+      pinned: true,
+    }),
+  );
 
   await workspace.deleteSelf();
   // Deleting restarts the workspace DO about 100ms out (Overseer.scheduleAccessRestart), severing
@@ -74,7 +80,8 @@ it.concurrent("lists workspace metadata after activity and removes it after dele
   // to reopen. `workspace` stays held through the restart, so this session must survive it.
   await settleRestart();
   await waitFor("the deleted workspace to disappear from the user's list", async () =>
-    (await authenticated.listGadgets()).some(entry => entry.id === id) ? null : true);
+    (await authenticated.listGadgets()).some((entry) => entry.id === id) ? null : true,
+  );
 });
 
 it.concurrent("persists an ordered human-only chat without starting an agent", async () => {
@@ -86,11 +93,11 @@ it.concurrent("persists an ordered human-only chat without starting an agent", a
   await workspace.sendChatMessage(chatId, "Second message", null);
 
   const history = await workspace.getChatHistory(chatId);
-  expect(history.messages.map(message =>
-    message.type === "message" ? message.message : message.type)).toEqual([
-    "First message",
-    "Second message",
-  ]);
+  expect(
+    history.messages.map((message) =>
+      message.type === "message" ? message.message : message.type,
+    ),
+  ).toEqual(["First message", "Second message"]);
   const chats = await workspace.listChats();
   expect(chats).toEqual([expect.objectContaining({ id: chatId })]);
   expect(chats[0]?.activeAgent).toBeUndefined();
@@ -101,8 +108,7 @@ it.concurrent("persists an ordered human-only chat without starting an agent", a
   await workspace.deleteSelf();
 });
 
-it.concurrent("Git blob uploads are reusable, workspace-local, and downloadable only through their chat",
-    async () => {
+it.concurrent("Git blob uploads are reusable, workspace-local, and downloadable only through their chat", async () => {
   using publicApi = connect(requireHarness().url);
   using authenticated = await signUp(publicApi, username());
   using ws = await authenticated.newGadget();
@@ -110,20 +116,26 @@ it.concurrent("Git blob uploads are reusable, workspace-local, and downloadable 
   const content = new TextEncoder().encode("only chat A");
   const oid = await ws.uploadBlob(content);
   expect(await ws.uploadBlob(content)).toBe(oid);
-  const sent = {oid, mimeType: "text/plain", name: "a.txt"};
+  const sent = { oid, mimeType: "text/plain", name: "a.txt" };
   const chatA = await ws.newChat("With attachment", null, undefined, [sent]);
   const chatB = await ws.newChat("Without attachment", null);
-  const message = (await ws.getChatHistory(chatA)).messages.find(m => m.type === "message");
-  if (message?.type !== "message" || !message.attachments?.length) throw new Error("Missing attachment");
+  const message = (await ws.getChatHistory(chatA)).messages.find((m) => m.type === "message");
+  if (message?.type !== "message" || !message.attachments?.length)
+    throw new Error("Missing attachment");
   const attachmentId = message.attachments[0].id;
 
-  expect(new TextDecoder().decode(await ws.getChatAttachmentContent(chatA, attachmentId))).toBe("only chat A");
-  await expect(ws.getChatAttachmentContent(chatB, attachmentId)).rejects.toThrow("Chat attachment not found.");
+  expect(new TextDecoder().decode(await ws.getChatAttachmentContent(chatA, attachmentId))).toBe(
+    "only chat A",
+  );
+  await expect(ws.getChatAttachmentContent(chatB, attachmentId)).rejects.toThrow(
+    "Chat attachment not found.",
+  );
 
   await ws.sendChatMessage(chatB, "Reuse uploaded bytes", null, undefined, [sent]);
   using otherWorkspace = await authenticated.newGadget();
-  await expect(otherWorkspace.newChat("Unknown blob", null, undefined, [sent]))
-    .rejects.toThrow("Unknown Git blob.");
+  await expect(otherWorkspace.newChat("Unknown blob", null, undefined, [sent])).rejects.toThrow(
+    "Unknown Git blob.",
+  );
   await otherWorkspace.deleteSelf();
 
   await ws.deleteSelf();
@@ -141,8 +153,9 @@ it.concurrent("creates, renames, reopens, and removes a Gadget capability", asyn
   await gadget.setTitle("Updated Status");
   using reopened = await workspace.getGadget(gadgetId);
   expect(await reopened.getTitle()).toBe("Updated Status");
-  await expect(workspace.createGadget("Conflict", undefined, "STATUS"))
-    .rejects.toThrow('already a gadget named "STATUS"');
+  await expect(workspace.createGadget("Conflict", undefined, "STATUS")).rejects.toThrow(
+    'already a gadget named "STATUS"',
+  );
 
   await gadget.remove();
   await expect(workspace.getGadget(gadgetId)).rejects.toThrow(`No such gadget: ${gadgetId}`);
@@ -151,7 +164,10 @@ it.concurrent("creates, renames, reopens, and removes a Gadget capability", asyn
 
 it.concurrent("only the owner deletes a workspace, and later opens say why", async () => {
   const [owner, collaborator, stranger] = nextUsernames(
-      "deleteowner", "deletecollaborator", "deletestranger");
+    "deleteowner",
+    "deletecollaborator",
+    "deletestranger",
+  );
   if (!owner || !collaborator || !stranger) throw new Error("Failed to allocate test usernames");
 
   using ownerPublic = connect(requireHarness().url);
@@ -162,13 +178,14 @@ it.concurrent("only the owner deletes a workspace, and later opens say why", asy
   using strangerApi = await signUp(strangerPublic, stranger);
   using ownerWorkspace = await ownerApi.newGadget();
   const workspaceId = (await ownerWorkspace.getMetadata()).id;
-  if (!await ownerWorkspace.addCollaborator(collaborator, "build")) {
+  if (!(await ownerWorkspace.addCollaborator(collaborator, "build"))) {
     throw new Error(`Failed to share the workspace with ${collaborator}`);
   }
   using collaboratorWorkspace = await collaboratorApi.openGadget(workspaceId);
 
-  await expect(collaboratorWorkspace.deleteSelf())
-      .rejects.toThrow("Only the workspace owner can delete it.");
+  await expect(collaboratorWorkspace.deleteSelf()).rejects.toThrow(
+    "Only the workspace owner can delete it.",
+  );
   const denied = await rejectedOpen(strangerApi, workspaceId);
   expect(getOpenGadgetErrorCode(denied)).toBe(OPEN_GADGET_ERROR_CODES.workspaceAccessDenied);
   expect(Object.prototype.propertyIsEnumerable.call(denied, "code")).toBe(true);

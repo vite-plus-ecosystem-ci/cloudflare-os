@@ -1,18 +1,21 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { ConfiguratorUISpec } from "../index.ts";
 import { collectResourceUrl, createSession } from "./session.ts";
 import { createConfiguratorStore } from "./store.ts";
 
-const deferred = <T,>() => Promise.withResolvers<T>();
+const deferred = <T>() => Promise.withResolvers<T>();
 
 /** A session as the root leaves it after rendering values the module calls ready. */
 const session = (resourceUrl: ConfiguratorUISpec<null>["resourceUrl"]) => {
-  const running = createSession({
-    spec: { initial: {}, resourceUrl, render: () => null },
-    ui: null,
-    store: createConfiguratorStore({ folderId: "F1" }, { folderId: "Reports" }),
-    ensureResources: vi.fn(),
-  }, vi.fn());
+  const running = createSession(
+    {
+      spec: { initial: {}, resourceUrl, render: () => null },
+      ui: null,
+      store: createConfiguratorStore({ folderId: "F1" }, { folderId: "Reports" }),
+      ensureResources: vi.fn(),
+    },
+    vi.fn(),
+  );
   running.moduleReady = true;
   return running;
 };
@@ -26,10 +29,14 @@ describe("collectResourceUrl", () => {
   it("refuses while the screen cannot be trusted to show what would be collected", async () => {
     const running = session(() => "https://example.com/");
     running.renderFailed = true;
-    await expect(collectResourceUrl(running)).rejects.toThrow(/failed to render its current state/i);
+    await expect(collectResourceUrl(running)).rejects.toThrow(
+      /failed to render its current state/i,
+    );
     running.renderFailed = false;
     running.treeFailed = true;
-    await expect(collectResourceUrl(running)).rejects.toThrow(/failed to render its current state/i);
+    await expect(collectResourceUrl(running)).rejects.toThrow(
+      /failed to render its current state/i,
+    );
     running.treeFailed = false;
     running.store.setHold("target", "Not showing its choice.");
     await expect(collectResourceUrl(running)).rejects.toThrow("Not showing its choice.");
@@ -56,7 +63,9 @@ describe("collectResourceUrl", () => {
   });
 
   it("refuses an empty URL", async () => {
-    await expect(collectResourceUrl(session(() => ""))).rejects.toThrow(/did not provide a resource URL/i);
+    await expect(collectResourceUrl(session(() => ""))).rejects.toThrow(
+      /did not provide a resource URL/i,
+    );
   });
 });
 
@@ -84,12 +93,15 @@ describe("store", () => {
 describe("readiness", () => {
   it("combines every input, whichever changes last, and reaches the host once per change", () => {
     const setSelectionReady = vi.fn();
-    const running = createSession({
-      spec: { initial: {}, resourceUrl: () => "", render: () => null },
-      ui: null,
-      store: createConfiguratorStore({}),
-      ensureResources: vi.fn(),
-    }, setSelectionReady);
+    const running = createSession(
+      {
+        spec: { initial: {}, resourceUrl: () => "", render: () => null },
+        ui: null,
+        store: createConfiguratorStore({}),
+        ensureResources: vi.fn(),
+      },
+      setSelectionReady,
+    );
     running.moduleReady = true;
     running.postReadiness();
     running.postReadiness();

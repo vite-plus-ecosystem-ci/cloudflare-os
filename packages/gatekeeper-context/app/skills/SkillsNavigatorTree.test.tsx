@@ -4,7 +4,7 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import type { RpcStub } from "capnweb";
 import { Toasty } from "@cloudflare/kumo";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type {
   ContextApi,
   ContextCollectionMetadata,
@@ -35,26 +35,29 @@ const OWNED: Pick<EnabledCollectionInfo, "source" | "membership"> = {
   membership: { role: "owner", shared: false },
 };
 
-const navigator = (
-  collectionId: string,
-  access = OWNED,
-): SkillNavigatorCollection[] => [{
-  collection: info(collectionId, access),
-  children: [{
-    type: "directory",
-    path: "legacy",
-    name: "legacy",
-    children: [{
-      type: "skill",
-      collectionId,
-      manifestPath: "legacy/review/SKILL.md",
-      directoryPath: "legacy/review",
-      name: "incident-response",
-      description: "Review code",
-      lastUpdated: new Date(Date.now() - 12 * 60_000),
-    }],
-  }],
-}];
+const navigator = (collectionId: string, access = OWNED): SkillNavigatorCollection[] => [
+  {
+    collection: info(collectionId, access),
+    children: [
+      {
+        type: "directory",
+        path: "legacy",
+        name: "legacy",
+        children: [
+          {
+            type: "skill",
+            collectionId,
+            manifestPath: "legacy/review/SKILL.md",
+            directoryPath: "legacy/review",
+            name: "incident-response",
+            description: "Review code",
+            lastUpdated: new Date(Date.now() - 12 * 60_000),
+          },
+        ],
+      },
+    ],
+  },
+];
 
 const metadata = (
   source: "web" | "git",
@@ -67,9 +70,10 @@ const metadata = (
   created: new Date(),
   lastUpdated: new Date(),
   documentCount: 1,
-  content: source === "web"
-    ? { source }
-    : { source, remote: "", branch: "main", lastRefreshedAt: new Date() },
+  content:
+    source === "web"
+      ? { source }
+      : { source, remote: "", branch: "main", lastRefreshedAt: new Date() },
 });
 
 const menuItems = () => [...document.querySelectorAll<HTMLElement>("[role=menuitem]")];
@@ -124,35 +128,45 @@ describe("SkillsNavigatorTree", () => {
       renameContextSkill: async () => {},
       syncContextCollectionArtifactSource,
     } as unknown as RpcStub<ContextApi>;
-    act(() => root?.render(
-      <ContextApiProvider value={api}>
-        <Toasty>
-          <SkillsNavigatorTree
-            navigator={navigator("collection", access)}
-            collectionMetadata={metadataAvailable
-              ? new Map([["collection", metadata(source, visibility)]])
-              : new Map()}
-            collectionPermissions={permissions ? new Map([["collection", permissions]]) : new Map()}
-            failedDocumentCollectionIds={documentsFailed ? new Set(["collection"]) : new Set()}
-            writableCollectionIds={writable ? new Set(["collection"]) : new Set()}
-            supportsGitCollections
-            expandAll
-            onSelectSkill={() => {}}
-            onOpenCollection={onOpenCollection}
-            onAddSkill={() => {}}
-            onUploadSkills={onUploadSkills}
-            onEditCollection={() => {}}
-            onShareCollection={onShareCollection}
-            onLeaveCollection={onLeaveCollection}
-            onDelete={onDelete}
-            onRetryCollection={onRetryCollection}
-            onChanged={() => {}}
-          />
-        </Toasty>
-      </ContextApiProvider>,
-    ));
+    act(() =>
+      root?.render(
+        <ContextApiProvider value={api}>
+          <Toasty>
+            <SkillsNavigatorTree
+              navigator={navigator("collection", access)}
+              collectionMetadata={
+                metadataAvailable
+                  ? new Map([["collection", metadata(source, visibility)]])
+                  : new Map()
+              }
+              collectionPermissions={
+                permissions ? new Map([["collection", permissions]]) : new Map()
+              }
+              failedDocumentCollectionIds={documentsFailed ? new Set(["collection"]) : new Set()}
+              writableCollectionIds={writable ? new Set(["collection"]) : new Set()}
+              supportsGitCollections
+              expandAll
+              onSelectSkill={() => {}}
+              onOpenCollection={onOpenCollection}
+              onAddSkill={() => {}}
+              onUploadSkills={onUploadSkills}
+              onEditCollection={() => {}}
+              onShareCollection={onShareCollection}
+              onLeaveCollection={onLeaveCollection}
+              onDelete={onDelete}
+              onRetryCollection={onRetryCollection}
+              onChanged={() => {}}
+            />
+          </Toasty>
+        </ContextApiProvider>,
+      ),
+    );
     return {
-      onDelete, onLeaveCollection, onOpenCollection, onRetryCollection, onShareCollection,
+      onDelete,
+      onLeaveCollection,
+      onOpenCollection,
+      onRetryCollection,
+      onShareCollection,
       syncContextCollectionArtifactSource,
     };
   };
@@ -164,24 +178,34 @@ describe("SkillsNavigatorTree", () => {
     canDelete: false,
   };
 
-  const openMenu = (name: string) => act(() => row(name)?.dispatchEvent(new MouseEvent("contextmenu", {
-    bubbles: true,
-    cancelable: true,
-  })));
+  const openMenu = (name: string) =>
+    act(() =>
+      row(name)?.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
 
-  const row = (name: string) => [...container!.querySelectorAll<HTMLElement>(
-    "[data-hierarchical-list-row]",
-  )].find((candidate) => candidate.textContent?.includes(name));
+  const row = (name: string) =>
+    [...container!.querySelectorAll<HTMLElement>("[data-hierarchical-list-row]")].find(
+      (candidate) => candidate.textContent?.includes(name),
+    );
 
   it("provides no actions or movement for a read-only collection", () => {
     renderTree({ writable: false });
     const skillRow = row("Incident Response");
 
     expect(skillRow?.draggable).toBe(false);
-    act(() => skillRow?.dispatchEvent(new MouseEvent("contextmenu", {
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      skillRow?.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
     expect(document.body.textContent).not.toContain("Rename");
     expect(document.body.textContent).not.toContain("Delete");
   });
@@ -197,10 +221,18 @@ describe("SkillsNavigatorTree", () => {
     openMenu("collection");
     expect(menuItems().map((item) => item.textContent)).toEqual(["Open collection", "Leave"]);
 
-    act(() => menuItems().find((item) => item.textContent === "Leave")?.click());
+    act(() =>
+      menuItems()
+        .find((item) => item.textContent === "Leave")
+        ?.click(),
+    );
     expect(onLeaveCollection).toHaveBeenCalledWith({ id: "collection", title: "collection" });
     openMenu("collection");
-    act(() => menuItems().find((item) => item.textContent === "Open collection")?.click());
+    act(() =>
+      menuItems()
+        .find((item) => item.textContent === "Open collection")
+        ?.click(),
+    );
     expect(onOpenCollection).toHaveBeenCalledWith("collection");
   });
 
@@ -213,18 +245,15 @@ describe("SkillsNavigatorTree", () => {
 
     expect(row("collection")?.textContent).toContain("Shared with you · Editor");
     openMenu("collection");
-    expect([...document.querySelectorAll<HTMLElement>("[role=menuitem]")]
-      .map((item) => item.textContent)).toEqual([
-      "Open collection",
-      "Add skill",
-      "Upload skills",
-      "Edit",
-      "Share",
-      "Leave",
-    ]);
+    expect(
+      [...document.querySelectorAll<HTMLElement>("[role=menuitem]")].map(
+        (item) => item.textContent,
+      ),
+    ).toEqual(["Open collection", "Add skill", "Upload skills", "Edit", "Share", "Leave"]);
 
-    const share = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")]
-      .find((item) => item.textContent === "Share");
+    const share = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")].find(
+      (item) => item.textContent === "Share",
+    );
     act(() => share?.click());
     expect(onShareCollection).toHaveBeenCalledWith({ id: "collection", title: "collection" });
   });
@@ -245,8 +274,9 @@ describe("SkillsNavigatorTree", () => {
     expect(row("Incident Response")?.draggable).toBe(true);
     expect(row("Incident Response")?.textContent).toContain("Review code");
     expect(row("Incident Response")?.textContent).toContain("12m ago");
-    expect(row("Incident Response")?.querySelector('[aria-label="Updated 12 minutes ago"]'))
-      .not.toBeNull();
+    expect(
+      row("Incident Response")?.querySelector('[aria-label="Updated 12 minutes ago"]'),
+    ).not.toBeNull();
     expect(row("legacy")?.draggable).toBe(false);
   });
 
@@ -262,12 +292,17 @@ describe("SkillsNavigatorTree", () => {
     expect(collectionRow?.textContent).toContain("Private");
     expect(collectionRow?.textContent).toContain("just now");
     expect(collectionRow?.querySelector('[aria-label="Updated just now"]')).not.toBeNull();
-    act(() => collectionRow?.dispatchEvent(new MouseEvent("contextmenu", {
-      bubbles: true,
-      cancelable: true,
-    })));
-    const refresh = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")]
-      .find((item) => item.textContent?.includes("Refresh"));
+    act(() =>
+      collectionRow?.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    const refresh = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")].find((item) =>
+      item.textContent?.includes("Refresh"),
+    );
     expect(refresh).toBeDefined();
 
     await act(async () => {
@@ -291,7 +326,11 @@ describe("SkillsNavigatorTree", () => {
     });
 
     openMenu("collection");
-    expect(menuItems().map((item) => item.textContent)).toEqual(["Open collection", "Share", "Delete"]);
+    expect(menuItems().map((item) => item.textContent)).toEqual([
+      "Open collection",
+      "Share",
+      "Delete",
+    ]);
 
     act(() => menuItems()[2]?.click());
     expect(onDelete).toHaveBeenCalledWith({
@@ -313,8 +352,9 @@ describe("SkillsNavigatorTree", () => {
 
     openMenu("collection");
     const menu = document.querySelector<HTMLElement>("[role=menu]");
-    expect([...menu!.querySelectorAll<HTMLElement>("[role=menuitem]")]
-      .map((item) => item.textContent)).toEqual(["Open collection", "Edit"]);
+    expect(
+      [...menu!.querySelectorAll<HTMLElement>("[role=menuitem]")].map((item) => item.textContent),
+    ).toEqual(["Open collection", "Edit"]);
 
     act(() => retryRow?.click());
     expect(onRetryCollection).toHaveBeenCalledWith("collection");
@@ -339,34 +379,37 @@ describe("SkillsNavigatorTree", () => {
   it("shows collection actions in the action menu", () => {
     renderTree({ writable: true });
 
-    act(() => row("collection")?.dispatchEvent(new MouseEvent("contextmenu", {
-      bubbles: true,
-      cancelable: true,
-    })));
+    act(() =>
+      row("collection")?.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
 
     const menu = document.querySelector<HTMLElement>('[role="menu"]');
     expect(menu).not.toBeNull();
-    expect([...menu!.querySelectorAll<HTMLElement>('[role="menuitem"]')]
-      .map((item) => item.textContent)).toEqual([
-        "Open collection",
-        "Add skill",
-        "Upload skills",
-        "Edit",
-        "Share",
-        "Delete",
-      ]);
+    expect(
+      [...menu!.querySelectorAll<HTMLElement>('[role="menuitem"]')].map((item) => item.textContent),
+    ).toEqual(["Open collection", "Add skill", "Upload skills", "Edit", "Share", "Delete"]);
   });
 
   it("uploads skills into a writable legacy directory from its context menu", () => {
     const onUploadSkills = vi.fn<(target: UploadSkillsTarget) => void>();
     renderTree({ writable: true, onUploadSkills });
 
-    act(() => row("legacy")?.dispatchEvent(new MouseEvent("contextmenu", {
-      bubbles: true,
-      cancelable: true,
-    })));
-    const upload = [...document.body.querySelectorAll<HTMLElement>("[role=menuitem]")]
-      .find((item) => item.textContent?.includes("Upload skills"));
+    act(() =>
+      row("legacy")?.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    const upload = [...document.body.querySelectorAll<HTMLElement>("[role=menuitem]")].find(
+      (item) => item.textContent?.includes("Upload skills"),
+    );
     act(() => upload?.click());
 
     expect(onUploadSkills).toHaveBeenCalledWith({
@@ -380,12 +423,17 @@ describe("SkillsNavigatorTree", () => {
     vi.useFakeTimers();
     renderTree({ writable: true });
 
-    act(() => row("Incident Response")?.dispatchEvent(new MouseEvent("contextmenu", {
-      bubbles: true,
-      cancelable: true,
-    })));
-    const rename = [...document.body.querySelectorAll<HTMLElement>("[role=menuitem]")]
-      .find((item) => item.textContent?.includes("Rename"));
+    act(() =>
+      row("Incident Response")?.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    const rename = [...document.body.querySelectorAll<HTMLElement>("[role=menuitem]")].find(
+      (item) => item.textContent?.includes("Rename"),
+    );
     act(() => rename?.click());
 
     expect(container?.querySelector('[aria-label="Rename skill"]')).toBeNull();

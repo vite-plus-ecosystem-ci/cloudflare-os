@@ -1,23 +1,37 @@
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AccessTokenRequest } from "../../src/auth-retry";
 import type { GoogleDocConfiguratorRpc } from "../../src/configurator/google-doc-configurator-types";
-import { GOOGLE_DOC_MIME_TYPE, GOOGLE_SHEET_MIME_TYPE, GOOGLE_SLIDES_MIME_TYPE } from "../../src/drive-session";
+import {
+  GOOGLE_DOC_MIME_TYPE,
+  GOOGLE_SHEET_MIME_TYPE,
+  GOOGLE_SLIDES_MIME_TYPE,
+} from "../../src/drive-session";
 import { GatekeeperUserImpl, type UserAccount } from "../../src/google";
 import {
-  calendarPickerRank, hasCalendarPrivateAccessRole, hasCalendarWriteRole,
+  calendarPickerRank,
+  hasCalendarPrivateAccessRole,
+  hasCalendarWriteRole,
 } from "../../src/calendar-api";
 import {
-  BigQueryConfiguratorUI, CalendarConfiguratorUI, DriveConfiguratorUI, GoogleDocConfiguratorUI,
-  GoogleSheetsConfiguratorUI, GoogleSlidesConfiguratorUI,
+  BigQueryConfiguratorUI,
+  CalendarConfiguratorUI,
+  DriveConfiguratorUI,
+  GoogleDocConfiguratorUI,
+  GoogleSheetsConfiguratorUI,
+  GoogleSlidesConfiguratorUI,
 } from "../../src/google-configurators";
 import type { GoogleAccessToken } from "../../src/google-api";
 import { FOLDER_MIME_TYPE as FOLDER, SHORTCUT_MIME_TYPE as SHORTCUT } from "../../src/drive-api";
 import { OfficeConversion } from "../../src/office-conversion";
 import {
-  GOOGLE_DOC_RESOURCE, GOOGLE_SHEETS_RESOURCE, GOOGLE_SLIDES_RESOURCE, OFFICE_IMPORT_GRANT,
-  SHARED_DRIVES_GRANT, resourceUrlPatternsToOAuthScopes,
+  GOOGLE_DOC_RESOURCE,
+  GOOGLE_SHEETS_RESOURCE,
+  GOOGLE_SLIDES_RESOURCE,
+  OFFICE_IMPORT_GRANT,
+  SHARED_DRIVES_GRANT,
+  resourceUrlPatternsToOAuthScopes,
 } from "../../src/resources";
 
 const token = (value: string): GoogleAccessToken => ({
@@ -33,19 +47,28 @@ afterEach(() => {
 describe("Google resource configurators", () => {
   it("resolves the primary Calendar alias to its stable ID", async () => {
     let getToken = vi.fn(async () => token("access-token"));
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      id: "person@example.com",
-      summary: "Primary calendar",
-      primary: true,
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          id: "person@example.com",
+          summary: "Primary calendar",
+          primary: true,
+        }),
+      ),
+    );
 
-    await expect(new CalendarConfiguratorUI(getToken).getPrimaryCalendarId())
-      .resolves.toBe("person@example.com");
+    await expect(new CalendarConfiguratorUI(getToken).getPrimaryCalendarId()).resolves.toBe(
+      "person@example.com",
+    );
   });
 
   describe("Drive picker", () => {
     const picker = (holdsSharedDrivesGrant = true) =>
-      new DriveConfiguratorUI(async () => token("access-token"), async () => holdsSharedDrivesGrant);
+      new DriveConfiguratorUI(
+        async () => token("access-token"),
+        async () => holdsSharedDrivesGrant,
+      );
 
     /**
      * Answers each Drive request from `routes` by path, recording every URL asked for. A batch is
@@ -53,29 +76,40 @@ describe("Google resource configurators", () => {
      */
     const stubDrive = (routes: Record<string, unknown>) => {
       const calls: URL[] = [];
-      vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-        const url = new URL(input instanceof Request ? input.url : input.toString());
-        calls.push(url);
-        if (url.pathname === "/batch/drive/v3") return batchResponse(String(init?.body), routes);
-        const path = url.pathname.replace(/^\/drive\/v3/, "");
-        return path in routes
-          ? Response.json(routes[path])
-          : Response.json({ error: { code: 404, message: "File not found" } }, { status: 404 });
-      }));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+          const url = new URL(input instanceof Request ? input.url : input.toString());
+          calls.push(url);
+          if (url.pathname === "/batch/drive/v3") return batchResponse(String(init?.body), routes);
+          const path = url.pathname.replace(/^\/drive\/v3/, "");
+          return path in routes
+            ? Response.json(routes[path])
+            : Response.json({ error: { code: 404, message: "File not found" } }, { status: 404 });
+        }),
+      );
       return calls;
     };
 
     const batchResponse = (body: string, routes: Record<string, unknown>) => {
-      const parts = [...body.matchAll(/GET \/drive\/v3\/files\/([^?]+)\?/g)].map(([, id], index) => {
-        const file = routes[`/files/${decodeURIComponent(id)}`];
-        return [
-          "--batch", "Content-Type: application/http", `Content-ID: <response-item-${index}>`, "",
-          file ? "HTTP/1.1 200 OK" : "HTTP/1.1 404 Not Found", "Content-Type: application/json", "",
-          JSON.stringify(file ?? {}),
-        ].join("\r\n");
+      const parts = [...body.matchAll(/GET \/drive\/v3\/files\/([^?]+)\?/g)].map(
+        ([, id], index) => {
+          const file = routes[`/files/${decodeURIComponent(id)}`];
+          return [
+            "--batch",
+            "Content-Type: application/http",
+            `Content-ID: <response-item-${index}>`,
+            "",
+            file ? "HTTP/1.1 200 OK" : "HTTP/1.1 404 Not Found",
+            "Content-Type: application/json",
+            "",
+            JSON.stringify(file ?? {}),
+          ].join("\r\n");
+        },
+      );
+      return new Response(`${parts.join("\r\n")}\r\n--batch--\r\n`, {
+        headers: { "Content-Type": "multipart/mixed; boundary=batch" },
       });
-      return new Response(`${parts.join("\r\n")}\r\n--batch--\r\n`,
-        { headers: { "Content-Type": "multipart/mixed; boundary=batch" } });
     };
 
     // My Drive's root can be bound only by its real ID: the folder scope refuses the `root` alias.
@@ -109,19 +143,33 @@ describe("Google resource configurators", () => {
           nextPageToken: "page-3",
           files: [
             { id: "sub", name: "Plans", mimeType: FOLDER, capabilities: { canListChildren: true } },
-            { id: "locked", name: "Archive", mimeType: FOLDER, capabilities: { canListChildren: false } },
             {
-              id: "doc", name: "Notes", mimeType: "application/vnd.google-apps.document",
+              id: "locked",
+              name: "Archive",
+              mimeType: FOLDER,
+              capabilities: { canListChildren: false },
+            },
+            {
+              id: "doc",
+              name: "Notes",
+              mimeType: "application/vnd.google-apps.document",
               modifiedTime: "2026-10-01T10:00:00Z",
             },
             {
-              id: "link", name: "Team folder", mimeType: SHORTCUT,
+              id: "link",
+              name: "Team folder",
+              mimeType: SHORTCUT,
               shortcutDetails: { targetId: "team", targetMimeType: FOLDER },
             },
             { id: "dangling", name: "Gone", mimeType: SHORTCUT, shortcutDetails: {} },
           ],
         },
-        "/files/team": { id: "team", mimeType: FOLDER, trashed: false, capabilities: { canListChildren: true } },
+        "/files/team": {
+          id: "team",
+          mimeType: FOLDER,
+          trashed: false,
+          capabilities: { canListChildren: true },
+        },
       });
 
       await expect(picker().listDriveNodes("folder:F1", "", "page-2")).resolves.toEqual({
@@ -129,7 +177,10 @@ describe("Google resource configurators", () => {
           { id: "folder:sub", title: "Plans", kind: "folder", listable: true },
           { id: "folder:locked", title: "Archive", kind: "folder", listable: false },
           {
-            id: "file:doc", title: "Notes", kind: "file", mimeType: "application/vnd.google-apps.document",
+            id: "file:doc",
+            title: "Notes",
+            kind: "file",
+            mimeType: "application/vnd.google-apps.document",
             modifiedTime: "2026-10-01T10:00:00Z",
           },
           { id: "folder:team", title: "Team folder", kind: "folder", listable: true },
@@ -145,8 +196,12 @@ describe("Google resource configurators", () => {
     // A shortcut outlives its target being deleted, unshared or trashed, and a listing says nothing
     // of the target, so what the shortcut offers is decided by the target as read.
     it("offers a shortcut only for a target that could be connected", async () => {
-      const shortcut = (id: string, targetId: string, targetMimeType: string) =>
-        ({ id, name: id, mimeType: SHORTCUT, shortcutDetails: { targetId, targetMimeType } });
+      const shortcut = (id: string, targetId: string, targetMimeType: string) => ({
+        id,
+        name: id,
+        mimeType: SHORTCUT,
+        shortcutDetails: { targetId, targetMimeType },
+      });
       stubDrive({
         "/files": {
           files: [
@@ -158,7 +213,12 @@ describe("Google resource configurators", () => {
           ],
         },
         "/files/q3": { id: "q3", mimeType: "application/pdf", trashed: false },
-        "/files/limited": { id: "limited", mimeType: FOLDER, trashed: false, capabilities: { canListChildren: false } },
+        "/files/limited": {
+          id: "limited",
+          mimeType: FOLDER,
+          trashed: false,
+          capabilities: { canListChildren: false },
+        },
         "/files/trashed": { id: "trashed", mimeType: "application/pdf", trashed: true },
       });
 
@@ -190,8 +250,10 @@ describe("Google resource configurators", () => {
     it("names the grant listing shared drives needs, without asking Drive, until the account holds it", async () => {
       const calls = stubDrive({ "/drives": { drives: [] } });
 
-      await expect(picker(false).listDriveNodes("shared-drives", "", null))
-        .resolves.toEqual({ nodes: [], needsGrant: SHARED_DRIVES_GRANT });
+      await expect(picker(false).listDriveNodes("shared-drives", "", null)).resolves.toEqual({
+        nodes: [],
+        needsGrant: SHARED_DRIVES_GRANT,
+      });
       expect(calls).toEqual([]);
     });
 
@@ -200,7 +262,12 @@ describe("Google resource configurators", () => {
       const calls = stubDrive({
         "/files": {
           files: [
-            { id: "mine", name: "Team plans", mimeType: FOLDER, capabilities: { canListChildren: true } },
+            {
+              id: "mine",
+              name: "Team plans",
+              mimeType: FOLDER,
+              capabilities: { canListChildren: true },
+            },
             { id: "theirs", name: "Team budget", owners: [{ displayName: "Ada" }] },
             { id: "in-drive", name: "Team drive notes", driveId: "drive-1" },
           ],
@@ -209,7 +276,7 @@ describe("Google resource configurators", () => {
 
       const { nodes } = await picker().listDriveNodes("folder:F1", "Team", null);
 
-      expect(nodes.map(node => [node.id, node.detail])).toEqual([
+      expect(nodes.map((node) => [node.id, node.detail])).toEqual([
         ["folder:mine", "My Drive"],
         ["file:theirs", "Ada"],
         ["file:in-drive", "In a shared drive"],
@@ -223,7 +290,14 @@ describe("Google resource configurators", () => {
     // unique name needs none.
     it("tells apart nodes whose names look the same", async () => {
       const long = "x".repeat(240);
-      const names = ["Budget", "Budget\u200e", "budget\u200b", "Budget plan", `${long}A`, `${long}B`];
+      const names = [
+        "Budget",
+        "Budget\u200e",
+        "budget\u200b",
+        "Budget plan",
+        `${long}A`,
+        `${long}B`,
+      ];
       stubDrive({
         "/files": {
           files: [
@@ -235,39 +309,66 @@ describe("Google resource configurators", () => {
 
       const { nodes } = await picker().listDriveNodes("drive", "Budget", null);
 
-      expect(nodes.map(node => node.detail)).toEqual([
-        "My Drive · id0", "My Drive · id1", "My Drive · id2", "My Drive", "My Drive · id4",
-        "My Drive · id5", "In a shared drive",
+      expect(nodes.map((node) => node.detail)).toEqual([
+        "My Drive · id0",
+        "My Drive · id1",
+        "My Drive · id2",
+        "My Drive",
+        "My Drive · id4",
+        "My Drive · id5",
+        "In a shared drive",
       ]);
     });
 
     // The links Drive's and Docs' Copy link give out, and a browser's address bar, which adds the
     // signed-in account's index when there are several.
     it.each([
-      ["a folder's sharing link", "https://drive.google.com/drive/folders/D2?usp=sharing", "folder:D2"],
-      ["a folder from the address bar", "https://drive.google.com/drive/u/1/folders/D2", "folder:D2"],
-      ["a file's sharing link", " https://drive.google.com/file/d/F9/view?usp=drive_link ", "file:F9"],
+      [
+        "a folder's sharing link",
+        "https://drive.google.com/drive/folders/D2?usp=sharing",
+        "folder:D2",
+      ],
+      [
+        "a folder from the address bar",
+        "https://drive.google.com/drive/u/1/folders/D2",
+        "folder:D2",
+      ],
+      [
+        "a file's sharing link",
+        " https://drive.google.com/file/d/F9/view?usp=drive_link ",
+        "file:F9",
+      ],
       ["a Google Doc's link", "https://docs.google.com/document/d/F9/edit?usp=sharing", "file:F9"],
-      ["a Google Sheet from the address bar", "https://docs.google.com/spreadsheets/u/0/d/F9/edit#gid=0", "file:F9"],
+      [
+        "a Google Sheet from the address bar",
+        "https://docs.google.com/spreadsheets/u/0/d/F9/edit#gid=0",
+        "file:F9",
+      ],
     ])("finds the node %s names, instead of searching for it by name", async (_, link, id) => {
       const calls = stubDrive({
-        "/files/D2": { id: "D2", name: "Specs", mimeType: FOLDER, capabilities: { canListChildren: true } },
+        "/files/D2": {
+          id: "D2",
+          name: "Specs",
+          mimeType: FOLDER,
+          capabilities: { canListChildren: true },
+        },
         "/files/F9": { id: "F9", name: "Q3", mimeType: "application/vnd.google-apps.document" },
         "/files/root": { id: "0AMyRoot", name: "My Drive", mimeType: FOLDER },
       });
 
       const { nodes } = await picker().listDriveNodes("folder:F1", link, null);
 
-      expect(nodes.map(node => node.id)).toEqual([id]);
-      expect(calls.map(url => url.pathname)).not.toContain("/drive/v3/files");
+      expect(nodes.map((node) => node.id)).toEqual([id]);
+      expect(calls.map((url) => url.pathname)).not.toContain("/drive/v3/files");
     });
 
     it("finds nothing for a link to a node this account cannot see", async () => {
       const calls = stubDrive({});
 
-      await expect(picker().listDriveNodes("drive", "https://drive.google.com/file/d/F0/view", null))
-        .resolves.toEqual({ nodes: [] });
-      expect(calls.map(url => url.pathname)).not.toContain("/drive/v3/files");
+      await expect(
+        picker().listDriveNodes("drive", "https://drive.google.com/file/d/F0/view", null),
+      ).resolves.toEqual({ nodes: [] });
+      expect(calls.map((url) => url.pathname)).not.toContain("/drive/v3/files");
     });
 
     // A folder with limited access shows its name to a reader of a file inside it, but not its
@@ -277,15 +378,22 @@ describe("Google resource configurators", () => {
       stubDrive({
         "/files/F9": { id: "F9", name: "Q3.pdf", mimeType: "application/pdf", parents: ["A"] },
         "/files/A": {
-          id: "A", name: "Archive", mimeType: FOLDER, parents: ["0AMyRoot"],
-          trashed: false, capabilities: { canListChildren: false },
+          id: "A",
+          name: "Archive",
+          mimeType: FOLDER,
+          parents: ["0AMyRoot"],
+          trashed: false,
+          capabilities: { canListChildren: false },
         },
         "/files/0AMyRoot": { id: "0AMyRoot", name: "My Drive", mimeType: FOLDER, ...listable },
         "/files/root": { id: "0AMyRoot", name: "My Drive", mimeType: FOLDER, ...listable },
       });
 
       await expect(picker().getDriveNode("file:F9")).resolves.toEqual({
-        id: "file:F9", title: "Q3.pdf", kind: "file", mimeType: "application/pdf",
+        id: "file:F9",
+        title: "Q3.pdf",
+        kind: "file",
+        mimeType: "application/pdf",
         path: [
           { id: "folder:0AMyRoot", title: "My Drive", listable: true },
           { id: "folder:A", title: "Archive", listable: false },
@@ -296,17 +404,29 @@ describe("Google resource configurators", () => {
     it("places a pre-filled folder in its shared drive, without asking for My Drive", async () => {
       const calls = stubDrive({
         "/files/D2": {
-          id: "D2", name: "Specs", mimeType: FOLDER, driveId: "0ADrive", parents: ["0ADrive"],
+          id: "D2",
+          name: "Specs",
+          mimeType: FOLDER,
+          driveId: "0ADrive",
+          parents: ["0ADrive"],
           capabilities: { canListChildren: true },
         },
-        "/files/0ADrive": { id: "0ADrive", name: "Engineering", mimeType: FOLDER, driveId: "0ADrive" },
+        "/files/0ADrive": {
+          id: "0ADrive",
+          name: "Engineering",
+          mimeType: FOLDER,
+          driveId: "0ADrive",
+        },
       });
 
       await expect(picker().getDriveNode("folder:D2")).resolves.toMatchObject({
         id: "folder:D2",
-        path: [{ id: "shared-drives", title: "Shared drives" }, { id: "folder:0ADrive", title: "Engineering" }],
+        path: [
+          { id: "shared-drives", title: "Shared drives" },
+          { id: "folder:0ADrive", title: "Engineering" },
+        ],
       });
-      expect(calls.map(url => url.pathname)).not.toContain("/drive/v3/files/root");
+      expect(calls.map((url) => url.pathname)).not.toContain("/drive/v3/files/root");
     });
 
     // The walk costs a request per level, so it stops 20 folders up.
@@ -316,10 +436,23 @@ describe("Google resource configurators", () => {
     ])("%s", async (_, depth, pathLength) => {
       const ids = Array.from({ length: depth }, (_, index) => `F${index}`);
       stubDrive({
-        "/files/leaf": { id: "leaf", name: "Leaf.pdf", mimeType: "application/pdf", parents: [ids[0]] },
-        ...Object.fromEntries(ids.map((id, index) => [`/files/${id}`, {
-          id, name: id, mimeType: FOLDER, ...(index + 1 < depth ? { parents: [ids[index + 1]] } : {}),
-        }])),
+        "/files/leaf": {
+          id: "leaf",
+          name: "Leaf.pdf",
+          mimeType: "application/pdf",
+          parents: [ids[0]],
+        },
+        ...Object.fromEntries(
+          ids.map((id, index) => [
+            `/files/${id}`,
+            {
+              id,
+              name: id,
+              mimeType: FOLDER,
+              ...(index + 1 < depth ? { parents: [ids[index + 1]] } : {}),
+            },
+          ]),
+        ),
         "/files/root": { id: ids.at(-1), name: "My Drive", mimeType: FOLDER },
       });
 
@@ -330,7 +463,9 @@ describe("Google resource configurators", () => {
 
     // A partial path would show the node somewhere it is not.
     it("leaves out the path of a file shared from a folder this account cannot see", async () => {
-      stubDrive({ "/files/S1": { id: "S1", name: "Shared", mimeType: "text/plain", parents: ["hidden"] } });
+      stubDrive({
+        "/files/S1": { id: "S1", name: "Shared", mimeType: "text/plain", parents: ["hidden"] },
+      });
 
       const node = await picker().getDriveNode("file:S1");
 
@@ -351,10 +486,13 @@ describe("Google resource configurators", () => {
   it("offers every calendar the account can write, including limited writers", async () => {
     let getToken = vi.fn(async () => token("access-token"));
     let requestUrl: URL | undefined;
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-      requestUrl = new URL(input instanceof Request ? input.url : input);
-      return Response.json({ items: [] });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        requestUrl = new URL(input instanceof Request ? input.url : input);
+        return Response.json({ items: [] });
+      }),
+    );
 
     await new CalendarConfiguratorUI(getToken).listCalendars("");
 
@@ -364,9 +502,12 @@ describe("Google resource configurators", () => {
   // A limited writer can edit the calendar but not see private events, so it may be chosen as a
   // binding target yet must not be admitted as an observer of one.
   it("separates write access from private-event access only for limited writers", () => {
-    const calendar = (accessRole: string) => ({
-      id: "shared@example.com", summary: "Shared", accessRole,
-    } as Parameters<typeof hasCalendarWriteRole>[0]);
+    const calendar = (accessRole: string) =>
+      ({
+        id: "shared@example.com",
+        summary: "Shared",
+        accessRole,
+      }) as Parameters<typeof hasCalendarWriteRole>[0];
 
     for (const role of ["owner", "writer"]) {
       expect(hasCalendarWriteRole(calendar(role))).toBe(true);
@@ -378,8 +519,9 @@ describe("Google resource configurators", () => {
       expect(hasCalendarWriteRole(calendar(role))).toBe(false);
       expect(hasCalendarPrivateAccessRole(calendar(role))).toBe(false);
     }
-    expect(calendarPickerRank(calendar("writerWithoutPrivateAccess")))
-      .toBeLessThan(calendarPickerRank(calendar("reader")));
+    expect(calendarPickerRank(calendar("writerWithoutPrivateAccess"))).toBeLessThan(
+      calendarPickerRank(calendar("reader")),
+    );
   });
 
   it.each([
@@ -387,62 +529,88 @@ describe("Google resource configurators", () => {
     ["writer", true],
     ["writerWithoutPrivateAccess", true],
     ["reader", false],
-  ] as const)("reports %s access accurately for an exact calendar", async (accessRole, expected) => {
-    let getToken = vi.fn(async () => token("access-token"));
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      id: "shared@example.com",
-      summary: "Shared calendar",
-      accessRole,
-    })));
+  ] as const)(
+    "reports %s access accurately for an exact calendar",
+    async (accessRole, expected) => {
+      let getToken = vi.fn(async () => token("access-token"));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          Response.json({
+            id: "shared@example.com",
+            summary: "Shared calendar",
+            accessRole,
+          }),
+        ),
+      );
 
-    await expect(new CalendarConfiguratorUI(getToken).canWriteCalendar("shared@example.com"))
-      .resolves.toBe(expected);
-  });
+      await expect(
+        new CalendarConfiguratorUI(getToken).canWriteCalendar("shared@example.com"),
+      ).resolves.toBe(expected);
+    },
+  );
 
   it("treats inaccessible exact calendars as unavailable", async () => {
     let getToken = vi.fn(async () => token("access-token"));
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("not found", { status: 404 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("not found", { status: 404 })),
+    );
 
-    await expect(new CalendarConfiguratorUI(getToken).canWriteCalendar("private@example.com"))
-      .resolves.toBe(false);
+    await expect(
+      new CalendarConfiguratorUI(getToken).canWriteCalendar("private@example.com"),
+    ).resolves.toBe(false);
   });
 
   it("surfaces transient exact-calendar failures", async () => {
     let getToken = vi.fn(async () => token("access-token"));
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("unavailable", { status: 500 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("unavailable", { status: 500 })),
+    );
 
-    await expect(new CalendarConfiguratorUI(getToken).canWriteCalendar("shared@example.com"))
-      .rejects.toThrow("Google Calendar API request failed: 500");
+    await expect(
+      new CalendarConfiguratorUI(getToken).canWriteCalendar("shared@example.com"),
+    ).rejects.toThrow("Google Calendar API request failed: 500");
   });
 
   it("does not mistake a quota 403 for missing Calendar access", async () => {
     let getToken = vi.fn(async () => token("access-token"));
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("rate limit", { status: 403 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("rate limit", { status: 403 })),
+    );
 
-    await expect(new CalendarConfiguratorUI(getToken).canWriteCalendar("shared@example.com"))
-      .rejects.toThrow("Google Calendar API request failed: 403");
+    await expect(
+      new CalendarConfiguratorUI(getToken).canWriteCalendar("shared@example.com"),
+    ).rejects.toThrow("Google Calendar API request failed: 403");
   });
 
   it("refreshes a rejected Calendar access token", async () => {
     let getToken = vi.fn(async (opts?: AccessTokenRequest) =>
-      token(opts?.forceRefresh ? "fresh" : "stale"));
-    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-      let authorization = new Headers(init?.headers).get("Authorization");
-      if (authorization === "Bearer stale") {
-        return Response.json({ error: { code: 401 } }, { status: 401 });
-      }
-      return Response.json({
-        items: [{ id: "person@example.com", summary: "Primary calendar", primary: true }],
-      });
-    }));
+      token(opts?.forceRefresh ? "fresh" : "stale"),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        let authorization = new Headers(init?.headers).get("Authorization");
+        if (authorization === "Bearer stale") {
+          return Response.json({ error: { code: 401 } }, { status: 401 });
+        }
+        return Response.json({
+          items: [{ id: "person@example.com", summary: "Primary calendar", primary: true }],
+        });
+      }),
+    );
 
-    await expect(new CalendarConfiguratorUI(getToken).listCalendars(""))
-      .resolves.toEqual([{
+    await expect(new CalendarConfiguratorUI(getToken).listCalendars("")).resolves.toEqual([
+      {
         value: "person@example.com",
         title: "Primary calendar",
         subtitle: "Primary calendar",
         meta: undefined,
-      }]);
+      },
+    ]);
     expect(getToken.mock.calls).toEqual([
       [undefined],
       [{ forceRefresh: true, staleToken: "stale" }],
@@ -451,37 +619,43 @@ describe("Google resource configurators", () => {
 
   it("reloads a widened BigQuery access token after a scope 403", async () => {
     let getToken = vi.fn(async (opts?: AccessTokenRequest) =>
-      token(opts?.reloadStored ? "widened" : "narrow"));
-    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
-      let authorization = new Headers(init?.headers).get("Authorization");
-      if (authorization === "Bearer narrow") {
-        return Response.json({ error: { code: 403 } }, { status: 403 });
-      }
-      return Response.json({
-        projects: [{
-          id: "project-1",
-          friendlyName: "Project One",
-          projectReference: { projectId: "project-1" },
-        }],
-      });
-    }));
+      token(opts?.reloadStored ? "widened" : "narrow"),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        let authorization = new Headers(init?.headers).get("Authorization");
+        if (authorization === "Bearer narrow") {
+          return Response.json({ error: { code: 403 } }, { status: 403 });
+        }
+        return Response.json({
+          projects: [
+            {
+              id: "project-1",
+              friendlyName: "Project One",
+              projectReference: { projectId: "project-1" },
+            },
+          ],
+        });
+      }),
+    );
 
-    await expect(new BigQueryConfiguratorUI(getToken).listProjects(""))
-      .resolves.toEqual([{
+    await expect(new BigQueryConfiguratorUI(getToken).listProjects("")).resolves.toEqual([
+      {
         value: "project-1",
         title: "project-1",
         subtitle: "Project One",
-      }]);
-    expect(getToken.mock.calls).toEqual([
-      [undefined],
-      [{ reloadStored: true }],
+      },
     ]);
+    expect(getToken.mock.calls).toEqual([[undefined], [{ reloadStored: true }]]);
   });
 });
 
 /** Every Doc, Sheets and Slides configurator has the same RPC surface beyond its listing. */
 type OfficeConfigurator = Omit<GoogleDocConfiguratorRpc, "listDocs"> & {
-  list(query: string): Promise<{ value: string; title: string; subtitle?: string; meta?: string }[]>;
+  list(
+    query: string,
+  ): Promise<{ value: string; title: string; subtitle?: string; meta?: string }[]>;
 };
 
 type OfficeKindCase = {
@@ -499,22 +673,37 @@ type OfficeKindCase = {
 
 const OFFICE_KIND_CASES: OfficeKindCase[] = [
   {
-    kind: "sheets", pattern: GOOGLE_SHEETS_RESOURCE.urlPattern, list: "listSpreadsheets",
-    title: "Sheets", native: GOOGLE_SHEET_MIME_TYPE,
-    office: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", label: "xlsx",
-    other: "application/vnd.ms-excel.sheet.macroEnabled.12", otherLabel: "xlsm",
+    kind: "sheets",
+    pattern: GOOGLE_SHEETS_RESOURCE.urlPattern,
+    list: "listSpreadsheets",
+    title: "Sheets",
+    native: GOOGLE_SHEET_MIME_TYPE,
+    office: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    label: "xlsx",
+    other: "application/vnd.ms-excel.sheet.macroEnabled.12",
+    otherLabel: "xlsm",
   },
   {
-    kind: "doc", pattern: GOOGLE_DOC_RESOURCE.urlPattern, list: "listDocs",
-    title: "Docs", native: GOOGLE_DOC_MIME_TYPE,
+    kind: "doc",
+    pattern: GOOGLE_DOC_RESOURCE.urlPattern,
+    list: "listDocs",
+    title: "Docs",
+    native: GOOGLE_DOC_MIME_TYPE,
     office: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    label: "docx", other: "application/msword", otherLabel: "doc",
+    label: "docx",
+    other: "application/msword",
+    otherLabel: "doc",
   },
   {
-    kind: "slides", pattern: GOOGLE_SLIDES_RESOURCE.urlPattern, list: "listPresentations",
-    title: "Slides", native: GOOGLE_SLIDES_MIME_TYPE,
+    kind: "slides",
+    pattern: GOOGLE_SLIDES_RESOURCE.urlPattern,
+    list: "listPresentations",
+    title: "Slides",
+    native: GOOGLE_SLIDES_MIME_TYPE,
     office: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    label: "pptx", other: "application/vnd.ms-powerpoint", otherLabel: "ppt",
+    label: "pptx",
+    other: "application/vnd.ms-powerpoint",
+    otherLabel: "ppt",
   },
 ];
 
@@ -546,17 +735,20 @@ class FakeDrive {
   }
 
   get copies() {
-    return this.requests.filter(request => request.method === "POST");
+    return this.requests.filter((request) => request.method === "POST");
   }
 
   install(): this {
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      let url = new URL(input instanceof Request ? input.url : input.toString());
-      let method = init?.method ?? "GET";
-      let body = init?.body === undefined ? undefined : JSON.parse(String(init.body));
-      this.requests.push({ method, url, ...(body === undefined ? {} : { body }) });
-      return this.#answer(method, url, body);
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        let url = new URL(input instanceof Request ? input.url : input.toString());
+        let method = init?.method ?? "GET";
+        let body = init?.body === undefined ? undefined : JSON.parse(String(init.body));
+        this.requests.push({ method, url, ...(body === undefined ? {} : { body }) });
+        return this.#answer(method, url, body);
+      }),
+    );
     return this;
   }
 
@@ -566,17 +758,25 @@ class FakeDrive {
     if (path === "/about") return Response.json({ maxImportSizes: {} });
     if (path === "/files") {
       let q = url.searchParams.get("q") ?? "";
-      let sourceId = /appProperties has \{ key='gadgetsConvertedFrom' and value='([^']+)' \}/.exec(q)?.[1];
-      let files = [...this.files.values()].filter(file => sourceId === undefined
-        ? q.includes(`mimeType = '${file.mimeType}'`)
-        : file.appProperties?.gadgetsConvertedFrom === sourceId && !file.trashed);
-      return Response.json({ files: files.map(file => this.#fields(file)) });
+      let sourceId = /appProperties has \{ key='gadgetsConvertedFrom' and value='([^']+)' \}/.exec(
+        q,
+      )?.[1];
+      let files = [...this.files.values()].filter((file) =>
+        sourceId === undefined
+          ? q.includes(`mimeType = '${file.mimeType}'`)
+          : file.appProperties?.gadgetsConvertedFrom === sourceId && !file.trashed,
+      );
+      return Response.json({ files: files.map((file) => this.#fields(file)) });
     }
     let copy = /^\/files\/([^/]+)\/copy$/.exec(path);
     if (copy && method === "POST") {
       let made: FakeFile = {
-        id: `copy-of-${copy[1]}`, name: body.name, mimeType: body.mimeType, trashed: false,
-        parents: body.parents, createdTime: "2026-10-15T10:00:00.000Z",
+        id: `copy-of-${copy[1]}`,
+        name: body.name,
+        mimeType: body.mimeType,
+        trashed: false,
+        parents: body.parents,
+        createdTime: "2026-10-15T10:00:00.000Z",
         appProperties: body.appProperties,
       };
       this.files.set(made.id, made);
@@ -592,8 +792,13 @@ class FakeDrive {
 
   #fields(file: FakeFile) {
     return {
-      id: file.id, name: file.name, mimeType: file.mimeType, trashed: file.trashed ?? false,
-      parents: file.parents, createdTime: file.createdTime, modifiedTime: file.modifiedTime,
+      id: file.id,
+      name: file.name,
+      mimeType: file.mimeType,
+      trashed: file.trashed ?? false,
+      parents: file.parents,
+      createdTime: file.createdTime,
+      modifiedTime: file.modifiedTime,
       appProperties: file.appProperties,
       capabilities: { canCopy: file.canCopy ?? true, canEdit: file.canEdit ?? true },
     };
@@ -619,17 +824,19 @@ async function startOfficeConfigurator(testCase: OfficeKindCase, granted: string
   // Each result is awaited into a plain promise: an RpcPromise is callable, and `expect().rejects`
   // would call it.
   let ui: OfficeConfigurator = {
-    list: async query => await stub[testCase.list](query),
-    inspectFile: async fileId => await stub.inspectFile(fileId),
+    list: async (query) => await stub[testCase.list](query),
+    inspectFile: async (fileId) => await stub.inspectFile(fileId),
     hasConversionAccess: async () => await stub.hasConversionAccess(),
-    convertFile: async (fileId, opts) => opts === undefined
-      ? await stub.convertFile(fileId) : await stub.convertFile(fileId, opts),
+    convertFile: async (fileId, opts) =>
+      opts === undefined ? await stub.convertFile(fileId) : await stub.convertFile(fileId, opts),
   };
   return { ui, account, user };
 }
 
 const OFFICE_CONFIGURATOR_UIS = {
-  doc: GoogleDocConfiguratorUI, sheets: GoogleSheetsConfiguratorUI, slides: GoogleSlidesConfiguratorUI,
+  doc: GoogleDocConfiguratorUI,
+  sheets: GoogleSheetsConfiguratorUI,
+  slides: GoogleSlidesConfiguratorUI,
 };
 
 /**
@@ -637,24 +844,33 @@ const OFFICE_CONFIGURATOR_UIS = {
  * workerd reports a rejection through a local RPC stub as uncaught even once it is handled.
  */
 function directOfficeConfigurator(testCase: OfficeKindCase): OfficeConfigurator {
-  let conversion = new OfficeConversion(testCase.kind, async () => "access-token", async () => true);
+  let conversion = new OfficeConversion(
+    testCase.kind,
+    async () => "access-token",
+    async () => true,
+  );
   let target = new OFFICE_CONFIGURATOR_UIS[testCase.kind](
-    async () => token("access-token"), conversion,
+    async () => token("access-token"),
+    conversion,
   ) as unknown as Record<string, (...args: unknown[]) => Promise<any>>;
   return {
-    list: query => target[testCase.list](query),
-    inspectFile: fileId => target.inspectFile(fileId),
+    list: (query) => target[testCase.list](query),
+    inspectFile: (fileId) => target.inspectFile(fileId),
     hasConversionAccess: () => target.hasConversionAccess(),
     convertFile: (fileId, opts) => target.convertFile(fileId, opts),
   };
 }
 
 const officeSource = (testCase: OfficeKindCase, overrides: Partial<FakeFile> = {}): FakeFile => ({
-  id: "source-1", name: `Report.${testCase.label}`, mimeType: testCase.office,
-  parents: ["folder-1"], modifiedTime: "2026-10-01T00:00:00.000Z", ...overrides,
+  id: "source-1",
+  name: `Report.${testCase.label}`,
+  mimeType: testCase.office,
+  parents: ["folder-1"],
+  modifiedTime: "2026-10-01T00:00:00.000Z",
+  ...overrides,
 });
 
-describe.each(OFFICE_KIND_CASES)("the $title configurator's Office files", testCase => {
+describe.each(OFFICE_KIND_CASES)("the $title configurator's Office files", (testCase) => {
   it("lists native files and the Office files a connect converts, labelled", async () => {
     let drive = new FakeDrive(
       { id: "native-1", name: "Report", mimeType: testCase.native },
@@ -668,11 +884,15 @@ describe.each(OFFICE_KIND_CASES)("the $title configurator's Office files", testC
     expect(options).toEqual([
       { value: "native-1", title: "Report", subtitle: "" },
       {
-        value: "office-1", title: `Report.${testCase.label.toUpperCase()}`, subtitle: "",
+        value: "office-1",
+        title: `Report.${testCase.label.toUpperCase()}`,
+        subtitle: "",
         meta: `Makes a Google ${testCase.title} copy`,
       },
       {
-        value: "office-2", title: `Report draft (${testCase.otherLabel})`, subtitle: "",
+        value: "office-2",
+        title: `Report draft (${testCase.otherLabel})`,
+        subtitle: "",
         meta: `Makes a Google ${testCase.title} copy`,
       },
     ]);
@@ -694,10 +914,14 @@ describe.each(OFFICE_KIND_CASES)("the $title configurator's Office files", testC
 
     await expect(ui.inspectFile("native-1")).resolves.toEqual({ type: "native" });
     await expect(ui.inspectFile("source-1")).resolves.toEqual({
-      type: "office", title: `Report.${testCase.label}`, label: testCase.label, canCopy: true,
+      type: "office",
+      title: `Report.${testCase.label}`,
+      label: testCase.label,
+      canCopy: true,
     });
-    await expect(ui.inspectFile("locked-1")).resolves
-      .toEqual(expect.objectContaining({ type: "office", canCopy: false }));
+    await expect(ui.inspectFile("locked-1")).resolves.toEqual(
+      expect.objectContaining({ type: "office", canCopy: false }),
+    );
     await expect(ui.inspectFile("csv-1")).resolves.toEqual({ type: "unsupported" });
   });
 
@@ -706,26 +930,45 @@ describe.each(OFFICE_KIND_CASES)("the $title configurator's Office files", testC
     let { ui } = await startOfficeConfigurator(testCase);
 
     await expect(ui.inspectFile("source-1")).resolves.toEqual({
-      type: "refused", message: "This file is in the Drive trash. Restore it before converting it.",
+      type: "refused",
+      message: "This file is in the Drive trash. Restore it before converting it.",
     });
   });
 
   it("offers the copy made before, with the date it was made, and only one the account can edit", async () => {
-    new FakeDrive(officeSource(testCase), {
-      id: "theirs", name: "Report", mimeType: testCase.native, parents: ["shared-folder"],
-      canEdit: false, createdTime: "2026-10-05T00:00:00.000Z",
-      appProperties: { gadgetsConvertedFrom: "source-1" },
-    }, {
-      id: "copy-a", name: "Report", mimeType: testCase.native, parents: ["folder-1"],
-      createdTime: "2026-10-04T00:00:00.000Z", appProperties: { gadgetsConvertedFrom: "source-1" },
-    }).install();
+    new FakeDrive(
+      officeSource(testCase),
+      {
+        id: "theirs",
+        name: "Report",
+        mimeType: testCase.native,
+        parents: ["shared-folder"],
+        canEdit: false,
+        createdTime: "2026-10-05T00:00:00.000Z",
+        appProperties: { gadgetsConvertedFrom: "source-1" },
+      },
+      {
+        id: "copy-a",
+        name: "Report",
+        mimeType: testCase.native,
+        parents: ["folder-1"],
+        createdTime: "2026-10-04T00:00:00.000Z",
+        appProperties: { gadgetsConvertedFrom: "source-1" },
+      },
+    ).install();
     let { ui } = await startOfficeConfigurator(testCase);
 
     let inspection = await ui.inspectFile("source-1");
 
-    expect(inspection).toEqual(expect.objectContaining({
-      existingCopy: { fileId: "copy-a", title: "Report", convertedAt: new Date("2026-10-04T00:00:00.000Z") },
-    }));
+    expect(inspection).toEqual(
+      expect.objectContaining({
+        existingCopy: {
+          fileId: "copy-a",
+          title: "Report",
+          convertedAt: new Date("2026-10-04T00:00:00.000Z"),
+        },
+      }),
+    );
   });
 
   it("asks for access, without calling Drive, until the account holds the grant", async () => {
@@ -749,17 +992,31 @@ describe.each(OFFICE_KIND_CASES)("the $title configurator's Office files", testC
     let { ui } = await startOfficeConfigurator(testCase, [OFFICE_IMPORT_GRANT]);
 
     await expect(ui.convertFile("source-1")).resolves.toEqual({
-      type: "converted", fileId: "copy-of-source-1", title: "Report", location: "besideOriginal",
+      type: "converted",
+      fileId: "copy-of-source-1",
+      title: "Report",
+      location: "besideOriginal",
       reused: false,
     });
-    expect(drive.copies.map(copy => copy.body)).toEqual([{
-      name: "Report", mimeType: testCase.native, parents: ["folder-1"],
-      appProperties: { gadgetsConvertedFrom: "source-1", gadgetsSourceModified: "2026-10-01T00:00:00.000Z" },
-    }]);
-    expect(info).toHaveBeenCalledWith(expect.objectContaining({
-      event: "google.office.converted", conversionKind: testCase.kind, fileId: "source-1",
-      copyFileId: "copy-of-source-1",
-    }));
+    expect(drive.copies.map((copy) => copy.body)).toEqual([
+      {
+        name: "Report",
+        mimeType: testCase.native,
+        parents: ["folder-1"],
+        appProperties: {
+          gadgetsConvertedFrom: "source-1",
+          gadgetsSourceModified: "2026-10-01T00:00:00.000Z",
+        },
+      },
+    ]);
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "google.office.converted",
+        conversionKind: testCase.kind,
+        fileId: "source-1",
+        copyFileId: "copy-of-source-1",
+      }),
+    );
   });
 
   it("copies into My Drive's root when the original's folder cannot take it", async () => {
@@ -767,22 +1024,32 @@ describe.each(OFFICE_KIND_CASES)("the $title configurator's Office files", testC
     let drive = new FakeDrive(officeSource(testCase, { parents: ["read-only-folder"] })).install();
     let { ui } = await startOfficeConfigurator(testCase, [OFFICE_IMPORT_GRANT]);
 
-    await expect(ui.convertFile("source-1")).resolves.toEqual(expect.objectContaining({
-      type: "converted", location: "myDrive",
-    }));
-    expect(drive.copies.map(copy => copy.body.parents)).toEqual([["root"]]);
+    await expect(ui.convertFile("source-1")).resolves.toEqual(
+      expect.objectContaining({
+        type: "converted",
+        location: "myDrive",
+      }),
+    );
+    expect(drive.copies.map((copy) => copy.body.parents)).toEqual([["root"]]);
   });
 
   it("reuses a copy made before without the grant", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     let drive = new FakeDrive(officeSource(testCase), {
-      id: "copy-a", name: "Report", mimeType: testCase.native, parents: ["folder-1"],
+      id: "copy-a",
+      name: "Report",
+      mimeType: testCase.native,
+      parents: ["folder-1"],
       appProperties: { gadgetsConvertedFrom: "source-1" },
     }).install();
     let { ui, account } = await startOfficeConfigurator(testCase);
 
     await expect(ui.convertFile("source-1", { reuse: "copy-a" })).resolves.toEqual({
-      type: "converted", fileId: "copy-a", title: "Report", location: "besideOriginal", reused: true,
+      type: "converted",
+      fileId: "copy-a",
+      title: "Report",
+      location: "besideOriginal",
+      reused: true,
     });
     expect(account.getGrantedResourceUrlPatterns).not.toHaveBeenCalled();
     expect(drive.copies).toEqual([]);
@@ -791,13 +1058,17 @@ describe.each(OFFICE_KIND_CASES)("the $title configurator's Office files", testC
   it("still reuses a copy made before once the owner has turned off copying", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     let drive = new FakeDrive(officeSource(testCase, { canCopy: false }), {
-      id: "copy-a", name: "Report", mimeType: testCase.native, parents: ["folder-1"],
+      id: "copy-a",
+      name: "Report",
+      mimeType: testCase.native,
+      parents: ["folder-1"],
       appProperties: { gadgetsConvertedFrom: "source-1" },
     }).install();
     let ui = directOfficeConfigurator(testCase);
 
     await expect(ui.convertFile("source-1", { reuse: "copy-a" })).resolves.toEqual(
-      expect.objectContaining({ type: "converted", fileId: "copy-a", reused: true }));
+      expect.objectContaining({ type: "converted", fileId: "copy-a", reused: true }),
+    );
     expect(drive.copies).toEqual([]);
   });
 
@@ -819,8 +1090,9 @@ describe.each(OFFICE_KIND_CASES)("the $title configurator's Office files", testC
     let ui = directOfficeConfigurator(testCase);
 
     await expect(ui.convertFile("../source-1")).rejects.toThrow("Not a Google Drive file ID.");
-    await expect(ui.convertFile("source-1", { reuse: "copy/1" }))
-      .rejects.toThrow("Not a Google Drive file ID.");
+    await expect(ui.convertFile("source-1", { reuse: "copy/1" })).rejects.toThrow(
+      "Not a Google Drive file ID.",
+    );
     expect(drive.requests).toEqual([]);
   });
 
@@ -829,43 +1101,90 @@ describe.each(OFFICE_KIND_CASES)("the $title configurator's Office files", testC
     let warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     let drive = new FakeDrive(
       officeSource(testCase),
-      { id: "copy-a", name: "Report", mimeType: testCase.native, parents: ["folder-1"],
-        appProperties: { gadgetsConvertedFrom: "source-1" } },
-      { id: "copy-b", name: "Other", mimeType: testCase.native,
-        appProperties: { gadgetsConvertedFrom: "source-2" } },
-      { id: "copy-c", name: "Report", mimeType: testCase.native, trashed: true,
-        appProperties: { gadgetsConvertedFrom: "source-1" } },
-      { id: "copy-d", name: "Report", mimeType: testCase.native, canEdit: false,
-        appProperties: { gadgetsConvertedFrom: "source-1" } },
+      {
+        id: "copy-a",
+        name: "Report",
+        mimeType: testCase.native,
+        parents: ["folder-1"],
+        appProperties: { gadgetsConvertedFrom: "source-1" },
+      },
+      {
+        id: "copy-b",
+        name: "Other",
+        mimeType: testCase.native,
+        appProperties: { gadgetsConvertedFrom: "source-2" },
+      },
+      {
+        id: "copy-c",
+        name: "Report",
+        mimeType: testCase.native,
+        trashed: true,
+        appProperties: { gadgetsConvertedFrom: "source-1" },
+      },
+      {
+        id: "copy-d",
+        name: "Report",
+        mimeType: testCase.native,
+        canEdit: false,
+        appProperties: { gadgetsConvertedFrom: "source-1" },
+      },
     ).install();
     let ui = directOfficeConfigurator(testCase);
 
     await expect(ui.convertFile("source-1", { reuse: "copy-a" })).resolves.toEqual({
-      type: "converted", fileId: "copy-a", title: "Report", location: "besideOriginal", reused: true,
+      type: "converted",
+      fileId: "copy-a",
+      title: "Report",
+      location: "besideOriginal",
+      reused: true,
     });
-    await expect(ui.convertFile("source-1", { reuse: "copy-b" })).rejects.toThrow("no longer available");
-    await expect(ui.convertFile("source-1", { reuse: "copy-c" })).rejects.toThrow("no longer available");
-    await expect(ui.convertFile("source-1", { reuse: "copy-d" })).rejects.toThrow("no longer available");
+    await expect(ui.convertFile("source-1", { reuse: "copy-b" })).rejects.toThrow(
+      "no longer available",
+    );
+    await expect(ui.convertFile("source-1", { reuse: "copy-c" })).rejects.toThrow(
+      "no longer available",
+    );
+    await expect(ui.convertFile("source-1", { reuse: "copy-d" })).rejects.toThrow(
+      "no longer available",
+    );
     expect(drive.copies).toEqual([]);
-    expect(info).toHaveBeenCalledWith(expect.objectContaining({
-      event: "google.office.reused", conversionKind: testCase.kind, fileId: "source-1",
-      copyFileId: "copy-a",
-    }));
-    expect(warn).toHaveBeenCalledWith(expect.objectContaining({
-      event: "google.office.failed", conversionKind: testCase.kind, fileId: "source-1",
-      method: "reuse",
-    }));
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "google.office.reused",
+        conversionKind: testCase.kind,
+        fileId: "source-1",
+        copyFileId: "copy-a",
+      }),
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "google.office.failed",
+        conversionKind: testCase.kind,
+        fileId: "source-1",
+        method: "reuse",
+      }),
+    );
     expect(JSON.stringify([...info.mock.calls, ...warn.mock.calls])).not.toContain("Other");
   });
 });
 
 describe("the Office import grant", () => {
   it("is held by the account but left out of what the Workshop is told it was granted", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      sub: "1234", name: "Ada", email: "ada@example.com", picture: "https://example.com/ada.png",
-    })));
-    let { user } = await startOfficeConfigurator(
-      OFFICE_KIND_CASES[0], [GOOGLE_SHEETS_RESOURCE.urlPattern, OFFICE_IMPORT_GRANT]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          sub: "1234",
+          name: "Ada",
+          email: "ada@example.com",
+          picture: "https://example.com/ada.png",
+        }),
+      ),
+    );
+    let { user } = await startOfficeConfigurator(OFFICE_KIND_CASES[0], [
+      GOOGLE_SHEETS_RESOURCE.urlPattern,
+      OFFICE_IMPORT_GRANT,
+    ]);
 
     let description = await user.describe();
 
@@ -895,16 +1214,29 @@ async function storedAccount(resourceUrlPatterns: string[]) {
 
 describe("the Office import grant on a stored account", () => {
   it("is kept by the account, so asking for it again needs no consent, but is never described", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
-      sub: "1234", name: "Ada", email: "ada@example.com", picture: "https://example.com/ada.png",
-    })));
-    let { account, user } = await storedAccount([GOOGLE_SHEETS_RESOURCE.urlPattern, OFFICE_IMPORT_GRANT]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          sub: "1234",
+          name: "Ada",
+          email: "ada@example.com",
+          picture: "https://example.com/ada.png",
+        }),
+      ),
+    );
+    let { account, user } = await storedAccount([
+      GOOGLE_SHEETS_RESOURCE.urlPattern,
+      OFFICE_IMPORT_GRANT,
+    ]);
 
     expect(await account.getGrantedResourceUrlPatterns()).toEqual(
-      expect.arrayContaining([GOOGLE_SHEETS_RESOURCE.urlPattern, OFFICE_IMPORT_GRANT]));
+      expect.arrayContaining([GOOGLE_SHEETS_RESOURCE.urlPattern, OFFICE_IMPORT_GRANT]),
+    );
     await expect(user.ensureResources([OFFICE_IMPORT_GRANT])).resolves.toEqual({});
-    expect((await user.describe()).grantedResourceUrlPatterns)
-      .toEqual([GOOGLE_SHEETS_RESOURCE.urlPattern]);
+    expect((await user.describe()).grantedResourceUrlPatterns).toEqual([
+      GOOGLE_SHEETS_RESOURCE.urlPattern,
+    ]);
   });
 
   it("is asked for, with everything already recorded, when the account does not hold it", async () => {
@@ -915,8 +1247,10 @@ describe("the Office import grant on a stored account", () => {
     expect(url).toMatch(new RegExp(`/${account.id.toString()}/[^/]+$`));
     expect(await account.getGrantedResourceUrlPatterns()).not.toContain(OFFICE_IMPORT_GRANT);
     let flow = await runInDurableObject(account, (_instance: unknown, state: DurableObjectState) =>
-      state.storage.kv.get<{ requestedResources: string[] }>(OAUTH_FLOW_KEY));
-    expect(flow?.requestedResources.toSorted())
-      .toEqual([GOOGLE_SHEETS_RESOURCE.urlPattern, OFFICE_IMPORT_GRANT].toSorted());
+      state.storage.kv.get<{ requestedResources: string[] }>(OAUTH_FLOW_KEY),
+    );
+    expect(flow?.requestedResources.toSorted()).toEqual(
+      [GOOGLE_SHEETS_RESOURCE.urlPattern, OFFICE_IMPORT_GRANT].toSorted(),
+    );
   });
 });

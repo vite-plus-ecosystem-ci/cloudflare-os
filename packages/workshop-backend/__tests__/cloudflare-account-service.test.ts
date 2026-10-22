@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import { listAccounts } from "../src/ai-gateway-billing/cloudflare/account-service";
 
 const TOKEN = "test-token";
@@ -23,10 +23,13 @@ it("walks every page rather than stopping at the provider's default page size", 
   // `/accounts` is paginated and defaults to 20 per page, so the unpaginated GET this replaced hid
   // every account after the first 20 -- the user could not pick one of them to bill.
   const urls: string[] = [];
-  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-    urls.push(String(input));
-    return urls.length === 1 ? page(50, 0, 50, 57) : page(7, 50, 50, 57);
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      urls.push(String(input));
+      return urls.length === 1 ? page(50, 0, 50, 57) : page(7, 50, 50, 57);
+    }),
+  );
 
   const accounts = await listAccounts(TOKEN);
 
@@ -59,17 +62,23 @@ it("caps the walk so a misbehaving provider cannot loop forever", async () => {
 
 it("keeps the accounts gathered before a mid-walk failure", async () => {
   let call = 0;
-  vi.stubGlobal("fetch", vi.fn(async () => {
-    call++;
-    return call === 1 ? page(50, 0, 50, 99) : new Response("nope", { status: 500 });
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      call++;
+      return call === 1 ? page(50, 0, 50, 99) : new Response("nope", { status: 500 });
+    }),
+  );
 
   // A partial list beats none: the alternative is showing the user no accounts at all.
   expect(await listAccounts(TOKEN)).toHaveLength(50);
 });
 
 it("returns no accounts when the first page fails", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("denied", { status: 403 })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("denied", { status: 403 })),
+  );
 
   expect(await listAccounts(TOKEN)).toEqual([]);
 });

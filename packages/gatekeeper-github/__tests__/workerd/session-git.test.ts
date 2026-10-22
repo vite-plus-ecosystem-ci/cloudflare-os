@@ -10,7 +10,7 @@
 
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import type { ApprovalQueue } from "@gadgets/workshop-shared/gatekeeper";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { GitHubGatekeeperImpl } from "../../src/github";
 import { GitHubPullRequestImpl, GitHubRepoSessionImpl } from "../../src/github";
 import type {
@@ -112,7 +112,11 @@ function repoSession(queue: TestApprovalQueue, methods: Partial<Record<string, u
   return new GitHubRepoSessionImpl(fakeGatekeeper(methods), queueStub(queue));
 }
 
-function pullSession(queue: TestApprovalQueue, id: string, methods: Partial<Record<string, unknown>>) {
+function pullSession(
+  queue: TestApprovalQueue,
+  id: string,
+  methods: Partial<Record<string, unknown>>,
+) {
   return new GitHubPullRequestImpl(fakeGatekeeper(methods), queueStub(queue), id);
 }
 
@@ -120,10 +124,8 @@ describe("GitHubRepoSessionImpl advertising", () => {
   it("advertises head and base shas per fetched page of listPullRequests", async () => {
     const queue = new TestApprovalQueue();
     const session = repoSession(queue, {
-      listPullRequests: async () => pagesCursor([
-        [pullSummary(1, oid(1), oid(2))],
-        [pullSummary(2, oid(3), oid(2))],
-      ]),
+      listPullRequests: async () =>
+        pagesCursor([[pullSummary(1, oid(1), oid(2))], [pullSummary(2, oid(3), oid(2))]]),
     });
 
     const cursor = await session.listPullRequests();
@@ -139,9 +141,8 @@ describe("GitHubRepoSessionImpl advertising", () => {
   it("advertises head and base shas from searchPullRequests, skipping empty provisional shas", async () => {
     const queue = new TestApprovalQueue();
     const session = repoSession(queue, {
-      searchPullRequests: async () => pagesCursor([
-        [pullSummary(1, oid(1), oid(2)), pullSummary(2, "", "")],
-      ]),
+      searchPullRequests: async () =>
+        pagesCursor([[pullSummary(1, oid(1), oid(2)), pullSummary(2, "", "")]]),
     });
 
     const cursor = await session.searchPullRequests({ text: "frobnicate" });
@@ -169,9 +170,8 @@ describe("GitHubRepoSessionImpl advertising", () => {
     // oid(1) is a pending chain commit; its parent oid(2) is the GitHub-known anchor.
     const queue = new TestApprovalQueue();
     const session = repoSession(queue, {
-      listCommits: async () => pagesCursor([
-        [commitSummary(oid(1), [oid(2)]), commitSummary(oid(2), [oid(3)])],
-      ]),
+      listCommits: async () =>
+        pagesCursor([[commitSummary(oid(1), [oid(2)]), commitSummary(oid(2), [oid(3)])]]),
       isSimulatedCommitId: (id: string) => id === oid(1),
     });
 
@@ -182,9 +182,8 @@ describe("GitHubRepoSessionImpl advertising", () => {
   it("advertises branch heads from listBranches", async () => {
     const queue = new TestApprovalQueue();
     const session = repoSession(queue, {
-      listBranches: async () => pagesCursor([
-        [{ name: "main", headCommit: oid(1), protected: true }],
-      ]),
+      listBranches: async () =>
+        pagesCursor([[{ name: "main", headCommit: oid(1), protected: true }]]),
     });
 
     const cursor = await session.listBranches();
@@ -198,12 +197,13 @@ describe("GitHubRepoSessionImpl advertising", () => {
     // is not on GitHub yet, so advertising it would record a wrong pull-routing hint that
     // outlives a rejection.
     const session = repoSession(queue, {
-      listBranches: async () => pagesCursor([
-        [
-          { name: "main", headCommit: oid(2), protected: false },
-          { name: "other", headCommit: oid(1), protected: false },
-        ],
-      ]),
+      listBranches: async () =>
+        pagesCursor([
+          [
+            { name: "main", headCommit: oid(2), protected: false },
+            { name: "other", headCommit: oid(1), protected: false },
+          ],
+        ]),
       isSimulatedCommitId: (id: string) => id === oid(2),
     });
 
@@ -215,9 +215,7 @@ describe("GitHubRepoSessionImpl advertising", () => {
   it("advertises tag commits from listTags", async () => {
     const queue = new TestApprovalQueue();
     const session = repoSession(queue, {
-      listTags: async () => pagesCursor([
-        [{ name: "v1.0.0", commit: oid(1) }],
-      ]),
+      listTags: async () => pagesCursor([[{ name: "v1.0.0", commit: oid(1) }]]),
     });
 
     const cursor = await session.listTags();
@@ -228,9 +226,7 @@ describe("GitHubRepoSessionImpl advertising", () => {
   it("advertises commit ids and parents from listCommits", async () => {
     const queue = new TestApprovalQueue();
     const session = repoSession(queue, {
-      listCommits: async () => pagesCursor([
-        [commitSummary(oid(1), [oid(2)])],
-      ]),
+      listCommits: async () => pagesCursor([[commitSummary(oid(1), [oid(2)])]]),
     });
 
     const cursor = await session.listCommits();
@@ -241,7 +237,10 @@ describe("GitHubRepoSessionImpl advertising", () => {
   it("advertises the resolved commit and its parents from getCommit", async () => {
     const queue = new TestApprovalQueue();
     const session = repoSession(queue, {
-      getCommit: async () => ({ details: commitSummary(oid(1), [oid(2), oid(3)]), fromCache: false }),
+      getCommit: async () => ({
+        details: commitSummary(oid(1), [oid(2), oid(3)]),
+        fromCache: false,
+      }),
     });
 
     const details = await session.getCommit("abc1234");
@@ -289,17 +288,26 @@ describe("GitHubRepoSessionImpl advertising", () => {
 describe("GitHubRepoSessionImpl push", () => {
   function pushFakes() {
     const prepared: unknown[][] = [];
-    const submitted: { action: { type: string }, description: { pushedCommits?: string[] } }[] = [];
+    const submitted: { action: { type: string }; description: { pushedCommits?: string[] } }[] = [];
     const methods = {
       preparePush: async (branch: string, commitId: string, force: boolean, cache: unknown) => {
         prepared.push([branch, commitId, force, cache]);
         return {
-          type: "push", approvalId: 1, submittedAt: 0, owner: "cloudflare", repo: "workerd",
-          branch, expectedOldSha: oid(9), newSha: commitId, force,
+          type: "push",
+          approvalId: 1,
+          submittedAt: 0,
+          owner: "cloudflare",
+          repo: "workerd",
+          branch,
+          expectedOldSha: oid(9),
+          newSha: commitId,
+          force,
         };
       },
       submitActionForApproval: async (
-        _queue: unknown, action: { type: string }, description: { pushedCommits?: string[] },
+        _queue: unknown,
+        action: { type: string },
+        description: { pushedCommits?: string[] },
       ) => {
         submitted.push({ action, description });
       },
@@ -326,7 +334,7 @@ describe("GitHubRepoSessionImpl push", () => {
     const { submitted, methods } = pushFakes();
     const session = repoSession(queue, {
       ...methods,
-      preparePush: async () => null,  // the gatekeeper found the desired state already holds
+      preparePush: async () => null, // the gatekeeper found the desired state already holds
     });
 
     await session.push("main", oid(1));
@@ -404,10 +412,8 @@ describe("GitHubPullRequestImpl advertising", () => {
   it("advertises commit ids and parents per fetched page of listCommits", async () => {
     const queue = new TestApprovalQueue();
     const session = pullSession(queue, "1", {
-      pullCommits: async () => pagesCursor([
-        [commitSummary(oid(1), [oid(2)])],
-        [commitSummary(oid(3), [])],
-      ]),
+      pullCommits: async () =>
+        pagesCursor([[commitSummary(oid(1), [oid(2)])], [commitSummary(oid(3), [])]]),
     });
 
     const cursor = await session.listCommits();
@@ -449,9 +455,8 @@ describe("GitHubPullRequestImpl advertising", () => {
     // anchor oid(2) as a parent) with pending ones (oid(1)); only real ids advertise.
     const queue = new TestApprovalQueue();
     const session = pullSession(queue, "~1", {
-      pullCommits: async () => pagesCursor([
-        [commitSummary(oid(3), []), commitSummary(oid(1), [oid(2)])],
-      ]),
+      pullCommits: async () =>
+        pagesCursor([[commitSummary(oid(3), []), commitSummary(oid(1), [oid(2)])]]),
       isSimulatedCommitId: (id: string) => id === oid(1),
     });
 

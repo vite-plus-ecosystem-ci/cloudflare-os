@@ -6,13 +6,14 @@
 import { join } from "node:path";
 import { build } from "esbuild";
 import { chromium, type Browser, type Frame, type Page } from "playwright";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { configuratorHtml } from "./html.ts";
 import { transpileConfiguratorModule } from "./module.ts";
 import { buildConfiguratorRuntime, type ConfiguratorRuntime } from "./runtime.ts";
 
 const sourceBase = "app:///gatekeeper/test/configurator";
-const LONG_FOLDER = "Foo Bar Baz Qux - The Very Long Quux Corge Grault Garply Waldo Fred Plugh Xyzzy Thud, " +
+const LONG_FOLDER =
+  "Foo Bar Baz Qux - The Very Long Quux Corge Grault Garply Waldo Fred Plugh Xyzzy Thud, " +
   "Wibble Wobble Wubble Flob";
 
 const FOLDER_PICKER = `
@@ -72,11 +73,17 @@ const runtimes = new Map<boolean, Promise<ConfiguratorRuntime>>();
 
 const frameHtml = async (source: string, frontendReporting: boolean) => {
   if (!runtimes.has(frontendReporting)) {
-    runtimes.set(frontendReporting,
-      buildConfiguratorRuntime({ frontendReporting, sourceUrl: `${sourceBase}/runtime.js` }));
+    runtimes.set(
+      frontendReporting,
+      buildConfiguratorRuntime({ frontendReporting, sourceUrl: `${sourceBase}/runtime.js` }),
+    );
   }
   const runtime = await runtimes.get(frontendReporting)!;
-  const module = transpileConfiguratorModule(source, { fileName: "test-ui.tsx", sourceBase, frontendReporting });
+  const module = transpileConfiguratorModule(source, {
+    fileName: "test-ui.tsx",
+    sourceBase,
+    frontendReporting,
+  });
   return configuratorHtml(runtime, module);
 };
 
@@ -149,67 +156,84 @@ afterAll(async () => {
   await browser?.close();
 });
 
-type Hosted = { page: Page; frame: () => Frame; events(): Promise<unknown[][]>; consoleErrors: string[] };
+type Hosted = {
+  page: Page;
+  frame: () => Frame;
+  events(): Promise<unknown[][]>;
+  consoleErrors: string[];
+};
 
 const host = async (html: string, query = ""): Promise<Hosted> => {
   const page = await browser.newPage();
   const consoleErrors: string[] = [];
-  page.on("console", message => {
+  page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
-  page.on("pageerror", error => consoleErrors.push(error.message));
-  await page.route("http://host.test/**", route => {
+  page.on("pageerror", (error) => consoleErrors.push(error.message));
+  await page.route("http://host.test/**", (route) => {
     const { pathname } = new URL(route.request().url());
     if (pathname === "/frame.html") return route.fulfill({ body: html, contentType: "text/plain" });
     return route.fulfill({ body: hostPage, contentType: "text/html" });
   });
   await page.goto(`http://host.test/${query}`);
   const frame = () => {
-    const child = page.frames().find(candidate => candidate !== page.mainFrame());
+    const child = page.frames().find((candidate) => candidate !== page.mainFrame());
     if (!child) throw new Error("The configurator frame is missing.");
     return child;
   };
   return {
     page,
     frame,
-    events: () => page.evaluate(() => {
-      // Set by HOST_SCRIPT before the frame loads.
-      const hostGlobals = globalThis as unknown as HostGlobals;
-      return hostGlobals.events;
-    }),
+    events: () =>
+      page.evaluate(() => {
+        // Set by HOST_SCRIPT before the frame loads.
+        const hostGlobals = globalThis as unknown as HostGlobals;
+        return hostGlobals.events;
+      }),
     consoleErrors,
   };
 };
 
-const collect = (page: Page) => page.evaluate(async () => {
-  // Set by HOST_SCRIPT once the frame's handshake arrives.
-  const hostGlobals = globalThis as unknown as HostGlobals;
-  try {
-    return { url: String(await hostGlobals.frameStub.collectResourceUrl()) };
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : String(error) };
-  }
-});
+const collect = (page: Page) =>
+  page.evaluate(async () => {
+    // Set by HOST_SCRIPT once the frame's handshake arrives.
+    const hostGlobals = globalThis as unknown as HostGlobals;
+    try {
+      return { url: String(await hostGlobals.frameStub.collectResourceUrl()) };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  });
 
 describe("generated configurator frame", () => {
   it("runs under its own policy and completes the host protocol", async () => {
-    const { page, frame, events, consoleErrors } = await host(await frameHtml(FOLDER_PICKER, false));
+    const { page, frame, events, consoleErrors } = await host(
+      await frameHtml(FOLDER_PICKER, false),
+    );
     try {
       const input = frame().getByRole("combobox", { name: "Folder" });
       await input.click();
       await input.pressSequentially("pro");
       await frame().getByRole("option", { name: "Proposals" }).waitFor();
-      await expect.poll(async () => (await events()).filter(([kind]) => kind === "search").at(-1))
+      await expect
+        .poll(async () => (await events()).filter(([kind]) => kind === "search").at(-1))
         .toEqual(["search", "pro"]);
       await input.press("ArrowDown");
       await input.press("ArrowDown");
       await input.press("Enter");
 
-      await expect.poll(async () => (await events()).filter(([kind]) => kind === "ready").map(([, ready]) => ready))
+      await expect
+        .poll(async () =>
+          (await events()).filter(([kind]) => kind === "ready").map(([, ready]) => ready),
+        )
         .toEqual([false, true]);
       expect(await collect(page)).toEqual({ url: "https://files.example.com/folders/proposals" });
       // The frame grew to fit the open popup and reserved only the form's own height for it.
-      const sizes = (await events()).filter(([kind]) => kind === "resize") as [string, number, number][];
+      const sizes = (await events()).filter(([kind]) => kind === "resize") as [
+        string,
+        number,
+        number,
+      ][];
       expect(sizes.some(([, height, layoutHeight]) => height > layoutHeight + 40)).toBe(true);
       // A script the policy refused, or a missing global, would show here.
       expect(consoleErrors).toEqual([]);
@@ -222,7 +246,8 @@ describe("generated configurator frame", () => {
     const { page, frame, events } = await host(await frameHtml(ACCEPTED_TYPES, false));
     try {
       await frame().getByText("Accepts https://files.example.com/folders/*").waitFor();
-      await expect.poll(async () => (await events()).filter(([kind]) => kind === "ready").at(-1))
+      await expect
+        .poll(async () => (await events()).filter(([kind]) => kind === "ready").at(-1))
         .toEqual(["ready", true]);
       expect(await collect(page)).toEqual({ url: "https://files.example.com/folders/*" });
     } finally {
@@ -232,10 +257,14 @@ describe("generated configurator frame", () => {
 
   // A gatekeeper's new frames reach tabs still running the Workshop they were built after.
   it("offers every resource type to a host too old to say which it accepts", async () => {
-    const { page, frame, events } = await host(await frameHtml(ACCEPTED_TYPES, false), "?older-workshop");
+    const { page, frame, events } = await host(
+      await frameHtml(ACCEPTED_TYPES, false),
+      "?older-workshop",
+    );
     try {
       await frame().getByText("Accepts any type").waitFor();
-      await expect.poll(async () => (await events()).filter(([kind]) => kind === "ready").at(-1))
+      await expect
+        .poll(async () => (await events()).filter(([kind]) => kind === "ready").at(-1))
         .toEqual(["ready", true]);
       expect(await collect(page)).toEqual({ url: "https://files.example.com/any" });
     } finally {
@@ -250,10 +279,14 @@ describe("generated configurator frame", () => {
       await frame().getByRole("combobox", { name: "Folder" }).click();
       const long = frame().getByRole("option", { name: LONG_FOLDER });
       await long.waitFor();
-      expect(await frame().getByRole("listbox").evaluate(list => list.scrollWidth - list.clientWidth)).toBe(0);
+      expect(
+        await frame()
+          .getByRole("listbox")
+          .evaluate((list) => list.scrollWidth - list.clientWidth),
+      ).toBe(0);
 
       const tooltip = (option: typeof long) =>
-        option.evaluate(node => node.querySelector("[title]")?.getAttribute("title") ?? "");
+        option.evaluate((node) => node.querySelector("[title]")?.getAttribute("title") ?? "");
       await long.hover();
       expect(await tooltip(long)).toBe(LONG_FOLDER);
       const short = frame().getByRole("option", { name: "Projects" });
@@ -273,7 +306,9 @@ describe("generated configurator frame", () => {
         await frame().getByRole("combobox", { name: "Folder" }).click();
         await option.waitFor();
         await leave();
-        expect(await page.locator("#host-control").evaluate(node => node.matches(":focus"))).toBe(true);
+        expect(await page.locator("#host-control").evaluate((node) => node.matches(":focus"))).toBe(
+          true,
+        );
         await option.waitFor({ state: "hidden" });
       }
     } finally {
@@ -282,12 +317,16 @@ describe("generated configurator frame", () => {
   }, 30_000);
 
   it("asks the host for access from a Button, and shows its answer or refusal", async () => {
-    const { page, frame, events, consoleErrors } = await host(await frameHtml(ACCESS_REQUEST, false));
+    const { page, frame, events, consoleErrors } = await host(
+      await frameHtml(ACCESS_REQUEST, false),
+    );
     try {
       await frame().getByRole("button", { name: "Convert" }).click();
       await expect.poll(() => frame().getByRole("status").textContent()).toBe("Granted: false");
       await frame().getByRole("button", { name: "Refused" }).click();
-      await expect.poll(() => frame().getByRole("alert").textContent()).toBe("The user closed the pop-up.");
+      await expect
+        .poll(() => frame().getByRole("alert").textContent())
+        .toBe("The user closed the pop-up.");
       expect((await events()).filter(([kind]) => kind === "ensureResources")).toEqual([
         ["ensureResources", ["https://example.com/grant"]],
         ["ensureResources", ["https://example.com/refused"]],
@@ -301,12 +340,17 @@ describe("generated configurator frame", () => {
   it("reports a failed render to the host when reporting is built in, and never becomes ready", async () => {
     const { page, events } = await host(await frameHtml(FAILING_RENDER, true));
     try {
-      await expect.poll(async () => (await events()).filter(([kind]) => kind === "message").length)
+      await expect
+        .poll(async () => (await events()).filter(([kind]) => kind === "message").length)
         .toBeGreaterThan(0);
       const [[, message]] = (await events()).filter(([kind]) => kind === "message");
       expect(message).toMatchObject({
         type: "gadgets.frontend-error.v1",
-        report: { failureSite: "configurator.render", handled: false, exception: { message: "render failure" } },
+        report: {
+          failureSite: "configurator.render",
+          handled: false,
+          exception: { message: "render failure" },
+        },
       });
       expect((await events()).filter(([kind]) => kind === "ready")).toEqual([["ready", false]]);
       expect(await collect(page)).toEqual({ error: expect.stringMatching(/failed to render/i) });

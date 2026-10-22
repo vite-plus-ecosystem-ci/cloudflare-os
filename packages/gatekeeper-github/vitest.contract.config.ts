@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 /**
  * The live checks of what the hooks rely on GitHub for (`__tests__/contract`), which the

@@ -3,8 +3,8 @@
 
 import { act } from "preact/test-utils";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { page, userEvent } from "vitest/browser";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { page, userEvent } from "vite-plus/test/browser";
 import type {
   ConfiguratorUIHierarchyItem,
   ConfiguratorUIHierarchyPage,
@@ -33,8 +33,14 @@ let container: HTMLElement | undefined;
 const mount = async (spec: Spec, queries: Record<string, string> = {}) => {
   const setSelectionReady = vi.fn<(ready: boolean) => void>();
   const session: ConfiguratorSession = createSession(
-    { spec, ui: null, store: createConfiguratorStore(spec.initial, queries), ensureResources: vi.fn() },
-    setSelectionReady);
+    {
+      spec,
+      ui: null,
+      store: createConfiguratorStore(spec.initial, queries),
+      ensureResources: vi.fn(),
+    },
+    setSelectionReady,
+  );
   container = document.body.appendChild(document.createElement("div"));
   root = createRoot(container);
   await act(() => root!.render(<ConfiguratorRoot session={session} />));
@@ -45,7 +51,10 @@ const mount = async (spec: Spec, queries: Record<string, string> = {}) => {
   };
 };
 
-const tools = Array.from({ length: 12 }, (_, index) => ({ value: `tool-${index}`, title: `Tool ${index}` }));
+const tools = Array.from({ length: 12 }, (_, index) => ({
+  value: `tool-${index}`,
+  title: `Tool ${index}`,
+}));
 
 afterEach(() => {
   act(() => root?.unmount());
@@ -60,7 +69,11 @@ const Broken = ({ broken }: { broken: boolean }) => {
 
 describe("readiness", () => {
   it("reports ready once rendered when the module has no readiness predicate", async () => {
-    const { readiness } = await mount({ initial: {}, resourceUrl: () => "https://example.com/", render: () => <p>Hi</p> });
+    const { readiness } = await mount({
+      initial: {},
+      resourceUrl: () => "https://example.com/",
+      render: () => <p>Hi</p>,
+    });
     expect(readiness()).toEqual([true]);
   });
 
@@ -80,7 +93,9 @@ describe("readiness", () => {
     const failing = await mount({
       initial: {},
       resourceUrl: () => "https://example.com/",
-      render: () => { throw new Error("first render failure"); },
+      render: () => {
+        throw new Error("first render failure");
+      },
     });
     expect(failing.readiness()).toEqual([false]);
     // The notice shows the error's whole stack.
@@ -93,13 +108,19 @@ describe("readiness", () => {
       resourceUrl: () => "https://example.com/",
       render: ({ values, setValues }) => {
         if (values.fail) throw new Error("state-driven failure");
-        return <button type="button" onClick={() => setValues({ fail: "yes" })}>Break</button>;
+        return (
+          <button type="button" onClick={() => setValues({ fail: "yes" })}>
+            Break
+          </button>
+        );
       },
     });
     await userEvent.click(page.getByRole("button", { name: "Break" }));
     expect(readiness()).toEqual([true, false]);
     await expect.element(page.getByRole("button", { name: "Break" })).toBeVisible();
-    await expect(collectResourceUrl(session)).rejects.toThrow(/failed to render its current state/i);
+    await expect(collectResourceUrl(session)).rejects.toThrow(
+      /failed to render its current state/i,
+    );
 
     await act(() => session.store.setValues({ fail: null }));
     expect(readiness()).toEqual([true, false, true]);
@@ -116,7 +137,9 @@ describe("readiness", () => {
     await act(() => session.store.setValues({ broken: "yes" }));
     await expect.element(page.getByText("component failure", { exact: false })).toBeVisible();
     expect(readiness().at(-1)).toBe(false);
-    await expect(collectResourceUrl(session)).rejects.toThrow(/failed to render its current state/i);
+    await expect(collectResourceUrl(session)).rejects.toThrow(
+      /failed to render its current state/i,
+    );
 
     await act(() => session.store.setValues({ broken: null }));
     await expect.element(page.getByText("Fine")).toBeVisible();
@@ -126,8 +149,14 @@ describe("readiness", () => {
   // The host reports the viewport on every frame its modal scrolls; none of it reaches the module.
   it("neither re-renders the module nor re-reports readiness for what only the controls read", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const render = vi.fn<Spec["render"]>(({ values }) => <Broken broken={Boolean(values.broken)} />);
-    const { readiness, session } = await mount({ initial: { broken: "yes" }, resourceUrl: () => "https://example.com/", render });
+    const render = vi.fn<Spec["render"]>(({ values }) => (
+      <Broken broken={Boolean(values.broken)} />
+    ));
+    const { readiness, session } = await mount({
+      initial: { broken: "yes" },
+      resourceUrl: () => "https://example.com/",
+      render,
+    });
     await expect.element(page.getByText("component failure", { exact: false })).toBeVisible();
     const posted = readiness();
 
@@ -140,13 +169,21 @@ describe("readiness", () => {
   });
 });
 
-const checkboxSpec = (loadOptions: () => Promise<ConfiguratorUIOption[]>, disabled = false): Spec => ({
+const checkboxSpec = (
+  loadOptions: () => Promise<ConfiguratorUIOption[]>,
+  disabled = false,
+): Spec => ({
   initial: { tools: null },
   resourceUrl: () => "https://example.com/",
   render: ({ values, setValues }) => (
     <Field label="Tools">
-      <CheckboxList name="tools" value={values.tools} disabled={disabled} loadOptions={loadOptions}
-        onChange={next => setValues({ tools: next })} />
+      <CheckboxList
+        name="tools"
+        value={values.tools}
+        disabled={disabled}
+        loadOptions={loadOptions}
+        onChange={(next) => setValues({ tools: next })}
+      />
     </Field>
   ),
 });
@@ -157,8 +194,12 @@ const serverToolsSpec = (load: (server: string) => Promise<ConfiguratorUIOption[
   resourceUrl: () => "https://example.com/",
   render: ({ values, setValues }) => (
     <Field label="Tools">
-      <CheckboxList name={`tools:${values.server}`} value={values.tools}
-        loadOptions={() => load(values.server!)} onChange={next => setValues({ tools: next })} />
+      <CheckboxList
+        name={`tools:${values.server}`}
+        value={values.tools}
+        loadOptions={() => load(values.server!)}
+        onChange={(next) => setValues({ tools: next })}
+      />
     </Field>
   ),
 });
@@ -179,11 +220,19 @@ describe("CheckboxList", () => {
   });
 
   it("names an option by its title, describes it by the rest, and toggles it from anywhere on its row", async () => {
-    const { values } = await mount(checkboxSpec(async () => [
-      { value: "search", title: "Search issues", subtitle: "Find issues by text.", meta: "read-only" },
-      { value: "create", title: "Create issue", meta: "needs approval" },
-    ]));
-    await expect.element(page.getByRole("checkbox", { name: "Search issues", exact: true }))
+    const { values } = await mount(
+      checkboxSpec(async () => [
+        {
+          value: "search",
+          title: "Search issues",
+          subtitle: "Find issues by text.",
+          meta: "read-only",
+        },
+        { value: "create", title: "Create issue", meta: "needs approval" },
+      ]),
+    );
+    await expect
+      .element(page.getByRole("checkbox", { name: "Search issues", exact: true }))
       .toHaveAccessibleDescription("Find issues by text. read-only");
     await userEvent.click(page.getByText("Find issues by text."));
     expect(values().tools).toBe("search");
@@ -195,7 +244,9 @@ describe("CheckboxList", () => {
   it("offers no way to change the selection while disabled", async () => {
     await mount({ ...checkboxSpec(async () => tools, true), initial: { tools: "tool-1" } });
     await expect.element(page.getByText("1 of 12 selected")).toBeVisible();
-    await expect.element(page.getByRole("checkbox", { name: "Tool 1", exact: true })).toBeDisabled();
+    await expect
+      .element(page.getByRole("checkbox", { name: "Tool 1", exact: true }))
+      .toBeDisabled();
     expect(page.getByRole("button", { name: "Select all" }).elements()).toEqual([]);
     expect(page.getByRole("button", { name: "Clear" }).elements()).toEqual([]);
   });
@@ -242,7 +293,9 @@ describe("CheckboxList", () => {
 
   it("shares a load still in flight when its name comes back", async () => {
     const pending = deferred<ConfiguratorUIOption[]>();
-    const load = vi.fn((server: string) => server === "a" ? pending.promise : Promise.resolve(tools));
+    const load = vi.fn((server: string) =>
+      server === "a" ? pending.promise : Promise.resolve(tools),
+    );
     const { session } = await mount(serverToolsSpec(load));
     await act(() => session.store.setValues({ server: "b" }));
     await act(() => session.store.setValues({ server: "a" }));
@@ -254,7 +307,9 @@ describe("CheckboxList", () => {
   // Preact runs effects a frame after it renders, and a load can settle in between.
   it("shows a load in flight that settles between its name's render and effect", async () => {
     const pending = deferred<ConfiguratorUIOption[]>();
-    const load = vi.fn((server: string) => server === "a" ? pending.promise : Promise.resolve(tools));
+    const load = vi.fn((server: string) =>
+      server === "a" ? pending.promise : Promise.resolve(tools),
+    );
     const { session } = await mount(serverToolsSpec(load));
     await act(() => session.store.setValues({ server: "b" }));
     await expect.element(page.getByRole("checkbox", { name: "Tool 1", exact: true })).toBeVisible();
@@ -268,12 +323,18 @@ describe("CheckboxList", () => {
   });
 
   it("starts a list with a new name unfiltered, and gives a name it had before its filter back", async () => {
-    const { session } = await mount(serverToolsSpec(async server => tools.map(tool => ({ ...tool, title: `${server} ${tool.title}` }))));
+    const { session } = await mount(
+      serverToolsSpec(async (server) =>
+        tools.map((tool) => ({ ...tool, title: `${server} ${tool.title}` })),
+      ),
+    );
     const filter = page.getByRole("searchbox", { name: "Filter options" });
     await userEvent.fill(filter, "a Tool 1");
     await act(() => session.store.setValues({ server: "b" }));
     await expect.element(filter).toHaveValue("");
-    await expect.element(page.getByRole("checkbox", { name: "b Tool 11", exact: true })).toBeVisible();
+    await expect
+      .element(page.getByRole("checkbox", { name: "b Tool 11", exact: true }))
+      .toBeVisible();
 
     await act(() => session.store.setValues({ server: "a" }));
     await expect.element(filter).toHaveValue("a Tool 1");
@@ -288,10 +349,14 @@ describe("RadioCards", () => {
       resourceUrl: () => "https://example.com/",
       render: ({ values, setValues }) => (
         <Field label="Tools">
-          <RadioCards value={values.mode} onChange={mode => setValues({ mode })} options={[
-            { value: "all", title: "All tools", description: "Every tool." },
-            { value: "choose", title: "Choose tools", description: "Only the ones ticked." },
-          ]} />
+          <RadioCards
+            value={values.mode}
+            onChange={(mode) => setValues({ mode })}
+            options={[
+              { value: "all", title: "All tools", description: "Every tool." },
+              { value: "choose", title: "Choose tools", description: "Only the ones ticked." },
+            ]}
+          />
         </Field>
       ),
     });
@@ -302,13 +367,22 @@ describe("RadioCards", () => {
   });
 });
 
-const autocompleteSpec = (loadOptions: (query: string) => Promise<ConfiguratorUIOption[]>, onClear?: () => void): Spec => ({
+const autocompleteSpec = (
+  loadOptions: (query: string) => Promise<ConfiguratorUIOption[]>,
+  onClear?: () => void,
+): Spec => ({
   initial: { folderId: null },
   resourceUrl: () => "https://example.com/",
   render: ({ values, setValues }) => (
     <Field label="Folder">
-      <Autocomplete name="folderId" value={values.folderId} placeholder="Search folders..."
-        loadOptions={loadOptions} onClear={onClear} onChange={next => setValues({ folderId: next })} />
+      <Autocomplete
+        name="folderId"
+        value={values.folderId}
+        placeholder="Search folders..."
+        loadOptions={loadOptions}
+        onClear={onClear}
+        onChange={(next) => setValues({ folderId: next })}
+      />
     </Field>
   ),
 });
@@ -322,20 +396,26 @@ const inspectingSpec = (loadOptions: (query: string) => Promise<ConfiguratorUIOp
   render: ({ values, setValues }) => (
     <div>
       <Field label="Folder">
-        <Autocomplete name="folderId" value={values.folderId} placeholder="Search folders..."
+        <Autocomplete
+          name="folderId"
+          value={values.folderId}
+          placeholder="Search folders..."
           loadOptions={loadOptions}
-          onChange={folderId => {
+          onChange={(folderId) => {
             setValues({ folderId: null, inspected: null });
-            if (folderId) void Promise.resolve().then(() => setValues({ folderId, inspected: folderId }));
-          }} />
+            if (folderId)
+              void Promise.resolve().then(() => setValues({ folderId, inspected: folderId }));
+          }}
+        />
       </Field>
       {values.inspected ? <p>{`Inspected ${values.inspected}`}</p> : null}
     </div>
   ),
 });
-const folders = async (query: string) => ["Projects", "Proposals", "Personal"]
-  .filter(title => title.toLowerCase().includes(query.toLowerCase()))
-  .map(title => ({ value: title.toLowerCase(), title, subtitle: "My Drive" }));
+const folders = async (query: string) =>
+  ["Projects", "Proposals", "Personal"]
+    .filter((title) => title.toLowerCase().includes(query.toLowerCase()))
+    .map((title) => ({ value: title.toLowerCase(), title, subtitle: "My Drive" }));
 const input = () => page.getByRole("combobox", { name: "Folder" });
 
 describe("Autocomplete", () => {
@@ -414,7 +494,9 @@ describe("Autocomplete", () => {
     await expect.element(page.getByRole("option", { name: /Proposals/ })).not.toBeInTheDocument();
 
     // Not by role: while the popup is open, Base UI hides everything outside it from the a11y tree.
-    await userEvent.click(page.elementLocator(document.querySelector('[aria-label="Clear selection"]')!));
+    await userEvent.click(
+      page.elementLocator(document.querySelector('[aria-label="Clear selection"]')!),
+    );
     await expect.element(page.getByRole("option", { name: /Proposals/ })).toBeVisible();
     expect(loadOptions).toHaveBeenLastCalledWith("");
   });
@@ -454,7 +536,9 @@ describe("Autocomplete", () => {
   it("keeps the focus it was given before its first effects ran", async () => {
     const spec = autocompleteSpec(folders);
     const session = createSession(
-      { spec, ui: null, store: createConfiguratorStore(spec.initial), ensureResources: vi.fn() }, () => {});
+      { spec, ui: null, store: createConfiguratorStore(spec.initial), ensureResources: vi.fn() },
+      () => {},
+    );
     container = document.body.appendChild(document.createElement("div"));
     root = createRoot(container);
     // Outside act, which would run the effects at once.
@@ -462,7 +546,7 @@ describe("Autocomplete", () => {
     const field = input().element() as HTMLInputElement;
     field.focus();
     // Preact flushes effects in a task its next animation frame queues; this one is queued after it.
-    await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve)));
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve)));
     expect(document.activeElement).toBe(field);
   });
 });
@@ -473,10 +557,20 @@ describe("Button", () => {
     resourceUrl: () => "https://example.com/",
     render: ({ values, setValues }) => (
       <div>
-        <Button onClick={() => setValues({ clicks: String(Number(values.clicks) + 1) })}>Count</Button>
-        <Button variant="secondary" disabled onClick={() => setValues({ clicks: "disabled" })}>Use the copy</Button>
-        <Button disabled={Boolean(values.started)} onClick={() => setValues({ started: "yes" })}>Start</Button>
-        {values.finished ? null : <Button variant="secondary" onClick={() => setValues({ finished: "yes" })}>Finish</Button>}
+        <Button onClick={() => setValues({ clicks: String(Number(values.clicks) + 1) })}>
+          Count
+        </Button>
+        <Button variant="secondary" disabled onClick={() => setValues({ clicks: "disabled" })}>
+          Use the copy
+        </Button>
+        <Button disabled={Boolean(values.started)} onClick={() => setValues({ started: "yes" })}>
+          Start
+        </Button>
+        {values.finished ? null : (
+          <Button variant="secondary" onClick={() => setValues({ finished: "yes" })}>
+            Finish
+          </Button>
+        )}
         <p>{`Clicks: ${values.clicks}`}</p>
       </div>
     ),
@@ -508,8 +602,14 @@ describe("Button", () => {
 
   it("hands focus on from a Button that leaves the form when clicked before the first effects ran", async () => {
     const session = createSession(
-      { spec: buttonSpec, ui: null, store: createConfiguratorStore(buttonSpec.initial), ensureResources: vi.fn() },
-      () => {});
+      {
+        spec: buttonSpec,
+        ui: null,
+        store: createConfiguratorStore(buttonSpec.initial),
+        ensureResources: vi.fn(),
+      },
+      () => {},
+    );
     container = document.body.appendChild(document.createElement("div"));
     root = createRoot(container);
     // Outside act, which would run the effects at once.
@@ -536,7 +636,7 @@ describe("HierarchyPicker", () => {
           value={target}
           root={{ id: "drive", title: "My Drive", selectable: true }}
           loadItems={async ({ parentId }) => ({ items: tree[parentId] ?? [] })}
-          onChange={next => setValues({ target: next })}
+          onChange={(next) => setValues({ target: next })}
         />
       ),
     });
@@ -551,7 +651,10 @@ describe("HierarchyPicker", () => {
   });
 
   const q1: ConfiguratorUIHierarchyItem = {
-    id: "q1", title: "Q1.pdf", kind: "leaf", path: [{ id: "reports", title: "Reports" }],
+    id: "q1",
+    title: "Q1.pdf",
+    kind: "leaf",
+    path: [{ id: "reports", title: "Reports" }],
   };
 
   /** A module whose picker opens on `q1`, pre-filled, and that is ready whenever it holds a value. */
@@ -565,7 +668,7 @@ describe("HierarchyPicker", () => {
         name="target"
         value={target}
         root={{ id: "drive", title: "My Drive" }}
-        onChange={next => setValues({ target: next })}
+        onChange={(next) => setValues({ target: next })}
       />
     ),
   });
@@ -573,10 +676,12 @@ describe("HierarchyPicker", () => {
   it("withholds readiness and collection until a pre-filled value is shown", async () => {
     const lookup = deferred<ConfiguratorUIHierarchyItem | null>();
     const listing = deferred<ConfiguratorUIHierarchyPage>();
-    const { session, readiness } = await mount(prefilledPicker({
-      loadItem: () => lookup.promise,
-      loadItems: () => listing.promise,
-    }));
+    const { session, readiness } = await mount(
+      prefilledPicker({
+        loadItem: () => lookup.promise,
+        loadItems: () => listing.promise,
+      }),
+    );
 
     expect(readiness()).toEqual([false]);
     await expect(collectResourceUrl(session)).rejects.toThrow(/not showing its choice/i);
@@ -590,10 +695,14 @@ describe("HierarchyPicker", () => {
   });
 
   it("keeps withholding a pre-filled value whose folder fails to list", async () => {
-    const { session, readiness } = await mount(prefilledPicker({
-      loadItem: async () => q1,
-      loadItems: async () => { throw new Error("Drive is down."); },
-    }));
+    const { session, readiness } = await mount(
+      prefilledPicker({
+        loadItem: async () => q1,
+        loadItems: async () => {
+          throw new Error("Drive is down.");
+        },
+      }),
+    );
 
     await expect.element(page.getByRole("button", { name: "Retry" })).toBeVisible();
     expect(readiness()).toEqual([false]);
@@ -619,7 +728,7 @@ describe("Notice", () => {
     await expect.element(status).toHaveTextContent("Connecting makes a copy.");
     const region = status.element();
     const mutations: MutationRecord[] = [];
-    const observer = new MutationObserver(records => mutations.push(...records));
+    const observer = new MutationObserver((records) => mutations.push(...records));
     observer.observe(region, { childList: true, characterData: true, subtree: true });
     try {
       await act(() => session.store.setValues({ unrelated: "changed" }));
@@ -630,9 +739,13 @@ describe("Notice", () => {
       expect(status.element()).toBe(region);
       expect(mutations).not.toEqual([]);
 
-      await act(() => session.store.setValues({ step: null, failure: "The user closed the pop-up." }));
+      await act(() =>
+        session.store.setValues({ step: null, failure: "The user closed the pop-up." }),
+      );
       await expect.element(status).toHaveTextContent("Connecting makes a copy.");
-      await expect.element(page.getByRole("alert")).toHaveTextContent("The user closed the pop-up.");
+      await expect
+        .element(page.getByRole("alert"))
+        .toHaveTextContent("The user closed the pop-up.");
     } finally {
       observer.disconnect();
     }

@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { AutoApprovalDrainer, AutoApprovalStorage, ApplyPendingActionFn, autoApprovalRule }
-    from "../src/auto-approval.js";
+import { describe, it, expect } from "vite-plus/test";
+import {
+  AutoApprovalDrainer,
+  AutoApprovalStorage,
+  ApplyPendingActionFn,
+  autoApprovalRule,
+} from "../src/auto-approval.js";
 import type { ActionRecord } from "../src/storage-schema/overseer-storage.js";
 import type { AiChatAuthorInfo } from "@gadgets/workshop-shared/api";
 import type { ActionDescription } from "@gadgets/workshop-shared/gatekeeper";
@@ -14,10 +18,13 @@ const ENABLER: AiChatAuthorInfo = { type: "user", id: "enabler@example.com", nam
 
 function enableRule(storage: AutoApprovalStorage, actionTag = "edit", gatekeeperId = GK) {
   storage.autoApproveTags.put({
-    gatekeeperId, actionKind: { tag: actionTag, label: "Edits" }, enabledBy: ENABLER });
+    gatekeeperId,
+    actionKind: { tag: actionTag, label: "Edits" },
+    enabledBy: ENABLER,
+  });
 }
 
-function getAction(storage: AutoApprovalStorage, id: number): ActionRecord & {type: "action"} {
+function getAction(storage: AutoApprovalStorage, id: number): ActionRecord & { type: "action" } {
   let record = storage.actions.get(id);
   if (!record || record.type !== "action") throw new Error(`No action ${id}`);
   return record;
@@ -105,7 +112,7 @@ describe("AutoApprovalDrainer.drain", () => {
     let storage = makeStorage();
     enableRule(storage);
     putAction(storage, 1);
-    putAction(storage, 2, { autoApprovable: false });  // manual gate
+    putAction(storage, 2, { autoApprovable: false }); // manual gate
     putAction(storage, 3);
 
     let { applyFn, calls } = makeImmediateApply(storage);
@@ -138,15 +145,15 @@ describe("AutoApprovalDrainer.drain", () => {
     let apply = makeControlledApply(storage);
     let drainer = new AutoApprovalDrainer(storage, apply.applyFn);
 
-    let first = drainer.drain(GK);   // starts, calls apply(1), parks mid-apply
-    let second = drainer.drain(GK);  // must coalesce, not start a second apply
+    let first = drainer.drain(GK); // starts, calls apply(1), parks mid-apply
+    let second = drainer.drain(GK); // must coalesce, not start a second apply
     await flush();
 
     expect(apply.calls).toEqual([1]);
     expect(apply.inFlight()).toBe(1);
 
-    apply.releaseNext();             // resolve apply(1); record becomes approved
-    await Promise.all([first, second]);  // rerun re-lists: action 1 no longer pending
+    apply.releaseNext(); // resolve apply(1); record becomes approved
+    await Promise.all([first, second]); // rerun re-lists: action 1 no longer pending
 
     expect(apply.calls).toEqual([1]);
     expect(getAction(storage, 1).state).toBe("approved");
@@ -162,20 +169,22 @@ describe("AutoApprovalDrainer.drain", () => {
     let apply = makeControlledApply(storage);
     let drainer = new AutoApprovalDrainer(storage, apply.applyFn);
 
-    let first = drainer.drain(GK);   // parks mid-apply on action 1
+    let first = drainer.drain(GK); // parks mid-apply on action 1
 
-    putAction(storage, 2);           // new eligible action arrives mid-drain
+    putAction(storage, 2); // new eligible action arrives mid-drain
     let secondResolved = false;
-    let second = drainer.drain(GK).then(() => { secondResolved = true; });
+    let second = drainer.drain(GK).then(() => {
+      secondResolved = true;
+    });
 
-    apply.releaseNext();             // finish action 1; rerun pass should pick up action 2
+    apply.releaseNext(); // finish action 1; rerun pass should pick up action 2
     await flush();
 
     expect(apply.calls).toEqual([1, 2]);
     expect(apply.inFlight()).toBe(1);
     expect(secondResolved).toBe(false);
 
-    apply.releaseNext();             // finish action 2
+    apply.releaseNext(); // finish action 2
     await Promise.all([first, second]);
 
     expect(apply.calls).toEqual([1, 2]);
@@ -189,9 +198,9 @@ describe("AutoApprovalDrainer.drain", () => {
     let eligible: number[] = [];
     for (let id = 0; id < 230; id++) {
       if (id % 5 === 0) {
-        putAction(storage, id, { gatekeeperId: GK + 1 });   // other gatekeeper: skipped, not a gate
+        putAction(storage, id, { gatekeeperId: GK + 1 }); // other gatekeeper: skipped, not a gate
       } else if (id % 5 === 1) {
-        putAction(storage, id, { state: "approved" });      // already resolved
+        putAction(storage, id, { state: "approved" }); // already resolved
       } else {
         putAction(storage, id);
         eligible.push(id);
@@ -272,9 +281,9 @@ describe("AutoApprovalDrainer.drain", () => {
 
     let apply = makeControlledApply(storage);
     let drainer = new AutoApprovalDrainer(storage, apply.applyFn);
-    let first = drainer.drain(GK);   // snapshots pending = [1]
+    let first = drainer.drain(GK); // snapshots pending = [1]
 
-    putAction(storage, 2);           // arrives mid-drain, with no accompanying drain() call
+    putAction(storage, 2); // arrives mid-drain, with no accompanying drain() call
     apply.releaseNext();
     await first;
 
@@ -319,25 +328,28 @@ describe("autoApprovalRule", () => {
   it("requires the author's autoApprovable verdict", () => {
     let storage = makeStorage();
     enableRule(storage);
-    expect(autoApprovalRule(storage, GK, eligibleDescription({ autoApprovable: undefined })))
-        .toBeUndefined();
-    expect(autoApprovalRule(storage, GK, eligibleDescription({ autoApprovable: false })))
-        .toBeUndefined();
+    expect(
+      autoApprovalRule(storage, GK, eligibleDescription({ autoApprovable: undefined })),
+    ).toBeUndefined();
+    expect(
+      autoApprovalRule(storage, GK, eligibleDescription({ autoApprovable: false })),
+    ).toBeUndefined();
   });
 
   it("requires an actionKind", () => {
     let storage = makeStorage();
     enableRule(storage);
-    expect(autoApprovalRule(storage, GK, eligibleDescription({ actionKind: undefined })))
-        .toBeUndefined();
+    expect(
+      autoApprovalRule(storage, GK, eligibleDescription({ actionKind: undefined })),
+    ).toBeUndefined();
   });
 
   it("requires a user-enabled rule for the kind on this gatekeeper", () => {
     let storage = makeStorage();
     expect(autoApprovalRule(storage, GK, eligibleDescription())).toBeUndefined();
-    enableRule(storage, "edit", GK + 1);  // right tag, wrong gatekeeper
+    enableRule(storage, "edit", GK + 1); // right tag, wrong gatekeeper
     expect(autoApprovalRule(storage, GK, eligibleDescription())).toBeUndefined();
-    enableRule(storage, "delete", GK);    // right gatekeeper, wrong tag
+    enableRule(storage, "delete", GK); // right gatekeeper, wrong tag
     expect(autoApprovalRule(storage, GK, eligibleDescription())).toBeUndefined();
   });
 

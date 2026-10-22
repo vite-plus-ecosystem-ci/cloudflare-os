@@ -3,14 +3,23 @@
 // request before it, or everything after the first difference is paid for again.
 
 import { z } from "zod";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import { openAgentSession } from "../src/agent-session.js";
 import {
-  startTestGatekeeperHarness, TEST_VENDOR_ID, testControl, type Harness,
+  startTestGatekeeperHarness,
+  TEST_VENDOR_ID,
+  testControl,
+  type Harness,
 } from "../src/harness.js";
 import { SCRIPTED_MODEL_ID, scriptedModelRouter, systemPromptOf } from "../src/mock-model.js";
 import {
-  accountLabel, connect, listConnectedAccounts, nextUsernames, signUp, waitFor, waitForIdleChat,
+  accountLabel,
+  connect,
+  listConnectedAccounts,
+  nextUsernames,
+  signUp,
+  waitFor,
+  waitForIdleChat,
 } from "../src/rpc-client.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 
@@ -38,20 +47,23 @@ const REQUEST = z.looseObject({ messages: z.array(z.unknown()) });
 
 // Compares serialized JSON, so a reordered key counts as a difference, as it does for the cache.
 function expectEachRequestExtendsThePrevious(requests: readonly unknown[]) {
-  const parsed = requests.map(request => REQUEST.parse(request));
+  const parsed = requests.map((request) => REQUEST.parse(request));
   for (const [index, { messages, ...fields }] of parsed.entries()) {
     const previous = parsed[index - 1];
     if (previous === undefined) continue;
     const { messages: previousMessages, ...previousFields } = previous;
-    expect(JSON.stringify(fields), `fields of request ${index}`)
-        .toBe(JSON.stringify(previousFields));
-    expect(messages.slice(0, previousMessages.length).map(m => JSON.stringify(m)),
-        `messages of request ${index}`).toEqual(previousMessages.map(m => JSON.stringify(m)));
+    expect(JSON.stringify(fields), `fields of request ${index}`).toBe(
+      JSON.stringify(previousFields),
+    );
+    expect(
+      messages.slice(0, previousMessages.length).map((m) => JSON.stringify(m)),
+      `messages of request ${index}`,
+    ).toEqual(previousMessages.map((m) => JSON.stringify(m)));
   }
 }
 
 const READ_TEST_VALUE =
-    "export default async function(self, env) { console.log(await env.TEST_AMBIENT.readValue()); }";
+  "export default async function(self, env) { console.log(await env.TEST_AMBIENT.readValue()); }";
 
 it.concurrent("each request starts with the whole request before it", async () => {
   const model = models.script([
@@ -75,8 +87,13 @@ it.concurrent("each request starts with the whole request before it", async () =
 // gadget it created from its own tool call.
 it.concurrent("creating a gadget keeps each request a prefix of the next", async () => {
   const model = models.script([
-    { toolCall: { id: "create", name: "createGadget",
-                  arguments: { title: "Meeting notes", bindingName: "NOTES" } } },
+    {
+      toolCall: {
+        id: "create",
+        name: "createGadget",
+        arguments: { title: "Meeting notes", bindingName: "NOTES" },
+      },
+    },
     { text: "I created it." },
     { text: "It is there." },
   ]);
@@ -94,11 +111,13 @@ it.concurrent("creating a gadget keeps each request a prefix of the next", async
 
 // Compaction rewrites the chat's history anyway, so it lists the gadgets as they are, and the
 // turns after it keep that list.
-it.concurrent("a compaction lists the workspace's gadgets afresh, and later turns keep that list",
-    async () => {
+it.concurrent("a compaction lists the workspace's gadgets afresh, and later turns keep that list", async () => {
   const model = models.script([
     // Over 85% of the scripted model's input budget, so turn 2 compacts first.
-    { text: "First reply.", usage: { prompt_tokens: 195_000, completion_tokens: 1, total_tokens: 195_001 } },
+    {
+      text: "First reply.",
+      usage: { prompt_tokens: 195_000, completion_tokens: 1, total_tokens: 195_001 },
+    },
     { text: "Summary of the first turn." },
     { text: "Second reply." },
     { text: "Third reply." },
@@ -114,7 +133,10 @@ it.concurrent("a compaction lists the workspace's gadgets afresh, and later turn
   await waitForIdleChat(ws, chatId);
   (await ws.createGadget("Meeting notes", undefined, "NOTES"))[Symbol.dispose]();
   await ws.sendChatMessage(chatId, "Second question", SCRIPTED_MODEL_ID);
-  await waitFor("the summary and resumed requests", async () => model.requests.length === 3 || null);
+  await waitFor(
+    "the summary and resumed requests",
+    async () => model.requests.length === 3 || null,
+  );
   await waitForIdleChat(ws, chatId);
 
   const [first, , resumed] = model.requests;
@@ -137,8 +159,7 @@ function setSkills(label: string, skills: string[]): Promise<void> {
 
 // The system prompt lists the catalogs as the chat first saw them. A later change reaches the
 // agent as a synthetic tool call at the end of the history.
-it.concurrent("a catalog change keeps each request a prefix of the next, and the agent is told",
-    async () => {
+it.concurrent("a catalog change keeps each request a prefix of the next, and the agent is told", async () => {
   const model = models.script([{ text: "First reply." }, { text: "Second reply." }]);
   await using session = await openAgentSession(harness.url, {
     modelId: SCRIPTED_MODEL_ID,
@@ -163,8 +184,7 @@ it.concurrent("a catalog change keeps each request a prefix of the next, and the
 
 // An always-available resource the workspace gains after the chat started joins the chat's env on
 // its next turn. The system prompt keeps the list the chat started with, so the agent is told.
-it.concurrent("a resource gained mid-chat keeps each request a prefix, and the agent can use it",
-    async () => {
+it.concurrent("a resource gained mid-chat keeps each request a prefix, and the agent can use it", async () => {
   const model = models.script([
     { text: "First reply." },
     { toolCall: { id: "read-value", name: "executeCode", arguments: { code: READ_TEST_VALUE } } },
@@ -181,7 +201,7 @@ it.concurrent("a resource gained mid-chat keeps each request a prefix, and the a
 
   expect(model.requests).toHaveLength(3);
   expectEachRequestExtendsThePrevious(model.requests);
-  const [, second, third] = model.requests.map(request => REQUEST.parse(request).messages);
+  const [, second, third] = model.requests.map((request) => REQUEST.parse(request).messages);
   expect(JSON.stringify(second?.at(-1))).toContain("`env.TEST_AMBIENT` (");
   expect(JSON.stringify(second?.at(-1))).toContain("is now always available");
   expect(JSON.stringify(third?.at(-1))).toContain("42");
@@ -200,8 +220,11 @@ it.concurrent("compacting after a catalog change keeps the catalogs the chat saw
   using api = await signUp(publicApi, owner!);
   await api.addModel(model.userModel.profile, model.userModel.config);
   await api.provisionAmbientAccount(TEST_VENDOR_ID);
-  const account = await waitFor("the ambient account", async () =>
-      (await listConnectedAccounts(api)).find(entry => entry.vendorId === TEST_VENDOR_ID) ?? null);
+  const account = await waitFor(
+    "the ambient account",
+    async () =>
+      (await listConnectedAccounts(api)).find((entry) => entry.vendorId === TEST_VENDOR_ID) ?? null,
+  );
   const label = accountLabel(account);
   await setSkills(label, ["Tax rules"]);
   using ws = await api.newGadget();
@@ -211,7 +234,10 @@ it.concurrent("compacting after a catalog change keeps the catalogs the chat saw
   await waitForIdleChat(ws, chatId);
   await setSkills(label, ["Tax rules", "Travel policy"]);
   await ws.sendChatMessage(
-      chatId, { id: { builtin: true, commandId: "compact" }, args: "" }, SCRIPTED_MODEL_ID);
+    chatId,
+    { id: { builtin: true, commandId: "compact" }, args: "" },
+    SCRIPTED_MODEL_ID,
+  );
   await waitFor("the summary request", async () => model.requests.length === 2 || null);
   await waitForIdleChat(ws, chatId);
   await ws.sendChatMessage(chatId, "Second question", SCRIPTED_MODEL_ID);
