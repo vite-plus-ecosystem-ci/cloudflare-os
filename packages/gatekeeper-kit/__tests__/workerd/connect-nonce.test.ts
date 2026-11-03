@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   ACCESS_TOKEN_SAFETY_MS,
   CONNECT_TIMEOUT_MS,
@@ -42,7 +42,9 @@ describe("isLiveNonce", () => {
     expect(isLiveNonce({ value: "", expiresAt: 200 }, "", 100)).toBe(false);
     expect(isLiveNonce(live, "", 100)).toBe(false);
     expect(isLiveNonce({ value: "abc" } as unknown as TimedNonce, "abc", 100)).toBe(false);
-    expect(isLiveNonce({ value: 7, expiresAt: 200 } as unknown as TimedNonce, "7", 100)).toBe(false);
+    expect(isLiveNonce({ value: 7, expiresAt: 200 } as unknown as TimedNonce, "7", 100)).toBe(
+      false,
+    );
     // NaN loses every comparison, so an unusable clock would read as not-yet-expired.
     expect(isLiveNonce(live, "abc", Number.NaN)).toBe(false);
     expect(isLiveNonce(live, "abc", -Infinity)).toBe(false);

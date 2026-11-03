@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { Usage } from "@earendil-works/pi-ai";
@@ -23,7 +23,11 @@ const FIRST_PING = 4.5 * MINUTE;
 // A resend's usage, costing `cost`: by default, as much as the requests below estimate.
 function usage(cacheRead: number, cacheWrite = 0, cost = 1): Usage {
   return {
-    input: 10, output: 1, cacheRead, cacheWrite, totalTokens: 11 + cacheRead + cacheWrite,
+    input: 10,
+    output: 1,
+    cacheRead,
+    cacheWrite,
+    totalTokens: 11 + cacheRead + cacheWrite,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: cost },
   };
 }
@@ -32,11 +36,16 @@ function usage(cacheRead: number, cacheWrite = 0, cost = 1): Usage {
 // Anthropic's prices (reads at a tenth of input, 5-minute writes at 1.25x), a miss of the whole
 // prompt costs 11.5 reads of it.
 function request(
-    answer: () => Promise<Usage> = async () => usage(100_000),
-    overrides: Partial<CachedRequest> = {}) {
+  answer: () => Promise<Usage> = async () => usage(100_000),
+  overrides: Partial<CachedRequest> = {},
+) {
   const resend = vi.fn(async () => ({ usage: await answer() }));
   const cached: CachedRequest = {
-    sentAt: Date.now(), cacheLifetime: 5 * MINUTE, resendCost: 1, expiryCost: 11.5, resend,
+    sentAt: Date.now(),
+    cacheLifetime: 5 * MINUTE,
+    resendCost: 1,
+    expiryCost: 11.5,
+    resend,
     ...overrides,
   };
   return { cached, resend };
@@ -171,7 +180,12 @@ describe("ChatCacheWarmer", () => {
     // The shared head is still cached, but the chat's own part had expired.
     { name: "writes to the cache", answer: async () => usage(10_000, 90_000) },
     { name: "reads nothing from the cache", answer: async () => usage(0) },
-    { name: "fails", answer: async (): Promise<Usage> => { throw new Error("overloaded"); } },
+    {
+      name: "fails",
+      answer: async (): Promise<Usage> => {
+        throw new Error("overloaded");
+      },
+    },
   ])("stops after a ping that $name", async ({ answer }) => {
     warmer.view(CHAT);
     const { cached, resend } = request(answer);
@@ -202,7 +216,12 @@ describe("ChatCacheWarmer", () => {
   it("drops a ping that was out when warming stopped, but still charges its cost", async () => {
     warmer.view(CHAT);
     let answer!: (usage: Usage) => void;
-    const { cached, resend } = request(() => new Promise(resolve => { answer = resolve; }));
+    const { cached, resend } = request(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    );
     warmer.start(CHAT, cached, MODEL);
 
     await vi.advanceTimersByTimeAsync(FIRST_PING);
@@ -235,11 +254,18 @@ describe("ChatCacheWarmer", () => {
       expect(vi.getTimerCount()).toBe(0);
       expect(logs).not.toHaveBeenCalledWith(pauseEnded({}));
       warmer.end(CHAT, "turn");
-      expect(logs).toHaveBeenLastCalledWith(pauseEnded({
-        gadgetId: WORKSPACE, chatId: CHAT, modelId: MODEL, pauseEnd: "turn",
-        durationMs: 3 * 60 * MINUTE, cacheLifetimeMs: 5 * MINUTE, resendCostUsd: 1,
-        missCostUsd: 11.5,
-      }));
+      expect(logs).toHaveBeenLastCalledWith(
+        pauseEnded({
+          gadgetId: WORKSPACE,
+          chatId: CHAT,
+          modelId: MODEL,
+          pauseEnd: "turn",
+          durationMs: 3 * 60 * MINUTE,
+          cacheLifetimeMs: 5 * MINUTE,
+          resendCostUsd: 1,
+          missCostUsd: 11.5,
+        }),
+      );
 
       // Deleting the chat during its next turn doesn't log the ended pause again.
       logs.mockClear();
@@ -259,7 +285,8 @@ describe("ChatCacheWarmer", () => {
       leaveSecond();
       warmer.end(CHAT, "turn");
       expect(logs).toHaveBeenCalledExactlyOnceWith(
-          pauseEnded({ pauseEnd: "left", durationMs: MINUTE }));
+        pauseEnded({ pauseEnd: "left", durationMs: MINUTE }),
+      );
     });
 
     it("only after a turn that ended in a viewed chat", () => {
@@ -275,7 +302,7 @@ describe("ChatCacheWarmer", () => {
 interface OverseerInternals {
   cacheWarmer: ChatCacheWarmer;
   storage: {
-    chatMeta: { get(id: number): AiChatMetadata | undefined, put(meta: AiChatMetadata): void };
+    chatMeta: { get(id: number): AiChatMetadata | undefined; put(meta: AiChatMetadata): void };
     totalCost: { get(): number };
   };
 }
@@ -283,13 +310,16 @@ interface OverseerInternals {
 describe("a workspace's warm pings", () => {
   // A ping is no activity: counting it as one would move an idle open chat, and its workspace, to
   // the top of every list every few minutes.
-  it("adds each ping's cost to the chat's and workspace's totals, not to its activity",
-      async () => {
+  it("adds each ping's cost to the chat's and workspace's totals, not to its activity", async () => {
     let stub = env.TEST_OVERSEER.getByName("chat-cache-warming");
     await runInDurableObject(stub, async (instance: OverseerDurableObject) => {
       let impl = (instance as unknown as { impl: OverseerInternals }).impl;
-      impl.storage.chatMeta.put(
-          { id: CHAT, title: "Chat", started: new Date(0), lastActive: new Date(0) });
+      impl.storage.chatMeta.put({
+        id: CHAT,
+        title: "Chat",
+        started: new Date(0),
+        lastActive: new Date(0),
+      });
       let workspaceCost = impl.storage.totalCost.get();
 
       impl.cacheWarmer.view(CHAT);
@@ -301,8 +331,10 @@ describe("a workspace's warm pings", () => {
         vi.useRealTimers();
       }
 
-      expect(impl.storage.chatMeta.get(CHAT)).toMatchObject(
-          { totalCost: 0.5, lastActive: new Date(0) });
+      expect(impl.storage.chatMeta.get(CHAT)).toMatchObject({
+        totalCost: 0.5,
+        lastActive: new Date(0),
+      });
       expect(impl.storage.totalCost.get() - workspaceCost).toBe(0.5);
     });
   });

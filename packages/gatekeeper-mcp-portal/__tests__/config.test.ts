@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   isPortalServerHidden,
   isPortalToolGrantable,
@@ -37,12 +37,20 @@ describe("readPortalConfig", () => {
   it("rejects URL credentials rather than persisting or displaying them", () => {
     // This endpoint is copied into account state, resource URLs, and configurator inputs. Userinfo
     // would both become ambient fetch credentials and expose the configured secret to users.
-    expect(readPortalConfig(env({
-      MCP_PORTAL_URL: "https://admin:secret@gw.example.com/mcp",
-    }))).toBeNull();
-    expect(readPortalConfig(env({
-      MCP_PORTAL_URL: "https://admin@gw.example.com/mcp",
-    }))).toBeNull();
+    expect(
+      readPortalConfig(
+        env({
+          MCP_PORTAL_URL: "https://admin:secret@gw.example.com/mcp",
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      readPortalConfig(
+        env({
+          MCP_PORTAL_URL: "https://admin@gw.example.com/mcp",
+        }),
+      ),
+    ).toBeNull();
   });
 
   it("reads the endpoint and strips any fragment, defaulting the name and auth kind", () => {
@@ -51,11 +59,13 @@ describe("readPortalConfig", () => {
     expect(defaulted?.name).toBe("MCP Server Portal (gw.example.com)");
     expect(defaulted?.auth).toBe("oauth");
 
-    const configured = readPortalConfig(env({
-      MCP_PORTAL_URL: "https://gw.example.com/mcp",
-      MCP_PORTAL_NAME: "Cloudflare MCP Portal",
-      MCP_PORTAL_AUTH: "TOKEN",
-    }));
+    const configured = readPortalConfig(
+      env({
+        MCP_PORTAL_URL: "https://gw.example.com/mcp",
+        MCP_PORTAL_NAME: "Cloudflare MCP Portal",
+        MCP_PORTAL_AUTH: "TOKEN",
+      }),
+    );
     expect(configured?.name).toBe("Cloudflare MCP Portal");
     expect(configured?.auth).toBe("token");
   });
@@ -63,10 +73,14 @@ describe("readPortalConfig", () => {
   it("falls back to oauth for an unrecognized auth kind", () => {
     // Failing closed here would hide the connector over a typo; oauth is the safe default because it
     // cannot succeed without the user completing a real authorization.
-    expect(readPortalConfig(env({
-      MCP_PORTAL_URL: "https://gw.example.com/mcp",
-      MCP_PORTAL_AUTH: "basic",
-    }))?.auth).toBe("oauth");
+    expect(
+      readPortalConfig(
+        env({
+          MCP_PORTAL_URL: "https://gw.example.com/mcp",
+          MCP_PORTAL_AUTH: "basic",
+        }),
+      )?.auth,
+    ).toBe("oauth");
   });
 
   it("permits http only where guardedFetch would, which is local development", () => {
@@ -75,18 +89,24 @@ describe("readPortalConfig", () => {
     // produce a connector that appears in the list, takes a connect click, and then fails on its
     // first request over a URL the user never saw. Hiding it says the same thing at the right time.
     expect(readPortalConfig(env({ MCP_PORTAL_URL: "http://localhost:9000/mcp" }))).toBeNull();
-    expect(readPortalConfig(env({
-      MCP_PORTAL_URL: "http://localhost:9000/mcp",
-      MCP_ALLOW_INSECURE: "true",
-    }))?.endpoint).toBe("http://localhost:9000/mcp");
+    expect(
+      readPortalConfig(
+        env({
+          MCP_PORTAL_URL: "http://localhost:9000/mcp",
+          MCP_ALLOW_INSECURE: "true",
+        }),
+      )?.endpoint,
+    ).toBe("http://localhost:9000/mcp");
   });
 });
 
 describe("portalResource", () => {
-  const config = readPortalConfig(env({
-    MCP_PORTAL_URL: "https://gw.example.com/mcp",
-    MCP_PORTAL_NAME: "Acme Portal",
-  }))!;
+  const config = readPortalConfig(
+    env({
+      MCP_PORTAL_URL: "https://gw.example.com/mcp",
+      MCP_PORTAL_NAME: "Acme Portal",
+    }),
+  )!;
 
   it("scopes the resource to the portal's origin", () => {
     // Origin-scoped, so a resource URL for any other host matches nothing this connector offers.
@@ -126,10 +146,12 @@ describe("portalServer", () => {
     // The trust tier answers "what may its annotations do today" and is configuration. The bug this
     // pins: with `trust` doing double duty, a portal left at the default `byo` counted as
     // user-supplied, so the upstream could rename itself over MCP_PORTAL_NAME in every prompt.
-    const config = readPortalConfig(env({
-      MCP_PORTAL_URL: "https://gw.example.com/mcp",
-      MCP_PORTAL_NAME: "Acme Portal",
-    }))!;
+    const config = readPortalConfig(
+      env({
+        MCP_PORTAL_URL: "https://gw.example.com/mcp",
+        MCP_PORTAL_NAME: "Acme Portal",
+      }),
+    )!;
     expect(portalServer(config).provenance).toBe("deployment");
     expect(portalServer(config)).not.toHaveProperty("trust");
     expect(portalServer(config).serverName).toBe("Acme Portal");
@@ -168,8 +190,9 @@ describe("requirePortalServerScope", () => {
 
   it("accepts a server scope, with or without a tool pin", () => {
     expect(() => requirePortalServerScope({ serverId: "github" })).not.toThrow();
-    expect(() => requirePortalServerScope({ serverId: "github", tools: ["github_a"] }))
-      .not.toThrow();
+    expect(() =>
+      requirePortalServerScope({ serverId: "github", tools: ["github_a"] }),
+    ).not.toThrow();
     // Pinned-and-empty denies everything, which is fail-closed and fine to mint.
     expect(() => requirePortalServerScope({ serverId: "github", tools: [] })).not.toThrow();
   });
@@ -177,20 +200,26 @@ describe("requirePortalServerScope", () => {
   it("rejects invalid names and cross-server tools before endpoint discovery", () => {
     expect(() => requirePortalServerScope({ serverId: "" })).toThrow(/server id/i);
     expect(() => requirePortalServerScope({ serverId: "x".repeat(600) })).toThrow(/server id/i);
-    expect(() => requirePortalServerScope({ serverId: "github", tools: [""] }))
-      .toThrow(/tool name/i);
-    expect(() => requirePortalServerScope({ serverId: "github", tools: ["jira_search"] }))
-      .toThrow(/does not belong/i);
-    expect(() => requirePortalServerScope({
-      serverId: "portal", tools: ["portal_toggle_servers"],
-    })).toThrow(/portal management tool/i);
+    expect(() => requirePortalServerScope({ serverId: "github", tools: [""] })).toThrow(
+      /tool name/i,
+    );
+    expect(() => requirePortalServerScope({ serverId: "github", tools: ["jira_search"] })).toThrow(
+      /does not belong/i,
+    );
+    expect(() =>
+      requirePortalServerScope({
+        serverId: "portal",
+        tools: ["portal_toggle_servers"],
+      }),
+    ).toThrow(/portal management tool/i);
   });
 });
 
 describe("portal catalog validation", () => {
   it("selects exact-tool validation for a non-empty pinned grant", () => {
-    expect(portalCatalogValidationMode(
-      { serverId: "github", tools: ["github_search"] }, [])).toBe("named-tools");
+    expect(portalCatalogValidationMode({ serverId: "github", tools: ["github_search"] }, [])).toBe(
+      "named-tools",
+    );
   });
 
   it("uses the same server evidence for empty pinned and server-wide grants", () => {
@@ -222,8 +251,9 @@ describe("portal server visibility", () => {
   });
 
   it("refuses hidden servers at the grant boundary", () => {
-    expect(() => requirePortalServerVisible(configured, "jira-mcp-server"))
-      .toThrow(/native connector/);
+    expect(() => requirePortalServerVisible(configured, "jira-mcp-server")).toThrow(
+      /native connector/,
+    );
     expect(() => requirePortalServerVisible(configured, "gitlab-mcp-server")).not.toThrow();
   });
 });
@@ -234,7 +264,9 @@ describe("portalTokenFor", () => {
 
   it("serves the token for the endpoint the deployment currently names", () => {
     const configured = env({
-      MCP_PORTAL_URL: OLD, MCP_PORTAL_AUTH: "token", MCP_PORTAL_TOKEN: "old-secret",
+      MCP_PORTAL_URL: OLD,
+      MCP_PORTAL_AUTH: "token",
+      MCP_PORTAL_TOKEN: "old-secret",
     });
     expect(portalTokenFor(configured, OLD)).toBe("old-secret");
     expect(portalTokenFor(env({ MCP_PORTAL_URL: OLD }), OLD)).toBeNull();
@@ -243,9 +275,16 @@ describe("portalTokenFor", () => {
 
   it("withholds the token when the deployment no longer uses token auth", () => {
     for (const auth of ["oauth", "none"]) {
-      expect(portalTokenFor(env({
-        MCP_PORTAL_URL: OLD, MCP_PORTAL_AUTH: auth, MCP_PORTAL_TOKEN: "old-secret",
-      }), OLD)).toBeNull();
+      expect(
+        portalTokenFor(
+          env({
+            MCP_PORTAL_URL: OLD,
+            MCP_PORTAL_AUTH: auth,
+            MCP_PORTAL_TOKEN: "old-secret",
+          }),
+          OLD,
+        ),
+      ).toBeNull();
     }
   });
 
@@ -256,7 +295,9 @@ describe("portalTokenFor", () => {
     // facet that is about to contact the *old* host. An already-minted durable facet never passes
     // through `getGatekeeperClassFor` again, so that check cannot catch it either.
     const repointed = env({
-      MCP_PORTAL_URL: NEW, MCP_PORTAL_AUTH: "token", MCP_PORTAL_TOKEN: "new-secret",
+      MCP_PORTAL_URL: NEW,
+      MCP_PORTAL_AUTH: "token",
+      MCP_PORTAL_TOKEN: "new-secret",
     });
     expect(portalTokenFor(repointed, OLD)).toBeNull();
     expect(portalTokenFor(repointed, NEW)).toBe("new-secret");
@@ -266,9 +307,15 @@ describe("portalTokenFor", () => {
     // No configuration means no endpoint this token belongs to, so there is nothing safe to serve.
     expect(portalTokenFor(env({ MCP_PORTAL_TOKEN: "orphan-secret" }), OLD)).toBeNull();
     // An unusable URL hides the connector; it must not still release the secret.
-    expect(portalTokenFor(env({
-      MCP_PORTAL_URL: "http://old.example.com/mcp", MCP_PORTAL_TOKEN: "orphan-secret",
-    }), "http://old.example.com/mcp")).toBeNull();
+    expect(
+      portalTokenFor(
+        env({
+          MCP_PORTAL_URL: "http://old.example.com/mcp",
+          MCP_PORTAL_TOKEN: "orphan-secret",
+        }),
+        "http://old.example.com/mcp",
+      ),
+    ).toBeNull();
   });
 
   it("compares the whole endpoint, not just the origin", () => {
@@ -295,7 +342,7 @@ describe("toolGrantOptions", () => {
       tools,
       trust: "byo",
     });
-    expect(options.map(option => [option.value, option.meta])).toEqual([
+    expect(options.map((option) => [option.value, option.meta])).toEqual([
       ["google_list_events", "read-only"],
       ["google_delete_event", "needs approval"],
       ["google_send_mail", "needs approval"],
@@ -305,11 +352,15 @@ describe("toolGrantOptions", () => {
   it("uses summary text and degrades to the bare name without it", () => {
     const options = toolGrantOptions({
       serverId: "google",
-      tools: [{
-        name: "google_list_events", title: "List events",
-        description: "Lists calendar events.\nSecond line ignored.",
-        annotations: { readOnlyHint: true },
-      }, ...tools.slice(1)],
+      tools: [
+        {
+          name: "google_list_events",
+          title: "List events",
+          description: "Lists calendar events.\nSecond line ignored.",
+          annotations: { readOnlyHint: true },
+        },
+        ...tools.slice(1),
+      ],
       trust: "byo",
     });
     expect(options[0]).toEqual({
@@ -327,9 +378,11 @@ describe("toolGrantOptions", () => {
     // Auto-approval needs a vetted deployment as well, and is not something this form claims.
     for (const trust of ["vetted", "byo"] as const) {
       const options = toolGrantOptions({ serverId: "google", tools, trust });
-      expect(options.map(option => option.meta))
-        .toEqual(["read-only", "needs approval", "needs approval"]);
+      expect(options.map((option) => option.meta)).toEqual([
+        "read-only",
+        "needs approval",
+        "needs approval",
+      ]);
     }
   });
-
 });

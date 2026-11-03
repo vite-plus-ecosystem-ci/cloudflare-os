@@ -1,12 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const launch = vi.hoisted(() => vi.fn());
 vi.mock("@cloudflare/puppeteer", () => ({ launch }));
 
-const { BrowserRpcTransport, renderGadgetInBrowser } =
-    await import("../src/browser-export.js");
-const { createExportDeadline, limitExportStream } =
-    await import("../src/export-limits.js");
+const { BrowserRpcTransport, renderGadgetInBrowser } = await import("../src/browser-export.js");
+const { createExportDeadline, limitExportStream } = await import("../src/export-limits.js");
 
 type Harness = {
   browserClosed: () => boolean;
@@ -22,7 +20,7 @@ type Harness = {
   sanitizedInIsolatedRealm: () => boolean;
   mediaType: () => string | undefined;
   screenshotType: () => string | undefined;
-  screenshotClip: () => {x: number; y: number; width: number; height: number} | undefined;
+  screenshotClip: () => { x: number; y: number; width: number; height: number } | undefined;
   screenshotCaptureBeyondViewport: () => boolean | undefined;
   setDocumentDimensions: (width: number, height: number) => void;
   setSnapshot: (value: string) => void;
@@ -43,9 +41,9 @@ function makeHarness(pdfChunks = ["%PDF-1.4"], closePdf = true) {
   let sanitizedInIsolatedRealm = false;
   let mediaType: string | undefined;
   let screenshotType: string | undefined;
-  let screenshotClip: {x: number; y: number; width: number; height: number} | undefined;
+  let screenshotClip: { x: number; y: number; width: number; height: number } | undefined;
   let screenshotCaptureBeyondViewport: boolean | undefined;
-  let documentDimensions = {width: 1000, height: 1000};
+  let documentDimensions = { width: 1000, height: 1000 };
   let snapshot = "<!DOCTYPE html>\n<html><head></head><body>Snapshot</body></html>";
   let navigated = false;
   let requestHandler: ((request: unknown) => void) | undefined;
@@ -81,7 +79,8 @@ function makeHarness(pdfChunks = ["%PDF-1.4"], closePdf = true) {
       if (!isolated) throw new Error("Main-world sanitizer was invoked.");
       expect(sanitizerInstalled).toBe(true);
       sanitizedInIsolatedRealm = true;
-      htmlSanitized = typeof args[0] === "string" &&
+      htmlSanitized =
+        typeof args[0] === "string" &&
         args[0].includes("script-src 'none'") &&
         fn.toString().includes("ownerDocument") &&
         !fn.toString().includes("DOMParser") &&
@@ -94,14 +93,17 @@ function makeHarness(pdfChunks = ["%PDF-1.4"], closePdf = true) {
     if (fn.toString().includes("scrollWidth")) {
       if (!isolated) throw new Error("Document dimensions were measured in the main world.");
       const maxPixels = Number(args[0]);
-      const {width, height} = documentDimensions;
-      if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||
-          width <= 0 || height <= 0 || width > Math.floor(maxPixels / height)) {
-        return Promise.reject(new Error(
-          `Gadget screenshots may not exceed ${maxPixels} pixels.`,
-        ));
+      const { width, height } = documentDimensions;
+      if (
+        !Number.isSafeInteger(width) ||
+        !Number.isSafeInteger(height) ||
+        width <= 0 ||
+        height <= 0 ||
+        width > Math.floor(maxPixels / height)
+      ) {
+        return Promise.reject(new Error(`Gadget screenshots may not exceed ${maxPixels} pixels.`));
       }
-      return Promise.resolve({x: 0, y: 0, width, height});
+      return Promise.resolve({ x: 0, y: 0, width, height });
     }
     // The RPC transport polls this; the fake page never has a message to deliver.
     return new Promise(() => {});
@@ -124,7 +126,7 @@ function makeHarness(pdfChunks = ["%PDF-1.4"], closePdf = true) {
         url: () => "https://gadget-export.invalid/",
         isNavigationRequest: () => true,
         frame: () => mainFrame,
-        respond: async (response: {body: string, headers?: Record<string, string>}) => {
+        respond: async (response: { body: string; headers?: Record<string, string> }) => {
           exportDocument = response.body;
           exportDocumentCsp = response.headers?.["Content-Security-Policy"];
         },
@@ -133,7 +135,9 @@ function makeHarness(pdfChunks = ["%PDF-1.4"], closePdf = true) {
         url: () => "blob:https://gadget-export.invalid/test",
         isNavigationRequest: () => false,
         frame: () => mainFrame,
-        continue: async () => { blobRequestContinued = true; },
+        continue: async () => {
+          blobRequestContinued = true;
+        },
       });
     },
     mainFrame: () => mainFrame,
@@ -154,9 +158,13 @@ function makeHarness(pdfChunks = ["%PDF-1.4"], closePdf = true) {
         },
       });
     },
-    screenshot: async ({type, clip, captureBeyondViewport}: {
+    screenshot: async ({
+      type,
+      clip,
+      captureBeyondViewport,
+    }: {
       type: string;
-      clip?: {x: number; y: number; width: number; height: number};
+      clip?: { x: number; y: number; width: number; height: number };
       captureBeyondViewport?: boolean;
     }) => {
       screenshotType = type;
@@ -195,17 +203,17 @@ function makeHarness(pdfChunks = ["%PDF-1.4"], closePdf = true) {
     screenshotType: () => screenshotType,
     screenshotClip: () => screenshotClip,
     screenshotCaptureBeyondViewport: () => screenshotCaptureBeyondViewport,
-    setDocumentDimensions: (width, height) => { documentDimensions = {width, height}; },
-    setSnapshot: value => { snapshot = value; },
+    setDocumentDimensions: (width, height) => {
+      documentDimensions = { width, height };
+    },
+    setSnapshot: (value) => {
+      snapshot = value;
+    },
   };
   return { gadget, harness };
 }
 
-function render(
-  pdfChunks?: string[],
-  closePdf = true,
-  contentType = "application/pdf",
-) {
+function render(pdfChunks?: string[], closePdf = true, contentType = "application/pdf") {
   let { gadget, harness } = makeHarness(pdfChunks, closePdf);
   let stream = renderGadgetInBrowser(
     {} as BrowserRun,
@@ -257,18 +265,17 @@ describe("BrowserRpcTransport", () => {
     let pendingResults = Promise.allSettled(pending);
 
     await expect(transport.send("overflow")).rejects.toThrow("send queue overflowed");
-    expect((await pendingResults).every(result => result.status === "rejected")).toBe(true);
+    expect((await pendingResults).every((result) => result.status === "rejected")).toBe(true);
   });
 });
 
 describe("limitStream", () => {
   it("passes through output that stays within the cap", async () => {
-    expect(await collect(limitExportStream(
-      streamOf(["abc", "de"]),
-      createExportDeadline("timed out"),
-      undefined,
-      5,
-    ))).toBe("abcde");
+    expect(
+      await collect(
+        limitExportStream(streamOf(["abc", "de"]), createExportDeadline("timed out"), undefined, 5),
+      ),
+    ).toBe("abcde");
   });
 
   it("fails as soon as the cap is exceeded rather than buffering the whole export", async () => {
@@ -287,8 +294,12 @@ describe("limitStream", () => {
     try {
       const release = vi.fn(async () => {});
       const source = new ReadableStream<Uint8Array>({
-        pull() { return new Promise(() => {}); },
-        cancel() { return new Promise(() => {}); },
+        pull() {
+          return new Promise(() => {});
+        },
+        cancel() {
+          return new Promise(() => {});
+        },
       });
       const reader = limitExportStream(
         source,
@@ -318,7 +329,7 @@ describe("renderGadgetInBrowser", () => {
     expect(harness.mediaType()).toBe("print");
     expect(harness.browserClosed()).toBe(true);
     expect(harness.exportDocument()).toContain(
-      'globalThis.gadgetExportFormatId%20%3D%20%22test-format%22',
+      "globalThis.gadgetExportFormatId%20%3D%20%22test-format%22",
     );
     expect(harness.exportDocumentCsp()).toContain("img-src data: blob:");
     expect(harness.exportDocumentCsp()).toContain("media-src data: blob:");
@@ -366,7 +377,7 @@ describe("renderGadgetInBrowser", () => {
 
     expect(await collect(await stream)).toBe(screenshotType);
     expect(harness.screenshotType()).toBe(screenshotType);
-    expect(harness.screenshotClip()).toEqual({x: 0, y: 0, width: 1000, height: 1000});
+    expect(harness.screenshotClip()).toEqual({ x: 0, y: 0, width: 1000, height: 1000 });
     expect(harness.screenshotCaptureBeyondViewport()).toBe(true);
     expect(harness.mediaType()).toBe("screen");
     expect(harness.browserClosed()).toBe(true);
@@ -433,7 +444,11 @@ describe("renderGadgetInBrowser", () => {
         {} as BrowserRun,
         "export default {}",
         "Test Gadget",
-        { [Symbol.dispose]: () => { gadgetDisposed = true; } } as never,
+        {
+          [Symbol.dispose]: () => {
+            gadgetDisposed = true;
+          },
+        } as never,
         {
           id: "pdf",
           label: "PDF",
@@ -449,7 +464,9 @@ describe("renderGadgetInBrowser", () => {
       expect(gadgetDisposed).toBe(true);
 
       pendingLaunch.resolve({
-        close: async () => { browserClosed = true; },
+        close: async () => {
+          browserClosed = true;
+        },
       });
       await vi.advanceTimersByTimeAsync(0);
       expect(browserClosed).toBe(true);
@@ -462,19 +479,25 @@ describe("renderGadgetInBrowser", () => {
     let gadgetDisposed = false;
     launch.mockRejectedValue(new Error("no browser available"));
 
-    await expect(renderGadgetInBrowser(
-      {} as BrowserRun,
-      "export default {}",
-      "Test Gadget",
-      { [Symbol.dispose]: () => { gadgetDisposed = true; } } as never,
-      {
-        id: "pdf",
-        label: "PDF",
-        mode: "browser",
-        contentType: "application/pdf",
-        fileExtension: ".pdf",
-      },
-    )).rejects.toThrow("no browser available");
+    await expect(
+      renderGadgetInBrowser(
+        {} as BrowserRun,
+        "export default {}",
+        "Test Gadget",
+        {
+          [Symbol.dispose]: () => {
+            gadgetDisposed = true;
+          },
+        } as never,
+        {
+          id: "pdf",
+          label: "PDF",
+          mode: "browser",
+          contentType: "application/pdf",
+          fileExtension: ".pdf",
+        },
+      ),
+    ).rejects.toThrow("no browser available");
     expect(gadgetDisposed).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-plugin";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 import deployed from "./cloudflare.config.ts";
 
 const { compatibilityDate, compatibilityFlags } = deployed.worker;
@@ -21,13 +21,13 @@ export default defineConfig({
         compatibilityDate,
         compatibilityFlags,
         // cloudflare.config.ts's Text-module rules, which github.ts's .txt/.svg imports rely on.
-        modulesRules: [
-          { type: "Text", include: ["**/*.txt", "**/*.svg"] },
-        ],
+        modulesRules: [{ type: "Text", include: ["**/*.txt", "**/*.svg"] }],
         // Fake OAuth client credentials, so the account's code exchange and refresh can run, and
         // the origin GitHub delivers webhooks to, without which hooks are refused.
         bindings: {
-          CLIENT_ID: "test-client", CLIENT_SECRET: "test-secret", WEBHOOK_ORIGIN: "https://gadgets.test",
+          CLIENT_ID: "test-client",
+          CLIENT_SECRET: "test-secret",
+          WEBHOOK_ORIGIN: "https://gadgets.test",
         },
         durableObjects: {
           USER_ACCOUNT: { className: "UserAccount", useSQLite: true },

@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  decodeStoredContextBody, encodeStoredContextBody, truncateContextDescription,
+  decodeStoredContextBody,
+  encodeStoredContextBody,
+  truncateContextDescription,
 } from "../src/context-storage.js";
 import { artifactContextDocument } from "../src/artifact-sync.js";
 
@@ -15,9 +17,9 @@ describe("context document storage", () => {
 
   it("preserves a leading UTF-8 BOM", () => {
     const body = "\uFEFF# Title";
-    expect(decodeStoredContextBody("text/markdown", encodeStoredContextBody(
-      "text/markdown", body,
-    ))).toBe(body);
+    expect(
+      decodeStoredContextBody("text/markdown", encodeStoredContextBody("text/markdown", body)),
+    ).toBe(body);
   });
 
   it("reads legacy string records", () => {
@@ -31,8 +33,9 @@ describe("context document storage", () => {
   });
 
   it("rejects malformed binary base64 bodies", () => {
-    expect(() => encodeStoredContextBody("image/png", "AQID!"))
-      .toThrow("Binary document body must be valid canonical base64.");
+    expect(() => encodeStoredContextBody("image/png", "AQID!")).toThrow(
+      "Binary document body must be valid canonical base64.",
+    );
   });
 
   it("measures binary storage by decoded bytes rather than base64 length", () => {

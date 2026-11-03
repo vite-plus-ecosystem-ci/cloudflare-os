@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import type { EvalModel } from "./config.js";
 import type { LocalModelAccess } from "./target.js";
 
@@ -40,7 +40,10 @@ vi.mock("@gadgets/integration-tests/harness", () => ({
 }));
 
 import {
-  closeLocalEvalRuntimes, evalNetworkInterceptor, openLocalEvalTarget, runtimesStillRunning,
+  closeLocalEvalRuntimes,
+  evalNetworkInterceptor,
+  openLocalEvalTarget,
+  runtimesStillRunning,
 } from "./target.js";
 
 const realFetch = globalThis.fetch;
@@ -65,28 +68,37 @@ const GEMINI: EvalModel = { provider: "google", model: "gemini-3.6-flash" };
 const CLAUDE: EvalModel = { provider: "anthropic", model: "claude-sonnet-5" };
 const DIRECT: LocalModelAccess = { kind: "direct", accountId: "account-id", apiToken: "token" };
 const BINDING: LocalModelAccess = {
-  kind: "gateway", gateway: "gateway", accountId: "account-id", transport: "binding",
+  kind: "gateway",
+  gateway: "gateway",
+  accountId: "account-id",
+  transport: "binding",
 };
 const BINDING_WITH_TOKEN: LocalModelAccess = { ...BINDING, apiToken: "token" };
 const HTTPS: LocalModelAccess = {
-  kind: "gateway", gateway: "gateway", accountId: "account-id", transport: "https",
+  kind: "gateway",
+  gateway: "gateway",
+  accountId: "account-id",
+  transport: "https",
   apiToken: "token",
 };
 
 const DIRECT_INFERENCE_URL =
-    "https://api.cloudflare.com/client/v4/accounts/account-id/ai/v1/chat/completions";
+  "https://api.cloudflare.com/client/v4/accounts/account-id/ai/v1/chat/completions";
 const WORKERS_AI_INFERENCE_URL =
-    "https://gateway.ai.cloudflare.com/v1/account-id/gateway/workers-ai/v1/chat/completions";
+  "https://gateway.ai.cloudflare.com/v1/account-id/gateway/workers-ai/v1/chat/completions";
 const GEMINI_INFERENCE_URL =
-    "https://gateway.ai.cloudflare.com/v1/account-id/gateway/google-ai-studio/v1beta/models/gemini-3.6-flash:streamGenerateContent";
+  "https://gateway.ai.cloudflare.com/v1/account-id/gateway/google-ai-studio/v1beta/models/gemini-3.6-flash:streamGenerateContent";
 const CLAUDE_INFERENCE_URL =
-    "https://gateway.ai.cloudflare.com/v1/account-id/gateway/anthropic/v1/messages";
+  "https://gateway.ai.cloudflare.com/v1/account-id/gateway/anthropic/v1/messages";
 const COST_LOG_URL =
-    "https://api.cloudflare.com/client/v4/accounts/account-id/ai-gateway/gateways/gateway/logs/log-id";
+  "https://api.cloudflare.com/client/v4/accounts/account-id/ai-gateway/gateways/gateway/logs/log-id";
 
 /** Statuses the Workshop would see for `urls` with the filter for `access` and `models` installed. */
 async function egress(
-    access: LocalModelAccess, models: EvalModel[], urls: string[]): Promise<number[]> {
+  access: LocalModelAccess,
+  models: EvalModel[],
+  urls: string[],
+): Promise<number[]> {
   const network = evalNetworkInterceptor(access, models);
   network.install();
   try {
@@ -106,8 +118,9 @@ it("allows the direct Workers AI route", async () => {
 });
 
 it("allows AI Gateway inference and cost-log routes over HTTPS", async () => {
-  expect(await egress(HTTPS, [WORKERS_AI_MODEL], [WORKERS_AI_INFERENCE_URL, COST_LOG_URL]))
-    .toEqual([204, 204]);
+  expect(await egress(HTTPS, [WORKERS_AI_MODEL], [WORKERS_AI_INFERENCE_URL, COST_LOG_URL])).toEqual(
+    [204, 204],
+  );
 });
 
 it("keeps HTTPS model routes closed in binding mode, with or without a token", async () => {
@@ -117,8 +130,13 @@ it("keeps HTTPS model routes closed in binding mode, with or without a token", a
 });
 
 it("opens only the HTTPS inference route for an HTTPS-only provider in binding mode", async () => {
-  expect(await egress(BINDING_WITH_TOKEN, [GEMINI],
-      [GEMINI_INFERENCE_URL, WORKERS_AI_INFERENCE_URL, COST_LOG_URL])).toEqual([204, 403, 403]);
+  expect(
+    await egress(
+      BINDING_WITH_TOKEN,
+      [GEMINI],
+      [GEMINI_INFERENCE_URL, WORKERS_AI_INFERENCE_URL, COST_LOG_URL],
+    ),
+  ).toEqual([204, 403, 403]);
 });
 
 it("scopes HTTPS inference to the gateway routes of the models in the matrix", async () => {
@@ -128,11 +146,17 @@ it("scopes HTTPS inference to the gateway routes of the models in the matrix", a
 });
 
 it("returns a deterministic denial for every other route, loopback included", async () => {
-  expect(await egress(DIRECT, [WORKERS_AI_MODEL], [
-    "https://example.com/collect",
-    "https://api.cloudflare.com/client/v4/accounts/account-id/ai/v1anything",
-    "http://127.0.0.1:9999/admin",
-  ])).toEqual([403, 403, 403]);
+  expect(
+    await egress(
+      DIRECT,
+      [WORKERS_AI_MODEL],
+      [
+        "https://example.com/collect",
+        "https://api.cloudflare.com/client/v4/accounts/account-id/ai/v1anything",
+        "http://127.0.0.1:9999/admin",
+      ],
+    ),
+  ).toEqual([403, 403, 403]);
   expect(globalThis.fetch).not.toHaveBeenCalled();
 });
 
@@ -143,30 +167,34 @@ async function open(access: LocalModelAccess, model: EvalModel = WORKERS_AI_MODE
 
 it("configures the Workshop for HTTPS gateway access", async () => {
   await open(HTTPS);
-  expect(fakes.configs).toEqual([{
-    vars: {
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
-      CF_AI_GATEWAY_API_TOKEN: "token",
-      CF_AI_GATEWAY_PROVIDERS: "cloudflare",
-      CF_AI_GATEWAY_USE_BINDING: "false",
+  expect(fakes.configs).toEqual([
+    {
+      vars: {
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
+        CF_AI_GATEWAY_API_TOKEN: "token",
+        CF_AI_GATEWAY_PROVIDERS: "cloudflare",
+        CF_AI_GATEWAY_USE_BINDING: "false",
+      },
     },
-  }]);
+  ]);
 });
 
 it("configures the Workshop for the binding transport, retaining any token", async () => {
   await open(BINDING_WITH_TOKEN, GEMINI);
-  expect(fakes.configs).toEqual([{
-    account_id: "account-id",
-    ai: { binding: "WORKERS_AI", remote: true },
-    vars: {
-      CF_AI_GATEWAY: "gateway",
-      CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
-      CF_AI_GATEWAY_API_TOKEN: "token",
-      CF_AI_GATEWAY_PROVIDERS: "google",
-      CF_AI_GATEWAY_USE_BINDING: "true",
+  expect(fakes.configs).toEqual([
+    {
+      account_id: "account-id",
+      ai: { binding: "WORKERS_AI", remote: true },
+      vars: {
+        CF_AI_GATEWAY: "gateway",
+        CF_AI_GATEWAY_ACCOUNT_ID: "account-id",
+        CF_AI_GATEWAY_API_TOKEN: "token",
+        CF_AI_GATEWAY_PROVIDERS: "google",
+        CF_AI_GATEWAY_USE_BINDING: "true",
+      },
     },
-  }]);
+  ]);
 });
 
 it("leaves the Workshop config alone for direct access", async () => {

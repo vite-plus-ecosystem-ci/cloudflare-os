@@ -1,7 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import type { McpServerConfiguratorRpc } from
-  "../src/configurator/server-configurator-types.js";
+import type { McpServerConfiguratorRpc } from "../src/configurator/server-configurator-types.js";
 
 const mocks = vi.hoisted(() => ({ withClient: vi.fn() }));
 
@@ -10,8 +9,8 @@ vi.mock("capnweb-validate", () => ({
   skipRpcValidation: () => (value: unknown) => value,
 }));
 
-vi.mock("@gadgets/mcp-shared/connection", async importOriginal => ({
-  ...await importOriginal<typeof import("@gadgets/mcp-shared/connection")>(),
+vi.mock("@gadgets/mcp-shared/connection", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@gadgets/mcp-shared/connection")>()),
   withClient: mocks.withClient,
 }));
 
@@ -85,11 +84,13 @@ describe("hidden portal server boundaries", () => {
   it("removes hidden servers from the configurator RPC result", async () => {
     const { user } = makeSubject();
 
-    await expect((await configuratorFor(user)).listServerOptions()).resolves.toEqual([{
-      value: "gitlab",
-      title: "GitLab",
-      meta: undefined,
-    }]);
+    await expect((await configuratorFor(user)).listServerOptions()).resolves.toEqual([
+      {
+        value: "gitlab",
+        title: "GitLab",
+        meta: undefined,
+      },
+    ]);
   });
 
   it("does not fetch portal data for a hidden server's tool options", async () => {
@@ -102,8 +103,9 @@ describe("hidden portal server boundaries", () => {
   it("rejects a crafted hidden-server URL before fetching portal data", async () => {
     const { user } = makeSubject();
 
-    await expect(user.getGatekeeperClassFor(`${ENDPOINT}#server=jira`))
-      .rejects.toThrow(/native connector/);
+    await expect(user.getGatekeeperClassFor(`${ENDPOINT}#server=jira`)).rejects.toThrow(
+      /native connector/,
+    );
     expect(mocks.withClient).not.toHaveBeenCalled();
   });
 
@@ -136,14 +138,19 @@ describe("hidden portal server boundaries", () => {
         },
       },
     };
-    const facet = new McpGatekeeperImpl(ctx as never, {
-      MCP_PORTAL_HIDDEN_SERVER_IDS: "jira",
-    } as never);
+    const facet = new McpGatekeeperImpl(
+      ctx as never,
+      {
+        MCP_PORTAL_HIDDEN_SERVER_IDS: "jira",
+      } as never,
+    );
 
-    await expect(facet.tools()).resolves.toMatchObject([{
-      tool: { name: "jira_search" },
-      mode: "read",
-    }]);
+    await expect(facet.tools()).resolves.toMatchObject([
+      {
+        tool: { name: "jira_search" },
+        mode: "read",
+      },
+    ]);
     expect(mocks.withClient).not.toHaveBeenCalled();
   });
 });

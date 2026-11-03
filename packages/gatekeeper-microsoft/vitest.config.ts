@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   // The configurator and session modules carry `@validateRpc()`, applied in memory as in the workerd project.
@@ -12,7 +12,8 @@ export default defineConfig({
       // Lets modules that declare a Durable Object or an `RpcTarget` be imported at all. See the
       // stub for what it does and does not provide.
       "cloudflare:workers": fileURLToPath(
-        new URL("./__tests__/stubs/cloudflare-workers.ts", import.meta.url)),
+        new URL("./__tests__/stubs/cloudflare-workers.ts", import.meta.url),
+      ),
     },
   },
 });

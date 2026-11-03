@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   discoverAuthorizationServerMetadata,
   discoverOAuthServerInfo,
@@ -43,7 +43,8 @@ describe("SDK OAuth discovery through the guarded fetch adapter", () => {
     const info = await discoverOAuthServerInfo(endpoint, { fetchFn: sdkFetch() });
     expect(info.authorizationServerUrl).toBe("https://auth.example.com");
     expect(seen[0]).toBe(
-      "https://mcp.example.com/.well-known/oauth-protected-resource/mcp?tenant=one");
+      "https://mcp.example.com/.well-known/oauth-protected-resource/mcp?tenant=one",
+    );
   });
 
   it("never fetches a blocked advertised metadata URL", async () => {
@@ -65,9 +66,11 @@ describe("SDK OAuth discovery through the guarded fetch adapter", () => {
         response_types_supported: ["code"],
       },
     });
-    await expect(discoverAuthorizationServerMetadata("https://auth.example.com", {
-      fetchFn: sdkFetch(),
-    })).rejects.toBeInstanceOf(IssuerMismatchError);
+    await expect(
+      discoverAuthorizationServerMetadata("https://auth.example.com", {
+        fetchFn: sdkFetch(),
+      }),
+    ).rejects.toBeInstanceOf(IssuerMismatchError);
   });
 });
 

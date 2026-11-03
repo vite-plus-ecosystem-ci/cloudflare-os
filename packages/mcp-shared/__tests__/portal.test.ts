@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   isPortalNativeTool,
   looksLikePortal,
@@ -15,24 +15,26 @@ const COMPLETE = { truncated: false, cap: MAX_TOOLS_PER_SERVER };
 describe("portal detection", () => {
   it("recognizes a portal by its built-in server listing", () => {
     expect(looksLikePortal([{ name: "ordinary_tool" }], COMPLETE)).toBe(false);
-    expect(looksLikePortal(
-      [{ name: "portal_list_servers" }, { name: "gh_list_issues" }], COMPLETE))
-      .toBe(true);
+    expect(
+      looksLikePortal([{ name: "portal_list_servers" }, { name: "gh_list_issues" }], COMPLETE),
+    ).toBe(true);
   });
 
   it("does not infer a portal from prefixed-looking names alone", () => {
     // Plenty of ordinary servers name tools `verb_noun`. Only the portal's own tool is evidence.
     expect(looksLikePortal([{ name: "search" }, { name: "create_issue" }], COMPLETE)).toBe(false);
-    expect(looksLikePortal([{ name: "list_issues" }, { name: "create_issue" }], COMPLETE))
-      .toBe(false);
+    expect(looksLikePortal([{ name: "list_issues" }, { name: "create_issue" }], COMPLETE)).toBe(
+      false,
+    );
   });
 
   it("assumes a portal when the catalog was truncated", () => {
     // `tools/list` is capped at MAX_TOOLS_PER_SERVER and MCP does not order it, so on a large
     // endpoint `portal_list_servers` may be one of the tools we never saw. Concluding "not a portal"
     // from evidence we could not have seen would fail open; the next test shows what it costs.
-    const truncated = Array.from(
-      { length: MAX_TOOLS_PER_SERVER }, (_unused, index) => ({ name: `gh_tool_${index}` }));
+    const truncated = Array.from({ length: MAX_TOOLS_PER_SERVER }, (_unused, index) => ({
+      name: `gh_tool_${index}`,
+    }));
     expect(looksLikePortal(truncated, COMPLETE)).toBe(true);
     expect(looksLikePortal(truncated.slice(0, -1), COMPLETE)).toBe(false);
   });
@@ -52,11 +54,13 @@ describe("portal detection", () => {
     // granted it could widen its own authority. Detection is the only thing standing in the way.
     const truncated = [
       { name: "portal_toggle_single_server" },
-      ...Array.from(
-        { length: MAX_TOOLS_PER_SERVER - 1 }, (_unused, index) => ({ name: `gh_tool_${index}` })),
+      ...Array.from({ length: MAX_TOOLS_PER_SERVER - 1 }, (_unused, index) => ({
+        name: `gh_tool_${index}`,
+      })),
     ];
-    expect(scopeAllows({}, "portal_toggle_single_server", looksLikePortal(truncated, COMPLETE)))
-      .toBe(false);
+    expect(
+      scopeAllows({}, "portal_toggle_single_server", looksLikePortal(truncated, COMPLETE)),
+    ).toBe(false);
   });
 });
 
@@ -95,13 +99,16 @@ describe("server id recovery", () => {
 // Captured verbatim from a live Cloudflare MCP server portal. The earlier parser expected JSON and
 // returned nothing for this, which is the whole reason it was rewritten.
 const REAL_PORTAL_REPLY = {
-  content: [{
-    type: "text",
-    text: "Available MCP Servers:\n\n" +
-      "- Cloudflare documentation (test): \u2713 enabled\n" +
-      "- Linear (linear): \u2713 enabled\n\n" +
-      "Use portal_toggle_single_server to enable/disable a specific server.",
-  }],
+  content: [
+    {
+      type: "text",
+      text:
+        "Available MCP Servers:\n\n" +
+        "- Cloudflare documentation (test): \u2713 enabled\n" +
+        "- Linear (linear): \u2713 enabled\n\n" +
+        "Use portal_toggle_single_server to enable/disable a specific server.",
+    },
+  ],
 };
 
 describe("parsePortalServers", () => {
@@ -110,70 +117,93 @@ describe("parsePortalServers", () => {
     // portal tool, so neither may become a server. Each display name pairs with the id that
     // prefixes that server's tools, which is what a grant actually matches on.
     const listing = parsePortalServers(REAL_PORTAL_REPLY);
-    expect(listing).toEqual({ complete: true, servers: [
-      { id: "test", name: "Cloudflare documentation", enabled: true },
-      { id: "linear", name: "Linear", enabled: true },
-    ] });
-    expect(toolBelongsToServer(
-      "test_search_cloudflare_documentation", listing.servers[0].id)).toBe(true);
+    expect(listing).toEqual({
+      complete: true,
+      servers: [
+        { id: "test", name: "Cloudflare documentation", enabled: true },
+        { id: "linear", name: "Linear", enabled: true },
+      ],
+    });
+    expect(toolBelongsToServer("test_search_cloudflare_documentation", listing.servers[0].id)).toBe(
+      true,
+    );
   });
 
   it("reports a disabled server, and shows one whose wording it cannot read", () => {
     // The flag only drives a hint, so unfamiliar wording must not hide a grantable server.
-    expect(parsePortalServers({
-      content: [{
-        type: "text",
-        text: "- Linear (linear): \u2713 enabled\n- GitHub (github): \u2717 disabled"
-          + "\n- Jira (jira): active",
-      }],
-    })).toEqual({ complete: true, servers: [
-      { id: "linear", name: "Linear", enabled: true },
-      { id: "github", name: "GitHub", enabled: false },
-      { id: "jira", name: "Jira", enabled: true },
-    ] });
+    expect(
+      parsePortalServers({
+        content: [
+          {
+            type: "text",
+            text:
+              "- Linear (linear): \u2713 enabled\n- GitHub (github): \u2717 disabled" +
+              "\n- Jira (jira): active",
+          },
+        ],
+      }),
+    ).toEqual({
+      complete: true,
+      servers: [
+        { id: "linear", name: "Linear", enabled: true },
+        { id: "github", name: "GitHub", enabled: false },
+        { id: "jira", name: "Jira", enabled: true },
+      ],
+    });
   });
 
   it("reads structuredContent and distinguishes complete empty from unrecognized", () => {
-    expect(parsePortalServers({
-      structuredContent: [{ id: "gh", name: "GitHub", enabled: false }],
-    })).toEqual({
+    expect(
+      parsePortalServers({
+        structuredContent: [{ id: "gh", name: "GitHub", enabled: false }],
+      }),
+    ).toEqual({
       complete: true,
       servers: [{ id: "gh", name: "GitHub", enabled: false }],
     });
-    expect(parsePortalServers({ structuredContent: [] }))
-      .toEqual({ complete: true, servers: [] });
+    expect(parsePortalServers({ structuredContent: [] })).toEqual({ complete: true, servers: [] });
     expect(parsePortalServers({})).toEqual({ complete: false, servers: [] });
-    expect(parsePortalServers({ content: [{ type: "text", text: "no servers today" }] }))
-      .toEqual({ complete: false, servers: [] });
-    expect(parsePortalServers({ structuredContent: "a string" }))
-      .toEqual({ complete: false, servers: [] });
+    expect(parsePortalServers({ content: [{ type: "text", text: "no servers today" }] })).toEqual({
+      complete: false,
+      servers: [],
+    });
+    expect(parsePortalServers({ structuredContent: "a string" })).toEqual({
+      complete: false,
+      servers: [],
+    });
   });
 
   it("falls back to valid text when structured content has an unrecognized shape", () => {
-    expect(parsePortalServers({
-      structuredContent: { servers: [{ id: "ignored" }] },
-      content: [{ type: "text", text: "- GitHub (gh): enabled" }],
-    })).toEqual({
+    expect(
+      parsePortalServers({
+        structuredContent: { servers: [{ id: "ignored" }] },
+        content: [{ type: "text", text: "- GitHub (gh): enabled" }],
+      }),
+    ).toEqual({
       complete: true,
       servers: [{ id: "gh", name: "GitHub", enabled: true }],
     });
-    expect(parsePortalServers({
-      structuredContent: [{ type: "text", text: "not a server record" }],
-      content: [{ type: "text", text: "- Linear (linear): enabled" }],
-    })).toEqual({
+    expect(
+      parsePortalServers({
+        structuredContent: [{ type: "text", text: "not a server record" }],
+        content: [{ type: "text", text: "- Linear (linear): enabled" }],
+      }),
+    ).toEqual({
       complete: true,
       servers: [{ id: "linear", name: "Linear", enabled: true }],
     });
   });
 
   it("marks a partially malformed server list incomplete", () => {
-    expect(parsePortalServers({
-      content: [
-        { type: "text", text: "Available MCP Servers:" },
-        { type: "text", text: "- Linear (linear): enabled" },
-        { type: "text", text: "- malformed" },
-      ],
-    })).toEqual({
+    expect(
+      parsePortalServers({
+        content: [
+          { type: "text", text: "Available MCP Servers:" },
+          { type: "text", text: "- Linear (linear): enabled" },
+          { type: "text", text: "- malformed" },
+        ],
+      }),
+    ).toEqual({
       complete: false,
       servers: [{ id: "linear", name: "Linear", enabled: true }],
     });
@@ -181,13 +211,14 @@ describe("parsePortalServers", () => {
 
   it("marks unrecognized list formats incomplete so tool prefixes can recover them", () => {
     for (const entry of ["+ GitHub (gh): enabled", "1. GitHub (gh): enabled"]) {
-      expect(parsePortalServers({
-        content: [{ type: "text", text: `Available MCP Servers:\n${entry}` }],
-      })).toEqual({ complete: false, servers: [] });
+      expect(
+        parsePortalServers({
+          content: [{ type: "text", text: `Available MCP Servers:\n${entry}` }],
+        }),
+      ).toEqual({ complete: false, servers: [] });
     }
   });
 });
-
 
 describe("reconcilePortalServers", () => {
   const tools = [
@@ -198,10 +229,15 @@ describe("reconcilePortalServers", () => {
   ];
 
   it("names groups from the reported list", () => {
-    expect(reconcilePortalServers(
-      [{ id: "gh", name: "GitHub", enabled: true }, { id: "linear", name: "Linear", enabled: true }],
-      tools,
-    )).toEqual([
+    expect(
+      reconcilePortalServers(
+        [
+          { id: "gh", name: "GitHub", enabled: true },
+          { id: "linear", name: "Linear", enabled: true },
+        ],
+        tools,
+      ),
+    ).toEqual([
       { id: "gh", name: "GitHub", enabled: true },
       { id: "linear", name: "Linear", enabled: true },
     ]);
@@ -217,16 +253,24 @@ describe("reconcilePortalServers", () => {
 
   it("drops a reported server that contributes no tools", () => {
     const servers = reconcilePortalServers(
-      [{ id: "gh", name: "GitHub", enabled: true }, { id: "jira", name: "Jira", enabled: false }],
+      [
+        { id: "gh", name: "GitHub", enabled: true },
+        { id: "jira", name: "Jira", enabled: false },
+      ],
       [{ name: "gh_list_issues" }],
     );
     expect(servers).toEqual([{ id: "gh", name: "GitHub", enabled: true }]);
   });
 
   it("sorts by display name", () => {
-    expect(reconcilePortalServers(
-      [{ id: "gh", name: "Zulip", enabled: true }, { id: "linear", name: "Asana", enabled: true }],
-      tools,
-    ).map(server => server.name)).toEqual(["Asana", "Zulip"]);
+    expect(
+      reconcilePortalServers(
+        [
+          { id: "gh", name: "Zulip", enabled: true },
+          { id: "linear", name: "Asana", enabled: true },
+        ],
+        tools,
+      ).map((server) => server.name),
+    ).toEqual(["Asana", "Zulip"]);
   });
 });

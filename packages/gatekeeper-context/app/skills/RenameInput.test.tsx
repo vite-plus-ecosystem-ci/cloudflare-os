@@ -2,7 +2,7 @@
 
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { RenameInput } from "./RenameInput";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -21,14 +21,16 @@ describe("RenameInput", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    act(() => root?.render(
-      <RenameInput
-        initialValue="incident-response"
-        format="skill"
-        onCommit={onCommit}
-        onCancel={() => {}}
-      />,
-    ));
+    act(() =>
+      root?.render(
+        <RenameInput
+          initialValue="incident-response"
+          format="skill"
+          onCommit={onCommit}
+          onCancel={() => {}}
+        />,
+      ),
+    );
 
     const input = container.querySelector("input")!;
     expect(input.value).toBe("Incident Response");

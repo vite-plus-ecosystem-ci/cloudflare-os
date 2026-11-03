@@ -1,8 +1,10 @@
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
-import type { DeviceSessionHandoff, DeviceSessionTransfer } from
-  "../src/auth/device-session-handoff";
+import { describe, expect, it } from "vite-plus/test";
+import type {
+  DeviceSessionHandoff,
+  DeviceSessionTransfer,
+} from "../src/auth/device-session-handoff";
 import type { UserDurableObject } from "../src/user";
 
 declare module "cloudflare:workers" {
@@ -15,7 +17,10 @@ type UserInternals = UserDurableObject & {
   storage: {
     pendingDeviceHandoffs: {
       list(): Iterable<{
-        stateHash: string; ticketHash: string; handoff: DeviceSessionHandoff; expiresAt: Date;
+        stateHash: string;
+        ticketHash: string;
+        handoff: DeviceSessionHandoff;
+        expiresAt: Date;
       }>;
       put(record: unknown): void;
     };
@@ -32,38 +37,54 @@ const context = new TextEncoder().encode("cloudflare-os-device-session-v1");
 let counter = 0;
 
 async function appKey() {
-  const key = await crypto.subtle.generateKey(
-      { name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]) as CryptoKeyPair;
+  const key = (await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, [
+    "deriveBits",
+  ])) as CryptoKeyPair;
   const publicKey = new Uint8Array(
-      await crypto.subtle.exportKey("raw", key.publicKey) as ArrayBuffer)
-      .toBase64({ alphabet: "base64url", omitPadding: true });
+    (await crypto.subtle.exportKey("raw", key.publicKey)) as ArrayBuffer,
+  ).toBase64({ alphabet: "base64url", omitPadding: true });
   return { key, publicKey };
 }
 
 async function decrypt(
-    handoff: DeviceSessionHandoff,
-    keyPair: CryptoKeyPair,
-    handoffState = state,
+  handoff: DeviceSessionHandoff,
+  keyPair: CryptoKeyPair,
+  handoffState = state,
 ): Promise<DeviceSessionTransfer> {
   const peer = await crypto.subtle.importKey(
-      "raw", Uint8Array.fromBase64(handoff.publicKey, { alphabet: "base64url" }),
-      { name: "ECDH", namedCurve: "P-256" }, false, []);
+    "raw",
+    Uint8Array.fromBase64(handoff.publicKey, { alphabet: "base64url" }),
+    { name: "ECDH", namedCurve: "P-256" },
+    false,
+    [],
+  );
   const bits = await crypto.subtle.deriveBits(
-      { name: "ECDH", public: peer } as
-        SubtleCryptoDeriveKeyAlgorithm & { public: CryptoKey },
-      keyPair.privateKey, 256);
+    { name: "ECDH", public: peer } as SubtleCryptoDeriveKeyAlgorithm & { public: CryptoKey },
+    keyPair.privateKey,
+    256,
+  );
   const material = await crypto.subtle.importKey("raw", bits, "HKDF", false, ["deriveKey"]);
-  const key = await crypto.subtle.deriveKey({
-    name: "HKDF",
-    hash: "SHA-256",
-    salt: Uint8Array.fromBase64(handoff.salt, { alphabet: "base64url" }),
-    info: context,
-  }, material, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
-  const plaintext = await crypto.subtle.decrypt({
-    name: "AES-GCM",
-    iv: Uint8Array.fromBase64(handoff.iv, { alphabet: "base64url" }),
-    additionalData: new TextEncoder().encode(handoffState),
-  }, key, Uint8Array.fromBase64(handoff.ciphertext, { alphabet: "base64url" }));
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: Uint8Array.fromBase64(handoff.salt, { alphabet: "base64url" }),
+      info: context,
+    },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"],
+  );
+  const plaintext = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: Uint8Array.fromBase64(handoff.iv, { alphabet: "base64url" }),
+      additionalData: new TextEncoder().encode(handoffState),
+    },
+    key,
+    Uint8Array.fromBase64(handoff.ciphertext, { alphabet: "base64url" }),
+  );
   return JSON.parse(new TextDecoder().decode(plaintext)) as DeviceSessionTransfer;
 }
 

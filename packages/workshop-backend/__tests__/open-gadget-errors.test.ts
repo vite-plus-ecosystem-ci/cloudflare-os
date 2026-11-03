@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   createOpenWorkspaceError,
   getOpenWorkspaceErrorCode,
@@ -12,19 +12,16 @@ describe("open gadget errors", () => {
     [
       OPEN_WORKSPACE_ERROR_CODES.shareLinksDisabled,
       "Share links are disabled for this workspace because it contains sensitive data. " +
-          "The owner must add each person directly.",
+        "The owner must add each person directly.",
     ],
-  ] as const)(
-    "creates an enumerable %s code with a readable message",
-    (code, message) => {
-      let error = createOpenWorkspaceError(code);
+  ] as const)("creates an enumerable %s code with a readable message", (code, message) => {
+    let error = createOpenWorkspaceError(code);
 
-      expect(error.message).toBe(message);
-      expect(error.code).toBe(code);
-      expect(Object.keys(error)).toContain("code");
-      expect(getOpenWorkspaceErrorCode(error)).toBe(code);
-    },
-  );
+    expect(error.message).toBe(message);
+    expect(error.code).toBe(code);
+    expect(Object.keys(error)).toContain("code");
+    expect(getOpenWorkspaceErrorCode(error)).toBe(code);
+  });
 
   it.each(Object.values(OPEN_WORKSPACE_ERROR_CODES))(
     "does not infer %s from an error message",

@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { ComposerDocument } from "../composerDocument";
 import type { StoredComposerDraft } from "./composerDraft";
 
@@ -12,9 +12,10 @@ const iconState = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../../components/format/formatIconImage", () => ({
-  formatIconDataUrl: () => new Promise<string>((resolve) => {
-    iconState.resolve = resolve;
-  }),
+  formatIconDataUrl: () =>
+    new Promise<string>((resolve) => {
+      iconState.resolve = resolve;
+    }),
 }));
 
 import { readComposerDraft, writeComposerDraft } from "./composerDraft";
@@ -41,11 +42,11 @@ type DraftControls = {
     snapshot: ComposerDocumentSnapshot,
     transition: (document: ComposerDocument) => { document: ComposerDocument } | null,
     options?: CommitDocumentEditOptions,
-  ) => ({
+  ) => {
     document: ComposerDocument;
     documentRevision: number;
     editRevision: number;
-  }) | null;
+  } | null;
   document: ComposerDocument;
   getDocumentSnapshot: () => ComposerDocumentSnapshot;
   recordEdit: () => void;
@@ -113,9 +114,11 @@ describe("useComposerDraft", () => {
     await act(async () => root!.render(<Harness storageKey="draft:user-a" />));
 
     expect(controls.getDocumentSnapshot().documentRevision).toBe(snapshot.documentRevision);
-    expect(controls.commitDocumentEdit(snapshot, () => ({
-      document: emptyDocument("resource"),
-    }))).not.toBeNull();
+    expect(
+      controls.commitDocumentEdit(snapshot, () => ({
+        document: emptyDocument("resource"),
+      })),
+    ).not.toBeNull();
   });
 
   it("invalidates document snapshots when switching between identical keyed scopes", async () => {
@@ -129,9 +132,11 @@ describe("useComposerDraft", () => {
     expect(controls.getDocumentSnapshot().documentRevision).toBeGreaterThan(
       snapshot.documentRevision,
     );
-    expect(controls.commitDocumentEdit(snapshot, () => ({
-      document: emptyDocument("stale resource"),
-    }))).toBeNull();
+    expect(
+      controls.commitDocumentEdit(snapshot, () => ({
+        document: emptyDocument("stale resource"),
+      })),
+    ).toBeNull();
   });
 
   it("does not apply late draft decoration after an edit", async () => {
@@ -148,9 +153,7 @@ describe("useComposerDraft", () => {
 
     container = document.createElement("div");
     root = createRoot(container);
-    await act(async () => root!.render(
-      <Harness storageKey="draft:user-a" />,
-    ));
+    await act(async () => root!.render(<Harness storageKey="draft:user-a" />));
     act(() => {
       controls.recordEdit();
       controls.replaceDocument(emptyDocument("edited prompt"));
@@ -262,9 +265,11 @@ describe("useComposerDraft", () => {
 
     act(() => controls.replaceDocument(emptyDocument("replacement")));
 
-    expect(controls.commitDocumentEdit(staleSnapshot, () => ({
-      document: emptyDocument("stale result"),
-    }))).toBeNull();
+    expect(
+      controls.commitDocumentEdit(staleSnapshot, () => ({
+        document: emptyDocument("stale result"),
+      })),
+    ).toBeNull();
     expect(controls.document.text).toBe("replacement");
   });
 
@@ -289,8 +294,10 @@ describe("useComposerDraft", () => {
       await Promise.resolve();
     });
 
-    expect(controls.commitDocumentEdit(snapshot, (document) => ({ document }), {
-      allowPresentationChanges: true,
-    })).not.toBeNull();
+    expect(
+      controls.commitDocumentEdit(snapshot, (document) => ({ document }), {
+        allowPresentationChanges: true,
+      }),
+    ).not.toBeNull();
   });
 });

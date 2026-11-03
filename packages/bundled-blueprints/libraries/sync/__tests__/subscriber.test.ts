@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { createSubscriber } from "../src/subscriber.ts";
 
@@ -28,6 +28,8 @@ describe("createSubscriber", () => {
   });
 
   it("refuses a callback that is not a function", () => {
-    expect(() => createSubscriber(RpcTarget, { operation: 1 as unknown as () => void })).toThrow('Subscriber callback "operation" is not a function.');
+    expect(() => createSubscriber(RpcTarget, { operation: 1 as unknown as () => void })).toThrow(
+      'Subscriber callback "operation" is not a function.',
+    );
   });
 });

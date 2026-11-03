@@ -1,36 +1,59 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { AiChatMessage, AlwaysAvailableResource } from "@gadgets/workshop-shared/api";
 import {
-  AGENT_CATALOG_MAX_DESCRIPTION_LENGTH, AGENT_CATALOG_MAX_ENTRIES, AGENT_CATALOG_MAX_ID_LENGTH,
-  AGENT_CATALOG_MAX_TITLE_LENGTH, boundAgentCatalog,
+  AGENT_CATALOG_MAX_DESCRIPTION_LENGTH,
+  AGENT_CATALOG_MAX_ENTRIES,
+  AGENT_CATALOG_MAX_ID_LENGTH,
+  AGENT_CATALOG_MAX_TITLE_LENGTH,
+  boundAgentCatalog,
 } from "@gadgets/workshop-shared/gatekeeper";
 import {
-  findCatalogChanges, formatAgentCatalogPrompt, formatAlwaysAvailableResourcesPrompt,
-  formatCatalogChange, normalizeAgentCatalog, seenAlwaysAvailableResources,
+  findCatalogChanges,
+  formatAgentCatalogPrompt,
+  formatAlwaysAvailableResourcesPrompt,
+  formatCatalogChange,
+  normalizeAgentCatalog,
+  seenAlwaysAvailableResources,
 } from "../src/agent-catalog";
 
 describe("normalizeAgentCatalog", () => {
   it("sorts entries, strips control characters, and truncates long fields to the max bounds", () => {
     let catalog = normalizeAgentCatalog({
       entries: [
-        { id: "2".repeat(AGENT_CATALOG_MAX_ID_LENGTH + 10), title: "  Zebra\u0000  ",
-          description: "D".repeat(AGENT_CATALOG_MAX_DESCRIPTION_LENGTH + 100) },
-        { id: "1", title: "T".repeat(AGENT_CATALOG_MAX_TITLE_LENGTH + 50), description: " First collection " },
+        {
+          id: "2".repeat(AGENT_CATALOG_MAX_ID_LENGTH + 10),
+          title: "  Zebra\u0000  ",
+          description: "D".repeat(AGENT_CATALOG_MAX_DESCRIPTION_LENGTH + 100),
+        },
+        {
+          id: "1",
+          title: "T".repeat(AGENT_CATALOG_MAX_TITLE_LENGTH + 50),
+          description: " First collection ",
+        },
       ],
     });
 
     expect(catalog).toEqual({
       entries: [
-        { id: "1", title: "T".repeat(AGENT_CATALOG_MAX_TITLE_LENGTH), description: "First collection" },
-        { id: "2".repeat(AGENT_CATALOG_MAX_ID_LENGTH), title: "Zebra",
-          description: "D".repeat(AGENT_CATALOG_MAX_DESCRIPTION_LENGTH) },
+        {
+          id: "1",
+          title: "T".repeat(AGENT_CATALOG_MAX_TITLE_LENGTH),
+          description: "First collection",
+        },
+        {
+          id: "2".repeat(AGENT_CATALOG_MAX_ID_LENGTH),
+          title: "Zebra",
+          description: "D".repeat(AGENT_CATALOG_MAX_DESCRIPTION_LENGTH),
+        },
       ],
     });
   });
 
   it("truncates to the maximum entry count", () => {
     let entries = Array.from({ length: AGENT_CATALOG_MAX_ENTRIES + 5 }, (_, i) => ({
-      id: `${i}`, title: `Collection ${String(i).padStart(2, "0")}`, description: "x",
+      id: `${i}`,
+      title: `Collection ${String(i).padStart(2, "0")}`,
+      description: "x",
     }));
 
     let catalog = normalizeAgentCatalog({ entries });
@@ -43,13 +66,15 @@ describe("normalizeAgentCatalog", () => {
     // The gatekeeper puts what must survive first (the Context Library leads with its collections),
     // so a title that sorts last must still be kept when the cap clamps the list.
     let entries = [
-      {id: "keep", title: "Zulu collection", description: "survives despite sorting last"},
-      ...Array.from({length: AGENT_CATALOG_MAX_ENTRIES}, (_, i) => ({
-        id: `skill${i}`, title: `aa-skill-${String(i).padStart(4, "0")}`, description: "x",
+      { id: "keep", title: "Zulu collection", description: "survives despite sorting last" },
+      ...Array.from({ length: AGENT_CATALOG_MAX_ENTRIES }, (_, i) => ({
+        id: `skill${i}`,
+        title: `aa-skill-${String(i).padStart(4, "0")}`,
+        description: "x",
       })),
     ];
 
-    let catalog = normalizeAgentCatalog({entries});
+    let catalog = normalizeAgentCatalog({ entries });
 
     expect(catalog.entries).toHaveLength(AGENT_CATALOG_MAX_ENTRIES);
     expect(catalog.entries.at(-1)).toEqual(entries[0]);
@@ -57,10 +82,12 @@ describe("normalizeAgentCatalog", () => {
   });
 
   it("normalizes control characters without emitting false truncation", () => {
-    expect(normalizeAgentCatalog({
-      entries: [{id: "id", title: "Title\u009f", description: "Description"}],
-    })).toEqual({
-      entries: [{id: "id", title: "Title", description: "Description"}],
+    expect(
+      normalizeAgentCatalog({
+        entries: [{ id: "id", title: "Title\u009f", description: "Description" }],
+      }),
+    ).toEqual({
+      entries: [{ id: "id", title: "Title", description: "Description" }],
     });
   });
 
@@ -89,12 +116,12 @@ describe("normalizeAgentCatalog", () => {
       '{"entries":[{"id":"abc","title":"Runbooks","description":"deploy steps"}],"truncated":true}';
 
     expect(formatAgentCatalogPrompt(catalog)).toBe(`\n${serialized}`);
-    expect(formatAgentCatalogPrompt({entries: []})).toBe("");
+    expect(formatAgentCatalogPrompt({ entries: [] })).toBe("");
     expect(formatAgentCatalogPrompt(null)).toBe("");
 
     let message = formatAlwaysAvailableResourcesPrompt([
-      {title: "Context", name: "CONTEXT", catalog},
-      {title: "Empty", name: "EMPTY", catalog: {entries: []}},
+      { title: "Context", name: "CONTEXT", catalog },
+      { title: "Empty", name: "EMPTY", catalog: { entries: [] } },
     ]);
     expect(message).toContain(`- Context: \`env.CONTEXT\`\n${serialized}`);
     // A resource with no catalog gets just its env line, nothing inlined.
@@ -105,7 +132,7 @@ describe("normalizeAgentCatalog", () => {
 
 describe("boundAgentCatalog", () => {
   it("clamps the count and each field, keeping the order it was given", () => {
-    let entries = Array.from({length: AGENT_CATALOG_MAX_ENTRIES + 5}, (_, index) => ({
+    let entries = Array.from({ length: AGENT_CATALOG_MAX_ENTRIES + 5 }, (_, index) => ({
       id: `${index}-${"i".repeat(AGENT_CATALOG_MAX_ID_LENGTH)}`,
       title: `${index}-${"t".repeat(AGENT_CATALOG_MAX_TITLE_LENGTH)}`,
       description: `${index}-${"d".repeat(AGENT_CATALOG_MAX_DESCRIPTION_LENGTH)}`,
@@ -123,28 +150,37 @@ describe("boundAgentCatalog", () => {
   });
 
   it("reports no truncation when everything fits", () => {
-    expect(boundAgentCatalog([{id: "a", title: "A", description: "d"}])).toEqual({
-      entries: [{id: "a", title: "A", description: "d"}],
+    expect(boundAgentCatalog([{ id: "a", title: "A", description: "d" }])).toEqual({
+      entries: [{ id: "a", title: "A", description: "d" }],
       truncated: false,
     });
   });
 });
 
-let skill = (title: string) => ({id: title, title, description: `The ${title} skill.`});
-let skills = (...titles: string[]): AlwaysAvailableResource =>
-  ({name: "CONTEXT", title: "Skills", catalog: {entries: titles.map(skill)}});
-let unloaded: AlwaysAvailableResource = {name: "CONTEXT", title: "Skills", catalog: null};
+let skill = (title: string) => ({ id: title, title, description: `The ${title} skill.` });
+let skills = (...titles: string[]): AlwaysAvailableResource => ({
+  name: "CONTEXT",
+  title: "Skills",
+  catalog: { entries: titles.map(skill) },
+});
+let unloaded: AlwaysAvailableResource = { name: "CONTEXT", title: "Skills", catalog: null };
 let seen = (resource: AlwaysAvailableResource) => new Map([[resource.name, resource]]);
 let note = (sequence: number, resource: AlwaysAvailableResource): AiChatMessage => ({
-  chatId: 1, sequence, timestamp: new Date(0), author: {type: "agent", id: "m", name: "M"},
-  type: "catalogChange", resources: [resource],
+  chatId: 1,
+  sequence,
+  timestamp: new Date(0),
+  author: { type: "agent", id: "m", name: "M" },
+  type: "catalogChange",
+  resources: [resource],
 });
 
 describe("catalog changes", () => {
   it("reports a changed catalog and a resource the agent hasn't seen, not an unchanged one", () => {
-    let tasks: AlwaysAvailableResource = {name: "TASKS", title: "Tasks", catalog: null};
-    expect(findCatalogChanges(seen(skills("Tax")), [skills("Tax", "Travel"), tasks]))
-      .toEqual([skills("Tax", "Travel"), tasks]);
+    let tasks: AlwaysAvailableResource = { name: "TASKS", title: "Tasks", catalog: null };
+    expect(findCatalogChanges(seen(skills("Tax")), [skills("Tax", "Travel"), tasks])).toEqual([
+      skills("Tax", "Travel"),
+      tasks,
+    ]);
     expect(findCatalogChanges(seen(skills("Tax")), [skills("Tax")])).toEqual([]);
   });
 
@@ -168,7 +204,8 @@ describe("catalog changes", () => {
   it("applies only the changes recorded before a sequence", () => {
     let messages = [note(3, skills("Tax", "Travel")), note(7, skills("Travel"))];
 
-    expect(seenAlwaysAvailableResources([skills("Tax")], messages, 7).get("CONTEXT"))
-      .toEqual(skills("Tax", "Travel"));
+    expect(seenAlwaysAvailableResources([skills("Tax")], messages, 7).get("CONTEXT")).toEqual(
+      skills("Tax", "Travel"),
+    );
   });
 });

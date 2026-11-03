@@ -4,7 +4,7 @@
 // request framing. GitLab is faked at `fetch`; response bodies come from the
 // documentation-derived fixtures.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { isCredentialsExpired } from "@gadgets/gatekeeper-kit/credentials";
 import {
   GitLabApi,
@@ -34,15 +34,18 @@ type Call = { url: URL; init: RequestInit; headers: Headers; body?: string };
 /** Install a fetch fake answering each call from `responses` in order; returns the recorded calls. */
 function fakeFetch(responses: Array<Response | ((call: Call) => Response)>): Call[] {
   const calls: Call[] = [];
-  vi.stubGlobal("fetch", vi.fn(async (input: string | URL, init: RequestInit = {}) => {
-    const headers = new Headers(init.headers as HeadersInit | undefined);
-    const call: Call = { url: new URL(String(input)), init, headers };
-    if (typeof init.body === "string") call.body = init.body;
-    calls.push(call);
-    const next = responses.shift();
-    if (!next) throw new Error(`unexpected fetch: ${call.url}`);
-    return typeof next === "function" ? next(call) : next;
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL, init: RequestInit = {}) => {
+      const headers = new Headers(init.headers as HeadersInit | undefined);
+      const call: Call = { url: new URL(String(input)), init, headers };
+      if (typeof init.body === "string") call.body = init.body;
+      calls.push(call);
+      const next = responses.shift();
+      if (!next) throw new Error(`unexpected fetch: ${call.url}`);
+      return typeof next === "function" ? next(call) : next;
+    }),
+  );
   return calls;
 }
 
@@ -50,7 +53,10 @@ function json(data: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(data), {
     status: 200,
     ...init,
-    headers: { "content-type": "application/json", ...(init.headers as Record<string, string> | undefined) },
+    headers: {
+      "content-type": "application/json",
+      ...(init.headers as Record<string, string> | undefined),
+    },
   });
 }
 
@@ -112,11 +118,15 @@ describe("request composition", () => {
 
 describe("redirect refusal", () => {
   it("maps a same-origin 301 to a 'project moved' error carrying the Location, without following it", async () => {
-    fakeFetch([new Response(null, {
-      status: 301,
-      headers: { location: "https://gitlab.example.com/api/v4/projects/81" },
-    })]);
-    const error = await api().createIssue("old/path", { title: "x" }).catch(e => e);
+    fakeFetch([
+      new Response(null, {
+        status: 301,
+        headers: { location: "https://gitlab.example.com/api/v4/projects/81" },
+      }),
+    ]);
+    const error = await api()
+      .createIssue("old/path", { title: "x" })
+      .catch((e) => e);
     expect(error).toBeInstanceOf(GitLabApiError);
     expect(error.status).toBe(301);
     expect(error.movedTo).toBe("https://gitlab.example.com/api/v4/projects/81");
@@ -126,22 +136,33 @@ describe("redirect refusal", () => {
   it("recognises a rename by its /api/v4/ path even when the Location names the browser-facing host", async () => {
     // GitLab spells the Location with its configured external URL, so behind a separate Access
     // hostname the rename redirect is cross-origin to the request -- still a rename.
-    fakeFetch([new Response(null, {
-      status: 301,
-      headers: { location: "https://gitlab.example.com/api/v4/projects/81" },
-    })]);
-    const error = await api(ACCESS_INSTANCE).getProject("old/path").catch(e => e);
+    fakeFetch([
+      new Response(null, {
+        status: 301,
+        headers: { location: "https://gitlab.example.com/api/v4/projects/81" },
+      }),
+    ]);
+    const error = await api(ACCESS_INSTANCE)
+      .getProject("old/path")
+      .catch((e) => e);
     expect(error).toBeInstanceOf(GitLabApiError);
     expect(error.message).toMatch(/renamed or transferred/);
     expect(error.movedTo).toBe("https://gitlab.example.com/api/v4/projects/81");
   });
 
   it("names the access proxy, not a rename, when the redirect is to a login page", async () => {
-    fakeFetch([new Response(null, {
-      status: 302,
-      headers: { location: "https://team.cloudflareaccess.com/cdn-cgi/access/login/gitlab-access.example.com?kid=x" },
-    })]);
-    const error = await api(ACCESS_INSTANCE).getCurrentUser().catch(e => e);
+    fakeFetch([
+      new Response(null, {
+        status: 302,
+        headers: {
+          location:
+            "https://team.cloudflareaccess.com/cdn-cgi/access/login/gitlab-access.example.com?kid=x",
+        },
+      }),
+    ]);
+    const error = await api(ACCESS_INSTANCE)
+      .getCurrentUser()
+      .catch((e) => e);
     expect(error).toBeInstanceOf(GitLabApiError);
     expect(error.status).toBe(302);
     expect(error.message).not.toMatch(/renamed/);
@@ -152,19 +173,24 @@ describe("redirect refusal", () => {
 
 describe("error bodies", () => {
   it("reads the documented string message shape", () => {
-    expect(errorMessageFromBody(fx.errorBodies.data.notFound, "fallback")).toBe("404 Project Not Found");
-    expect(errorMessageFromBody(fx.errorBodies.data.missingAttribute, "fallback"))
-      .toBe("400 (Bad request) \"title\" not given");
+    expect(errorMessageFromBody(fx.errorBodies.data.notFound, "fallback")).toBe(
+      "404 Project Not Found",
+    );
+    expect(errorMessageFromBody(fx.errorBodies.data.missingAttribute, "fallback")).toBe(
+      '400 (Bad request) "title" not given',
+    );
   });
 
   it("flattens the documented validation-hash shape", () => {
-    expect(errorMessageFromBody(fx.errorBodies.data.validation, "fallback"))
-      .toBe("bio: is too long (maximum is 255 characters)");
+    expect(errorMessageFromBody(fx.errorBodies.data.validation, "fallback")).toBe(
+      "bio: is too long (maximum is 255 characters)",
+    );
   });
 
   it("reads the OAuth-style error shape", () => {
-    expect(errorMessageFromBody(fx.errorBodies.data.insufficientScope, "fallback"))
-      .toBe("insufficient_scope: The request requires higher privileges than provided by the access token.");
+    expect(errorMessageFromBody(fx.errorBodies.data.insufficientScope, "fallback")).toBe(
+      "insufficient_scope: The request requires higher privileges than provided by the access token.",
+    );
   });
 
   it("falls back for empty or unknown bodies", () => {
@@ -180,20 +206,38 @@ describe("error bodies", () => {
       json({ message: "401 Unauthorized" }, { status: 401 }),
       new Response("Unauthorized", { status: 401 }),
     ]);
-    const probe = await api().getCurrentUser().catch(e => e);
+    const probe = await api()
+      .getCurrentUser()
+      .catch((e) => e);
     expect(probe.isAuthError).toBe(true);
     // GitLab's documented "this user does not have permission to accept this merge request" is a
     // 401 too; it is the merge's own answer, not a revoked token.
-    expect((await api().mergeMergeRequest("g/p", 1, {}).catch(e => e)).isAuthError).toBe(false);
-    expect((await api().approveMergeRequest("g/p", 1, "abc").catch(e => e)).isAuthError).toBe(false);
+    expect(
+      (
+        await api()
+          .mergeMergeRequest("g/p", 1, {})
+          .catch((e) => e)
+      ).isAuthError,
+    ).toBe(false);
+    expect(
+      (
+        await api()
+          .approveMergeRequest("g/p", 1, "abc")
+          .catch((e) => e)
+      ).isAuthError,
+    ).toBe(false);
     // The git endpoints authenticate nothing but the bearer.
-    const git = await api().fetchGitUploadPack("g/p", new Uint8Array()).catch(e => e);
+    const git = await api()
+      .fetchGitUploadPack("g/p", new Uint8Array())
+      .catch((e) => e);
     expect(git.isAuthError).toBe(true);
   });
 
   it("appends Retry-After on a 429", async () => {
     fakeFetch([new Response("Retry later", { status: 429, headers: { "retry-after": "30" } })]);
-    const limited = await api().getCurrentUser().catch(e => e);
+    const limited = await api()
+      .getCurrentUser()
+      .catch((e) => e);
     expect(limited.status).toBe(429);
     expect(limited.message).toBe("Retry later (retry after 30s)");
   });
@@ -202,22 +246,37 @@ describe("error bodies", () => {
     const jsonType = { "content-type": "application/json" };
     fakeFetch([
       new Response(`"${"x".repeat(10 * 1024 * 1024)}"`, { headers: jsonType }),
-      new Response(JSON.stringify({ message: "y".repeat(70 * 1024) }), { status: 422, statusText: "Unprocessable Entity", headers: jsonType }),
+      new Response(JSON.stringify({ message: "y".repeat(70 * 1024) }), {
+        status: 422,
+        statusText: "Unprocessable Entity",
+        headers: jsonType,
+      }),
       new Response("{not json", { status: 500, headers: jsonType }),
-      new Response(`<html>${"z".repeat(5000)}</html>`, { status: 502, headers: { "content-type": "text/html" } }),
+      new Response(`<html>${"z".repeat(5000)}</html>`, {
+        status: 502,
+        headers: { "content-type": "text/html" },
+      }),
     ]);
-    const oversized = await api().getProject("g/p").catch(e => e);
+    const oversized = await api()
+      .getProject("g/p")
+      .catch((e) => e);
     expect(oversized).toBeInstanceOf(GitLabApiError);
     expect(oversized.status).toBe(502);
     expect(oversized.message).toMatch(/larger than the 10 MiB/);
     // Too large to be a message worth reading: the status speaks instead.
-    const longError = await api().getProject("g/p").catch(e => e);
+    const longError = await api()
+      .getProject("g/p")
+      .catch((e) => e);
     expect([longError.status, longError.message]).toEqual([422, "422 Unprocessable Entity"]);
     // Not the JSON it claims to be: quoted as text, not thrown as a SyntaxError.
-    const malformed = await api().getProject("g/p").catch(e => e);
+    const malformed = await api()
+      .getProject("g/p")
+      .catch((e) => e);
     expect([malformed.status, malformed.message]).toEqual([500, "{not json"]);
     // An HTML error page is excerpted rather than quoted whole.
-    const page = await api().getProject("g/p").catch(e => e);
+    const page = await api()
+      .getProject("g/p")
+      .catch((e) => e);
     expect(page.status).toBe(502);
     expect(page.message).toMatch(/^<html>z+$/);
     expect(page.message).toHaveLength(200);
@@ -229,7 +288,11 @@ describe("members", () => {
     const calls = fakeFetch([
       json([{ id: 8769, username: "dancarter", access_level: 30 }]),
       json([]),
-      json([{ id: 8769, username: "dancarter", access_level: 10 }, { id: 8769, username: "dancarter", access_level: 40 }, { id: 7, username: "other", access_level: 50 }]),
+      json([
+        { id: 8769, username: "dancarter", access_level: 10 },
+        { id: 8769, username: "dancarter", access_level: 40 },
+        { id: 7, username: "other", access_level: 50 },
+      ]),
     ]);
     expect(await api().getProjectMember("g/p", 8769)).toMatchObject({ access_level: 30 });
     expect(calls[0].url.pathname).toBe("/api/v4/projects/g%2Fp/members/all");
@@ -280,14 +343,27 @@ describe("issues and merge requests", () => {
 
   it("sends the issuable PUT with state_event and comma-joined label deltas", async () => {
     const calls = fakeFetch([json(fx.issueResponse.data)]);
-    await api().updateIssue("g/p", 41, { state_event: "close", add_labels: ["a", "b"], remove_labels: ["c"] });
+    await api().updateIssue("g/p", 41, {
+      state_event: "close",
+      add_labels: ["a", "b"],
+      remove_labels: ["c"],
+    });
     expect(calls[0].init.method).toBe("PUT");
-    expect(JSON.parse(calls[0].body!)).toEqual({ state_event: "close", add_labels: "a,b", remove_labels: "c" });
+    expect(JSON.parse(calls[0].body!)).toEqual({
+      state_event: "close",
+      add_labels: "a,b",
+      remove_labels: "c",
+    });
   });
 
   it("spells the MR draft filter with wip=yes|no and defaults state to all", async () => {
     const calls = fakeFetch([json([]), json([])]);
-    await api().listMergeRequests("g/p", { draft: true, sourceBranch: "feat", perPage: 20, page: 1 });
+    await api().listMergeRequests("g/p", {
+      draft: true,
+      sourceBranch: "feat",
+      perPage: 20,
+      page: 1,
+    });
     expect(calls[0].url.searchParams.get("wip")).toBe("yes");
     expect(calls[0].url.searchParams.get("state")).toBe("all");
     expect(calls[0].url.searchParams.get("source_branch")).toBe("feat");
@@ -297,18 +373,36 @@ describe("issues and merge requests", () => {
 
   it("creates an issue with assignee ids and joined labels", async () => {
     const calls = fakeFetch([json(fx.issueResponse.data, { status: 201 })]);
-    await api().createIssue("g/p", { title: "T", description: "D", labels: ["x"], assignee_ids: [9] });
-    expect(JSON.parse(calls[0].body!)).toEqual({ title: "T", description: "D", labels: "x", assignee_ids: [9] });
+    await api().createIssue("g/p", {
+      title: "T",
+      description: "D",
+      labels: ["x"],
+      assignee_ids: [9],
+    });
+    expect(JSON.parse(calls[0].body!)).toEqual({
+      title: "T",
+      description: "D",
+      labels: "x",
+      assignee_ids: [9],
+    });
   });
 
   it("creates a merge request with joined labels and assignee ids", async () => {
     const calls = fakeFetch([json(fx.mergeRequestResponse.data, { status: 201 })]);
     await api().createMergeRequest("g/p", {
-      source_branch: "feat", target_branch: "main", title: "T", labels: ["a", "b"], assignee_ids: [9, 10],
+      source_branch: "feat",
+      target_branch: "main",
+      title: "T",
+      labels: ["a", "b"],
+      assignee_ids: [9, 10],
     });
     expect(calls[0].url.pathname).toBe("/api/v4/projects/g%2Fp/merge_requests");
     expect(JSON.parse(calls[0].body!)).toEqual({
-      source_branch: "feat", target_branch: "main", title: "T", labels: "a,b", assignee_ids: [9, 10],
+      source_branch: "feat",
+      target_branch: "main",
+      title: "T",
+      labels: "a,b",
+      assignee_ids: [9, 10],
     });
   });
 
@@ -329,21 +423,33 @@ describe("issues and merge requests", () => {
       json(fx.mergeRequestResponse.data),
       json({ ...fx.approvalsResponse.data, user_has_approved: true }, { status: 201 }),
     ]);
-    await api().mergeMergeRequest("g/p", 133, { squash: true, sha: "e82eb4a0", should_remove_source_branch: true });
+    await api().mergeMergeRequest("g/p", 133, {
+      squash: true,
+      sha: "e82eb4a0",
+      should_remove_source_branch: true,
+    });
     expect(calls[0].url.pathname).toBe("/api/v4/projects/g%2Fp/merge_requests/133/merge");
-    expect(JSON.parse(calls[0].body!)).toEqual({ squash: true, sha: "e82eb4a0", should_remove_source_branch: true });
+    expect(JSON.parse(calls[0].body!)).toEqual({
+      squash: true,
+      sha: "e82eb4a0",
+      should_remove_source_branch: true,
+    });
     const approvals = await api().approveMergeRequest("g/p", 133, "e82eb4a0");
     expect(calls[1].url.pathname).toBe("/api/v4/projects/g%2Fp/merge_requests/133/approve");
     expect(JSON.parse(calls[1].body!)).toEqual({ sha: "e82eb4a0" });
     expect(approvals.user_has_approved).toBe(true);
-    expect(approvals.approved_by[0]).toMatchObject({ user: { id: 1 }, approved_at: "2016-06-09T01:45:21.720Z" });
+    expect(approvals.approved_by[0]).toMatchObject({
+      user: { id: 1 },
+      approved_at: "2016-06-09T01:45:21.720Z",
+    });
   });
 
   it("resolves the discussion reply, resolve, and listing paths", async () => {
     const calls = fakeFetch([json({}, { status: 201 }), json({}), json([])]);
     await api().addDiscussionNote("g/p", 7, fx.diffDiscussionResponse.data.id, "reply");
-    expect(calls[0].url.pathname)
-      .toBe(`/api/v4/projects/g%2Fp/merge_requests/7/discussions/${fx.diffDiscussionResponse.data.id}/notes`);
+    expect(calls[0].url.pathname).toBe(
+      `/api/v4/projects/g%2Fp/merge_requests/7/discussions/${fx.diffDiscussionResponse.data.id}/notes`,
+    );
     await api().setDiscussionResolved("g/p", 7, "abc", true);
     expect(calls[1].init.method).toBe("PUT");
     expect(JSON.parse(calls[1].body!)).toEqual({ resolved: true });
@@ -362,8 +468,13 @@ describe("issues and merge requests", () => {
     await api().createDraftNote("g/p", 11, {
       note: "nit",
       position: {
-        base_sha: "b", start_sha: "s", head_sha: "h", position_type: "text",
-        old_path: "a.ts", new_path: "a.ts", new_line: 3,
+        base_sha: "b",
+        start_sha: "s",
+        head_sha: "h",
+        position_type: "text",
+        old_path: "a.ts",
+        new_path: "a.ts",
+        new_line: 3,
       },
     });
     expect(calls[0].url.pathname).toBe("/api/v4/projects/g%2Fp/merge_requests/11/draft_notes");
@@ -371,13 +482,18 @@ describe("issues and merge requests", () => {
     expect(await api().listDraftNotes("g/p", 11)).toHaveLength(fx.draftNotesResponse.data.length);
     expect(calls[1].url.search).toBe("");
     await api().bulkPublishDraftNotes("g/p", 11, { reviewer_state: "requested_changes" });
-    expect(calls[2].url.pathname).toBe("/api/v4/projects/g%2Fp/merge_requests/11/draft_notes/bulk_publish");
+    expect(calls[2].url.pathname).toBe(
+      "/api/v4/projects/g%2Fp/merge_requests/11/draft_notes/bulk_publish",
+    );
     // No summary `note`: it exists only from 19.2, so a summary posts as its own note instead.
     expect(JSON.parse(calls[2].body!)).toEqual({ reviewer_state: "requested_changes" });
   });
 
   it("deletes a draft, and treats an already-gone draft (404) as deleted", async () => {
-    const calls = fakeFetch([new Response(null, { status: 204 }), json({ message: "404 Not found" }, { status: 404 })]);
+    const calls = fakeFetch([
+      new Response(null, { status: 204 }),
+      json({ message: "404 Not found" }, { status: 404 }),
+    ]);
     await api().deleteDraftNote("g/p", 11, 5);
     expect(calls[0].init.method).toBe("DELETE");
     expect(calls[0].url.pathname).toBe("/api/v4/projects/g%2Fp/merge_requests/11/draft_notes/5");
@@ -405,7 +521,9 @@ describe("pagination", () => {
       json([fx.diffDiscussionResponse.data], { headers: { "x-next-page": "3" } }),
       json([], { headers: { "x-next-page": "" } }),
     ]);
-    expect(await api().listDiscussions("g/p", "merge_requests", 7, 2, 100)).toMatchObject({ nextPage: 3 });
+    expect(await api().listDiscussions("g/p", "merge_requests", 7, 2, 100)).toMatchObject({
+      nextPage: 3,
+    });
     expect((await api().listDiscussions("g/p", "merge_requests", 7, 3, 100)).nextPage).toBeNull();
   });
 
@@ -441,12 +559,22 @@ describe("repository", () => {
   it("composes history filters and the compare query", async () => {
     const calls = fakeFetch([json([fx.commitResponse.data]), json(fx.compareResponse.data)]);
     await api().listCommits("g/p", {
-      refName: "main", path: "src/", author: "randx",
-      since: "2026-01-01T00:00:00Z", until: "2026-02-01T00:00:00Z", page: 1, perPage: 100,
+      refName: "main",
+      path: "src/",
+      author: "randx",
+      since: "2026-01-01T00:00:00Z",
+      until: "2026-02-01T00:00:00Z",
+      page: 1,
+      perPage: 100,
     });
     expect(Object.fromEntries(calls[0].url.searchParams)).toEqual({
-      ref_name: "main", path: "src/", author: "randx",
-      since: "2026-01-01T00:00:00Z", until: "2026-02-01T00:00:00Z", page: "1", per_page: "100",
+      ref_name: "main",
+      path: "src/",
+      author: "randx",
+      since: "2026-01-01T00:00:00Z",
+      until: "2026-02-01T00:00:00Z",
+      page: "1",
+      per_page: "100",
     });
     const compare = await api().compare("g/p", "main", "feature");
     expect(Object.fromEntries(calls[1].url.searchParams)).toEqual({ from: "main", to: "feature" });
@@ -469,9 +597,11 @@ describe("repository", () => {
     ]);
     const bytes = await api().getBlob("g/p", fx.blobResponse.data.sha, 1 << 20);
     expect(new TextDecoder().decode(bytes as Uint8Array)).toBe("This is a binary file");
-    expect(calls[0].url.pathname).toBe(`/api/v4/projects/g%2Fp/repository/blobs/${fx.blobResponse.data.sha}/raw`);
+    expect(calls[0].url.pathname).toBe(
+      `/api/v4/projects/g%2Fp/repository/blobs/${fx.blobResponse.data.sha}/raw`,
+    );
     expect(calls[0].headers.get("authorization")).toBe("Bearer tok-1");
-    expect(calls[0].headers.get("accept")).toBeNull();  // raw bytes, not the JSON envelope
+    expect(calls[0].headers.get("accept")).toBeNull(); // raw bytes, not the JSON envelope
 
     expect(await api().getBlob("g/p", fx.blobResponse.data.sha, 4096)).toBe("oversized");
     // Five 1 KiB chunks cross a 4 KiB cap; the stream was cancelled there, not drained.
@@ -488,14 +618,19 @@ describe("repository", () => {
 
 describe("git smart-HTTP", () => {
   it("POSTs upload-pack with protocol v2, oauth2 basic auth, and the Access headers", async () => {
-    const calls = fakeFetch([new Response("0000", {
-      status: 200, headers: { "content-type": "application/x-git-upload-pack-result" },
-    })]);
+    const calls = fakeFetch([
+      new Response("0000", {
+        status: 200,
+        headers: { "content-type": "application/x-git-upload-pack-result" },
+      }),
+    ]);
     const body = new TextEncoder().encode("0014command=fetch0000");
     const response = await api(ACCESS_INSTANCE).fetchGitUploadPack("group/sub/project", body);
     expect(response.ok).toBe(true);
     const [call] = calls;
-    expect(call.url.toString()).toBe("https://gitlab-access.example.com/group/sub/project.git/git-upload-pack");
+    expect(call.url.toString()).toBe(
+      "https://gitlab-access.example.com/group/sub/project.git/git-upload-pack",
+    );
     expect(call.headers.get("git-protocol")).toBe("version=2");
     expect(call.headers.get("content-type")).toBe("application/x-git-upload-pack-request");
     expect(call.headers.get("authorization")).toBe(`Basic ${btoa("oauth2:tok-1")}`);
@@ -504,10 +639,18 @@ describe("git smart-HTTP", () => {
   });
 
   it("POSTs receive-pack without a protocol header and with a streaming body", async () => {
-    const calls = fakeFetch([new Response("0000", {
-      status: 200, headers: { "content-type": "application/x-git-receive-pack-result" },
-    })]);
-    const stream = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new Uint8Array([0x30])); c.close(); } });
+    const calls = fakeFetch([
+      new Response("0000", {
+        status: 200,
+        headers: { "content-type": "application/x-git-receive-pack-result" },
+      }),
+    ]);
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(new Uint8Array([0x30]));
+        c.close();
+      },
+    });
     await api().fetchGitReceivePack("g/p", stream);
     expect(calls[0].url.toString()).toBe("https://gitlab.example.com/g/p.git/git-receive-pack");
     expect(calls[0].headers.has("git-protocol")).toBe(false);
@@ -515,22 +658,35 @@ describe("git smart-HTTP", () => {
   });
 
   it("reports a redirect on the git endpoint as an Access-policy problem rather than a parse error", async () => {
-    fakeFetch([new Response(null, { status: 302, headers: { location: "https://team.cloudflareaccess.com/login" } })]);
-    const error = await api().fetchGitUploadPack("g/p", new Uint8Array()).catch(e => e);
+    fakeFetch([
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://team.cloudflareaccess.com/login" },
+      }),
+    ]);
+    const error = await api()
+      .fetchGitUploadPack("g/p", new Uint8Array())
+      .catch((e) => e);
     expect(error).toBeInstanceOf(GitLabApiError);
     expect(error.message).toMatch(/Access application must admit the service token/);
   });
 
   it("rejects a non-git content type (a login page) before streaming", async () => {
-    fakeFetch([new Response("<html>login</html>", { status: 200, headers: { "content-type": "text/html" } })]);
-    const error = await api().fetchGitUploadPack("g/p", new Uint8Array()).catch(e => e);
+    fakeFetch([
+      new Response("<html>login</html>", { status: 200, headers: { "content-type": "text/html" } }),
+    ]);
+    const error = await api()
+      .fetchGitUploadPack("g/p", new Uint8Array())
+      .catch((e) => e);
     expect(error.status).toBe(502);
     expect(error.message).toMatch(/expected application\/x-git-upload-pack-result/);
   });
 
   it("surfaces a non-OK status with the body's first 200 chars", async () => {
     fakeFetch([new Response("Repository not found", { status: 404 })]);
-    const error = await api().fetchGitReceivePack("g/p", new ReadableStream()).catch(e => e);
+    const error = await api()
+      .fetchGitReceivePack("g/p", new ReadableStream())
+      .catch((e) => e);
     expect(error.status).toBe(404);
     expect(error.message).toBe("git push failed: 404 : Repository not found");
   });
@@ -538,10 +694,15 @@ describe("git smart-HTTP", () => {
 
 describe("OAuth", () => {
   it("builds the authorize URL on the browser-facing origin with every documented param", () => {
-    const url = new URL(buildAuthorizeUrl("https://gitlab.example.com", {
-      clientId: "app", redirectUri: "https://os.example/gatekeeper/gitlab/oauth",
-      scopes: ["api", "write_repository"], state: "doid:nonce", codeChallenge: "chal",
-    }));
+    const url = new URL(
+      buildAuthorizeUrl("https://gitlab.example.com", {
+        clientId: "app",
+        redirectUri: "https://os.example/gatekeeper/gitlab/oauth",
+        scopes: ["api", "write_repository"],
+        state: "doid:nonce",
+        codeChallenge: "chal",
+      }),
+    );
     expect(url.origin + url.pathname).toBe("https://gitlab.example.com/oauth/authorize");
     expect(Object.fromEntries(url.searchParams)).toEqual({
       client_id: "app",
@@ -557,16 +718,28 @@ describe("OAuth", () => {
   it("exchanges a code with client_secret and code_verifier, and reads expiry from expires_in", async () => {
     const calls = fakeFetch([json(fx.oauthTokenResponse.data)]);
     const now = 1_700_000_000_000;
-    const grant = await exchangeAuthCode(ACCESS_INSTANCE, {
-      code: "c", clientId: "app", clientSecret: "s", redirectUri: "https://os/oauth", codeVerifier: "v",
-    }, now);
+    const grant = await exchangeAuthCode(
+      ACCESS_INSTANCE,
+      {
+        code: "c",
+        clientId: "app",
+        clientSecret: "s",
+        redirectUri: "https://os/oauth",
+        codeVerifier: "v",
+      },
+      now,
+    );
     const [call] = calls;
     expect(call.url.toString()).toBe("https://gitlab-access.example.com/oauth/token");
     expect(call.headers.get("content-type")).toBe("application/x-www-form-urlencoded");
     expect(call.headers.get("cf-access-client-id")).toBe("id.access");
     expect(Object.fromEntries(new URLSearchParams(call.body))).toEqual({
-      grant_type: "authorization_code", code: "c", client_id: "app", client_secret: "s",
-      redirect_uri: "https://os/oauth", code_verifier: "v",
+      grant_type: "authorization_code",
+      code: "c",
+      client_id: "app",
+      client_secret: "s",
+      redirect_uri: "https://os/oauth",
+      code_verifier: "v",
     });
     expect(grant).toEqual({
       accessToken: fx.oauthTokenResponse.data.access_token,
@@ -577,23 +750,38 @@ describe("OAuth", () => {
 
   it("honours a non-default expires_in rather than assuming two hours", async () => {
     fakeFetch([json({ ...fx.oauthTokenResponse.data, expires_in: 300 })]);
-    const grant = await exchangeAuthCode(INSTANCE, {
-      code: "c", clientId: "a", clientSecret: "s", redirectUri: "r", codeVerifier: "v",
-    }, 0);
+    const grant = await exchangeAuthCode(
+      INSTANCE,
+      {
+        code: "c",
+        clientId: "a",
+        clientSecret: "s",
+        redirectUri: "r",
+        codeVerifier: "v",
+      },
+      0,
+    );
     expect(grant.expiresAt).toBe(300_000);
   });
 
   it("refuses a redirect from the token endpoint (Access turning the service token away) without quoting the login page", async () => {
-    fakeFetch([new Response(`<html>${"Sign in ".repeat(500)}</html>`, {
-      status: 302,
-      headers: {
-        location: "https://team.cloudflareaccess.com/cdn-cgi/access/login/gitlab-access.example.com",
-        "content-type": "text/html",
-      },
-    })]);
+    fakeFetch([
+      new Response(`<html>${"Sign in ".repeat(500)}</html>`, {
+        status: 302,
+        headers: {
+          location:
+            "https://team.cloudflareaccess.com/cdn-cgi/access/login/gitlab-access.example.com",
+          "content-type": "text/html",
+        },
+      }),
+    ]);
     const error = await exchangeAuthCode(ACCESS_INSTANCE, {
-      code: "c", clientId: "a", clientSecret: "s", redirectUri: "r", codeVerifier: "v",
-    }).catch(e => e);
+      code: "c",
+      clientId: "a",
+      clientSecret: "s",
+      redirectUri: "r",
+      codeVerifier: "v",
+    }).catch((e) => e);
     expect(error).toBeInstanceOf(GitLabApiError);
     expect(error.status).toBe(302);
     expect(error.message).toMatch(/redirected to https:\/\/team\.cloudflareaccess\.com/);
@@ -603,26 +791,45 @@ describe("OAuth", () => {
 
   it("accepts a token response without expires_in as non-expiring (GitLab before 15.0)", async () => {
     fakeFetch([json({ access_token: "x", refresh_token: "y", token_type: "bearer" })]);
-    const grant = await exchangeAuthCode(INSTANCE, {
-      code: "c", clientId: "a", clientSecret: "s", redirectUri: "r", codeVerifier: "v",
-    }, 0);
+    const grant = await exchangeAuthCode(
+      INSTANCE,
+      {
+        code: "c",
+        clientId: "a",
+        clientSecret: "s",
+        redirectUri: "r",
+        codeVerifier: "v",
+      },
+      0,
+    );
     expect(grant).toEqual({ accessToken: "x", refreshToken: "y" });
   });
 
   it("rejects an incomplete token response", async () => {
     fakeFetch([json({ access_token: "x", token_type: "bearer" })]);
     const error = await exchangeAuthCode(INSTANCE, {
-      code: "c", clientId: "a", clientSecret: "s", redirectUri: "r", codeVerifier: "v",
-    }).catch(e => e);
+      code: "c",
+      clientId: "a",
+      clientSecret: "s",
+      redirectUri: "r",
+      codeVerifier: "v",
+    }).catch((e) => e);
     expect(error).toBeInstanceOf(GitLabApiError);
     expect(error.message).toMatch(/incomplete/);
   });
 
   it("refreshes without redirect_uri and returns the rotated pair", async () => {
     const calls = fakeFetch([json(fx.oauthRefreshResponse.data)]);
-    const grant = await refreshAccessToken(INSTANCE, { refreshToken: "old", clientId: "app", clientSecret: "s" }, 0);
+    const grant = await refreshAccessToken(
+      INSTANCE,
+      { refreshToken: "old", clientId: "app", clientSecret: "s" },
+      0,
+    );
     expect(Object.fromEntries(new URLSearchParams(calls[0].body))).toEqual({
-      grant_type: "refresh_token", refresh_token: "old", client_id: "app", client_secret: "s",
+      grant_type: "refresh_token",
+      refresh_token: "old",
+      client_id: "app",
+      client_secret: "s",
     });
     expect(grant).toEqual({
       accessToken: fx.oauthRefreshResponse.data.access_token,
@@ -635,36 +842,51 @@ describe("OAuth", () => {
     fakeFetch([
       json(fx.oauthInvalidGrantResponse.data, { status: 400 }),
       new Response("upstream down", { status: 502 }),
-      new Response(null, { status: 302, headers: { location: "https://team.cloudflareaccess.com/cdn-cgi/access/login/x" } }),
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://team.cloudflareaccess.com/cdn-cgi/access/login/x" },
+      }),
     ]);
     const params = { refreshToken: "old", clientId: "a", clientSecret: "s" };
-    expect(isCredentialsExpired(await refreshAccessToken(INSTANCE, params).catch(e => e))).toBe(true);
-    const unavailable = await refreshAccessToken(INSTANCE, params).catch(e => e);
+    expect(isCredentialsExpired(await refreshAccessToken(INSTANCE, params).catch((e) => e))).toBe(
+      true,
+    );
+    const unavailable = await refreshAccessToken(INSTANCE, params).catch((e) => e);
     expect(unavailable).toBeInstanceOf(GitLabApiError);
     expect(unavailable.status).toBe(502);
     expect(isCredentialsExpired(unavailable)).toBe(false);
-    const turnedAway = await refreshAccessToken(INSTANCE, params).catch(e => e);
+    const turnedAway = await refreshAccessToken(INSTANCE, params).catch((e) => e);
     expect(turnedAway).toBeInstanceOf(GitLabApiError);
     expect(turnedAway.movedTo).toMatch(/cloudflareaccess/);
     expect(isCredentialsExpired(turnedAway)).toBe(false);
   });
 
-  it.each([429, 500, 503])("does not take invalid_grant in a %i body for the grant's death", async status => {
-    // A rate limiter or an unhealthy upstream can answer with an OAuth-shaped body; only a 4xx
-    // from the token endpoint itself is evidence about the refresh token.
-    fakeFetch([json(fx.oauthInvalidGrantResponse.data, { status })]);
-    const error = await refreshAccessToken(INSTANCE, { refreshToken: "old", clientId: "a", clientSecret: "s" })
-      .catch(e => e);
-    expect(error).toBeInstanceOf(GitLabApiError);
-    expect(error.status).toBe(status);
-    expect(isCredentialsExpired(error)).toBe(false);
-  });
+  it.each([429, 500, 503])(
+    "does not take invalid_grant in a %i body for the grant's death",
+    async (status) => {
+      // A rate limiter or an unhealthy upstream can answer with an OAuth-shaped body; only a 4xx
+      // from the token endpoint itself is evidence about the refresh token.
+      fakeFetch([json(fx.oauthInvalidGrantResponse.data, { status })]);
+      const error = await refreshAccessToken(INSTANCE, {
+        refreshToken: "old",
+        clientId: "a",
+        clientSecret: "s",
+      }).catch((e) => e);
+      expect(error).toBeInstanceOf(GitLabApiError);
+      expect(error.status).toBe(status);
+      expect(isCredentialsExpired(error)).toBe(false);
+    },
+  );
 
   it("revokes with client credentials and the token", async () => {
     const calls = fakeFetch([json({})]);
     await revokeToken(INSTANCE, { token: "t", clientId: "a", clientSecret: "s" });
     expect(calls[0].url.pathname).toBe("/oauth/revoke");
-    expect(Object.fromEntries(new URLSearchParams(calls[0].body))).toEqual({ token: "t", client_id: "a", client_secret: "s" });
+    expect(Object.fromEntries(new URLSearchParams(calls[0].body))).toEqual({
+      token: "t",
+      client_id: "a",
+      client_secret: "s",
+    });
   });
 });
 
@@ -672,7 +894,7 @@ describe("lineCode", () => {
   it("follows the documented <sha1(path)>_<old>_<new> formula", async () => {
     const code = await lineCode("package.json", 10, 10);
     const digest = await crypto.subtle.digest("SHA-1", new TextEncoder().encode("package.json"));
-    const hex = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
+    const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
     expect(code).toBe(`${hex}_10_10`);
     expect(code).toMatch(/^[0-9a-f]{40}_10_10$/);
   });

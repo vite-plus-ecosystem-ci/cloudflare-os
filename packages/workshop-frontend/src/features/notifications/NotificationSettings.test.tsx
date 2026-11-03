@@ -4,13 +4,17 @@
 import type * as Kumo from "@cloudflare/kumo";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { NotificationSettings } from "./NotificationSettings";
 
 const { enableBrowserPush } = vi.hoisted(() => ({
   enableBrowserPush: vi.fn<(api: object, userId: string, publicKey: string) => Promise<string>>(),
 }));
-let auth: { authenticatedApi: object; currentUser: { id: string }; isCurrentUserConfirmed: boolean };
+let auth: {
+  authenticatedApi: object;
+  currentUser: { id: string };
+  isCurrentUserConfirmed: boolean;
+};
 
 vi.mock("@cloudflare/kumo", async (importOriginal) => ({
   ...(await importOriginal<typeof Kumo>()),
@@ -30,10 +34,11 @@ vi.mock("./browserPush", () => ({
 let container: HTMLDivElement;
 let root: Root;
 
-const render = (next: typeof auth) => act(async () => {
-  auth = next;
-  root.render(<NotificationSettings />);
-});
+const render = (next: typeof auth) =>
+  act(async () => {
+    auth = next;
+    root.render(<NotificationSettings />);
+  });
 
 beforeEach(() => {
   enableBrowserPush.mockReset().mockResolvedValue("granted");

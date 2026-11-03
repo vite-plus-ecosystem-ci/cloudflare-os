@@ -1,6 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  XmlError, attribute, childElements, decodeEntities, parseXml, streamElements, textContent, type XmlElement, type XmlErrorCode,
+  XmlError,
+  attribute,
+  childElements,
+  decodeEntities,
+  parseXml,
+  streamElements,
+  textContent,
+  type XmlElement,
+  type XmlErrorCode,
   type XmlOptions,
 } from "../../src/content/xml";
 
@@ -8,12 +16,17 @@ const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const options: XmlOptions = { namespaces: { [W]: "w" } };
 
 function expectXmlError(text: string, code: XmlErrorCode, extra: Partial<XmlOptions> = {}): void {
-  expect(() => parseXml(text, { ...options, ...extra })).toThrow(expect.objectContaining({ name: "XmlError", code }) as XmlError);
+  expect(() => parseXml(text, { ...options, ...extra })).toThrow(
+    expect.objectContaining({ name: "XmlError", code }) as XmlError,
+  );
 }
 
 describe("parseXml", () => {
   it("reports names with the caller's prefix whatever prefix the file binds", () => {
-    const root = parseXml(`<doc xmlns:word="${W}"><word:p word:val="1"/><other:x xmlns:other="urn:other" plain="2"/></doc>`, options);
+    const root = parseXml(
+      `<doc xmlns:word="${W}"><word:p word:val="1"/><other:x xmlns:other="urn:other" plain="2"/></doc>`,
+      options,
+    );
     const [paragraph, other] = childElements(root);
     expect(paragraph!.name).toBe("w:p");
     expect(attribute(paragraph, "w:val")).toBe("1");
@@ -29,13 +42,19 @@ describe("parseXml", () => {
   });
 
   it("scopes namespace declarations to their element", () => {
-    const root = parseXml(`<r><a xmlns:w="${W}"><w:t/></a><w:t xmlns:w="urn:not-word"/></r>`, options);
+    const root = parseXml(
+      `<r><a xmlns:w="${W}"><w:t/></a><w:t xmlns:w="urn:not-word"/></r>`,
+      options,
+    );
     expect(childElements(childElements(root)[0])[0]!.name).toBe("w:t");
     expect(childElements(root)[1]!.name).toBe("{urn:not-word}t");
   });
 
   it("decodes predefined entities, numeric references and CDATA", () => {
-    const root = parseXml(`<t a="&lt;&quot;&#65;&#x42;">&amp;&apos;&gt; &#x1F600; <![CDATA[<raw> & stuff]]></t>`, options);
+    const root = parseXml(
+      `<t a="&lt;&quot;&#65;&#x42;">&amp;&apos;&gt; &#x1F600; <![CDATA[<raw> & stuff]]></t>`,
+      options,
+    );
     expect(attribute(root, "a")).toBe('<"AB');
     expect(textContent(root)).toBe("&'> 😀 <raw> & stuff");
   });
@@ -45,7 +64,10 @@ describe("parseXml", () => {
   });
 
   it("skips the XML declaration, processing instructions and comments", () => {
-    const root = parseXml(`<?xml version="1.0"?><!-- c --><?pi data?><r><!-- inner -->text<?x?></r><!-- after -->`, options);
+    const root = parseXml(
+      `<?xml version="1.0"?><!-- c --><?pi data?><r><!-- inner -->text<?x?></r><!-- after -->`,
+      options,
+    );
     expect(textContent(root)).toBe("text");
   });
 
@@ -110,17 +132,26 @@ describe("parseXml", () => {
     it("bounds the elements in one tree", () => {
       expectXmlError(`<r>${"<x/>".repeat(101)}</r>`, "limit", { maxElements: 100 });
       // Four attributes weigh as much as an element: 1 + 51 × (1 + 4 / 4) > 100.
-      expectXmlError(`<r>${'<x a="1" b="2" c="3" d="4"/>'.repeat(51)}</r>`, "limit", { maxElements: 100 });
-      expect(childElements(parseXml(`<r>${'<x a="1" b="2" c="3" d="4"/>'.repeat(49)}</r>`, { ...options, maxElements: 100 }))).toHaveLength(49);
+      expectXmlError(`<r>${'<x a="1" b="2" c="3" d="4"/>'.repeat(51)}</r>`, "limit", {
+        maxElements: 100,
+      });
+      expect(
+        childElements(
+          parseXml(`<r>${'<x a="1" b="2" c="3" d="4"/>'.repeat(49)}</r>`, {
+            ...options,
+            maxElements: 100,
+          }),
+        ),
+      ).toHaveLength(49);
     });
   });
 
   it("lets the caller replace elements as they close", () => {
     const root = parseXml("<r><wrap><keep>1</keep></wrap><keep>2</keep></r>", {
       ...options,
-      replace: element => (element.name === "wrap" ? element.children : undefined),
+      replace: (element) => (element.name === "wrap" ? element.children : undefined),
     });
-    expect(childElements(root).map(element => element.name)).toEqual(["keep", "keep"]);
+    expect(childElements(root).map((element) => element.name)).toEqual(["keep", "keep"]);
   });
 });
 
@@ -128,7 +159,7 @@ describe("streamElements", () => {
   it("yields each element at the requested depth as a complete subtree", () => {
     const text = `<w:document xmlns:w="${W}"><w:body><w:p><w:t>one</w:t></w:p><w:tbl><w:tr/></w:tbl><w:p><w:t>two</w:t></w:p></w:body></w:document>`;
     const blocks: XmlElement[] = [...streamElements(text, 2, options)];
-    expect(blocks.map(block => block.name)).toEqual(["w:p", "w:tbl", "w:p"]);
+    expect(blocks.map((block) => block.name)).toEqual(["w:p", "w:tbl", "w:p"]);
     expect(blocks.map(textContent)).toEqual(["one", "", "two"]);
   });
 

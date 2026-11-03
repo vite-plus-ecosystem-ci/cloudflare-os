@@ -1,6 +1,8 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import type {
-  AgentTurnOutcome, AgentTurnResult, WorkshopAgentSession,
+  AgentTurnOutcome,
+  AgentTurnResult,
+  WorkshopAgentSession,
 } from "@gadgets/integration-tests/agent-session";
 import type { AiChatMessage, WorkpieceSummary } from "@gadgets/workshop-shared/api";
 import { EVAL_VERIFICATION_BUDGET_MS } from "./budgets.js";
@@ -12,20 +14,23 @@ const fakes = vi.hoisted(() => {
   let phaseDelayMs = 0;
   const outcome: AgentTurnOutcome = { status: "completed" };
   const workpieces: WorkpieceSummary[] = [{ id: 1, type: "gadget", title: "Gadget" }];
-  const history: AiChatMessage[] = [{
-    chatId: 1,
-    sequence: 1,
-    timestamp: new Date(),
-    author: { type: "agent", id: "agent", name: "agent" },
-    type: "message",
-    message: "done",
-  }, {
-    chatId: 1,
-    sequence: 2,
-    timestamp: new Date(),
-    author: { type: "agent", id: "agent", name: "agent" },
-    type: "changes",
-  }];
+  const history: AiChatMessage[] = [
+    {
+      chatId: 1,
+      sequence: 1,
+      timestamp: new Date(),
+      author: { type: "agent", id: "agent", name: "agent" },
+      type: "message",
+      message: "done",
+    },
+    {
+      chatId: 1,
+      sequence: 2,
+      timestamp: new Date(),
+      author: { type: "agent", id: "agent", name: "agent" },
+      type: "changes",
+    },
+  ];
   const result: AgentTurnResult = { outcome, history, compactions: [], workpieces, usage: {} };
   const session: WorkshopAgentSession = {
     username: "agent",
@@ -33,16 +38,24 @@ const fakes = vi.hoisted(() => {
     runTurn: async () => result,
     approveActionsAndWait: async () => result,
     listActions: async () => ({ entries: [] }),
-    connectedAccount: () => { throw new Error("connectedAccount is not used by this test"); },
+    connectedAccount: () => {
+      throw new Error("connectedAccount is not used by this test");
+    },
     enableAmbientGatekeeper: async () => {
       throw new Error("enableAmbientGatekeeper is not used by this test");
     },
-    openGatekeeperApp: async () => { throw new Error("openGatekeeperApp is not used by this test"); },
-    openGadget: async () => { throw new Error("openGadget is not used by this test"); },
+    openGatekeeperApp: async () => {
+      throw new Error("openGatekeeperApp is not used by this test");
+    },
+    openGadget: async () => {
+      throw new Error("openGadget is not used by this test");
+    },
     acceptChanges: vi.fn(async () => {
-      await new Promise(resolve => setTimeout(resolve, phaseDelayMs));
+      await new Promise((resolve) => setTimeout(resolve, phaseDelayMs));
     }),
-    revertChanges: async () => { throw new Error("revertChanges is not used by this test"); },
+    revertChanges: async () => {
+      throw new Error("revertChanges is not used by this test");
+    },
     close: async () => {},
     [Symbol.asyncDispose]: async () => {},
   };
@@ -50,7 +63,12 @@ const fakes = vi.hoisted(() => {
     session,
     [Symbol.asyncDispose]: async () => {},
   };
-  return { target, setPhaseDelay: (ms: number) => { phaseDelayMs = ms; } };
+  return {
+    target,
+    setPhaseDelay: (ms: number) => {
+      phaseDelayMs = ms;
+    },
+  };
 });
 
 vi.mock("./target.js", () => ({
@@ -76,24 +94,30 @@ it("shares one deadline across verification, acceptance, and post-accept checks"
   fakes.setPhaseDelay(phaseDelay);
   const task: EvalTask = {
     id: "deadline",
-    turns: [{
-      prompt: "Build it",
-      verify: async () => {
-        await new Promise(resolve => setTimeout(resolve, phaseDelay));
+    turns: [
+      {
+        prompt: "Build it",
+        verify: async () => {
+          await new Promise((resolve) => setTimeout(resolve, phaseDelay));
+        },
+        verifyAfterAccept: async () => {
+          await new Promise((resolve) => setTimeout(resolve, phaseDelay));
+        },
       },
-      verifyAfterAccept: async () => {
-        await new Promise(resolve => setTimeout(resolve, phaseDelay));
-      },
-    }],
+    ],
   };
   const harness = createWorkshopHarness(task, ACCESS, IDENTITY);
-  const running = harness.run({ model: MODEL, trial: 1 }, {
-    signal: undefined,
-    artifacts: {},
-    setArtifact: () => {},
-  });
-  const failure = expect(running)
-    .rejects.toThrow("Post-accept verification exceeded its time budget");
+  const running = harness.run(
+    { model: MODEL, trial: 1 },
+    {
+      signal: undefined,
+      artifacts: {},
+      setArtifact: () => {},
+    },
+  );
+  const failure = expect(running).rejects.toThrow(
+    "Post-accept verification exceeded its time budget",
+  );
 
   await vi.advanceTimersByTimeAsync(EVAL_VERIFICATION_BUDGET_MS + 1);
   await failure;
@@ -103,21 +127,26 @@ it("does not accept changes after a failed verification", async () => {
   fakes.setPhaseDelay(0);
   const task: EvalTask = {
     id: "failed-check",
-    turns: [{
-      prompt: "Build it",
-      verify: async verifier => {
-        await verifier.check("failed", () => Promise.resolve({ pass: false }));
+    turns: [
+      {
+        prompt: "Build it",
+        verify: async (verifier) => {
+          await verifier.check("failed", () => Promise.resolve({ pass: false }));
+        },
+        verifyAfterAccept: async () => {},
       },
-      verifyAfterAccept: async () => {},
-    }],
+    ],
   };
   const harness = createWorkshopHarness(task, ACCESS, IDENTITY);
 
-  const result = await harness.run({ model: MODEL, trial: 1 }, {
-    signal: undefined,
-    artifacts: {},
-    setArtifact: () => {},
-  });
+  const result = await harness.run(
+    { model: MODEL, trial: 1 },
+    {
+      signal: undefined,
+      artifacts: {},
+      setArtifact: () => {},
+    },
+  );
 
   expect(result.output.success).toBe(false);
   expect(fakes.target.session.acceptChanges).not.toHaveBeenCalled();

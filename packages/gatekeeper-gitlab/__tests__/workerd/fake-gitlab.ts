@@ -11,7 +11,7 @@
 // headers ride on every kind of request (REST, OAuth, git).
 
 import { env, runInDurableObject } from "cloudflare:test";
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 import { getRedirectUri } from "../../src/gitlab-env.js";
 import type { UserAccount } from "../../src/gitlab.js";
 import type { GatekeeperProps } from "./worker.js";
@@ -38,7 +38,10 @@ export function json(data: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(data), {
     status: 200,
     ...init,
-    headers: { "content-type": "application/json", ...(init.headers as Record<string, string> | undefined) },
+    headers: {
+      "content-type": "application/json",
+      ...(init.headers as Record<string, string> | undefined),
+    },
   });
 }
 
@@ -58,20 +61,30 @@ export class FakeGitLab {
 
   /** How many recorded requests match. */
   count(method: string, pattern: RegExp): number {
-    return this.requests.filter(r => r.method === method && pattern.test(r.url.pathname + r.url.search)).length;
+    return this.requests.filter(
+      (r) => r.method === method && pattern.test(r.url.pathname + r.url.search),
+    ).length;
   }
 
   async #handle(input: string | URL | Request, init: RequestInit = {}): Promise<Response> {
     const request = input instanceof Request ? input : new Request(String(input), init);
     const url = new URL(request.url);
     if (url.origin !== API) {
-      throw new Error(`fake GitLab: ${request.method} ${url} was sent to ${url.origin}, not GITLAB_API_URL`);
+      throw new Error(
+        `fake GitLab: ${request.method} ${url} was sent to ${url.origin}, not GITLAB_API_URL`,
+      );
     }
-    if (request.headers.get("cf-access-client-id") !== ACCESS.id ||
-        request.headers.get("cf-access-client-secret") !== ACCESS.secret) {
+    if (
+      request.headers.get("cf-access-client-id") !== ACCESS.id ||
+      request.headers.get("cf-access-client-secret") !== ACCESS.secret
+    ) {
       throw new Error(`fake GitLab: ${request.method} ${url} lacks the Access service token`);
     }
-    const recorded: FakeRequest = { method: request.method, url, headers: new Headers(request.headers) };
+    const recorded: FakeRequest = {
+      method: request.method,
+      url,
+      headers: new Headers(request.headers),
+    };
     if (request.body) {
       recorded.bytes = new Uint8Array(await request.arrayBuffer());
       recorded.body = new TextDecoder().decode(recorded.bytes);
@@ -91,25 +104,36 @@ export class FakeGitLab {
  * package (and the internal stub, which wrote no `scopes`) stored before the kit: the account
  * migrates it on first read, as it does a deployed account's. Returns the account id.
  */
-export async function seedAccount(options: {
-  accessToken?: string;
-  refreshToken?: string;
-  expiresInMs?: number;
-  scopes?: string[] | null;
-} = {}): Promise<string> {
+export async function seedAccount(
+  options: {
+    accessToken?: string;
+    refreshToken?: string;
+    expiresInMs?: number;
+    scopes?: string[] | null;
+  } = {},
+): Promise<string> {
   const accountId = env.USER_ACCOUNT.newUniqueId();
   await runInDurableObject(env.USER_ACCOUNT.get(accountId), async (_instance, state) => {
     state.storage.kv.put("accessToken", options.accessToken ?? "test-token");
     state.storage.kv.put("refreshToken", options.refreshToken ?? "test-refresh");
-    state.storage.kv.put("accessTokenExpiresAt", Date.now() + (options.expiresInMs ?? 60 * 60 * 1000));
-    if (options.scopes !== null) state.storage.kv.put("scopes", options.scopes ?? ["api", "write_repository"]);
+    state.storage.kv.put(
+      "accessTokenExpiresAt",
+      Date.now() + (options.expiresInMs ?? 60 * 60 * 1000),
+    );
+    if (options.scopes !== null)
+      state.storage.kv.put("scopes", options.scopes ?? ["api", "write_repository"]);
   });
   return accountId.toString();
 }
 
 /** GitLab's token response for grant `n`: `access-n` / `refresh-n`, two hours. */
 export function tokenResponse(n: number) {
-  return { access_token: `access-${n}`, refresh_token: `refresh-${n}`, expires_in: 7200, token_type: "bearer" };
+  return {
+    access_token: `access-${n}`,
+    refresh_token: `refresh-${n}`,
+    expires_in: 7200,
+    token_type: "bearer",
+  };
 }
 
 /**
@@ -125,7 +149,10 @@ export async function stageReconnect(account: UserAccount, code: string): Promis
   return handoff!.ticket;
 }
 
-export function projectProps(userObjectId: string, projectPath = "group/sub/project"): GatekeeperProps {
+export function projectProps(
+  userObjectId: string,
+  projectPath = "group/sub/project",
+): GatekeeperProps {
   return { userObjectId, resourceKind: "project", projectPath };
 }
 

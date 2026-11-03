@@ -4,9 +4,20 @@
 // fail closed, and the observer probe requires Reporter membership whatever the project's visibility.
 
 import { env, runInDurableObject } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { matchesResourceUrlPattern, resolveRequestedResource } from "@gadgets/workshop-shared/gatekeeper";
-import { FakeGitLab, hooks, json, projectProps, seedAccount, stageReconnect, unwrap } from "./fake-gitlab.js";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import {
+  matchesResourceUrlPattern,
+  resolveRequestedResource,
+} from "@gadgets/workshop-shared/gatekeeper";
+import {
+  FakeGitLab,
+  hooks,
+  json,
+  projectProps,
+  seedAccount,
+  stageReconnect,
+  unwrap,
+} from "./fake-gitlab.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -19,8 +30,12 @@ describe("supported resources", () => {
     new FakeGitLab().install();
     const id = await seedAccount();
     const resources = await unwrap(await hooks().supportedResources(id));
-    expect(resources.map(r => r.title)).toEqual(["GitLab Merge Request", "GitLab Issue", "GitLab Project"]);
-    expect(resources.map(r => r.urlPattern)).toEqual([
+    expect(resources.map((r) => r.title)).toEqual([
+      "GitLab Merge Request",
+      "GitLab Issue",
+      "GitLab Project",
+    ]);
+    expect(resources.map((r) => r.urlPattern)).toEqual([
       "https://gitlab.example.com/:project+/-/merge_requests/:iid{/*}?",
       "https://gitlab.example.com/:project+/-/issues/:iid{/*}?",
       "https://gitlab.example.com/:project+",
@@ -36,9 +51,18 @@ describe("supported resources", () => {
     expect(matchesResourceUrlPattern(resources[2].urlPattern, mrUrl)).toBe(true);
     const resolved = resolveRequestedResource(resources, mrUrl);
     expect(resolved).toEqual({ ok: true, resource: resources[0] });
-    expect(resolveRequestedResource(resources, `${PROJECT}/-/issues/42`)).toEqual({ ok: true, resource: resources[1] });
-    expect(resolveRequestedResource(resources, PROJECT)).toEqual({ ok: true, resource: resources[2] });
-    expect(resolveRequestedResource(resources, `${PROJECT}/`)).toEqual({ ok: true, resource: resources[2] });
+    expect(resolveRequestedResource(resources, `${PROJECT}/-/issues/42`)).toEqual({
+      ok: true,
+      resource: resources[1],
+    });
+    expect(resolveRequestedResource(resources, PROJECT)).toEqual({
+      ok: true,
+      resource: resources[2],
+    });
+    expect(resolveRequestedResource(resources, `${PROJECT}/`)).toEqual({
+      ok: true,
+      resource: resources[2],
+    });
   });
 
   it("keeps a merge request or issue URL with GitLab's tab suffix on its own resource, not the project's", async () => {
@@ -46,12 +70,20 @@ describe("supported resources", () => {
     const id = await seedAccount();
     const resources = await unwrap(await hooks().supportedResources(id));
     for (const suffix of ["/diffs", "/commits", "/pipelines", "/diffs?commit_id=abc", "/"]) {
-      expect(resolveRequestedResource(resources, `${PROJECT}/-/merge_requests/7${suffix}`), suffix)
-        .toEqual({ ok: true, resource: resources[0] });
+      expect(
+        resolveRequestedResource(resources, `${PROJECT}/-/merge_requests/7${suffix}`),
+        suffix,
+      ).toEqual({ ok: true, resource: resources[0] });
     }
-    expect(resolveRequestedResource(resources, `${PROJECT}/-/issues/42/designs`)).toEqual({ ok: true, resource: resources[1] });
+    expect(resolveRequestedResource(resources, `${PROJECT}/-/issues/42/designs`)).toEqual({
+      ok: true,
+      resource: resources[1],
+    });
     // ...while a tree or blob URL under the project is still the project.
-    expect(resolveRequestedResource(resources, `${PROJECT}/-/tree/main/src`)).toEqual({ ok: true, resource: resources[2] });
+    expect(resolveRequestedResource(resources, `${PROJECT}/-/tree/main/src`)).toEqual({
+      ok: true,
+      resource: resources[2],
+    });
   });
 });
 
@@ -59,17 +91,29 @@ describe("getGatekeeperClassFor", () => {
   it("parses nested namespaces, issues, and merge requests, and refuses other origins", async () => {
     new FakeGitLab().install();
     const id = await seedAccount();
-    expect(await unwrap(await hooks().resourceFor(id, PROJECT))).toBe("https://gitlab.example.com/:project+");
-    expect(await unwrap(await hooks().resourceFor(id, `${PROJECT}/-/issues/42`)))
-      .toBe("https://gitlab.example.com/:project+/-/issues/:iid{/*}?");
-    expect(await unwrap(await hooks().resourceFor(id, `${PROJECT}/-/merge_requests/7/diffs`)))
-      .toBe("https://gitlab.example.com/:project+/-/merge_requests/:iid{/*}?");
+    expect(await unwrap(await hooks().resourceFor(id, PROJECT))).toBe(
+      "https://gitlab.example.com/:project+",
+    );
+    expect(await unwrap(await hooks().resourceFor(id, `${PROJECT}/-/issues/42`))).toBe(
+      "https://gitlab.example.com/:project+/-/issues/:iid{/*}?",
+    );
+    expect(await unwrap(await hooks().resourceFor(id, `${PROJECT}/-/merge_requests/7/diffs`))).toBe(
+      "https://gitlab.example.com/:project+/-/merge_requests/:iid{/*}?",
+    );
     // A tree/blob URL under the project is the project.
-    expect(await unwrap(await hooks().resourceFor(id, `${PROJECT}/-/tree/main`))).toBe("https://gitlab.example.com/:project+");
-    await expect(unwrap(await hooks().resourceFor(id, "https://gitlab.com/group/project"))).rejects.toThrow(/Unsupported GitLab URL/);
-    await expect(unwrap(await hooks().resourceFor(id, "https://gitlab.example.com/onlyone"))).rejects.toThrow(/Unsupported GitLab URL/);
+    expect(await unwrap(await hooks().resourceFor(id, `${PROJECT}/-/tree/main`))).toBe(
+      "https://gitlab.example.com/:project+",
+    );
+    await expect(
+      unwrap(await hooks().resourceFor(id, "https://gitlab.com/group/project")),
+    ).rejects.toThrow(/Unsupported GitLab URL/);
+    await expect(
+      unwrap(await hooks().resourceFor(id, "https://gitlab.example.com/onlyone")),
+    ).rejects.toThrow(/Unsupported GitLab URL/);
     // An issue route with a malformed number is refused, not widened to the whole project.
-    await expect(unwrap(await hooks().resourceFor(id, `${PROJECT}/-/issues/abc`))).rejects.toThrow(/Unsupported GitLab URL/);
+    await expect(unwrap(await hooks().resourceFor(id, `${PROJECT}/-/issues/abc`))).rejects.toThrow(
+      /Unsupported GitLab URL/,
+    );
   });
 });
 
@@ -78,9 +122,12 @@ describe("stale bindings", () => {
     new FakeGitLab().install();
     const id = await seedAccount();
     // The incubating gatekeeper stored `{ userObjectId, scopePath }`.
-    const stale = { userObjectId: id, scopePath: "group" } as unknown as ReturnType<typeof projectProps>;
-    await expect(unwrap(await hooks().projectMetadata("stale-props", stale)))
-      .rejects.toThrow(/created by an earlier version/);
+    const stale = { userObjectId: id, scopePath: "group" } as unknown as ReturnType<
+      typeof projectProps
+    >;
+    await expect(unwrap(await hooks().projectMetadata("stale-props", stale))).rejects.toThrow(
+      /created by an earlier version/,
+    );
   });
 });
 
@@ -90,7 +137,11 @@ describe("observer admission", () => {
   // reported null/null for group-inherited Developer access on every project but the one with a
   // direct membership -- and inherited access is what ~90% of members hold. The list form's
   // answers were checked live: a non-member is `[]`, an inherited Developer one row at 30.
-  type Member = { access_level: number; membership_state?: string; expires_at?: string | null } | null;
+  type Member = {
+    access_level: number;
+    membership_state?: string;
+    expires_at?: string | null;
+  } | null;
 
   /**
    * A fake where the token names the user (`Bearer <username>`), `/user` answers with that
@@ -100,17 +151,25 @@ describe("observer admission", () => {
   function fakeMembers(members: Record<string, Member>, projectStatus = 200): FakeGitLab {
     const gitlab = new FakeGitLab();
     const ids = Object.fromEntries(Object.keys(members).map((name, i) => [name, 100 + i]));
-    gitlab.on("GET", /^\/api\/v4\/user$/, request => {
+    gitlab.on("GET", /^\/api\/v4\/user$/, (request) => {
       const name = request.headers.get("authorization")!.replace("Bearer ", "");
-      return json({ id: ids[name] ?? 999, username: name, name, web_url: `https://gitlab.example.com/${name}` });
+      return json({
+        id: ids[name] ?? 999,
+        username: name,
+        name,
+        web_url: `https://gitlab.example.com/${name}`,
+      });
     });
-    gitlab.on("GET", /^\/api\/v4\/projects\/group%2Fsub%2Fproject\/members\/all\?/, request => {
-      if (projectStatus !== 200) return json({ message: `${projectStatus}` }, { status: projectStatus });
+    gitlab.on("GET", /^\/api\/v4\/projects\/group%2Fsub%2Fproject\/members\/all\?/, (request) => {
+      if (projectStatus !== 200)
+        return json({ message: `${projectStatus}` }, { status: projectStatus });
       // The documented `user_ids[]` filter; a non-member is the documented empty list.
       const id = Number(request.url.searchParams.get("user_ids[]"));
-      const name = Object.keys(ids).find(n => ids[n] === id);
+      const name = Object.keys(ids).find((n) => ids[n] === id);
       const member = name === undefined ? null : members[name];
-      return json(member === null || member === undefined ? [] : [{ id, username: name, ...member }]);
+      return json(
+        member === null || member === undefined ? [] : [{ id, username: name, ...member }],
+      );
     });
     return gitlab;
   }
@@ -164,7 +223,7 @@ describe("observer admission", () => {
     gitlab.install();
     const id = await seedAccount({ accessToken: "observer" });
     await unwrap(await hooks().hasProjectAccess(id, "group/sub/project"));
-    expect(gitlab.requests.map(r => r.url.pathname + r.url.search)).toEqual([
+    expect(gitlab.requests.map((r) => r.url.pathname + r.url.search)).toEqual([
       "/api/v4/user",
       "/api/v4/projects/group%2Fsub%2Fproject/members/all?user_ids%5B%5D=100&per_page=100",
     ]);
@@ -180,21 +239,28 @@ describe("observer admission", () => {
     // Reporter row and admit bob. Instead the id is fenced to the connection that answered it, and
     // the probe re-reads under the new one -- and denies bob.
     const gitlab = fakeMembers({ alice: { access_level: 20 }, bob: null });
-    gitlab.on("GET", /^\/api\/v4\/user$/, async request => {
+    gitlab.on("GET", /^\/api\/v4\/user$/, async (request) => {
       const name = request.headers.get("authorization")!.replace("Bearer ", "");
       if (name === "alice") {
         // The reconnect commits before alice's answer is sent. The handler runs in the object
         // making the probe, so the account stub is made here: one made in the test's own context
         // is an I/O object of another context and cannot be used from this one.
         const account = env.USER_ACCOUNT.get(env.USER_ACCOUNT.idFromString(id));
-        await runInDurableObject(account, async instance => {
+        await runInDurableObject(account, async (instance) => {
           await instance.commitReconnect(await stageReconnect(instance, "code-bob"));
         });
       }
-      return json({ id: name === "alice" ? 100 : 101, username: name, name, web_url: `https://gitlab.example.com/${name}` });
+      return json({
+        id: name === "alice" ? 100 : 101,
+        username: name,
+        name,
+        web_url: `https://gitlab.example.com/${name}`,
+      });
     });
     // The reconnect's code exchange mints bob's token.
-    gitlab.on("POST", /^\/oauth\/token/, () => json({ access_token: "bob", refresh_token: "bob-refresh", expires_in: 7200 }));
+    gitlab.on("POST", /^\/oauth\/token/, () =>
+      json({ access_token: "bob", refresh_token: "bob-refresh", expires_in: 7200 }),
+    );
     gitlab.install();
     const id = await seedAccount({ accessToken: "alice" });
     await hooks().installCallback(id);
@@ -206,15 +272,21 @@ describe("observer admission", () => {
   });
 
   it("is what addObserver enforces", async () => {
-    fakeMembers({ owner: { access_level: 50 }, reporter: { access_level: 20 }, guest: { access_level: 10 }, outsider: null }).install();
+    fakeMembers({
+      owner: { access_level: 50 },
+      reporter: { access_level: 20 },
+      guest: { access_level: 10 },
+      outsider: null,
+    }).install();
     const owner = await seedAccount({ accessToken: "owner" });
     const reporter = await seedAccount({ accessToken: "reporter" });
     const guest = await seedAccount({ accessToken: "guest" });
     const outsider = await seedAccount({ accessToken: "outsider" });
     await unwrap(await hooks().addObserver("observers", projectProps(owner), reporter));
     for (const denied of [guest, outsider]) {
-      await expect(unwrap(await hooks().addObserver("observers", projectProps(owner), denied)))
-        .rejects.toThrow(/does not have read access to the GitLab project group\/sub\/project/);
+      await expect(
+        unwrap(await hooks().addObserver("observers", projectProps(owner), denied)),
+      ).rejects.toThrow(/does not have read access to the GitLab project group\/sub\/project/);
     }
   });
 });
