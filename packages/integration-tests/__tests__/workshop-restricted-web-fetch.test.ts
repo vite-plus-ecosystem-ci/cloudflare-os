@@ -1,9 +1,18 @@
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { AdminApi } from "@gadgets/workshop-shared/api";
 import { openAgentSession } from "../src/agent-session.js";
-import { ADMIN_USERNAME, startTestGatekeeperHarness, TEST_VENDOR_ID, type Harness } from "../src/harness.js";
-import { SCRIPTED_MODEL_ID, scriptedModelRouter, type RoutedScriptedModel } from "../src/mock-model.js";
+import {
+  ADMIN_USERNAME,
+  startTestGatekeeperHarness,
+  TEST_VENDOR_ID,
+  type Harness,
+} from "../src/harness.js";
+import {
+  SCRIPTED_MODEL_ID,
+  scriptedModelRouter,
+  type RoutedScriptedModel,
+} from "../src/mock-model.js";
 import { NetworkInterceptor, type Handler } from "../src/network-interceptor.js";
 import { connect, signUp } from "../src/rpc-client.js";
 
@@ -17,7 +26,7 @@ const TRUSTED_HOST = "gadgets-test.example";
 const TARGET = `https://${TRUSTED_HOST}/restricted-web-fetch`;
 const PAGE = "The trusted page.";
 const webRequests: string[] = [];
-const web: Handler = url => {
+const web: Handler = (url) => {
   if (url.host !== TRUSTED_HOST) return null;
   webRequests.push(url.href);
   return new Response(PAGE, { headers: { "content-type": "text/plain" } });
@@ -43,22 +52,37 @@ afterAll(async () => {
   }
 });
 
-const READ_RESTRICTED = { toolCall: { id: "read-restricted", name: "executeCode", arguments: {
-  code: "export default async function(self, env) { console.log(await env.TEST_AMBIENT.readValue(true)); }",
-} } };
+const READ_RESTRICTED = {
+  toolCall: {
+    id: "read-restricted",
+    name: "executeCode",
+    arguments: {
+      code: "export default async function(self, env) { console.log(await env.TEST_AMBIENT.readValue(true)); }",
+    },
+  },
+};
 
-const fetchStep = (id: string, url: string) => ({ toolCall: { id, name: "webFetch", arguments: { url } } });
-
-const toolResult = (id: string, content: string) => ({ messages: expect.arrayContaining([
-  expect.objectContaining({ role: "tool", tool_call_id: id, content: expect.stringContaining(content) }),
-]) });
-
-const openSession = (model: RoutedScriptedModel) => openAgentSession(harness.url, {
-  modelId: SCRIPTED_MODEL_ID,
-  userModel: model.userModel,
-  ambientVendorIds: [TEST_VENDOR_ID],
-  usernamePrefix: "restrictedfetch",
+const fetchStep = (id: string, url: string) => ({
+  toolCall: { id, name: "webFetch", arguments: { url } },
 });
+
+const toolResult = (id: string, content: string) => ({
+  messages: expect.arrayContaining([
+    expect.objectContaining({
+      role: "tool",
+      tool_call_id: id,
+      content: expect.stringContaining(content),
+    }),
+  ]),
+});
+
+const openSession = (model: RoutedScriptedModel) =>
+  openAgentSession(harness.url, {
+    modelId: SCRIPTED_MODEL_ID,
+    userModel: model.userModel,
+    ambientVendorIds: [TEST_VENDOR_ID],
+    usernamePrefix: "restrictedfetch",
+  });
 
 it("refuses a web fetch once the workspace has read restricted data, with no trusted hosts", async () => {
   const model = models.script([
@@ -71,9 +95,13 @@ it("refuses a web fetch once the workspace has read restricted data, with no tru
 
   expect(turn.outcome).toEqual({ status: "completed" });
   expect(model.requests).toHaveLength(3);
-  expect(model.requests[2]).toMatchObject(toolResult("fetch-page",
+  expect(model.requests[2]).toMatchObject(
+    toolResult(
+      "fetch-page",
       "This workspace has observed sensitive data. To prevent leaks, the workspace is " +
-      "prohibited from fetching from public web sites."));
+        "prohibited from fetching from public web sites.",
+    ),
+  );
   expect(webRequests).toEqual([]);
 });
 
@@ -92,7 +120,9 @@ it("fetches only from trusted hosts once the workspace has read restricted data"
     expect(turn.outcome).toEqual({ status: "completed" });
     expect(model.requests).toHaveLength(4);
     expect(model.requests[2]).toMatchObject(toolResult("fetch-trusted", PAGE));
-    expect(model.requests[3]).toMatchObject(toolResult("fetch-other", `may only fetch from ${TRUSTED_HOST}`));
+    expect(model.requests[3]).toMatchObject(
+      toolResult("fetch-other", `may only fetch from ${TRUSTED_HOST}`),
+    );
     expect(webRequests).toEqual([TARGET]);
   } finally {
     await admin.setRestrictedWebFetchHosts([]);

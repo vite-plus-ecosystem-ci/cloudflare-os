@@ -1,46 +1,62 @@
 import { z } from "zod";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import { openAgentSession } from "../src/agent-session.js";
 import { startTestGatekeeperHarness, TEST_VENDOR_ID, type Harness } from "../src/harness.js";
 import {
-  scriptedChatCompletions, SCRIPTED_MODEL_CONFIG, SCRIPTED_MODEL_ID,
+  scriptedChatCompletions,
+  SCRIPTED_MODEL_CONFIG,
+  SCRIPTED_MODEL_ID,
   SCRIPTED_MODEL_PROFILE,
 } from "../src/mock-model.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 
 const TOOL_MESSAGES = z.object({
-  messages: z.array(z.object({
-    role: z.string(),
-    content: z.string().nullish(),
-    tool_call_id: z.string().optional(),
-  })),
+  messages: z.array(
+    z.object({
+      role: z.string(),
+      content: z.string().nullish(),
+      tool_call_id: z.string().optional(),
+    }),
+  ),
 });
 
 function toolResultText(request: unknown, toolCallId: string): string {
-  const message = TOOL_MESSAGES.parse(request).messages
-      .find(entry => entry.role === "tool" && entry.tool_call_id === toolCallId);
+  const message = TOOL_MESSAGES.parse(request).messages.find(
+    (entry) => entry.role === "tool" && entry.tool_call_id === toolCallId,
+  );
   if (message?.content == null) throw new Error(`No tool result for ${toolCallId}`);
   return message.content;
 }
 
 let harness: Harness;
 const model = scriptedChatCompletions([
-  { toolCall: { id: "create", name: "createGadget",
-                arguments: { title: "Notes", bindingName: "NOTES" } } },
+  {
+    toolCall: {
+      id: "create",
+      name: "createGadget",
+      arguments: { title: "Notes", bindingName: "NOTES" },
+    },
+  },
   // One step writes the file, reads and searches it, and requests a connection. The read and
   // the search see the write. The request makes the barrier record a "connectionRequest"
   // message between this step's tool-call message and its "changes" message, so the two are
   // not adjacent in the log.
-  { toolCalls: [
-    { id: "write", name: "writeFile",
-      arguments: { workpiece: "NOTES", filename: "notes.txt", content: "secret = 42\n" } },
-    { id: "read", name: "readFile",
-      arguments: { workpiece: "NOTES", filename: "notes.txt" } },
-    { id: "grep", name: "grep",
-      arguments: { workpiece: "NOTES", pattern: "secret" } },
-    { id: "connect", name: "requestConnection",
-      arguments: { vendorId: TEST_VENDOR_ID, reason: "to test", bindingName: "THINGS" } },
-  ] },
+  {
+    toolCalls: [
+      {
+        id: "write",
+        name: "writeFile",
+        arguments: { workpiece: "NOTES", filename: "notes.txt", content: "secret = 42\n" },
+      },
+      { id: "read", name: "readFile", arguments: { workpiece: "NOTES", filename: "notes.txt" } },
+      { id: "grep", name: "grep", arguments: { workpiece: "NOTES", pattern: "secret" } },
+      {
+        id: "connect",
+        name: "requestConnection",
+        arguments: { vendorId: TEST_VENDOR_ID, reason: "to test", bindingName: "THINGS" },
+      },
+    ],
+  },
   { text: "Still done." },
 ]);
 const network = new NetworkInterceptor({ handlers: [model.handler] });
@@ -71,8 +87,11 @@ it("elides a step's reads and searches when the user reverts the step", async ()
   const result = await session.runTurn("Write the secret, read it back, and connect.");
   expect(result.outcome).toEqual({ status: "completed" });
   expect(model.requests).toHaveLength(2);
-  expect(result.history.slice(-3).map(msg => msg.type))
-      .toEqual(["message", "connectionRequest", "changes"]);
+  expect(result.history.slice(-3).map((msg) => msg.type)).toEqual([
+    "message",
+    "connectionRequest",
+    "changes",
+  ]);
 
   // Reverting the step starts at its "changes" message. The read result must not outlive the
   // content it saw, even with the request record between the two messages.

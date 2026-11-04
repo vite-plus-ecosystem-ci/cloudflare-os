@@ -1,8 +1,28 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
-import { contrastRatio, highlightColorFor, HIGHLIGHT_ACCENT, slideBackdrop } from "../files/lib/highlight.ts";
-import { deckLogoBox, isEmptyLogoSlot, isLogoImageData, logoAlt, logoBlockBox, logoShowsOn, newLogoBlockBox } from "../files/lib/logo.ts";
-import { clampView, isFit, stepScale, wheelZoomFactor, zoomAt, type ZoomView } from "../files/lib/zoom.ts";
+import { describe, expect, it } from "vite-plus/test";
+import {
+  contrastRatio,
+  highlightColorFor,
+  HIGHLIGHT_ACCENT,
+  slideBackdrop,
+} from "../files/lib/highlight.ts";
+import {
+  deckLogoBox,
+  isEmptyLogoSlot,
+  isLogoImageData,
+  logoAlt,
+  logoBlockBox,
+  logoShowsOn,
+  newLogoBlockBox,
+} from "../files/lib/logo.ts";
+import {
+  clampView,
+  isFit,
+  stepScale,
+  wheelZoomFactor,
+  zoomAt,
+  type ZoomView,
+} from "../files/lib/zoom.ts";
 import type { DeckLogo, Slide } from "../files/lib/protocol.ts";
 
 // The pure rules the browser renderer and the PowerPoint export share: where logos go, which
@@ -11,7 +31,10 @@ import type { DeckLogo, Slide } from "../files/lib/protocol.ts";
 const COVER = { color: "#F6821F", inset: false, coverOrange: true };
 const slide = (background: Slide["background"]): Slide => ({ id: "s", background, blocks: [] });
 // The slide point under a screen point (relative to the stage's centre).
-const at = (view: ZoomView, x: number, y: number) => [(x - view.panX) / view.scale, (y - view.panY) / view.scale];
+const at = (view: ZoomView, x: number, y: number) => [
+  (x - view.panX) / view.scale,
+  (y - view.panY) / view.scale,
+];
 const WHITE = { color: "#FFFFFF", inset: false, dotGrid: 0 };
 
 describe("title highlight colour", () => {
@@ -42,13 +65,41 @@ describe("title highlight colour", () => {
 });
 
 describe("logos", () => {
-  const logo: DeckLogo = { src: "data:image/png;base64,AAAA", position: "top-right", onCover: true };
+  const logo: DeckLogo = {
+    src: "data:image/png;base64,AAAA",
+    position: "top-right",
+    onCover: true,
+  };
 
   it("places the deck logo in each corner, the same size, pinned to that corner", () => {
-    expect(deckLogoBox("top-left")).toEqual({ x: 36, y: 28, w: 140, h: 40, objectPosition: "left top" });
-    expect(deckLogoBox("top-right")).toEqual({ x: 1024, y: 28, w: 140, h: 40, objectPosition: "right top" });
-    expect(deckLogoBox("bottom-left")).toEqual({ x: 36, y: 607, w: 140, h: 40, objectPosition: "left bottom" });
-    expect(deckLogoBox("bottom-right")).toEqual({ x: 1024, y: 607, w: 140, h: 40, objectPosition: "right bottom" });
+    expect(deckLogoBox("top-left")).toEqual({
+      x: 36,
+      y: 28,
+      w: 140,
+      h: 40,
+      objectPosition: "left top",
+    });
+    expect(deckLogoBox("top-right")).toEqual({
+      x: 1024,
+      y: 28,
+      w: 140,
+      h: 40,
+      objectPosition: "right top",
+    });
+    expect(deckLogoBox("bottom-left")).toEqual({
+      x: 36,
+      y: 607,
+      w: 140,
+      h: 40,
+      objectPosition: "left bottom",
+    });
+    expect(deckLogoBox("bottom-right")).toEqual({
+      x: 1024,
+      y: 607,
+      w: 140,
+      h: 40,
+      objectPosition: "right bottom",
+    });
   });
 
   it("shows the deck logo on every slide, and on covers unless they are left out", () => {
@@ -68,14 +119,32 @@ describe("logos", () => {
   });
 
   it("sizes a logo block's picture by its box, else the deck logo's box times its scale", () => {
-    expect(logoBlockBox({ x: 10, y: 20, props: { scale: 0.5 } })).toEqual({ x: 10, y: 20, w: 70, h: 20, objectPosition: "left center" });
-    expect(logoBlockBox({ x: 10, y: 20, w: 200, h: 50, props: { align: "right" } })).toEqual({ x: 10, y: 20, w: 200, h: 50, objectPosition: "right center" });
+    expect(logoBlockBox({ x: 10, y: 20, props: { scale: 0.5 } })).toEqual({
+      x: 10,
+      y: 20,
+      w: 70,
+      h: 20,
+      objectPosition: "left center",
+    });
+    expect(logoBlockBox({ x: 10, y: 20, w: 200, h: 50, props: { align: "right" } })).toEqual({
+      x: 10,
+      y: 20,
+      w: 200,
+      h: 50,
+      objectPosition: "right center",
+    });
   });
 
   it("puts a new logo block in the top-right corner, or the next one clear of the deck logo", () => {
     expect(newLogoBlockBox()).toEqual({ x: 1024, y: 28, w: 140, h: 40, align: "right" });
     expect(newLogoBlockBox("top-left")).toEqual({ x: 1024, y: 28, w: 140, h: 40, align: "right" });
-    expect(newLogoBlockBox("top-right")).toEqual({ x: 1024, y: 607, w: 140, h: 40, align: "right" });
+    expect(newLogoBlockBox("top-right")).toEqual({
+      x: 1024,
+      y: 607,
+      w: 140,
+      h: 40,
+      align: "right",
+    });
   });
 
   it("tells an empty slot from an unnamed wordmark", () => {
@@ -97,9 +166,11 @@ describe("zoom", () => {
     const start = { scale: fit, panX: 0, panY: 0 };
     const anchor = { x: -480, y: -50 };
     let view = start;
-    for (let i = 0; i < 20; i++) view = zoomAt(view, view.scale * wheelZoomFactor(-8), anchor, fit, viewport);
+    for (let i = 0; i < 20; i++)
+      view = zoomAt(view, view.scale * wheelZoomFactor(-8), anchor, fit, viewport);
     expect(view.scale).toBeGreaterThan(1.5);
-    const [x0, y0] = at(start, anchor.x, anchor.y), [x1, y1] = at(view, anchor.x, anchor.y);
+    const [x0, y0] = at(start, anchor.x, anchor.y),
+      [x1, y1] = at(view, anchor.x, anchor.y);
     expect(x1).toBeCloseTo(x0, 6);
     expect(y1).toBeCloseTo(y0, 6);
   });
@@ -115,12 +186,13 @@ describe("zoom", () => {
 
   it("keeps the slide on screen however far it is panned", () => {
     const view = clampView({ scale: 2, panX: 1e6, panY: -1e6 }, fit, viewport);
-    const halfW = 1200 * 2 / 2, halfH = 675 * 2 / 2;
+    const halfW = (1200 * 2) / 2,
+      halfH = (675 * 2) / 2;
     // The slide's left edge stays left of the stage's middle; its bottom below the stage's middle.
     expect(view.panX - halfW).toBeLessThan(0);
     expect(view.panY + halfH).toBeGreaterThan(0);
     // ...and at most the margin past the fitted slide's edge.
-    expect(view.panX - halfW).toBeLessThanOrEqual(-1200 * fit / 2 + 48);
+    expect(view.panX - halfW).toBeLessThanOrEqual((-1200 * fit) / 2 + 48);
   });
 
   it("steps through the zoom levels and back to fit", () => {

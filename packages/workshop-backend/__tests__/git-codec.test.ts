@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { deflate } from "pako";
 import {
   applyGitDelta,
@@ -42,7 +42,7 @@ import {
 } from "./git-cache-fixtures";
 
 function fixture(oid: string): PackableObject {
-  let object = FIXTURE_OBJECTS.find(o => o.oid === oid);
+  let object = FIXTURE_OBJECTS.find((o) => o.oid === oid);
   if (!object) throw new Error(`no fixture object ${oid}`);
   return { type: object.type, payload: b64Bytes(object.payload) };
 }
@@ -103,8 +103,9 @@ describe("loose object codec", () => {
 
   it("computes the well-known oid of a canonical blob", async () => {
     // `echo 'hello world' | git hash-object --stdin`
-    expect(await gitObjectOid("blob", new TextEncoder().encode("hello world\n")))
-        .toBe("3b18e512dba79e4c8300dd08aeb37f8e728b8dad");
+    expect(await gitObjectOid("blob", new TextEncoder().encode("hello world\n"))).toBe(
+      "3b18e512dba79e4c8300dd08aeb37f8e728b8dad",
+    );
   });
 
   it("round-trips every fixture object through encode/decode", () => {
@@ -117,21 +118,23 @@ describe("loose object codec", () => {
   });
 
   it("rejects garbage bytes", () => {
-    expect(() => decodeLooseObject(new Uint8Array([1, 2, 3, 4])))
-        .toThrow(/corrupt loose git object/);
+    expect(() => decodeLooseObject(new Uint8Array([1, 2, 3, 4]))).toThrow(
+      /corrupt loose git object/,
+    );
   });
 
   it("rejects a header whose size disagrees with the payload", () => {
     // Deflate the lying bytes directly (encodeLooseObject would write a correct header).
-    expect(() => decodeLooseObject(deflate(new TextEncoder().encode("blob 5\0abc"))))
-        .toThrow(/header size does not match payload/);
+    expect(() => decodeLooseObject(deflate(new TextEncoder().encode("blob 5\0abc")))).toThrow(
+      /header size does not match payload/,
+    );
   });
 });
 
 describe("tree parser", () => {
   it("parses all five entry modes from the real-git fixture tree", () => {
     let entries = parseGitTree(fixture(TREE_1).payload, TREE_1);
-    expect(entries.map(e => [e.name, e.mode])).toStrictEqual([
+    expect(entries.map((e) => [e.name, e.mode])).toStrictEqual([
       ["README.md", "100644"],
       ["docs", "40000"],
       ["link.md", "120000"],
@@ -139,13 +142,13 @@ describe("tree parser", () => {
       ["src", "40000"],
       ["vendored", "160000"],
     ]);
-    expect(entries.find(e => e.name === "vendored")!.oid).toBe(GITLINK_TARGET);
+    expect(entries.find((e) => e.name === "vendored")!.oid).toBe(GITLINK_TARGET);
   });
 
   it("decodes a non-ASCII UTF-8 entry name byte-identically", () => {
-    let docs = parseGitTree(fixture(TREE_1).payload, TREE_1).find(e => e.name === "docs")!;
+    let docs = parseGitTree(fixture(TREE_1).payload, TREE_1).find((e) => e.name === "docs")!;
     let entries = parseGitTree(fixture(docs.oid).payload, docs.oid);
-    expect(entries.map(e => e.name)).toStrictEqual(["naïve.md"]);
+    expect(entries.map((e) => e.name)).toStrictEqual(["naïve.md"]);
   });
 
   it("scans a tree with a non-UTF-8 entry name structurally", () => {
@@ -156,8 +159,9 @@ describe("tree parser", () => {
   });
 
   it("fails a strict parse of a non-UTF-8 entry name, naming the tree and the bytes", () => {
-    expect(() => parseGitTree(fixture(BAD_NAME_TREE).payload, BAD_NAME_TREE))
-        .toThrow(new RegExp(`${BAD_NAME_TREE}.*not valid UTF-8.*fffe2e747874`));
+    expect(() => parseGitTree(fixture(BAD_NAME_TREE).payload, BAD_NAME_TREE)).toThrow(
+      new RegExp(`${BAD_NAME_TREE}.*not valid UTF-8.*fffe2e747874`),
+    );
   });
 
   it("rejects an unsupported entry mode rather than misreading it", () => {
@@ -171,7 +175,7 @@ describe("tree parser", () => {
 describe("tree encoder", () => {
   it("re-encodes every real-git fixture tree byte-identically, whatever the input order", () => {
     // Between them these cover all five entry modes and a non-ASCII name.
-    let trees = FIXTURE_OBJECTS.filter(o => o.type === "tree" && o.oid !== BAD_NAME_TREE);
+    let trees = FIXTURE_OBJECTS.filter((o) => o.type === "tree" && o.oid !== BAD_NAME_TREE);
     expect(trees.length).toBeGreaterThan(1);
     for (let tree of trees) {
       let payload = b64Bytes(tree.payload);
@@ -195,8 +199,12 @@ describe("tree encoder", () => {
       { mode: "100644", name: "foo.txt", oid: X_BLOB },
       { mode: "100644", name: "foo0", oid: X_BLOB },
     ]);
-    expect(parseGitTree(payload).map(e => e.name))
-        .toStrictEqual(["foo-bar", "foo.txt", "foo", "foo0"]);
+    expect(parseGitTree(payload).map((e) => e.name)).toStrictEqual([
+      "foo-bar",
+      "foo.txt",
+      "foo",
+      "foo0",
+    ]);
     expect(await gitObjectOid("tree", payload)).toBe("6174f963cab6a6776c96ce52ec8faca7462a54f1");
   });
 
@@ -209,7 +217,7 @@ describe("tree encoder", () => {
       { mode: "100644", name: "\u{1F600}", oid: X_BLOB },
       { mode: "100644", name: "\uFF5E", oid: X_BLOB },
     ]);
-    expect(parseGitTree(payload).map(e => e.name)).toStrictEqual(["\uFF5E", "\u{1F600}"]);
+    expect(parseGitTree(payload).map((e) => e.name)).toStrictEqual(["\uFF5E", "\u{1F600}"]);
     expect(await gitObjectOid("tree", payload)).toBe("bb40f9cf9c37cab4cee8cbe15ff5dd0df3ddbb9e");
   });
 
@@ -229,8 +237,12 @@ describe("tree encoder", () => {
       ["empty.txt", ""],
     ]);
     let store = newGitStore();
-    let commit = await store.writeFilesAsCommit(
-        files, { parents: [], author: ALICE, message: "files", timestamp: new Date(0) });
+    let commit = await store.writeFilesAsCommit(files, {
+      parents: [],
+      author: ALICE,
+      message: "files",
+      timestamp: new Date(0),
+    });
     expect(await fileTreeOid(files)).toBe(await store.commitTree(commit));
   });
 
@@ -239,11 +251,13 @@ describe("tree encoder", () => {
       expect(() => encodeGitTree([entry({ name })])).toThrow(/invalid entry name/);
     }
     // A file and a directory cannot share a name either, though they do not sort together.
-    expect(() => encodeGitTree([entry({}), entry({ name: "file.txt" }), entry({ mode: "40000" })]))
-        .toThrow(/duplicate entry name "file"/);
+    expect(() =>
+      encodeGitTree([entry({}), entry({ name: "file.txt" }), entry({ mode: "40000" })]),
+    ).toThrow(/duplicate entry name "file"/);
     expect(() => encodeGitTree([entry({ oid: X_BLOB.slice(1) })])).toThrow(/Invalid git object id/);
-    expect(() => encodeGitTree([entry({ mode: "040000" as GitTreeEntry["mode"] })]))
-        .toThrow(/unsupported entry mode 040000/);
+    expect(() => encodeGitTree([entry({ mode: "040000" as GitTreeEntry["mode"] })])).toThrow(
+      /unsupported entry mode 040000/,
+    );
   });
 });
 
@@ -253,8 +267,9 @@ describe("commit parser", () => {
       tree: TREE_1,
       parents: [],
     });
-    expect(parseGitCommitRefs(fixture(COMMIT_3).payload, COMMIT_3).parents)
-        .toStrictEqual([COMMIT_2]);
+    expect(parseGitCommitRefs(fixture(COMMIT_3).payload, COMMIT_3).parents).toStrictEqual([
+      COMMIT_2,
+    ]);
   });
 
   it("skips multi-line gpgsig continuation lines", () => {
@@ -273,15 +288,25 @@ describe("commit parser", () => {
 describe("commit encoder", () => {
   it("re-encodes real-git fixture commits byte-identically", () => {
     let alice = { ...ALICE, ...at(1700000000) };
-    expect(encodeGitCommit({
-      tree: TREE_1, parents: [], author: alice, committer: alice, message: "initial commit",
-    })).toStrictEqual(fixture(COMMIT_1).payload);
+    expect(
+      encodeGitCommit({
+        tree: TREE_1,
+        parents: [],
+        author: alice,
+        committer: alice,
+        message: "initial commit",
+      }),
+    ).toStrictEqual(fixture(COMMIT_1).payload);
 
     let later = { ...ALICE, ...at(1700000200) };
-    expect(encodeGitCommit({
-      ...parseGitCommitRefs(fixture(COMMIT_3).payload),
-      author: later, committer: later, message: "third commit\n",
-    })).toStrictEqual(fixture(COMMIT_3).payload);
+    expect(
+      encodeGitCommit({
+        ...parseGitCommitRefs(fixture(COMMIT_3).payload),
+        author: later,
+        committer: later,
+        message: "third commit\n",
+      }),
+    ).toStrictEqual(fixture(COMMIT_3).payload);
   });
 
   it("encodes a merge with a distinct committer and UTC offsets as real git does", async () => {
@@ -299,8 +324,10 @@ describe("commit encoder", () => {
     };
     let payload = encodeGitCommit(commit);
     expect(await gitObjectOid("commit", payload)).toBe("e5173d47b86cd826a08d49f1c8b6795726ad1967");
-    expect(parseGitCommitRefs(payload))
-        .toStrictEqual({ tree: commit.tree, parents: commit.parents });
+    expect(parseGitCommitRefs(payload)).toStrictEqual({
+      tree: commit.tree,
+      parents: commit.parents,
+    });
 
     // Parent order is part of the commit's identity.
     let swapped = encodeGitCommit({ ...commit, parents: commit.parents.toReversed() });
@@ -309,8 +336,8 @@ describe("commit encoder", () => {
 
   it("writes the same commit ids as isomorphic-git", async () => {
     let fs = makeGitObjectsFs(makeOverseerStorage(makeMockStorage()).gitObjects);
-    let timestamp = new Date(1700000000_999);  // recorded in whole seconds, rounded down
-    let cases: { parents: string[], message: string, committer?: typeof BOB }[] = [
+    let timestamp = new Date(1700000000_999); // recorded in whole seconds, rounded down
+    let cases: { parents: string[]; message: string; committer?: typeof BOB }[] = [
       { parents: [], message: "root" },
       { parents: [COMMIT_1], message: "one parent\n" },
       { parents: [COMMIT_2, COMMIT_1], message: "two parents", committer: BOB },
@@ -326,13 +353,17 @@ describe("commit encoder", () => {
     ];
     for (let { parents, message, committer } of cases) {
       let when = { timestamp: Math.floor(timestamp.getTime() / 1000), timezoneOffset: 0 };
-      let viaIsomorphicGit = await writeCommit({ fs, gitdir: GITDIR, commit: {
-        message,
-        tree: TREE_1,
-        parent: parents,
-        author: { ...ALICE, ...when },
-        committer: { ...(committer ?? ALICE), ...when },
-      } });
+      let viaIsomorphicGit = await writeCommit({
+        fs,
+        gitdir: GITDIR,
+        commit: {
+          message,
+          tree: TREE_1,
+          parent: parents,
+          author: { ...ALICE, ...when },
+          committer: { ...(committer ?? ALICE), ...when },
+        },
+      });
       let payload = encodeGitCommit({
         tree: TREE_1,
         parents,
@@ -340,8 +371,7 @@ describe("commit encoder", () => {
         committer: { ...(committer ?? ALICE), timestamp, utcOffsetMinutes: 0 },
         message,
       });
-      expect(await gitObjectOid("commit", payload), JSON.stringify(message))
-          .toBe(viaIsomorphicGit);
+      expect(await gitObjectOid("commit", payload), JSON.stringify(message)).toBe(viaIsomorphicGit);
     }
   });
 
@@ -361,27 +391,36 @@ describe("commit encoder", () => {
     };
     let payload = encodeGitCommit(commit);
     expect(new TextDecoder().decode(payload)).toBe(
-        `tree ${EMPTY_TREE}\nparent ${gadget}\nparent ${release}\n` +
+      `tree ${EMPTY_TREE}\nparent ${gadget}\nparent ${release}\n` +
         "author Alice Example <alice@example.com> 1700000000 +0000\n" +
         "committer Alice Example <alice@example.com> 1700000000 +0000\n" +
-        `blueprint-release ${release}\n\nMerge blueprint: Notes v1\n`);
+        `blueprint-release ${release}\n\nMerge blueprint: Notes v1\n`,
+    );
     expect(await gitObjectOid("commit", payload)).toBe("eadc807f8f8b0675263e44f01bd234ebb49e9ae6");
 
     // It round-trips: the commit's own fields are as they were, and the header reads back.
-    expect(parseGitCommitRefs(payload))
-        .toStrictEqual({ tree: EMPTY_TREE, parents: [gadget, release] });
+    expect(parseGitCommitRefs(payload)).toStrictEqual({
+      tree: EMPTY_TREE,
+      parents: [gadget, release],
+    });
     expect(readGitCommitHeader(payload, "blueprint-release")).toStrictEqual([release]);
     expect(readGitCommitHeader(payload, "blueprint")).toStrictEqual([]);
     expect(readGitCommitHeader(payload, "parent")).toStrictEqual([gadget, release]);
 
     // Several are written in the order given, and a name may repeat.
-    let several = encodeGitCommit({ ...commit, headers: [
-      { name: "x-one", value: "b" }, { name: "x-two", value: "" }, { name: "x-one", value: "a" },
-    ] });
+    let several = encodeGitCommit({
+      ...commit,
+      headers: [
+        { name: "x-one", value: "b" },
+        { name: "x-two", value: "" },
+        { name: "x-one", value: "a" },
+      ],
+    });
     expect(readGitCommitHeader(several, "x-one")).toStrictEqual(["b", "a"]);
     expect(readGitCommitHeader(several, "x-two")).toStrictEqual([""]);
-    expect(new TextDecoder().decode(several))
-        .toMatch(/\ncommitter [^\n]*\nx-one b\nx-two \nx-one a\n\n/);
+    expect(new TextDecoder().decode(several)).toMatch(
+      /\ncommitter [^\n]*\nx-one b\nx-two \nx-one a\n\n/,
+    );
   });
 
   it("reads a header's value across continuation lines, and never from the message", () => {
@@ -392,7 +431,10 @@ describe("commit encoder", () => {
 
     let alice = { ...ALICE, ...at(1700000000) };
     let payload = encodeGitCommit({
-      tree: TREE_1, parents: [], author: alice, committer: alice,
+      tree: TREE_1,
+      parents: [],
+      author: alice,
+      committer: alice,
       message: `subject\n\nblueprint-release ${COMMIT_1}\n`,
     });
     expect(readGitCommitHeader(payload, "blueprint-release")).toStrictEqual([]);
@@ -400,28 +442,38 @@ describe("commit encoder", () => {
 
   it("rejects fields that would not parse back as given", () => {
     let alice = { ...ALICE, ...at(1700000000) };
-    let commit: GitCommit =
-        { tree: TREE_1, parents: [COMMIT_1], author: alice, committer: alice, message: "m" };
+    let commit: GitCommit = {
+      tree: TREE_1,
+      parents: [COMMIT_1],
+      author: alice,
+      committer: alice,
+      message: "m",
+    };
     expect(() => encodeGitCommit({ ...commit, tree: "HEAD" })).toThrow(/Invalid git object id/);
-    expect(() => encodeGitCommit({ ...commit, parents: [COMMIT_1, ""] }))
-        .toThrow(/Invalid git object id/);
+    expect(() => encodeGitCommit({ ...commit, parents: [COMMIT_1, ""] })).toThrow(
+      /Invalid git object id/,
+    );
 
     // A newline in a name would otherwise let it write headers of its own.
     let forged = `Mallory <m@example.com> 1 +0000\nparent ${COMMIT_2}\nauthor Mallory`;
     for (let name of [forged, "a<b", "a>b", "a\0b"]) {
-      expect(() => encodeGitCommit({ ...commit, author: { ...alice, name } }))
-          .toThrow(/name or email contains/);
-      expect(() => encodeGitCommit({ ...commit, committer: { ...alice, email: name } }))
-          .toThrow(/name or email contains/);
+      expect(() => encodeGitCommit({ ...commit, author: { ...alice, name } })).toThrow(
+        /name or email contains/,
+      );
+      expect(() => encodeGitCommit({ ...commit, committer: { ...alice, email: name } })).toThrow(
+        /name or email contains/,
+      );
     }
 
     for (let timestamp of [new Date(NaN), new Date(-1)]) {
-      expect(() => encodeGitCommit({ ...commit, author: { ...alice, timestamp } }))
-          .toThrow(/timestamp is invalid/);
+      expect(() => encodeGitCommit({ ...commit, author: { ...alice, timestamp } })).toThrow(
+        /timestamp is invalid/,
+      );
     }
     for (let utcOffsetMinutes of [0.5, NaN, 6000, -6000]) {
-      expect(() => encodeGitCommit({ ...commit, committer: { ...alice, utcOffsetMinutes } }))
-          .toThrow(/invalid UTC offset/);
+      expect(() =>
+        encodeGitCommit({ ...commit, committer: { ...alice, utcOffsetMinutes } }),
+      ).toThrow(/invalid UTC offset/);
     }
 
     // What signatureSafe() leaves is always taken.
@@ -430,14 +482,29 @@ describe("commit encoder", () => {
     encodeGitCommit({ ...commit, author: { ...alice, name: signatureSafe(unsafe) } });
 
     // An extra header can neither be one of git's own nor write any other.
-    for (let name of ["parent", "tree", "Author", "committer", "gpgsig", "mergetag", "encoding",
-                      "", "two words", "x\ny", "-x", "1x", "x:y"]) {
-      expect(() => encodeGitCommit({ ...commit, headers: [{ name, value: "v" }] }), name)
-          .toThrow(/invalid header name/);
+    for (let name of [
+      "parent",
+      "tree",
+      "Author",
+      "committer",
+      "gpgsig",
+      "mergetag",
+      "encoding",
+      "",
+      "two words",
+      "x\ny",
+      "-x",
+      "1x",
+      "x:y",
+    ]) {
+      expect(() => encodeGitCommit({ ...commit, headers: [{ name, value: "v" }] }), name).toThrow(
+        /invalid header name/,
+      );
     }
     for (let value of [`${COMMIT_2}\nparent ${COMMIT_3}`, "a\n", "a\0b"]) {
-      expect(() => encodeGitCommit({ ...commit, headers: [{ name: "x-mark", value }] }))
-          .toThrow(/contains a newline or NUL/);
+      expect(() => encodeGitCommit({ ...commit, headers: [{ name: "x-mark", value }] })).toThrow(
+        /contains a newline or NUL/,
+      );
     }
   });
 });
@@ -451,14 +518,17 @@ describe("pack decoding", () => {
 
   for (let [name, packB64] of PACKS) {
     for (let step of [undefined, 1]) {
-      it(`decodes the real \`git pack-objects\` ${name} pack to the exact objects` +
-          (step ? ", byte by byte" : ""), async () => {
-        let objects = await decodePack(b64Bytes(packB64), { step });
-        expect(objects.map(o => o.oid).toSorted()).toStrictEqual(PACKED_OIDS.toSorted());
-        for (let { oid, type, payload } of objects) {
-          expect({ type, payload }).toStrictEqual(fixture(oid));
-        }
-      });
+      it(
+        `decodes the real \`git pack-objects\` ${name} pack to the exact objects` +
+          (step ? ", byte by byte" : ""),
+        async () => {
+          let objects = await decodePack(b64Bytes(packB64), { step });
+          expect(objects.map((o) => o.oid).toSorted()).toStrictEqual(PACKED_OIDS.toSorted());
+          for (let { oid, type, payload } of objects) {
+            expect({ type, payload }).toStrictEqual(fixture(oid));
+          }
+        },
+      );
     }
   }
 
@@ -470,8 +540,9 @@ describe("pack decoding", () => {
 
   it("rejects a truncated pack", async () => {
     let pack = b64Bytes(PACK_NO_DELTA);
-    await expect(decodePack(pack.subarray(0, pack.length - 40)))
-        .rejects.toThrow(/invalid packfile/);
+    await expect(decodePack(pack.subarray(0, pack.length - 40))).rejects.toThrow(
+      /invalid packfile/,
+    );
   });
 
   it("rejects a corrupted trailer, however the pack is chunked", async () => {
@@ -498,25 +569,33 @@ describe("pack decoding", () => {
   });
 
   it("enforces the object size cap while decoding", async () => {
-    await expect(decodePack(b64Bytes(PACK_NO_DELTA), { maxObjectSize: 64 }))
-        .rejects.toThrow(/exceeds the 64-byte limit/);
+    await expect(decodePack(b64Bytes(PACK_NO_DELTA), { maxObjectSize: 64 })).rejects.toThrow(
+      /exceeds the 64-byte limit/,
+    );
   });
 
   it("rejects an entry whose size varint is long enough to overflow", async () => {
     // Its zero digits overflow the multiplier, leaving a NaN size that no cap comparison rejects.
     let pack = concatBytes(await buildPackBytes([{ type: "blob", payload: new Uint8Array(3) }]));
     let entry = pack.subarray(12, -20);
-    let body = concatBytes([pack.subarray(0, 12), Uint8Array.of(entry[0] | 0x80),
-      new Uint8Array(160).fill(0x80), Uint8Array.of(0), entry.subarray(1)]);
+    let body = concatBytes([
+      pack.subarray(0, 12),
+      Uint8Array.of(entry[0] | 0x80),
+      new Uint8Array(160).fill(0x80),
+      Uint8Array.of(0),
+      entry.subarray(1),
+    ]);
     let bytes = concatBytes([body, new Uint8Array(await crypto.subtle.digest("SHA-1", body))]);
-    await expect(decodePack(bytes, { maxObjectSize: 64 }))
-        .rejects.toThrow(/entry size exceeds the 64-byte limit/);
+    await expect(decodePack(bytes, { maxObjectSize: 64 })).rejects.toThrow(
+      /entry size exceeds the 64-byte limit/,
+    );
   });
 
   it("enforces the pack size cap", async () => {
     let pack = b64Bytes(PACK_NO_DELTA);
-    await expect(decodePack(pack, { maxPackSize: pack.length - 1 }))
-        .rejects.toThrow(`packfile exceeds the ${pack.length - 1}-byte limit`);
+    await expect(decodePack(pack, { maxPackSize: pack.length - 1 })).rejects.toThrow(
+      `packfile exceeds the ${pack.length - 1}-byte limit`,
+    );
   });
 
   it("cancels the source when decoding fails", async () => {
@@ -524,8 +603,10 @@ describe("pack decoding", () => {
     let cancelled = false;
     let pack = new ReadableStream({
       type: "bytes",
-      pull: controller => controller.enqueue(new TextEncoder().encode("not a pack")),
-      cancel: () => { cancelled = true; },
+      pull: (controller) => controller.enqueue(new TextEncoder().encode("not a pack")),
+      cancel: () => {
+        cancelled = true;
+      },
     });
     let options = { maxPackSize: Infinity, maxObjectSize: 1, resolveBase: () => undefined };
     await expect(decodePackStream(pack, options).next()).rejects.toThrow(/bad magic/);
@@ -539,8 +620,8 @@ describe("pack decoding", () => {
     // Delta: baseSize, targetSize, then one copy op (offset byte + size byte) over the base.
     let delta = new Uint8Array([base.length, base.length, 0x91, 0, base.length]);
     let entryHeader = new Uint8Array([(7 << 4) | (delta.length & 0x0f)]);
-    expect(delta.length).toBeLessThan(16);  // single-byte size header
-    let oidBytes = Uint8Array.from(baseOid.match(/../g)!.map(h => parseInt(h, 16)));
+    expect(delta.length).toBeLessThan(16); // single-byte size header
+    let oidBytes = Uint8Array.from(baseOid.match(/../g)!.map((h) => parseInt(h, 16)));
     let header = new Uint8Array(12);
     header.set(new TextEncoder().encode("PACK"));
     new DataView(header.buffer).setUint32(4, 2);
@@ -549,12 +630,13 @@ describe("pack decoding", () => {
     let trailer = new Uint8Array(await crypto.subtle.digest("SHA-1", body));
     let pack = concatBytes([body, trailer]);
 
-    await expect(decodePack(pack, { maxObjectSize: 1 << 20 }))
-        .rejects.toThrow(new RegExp(`delta base ${baseOid} is unavailable`));
+    await expect(decodePack(pack, { maxObjectSize: 1 << 20 })).rejects.toThrow(
+      new RegExp(`delta base ${baseOid} is unavailable`),
+    );
 
     let objects = await decodePack(pack, {
       maxObjectSize: 1 << 20,
-      resolveBase: oid => oid === baseOid ? { type: "blob", payload: base } : undefined,
+      resolveBase: (oid) => (oid === baseOid ? { type: "blob", payload: base } : undefined),
     });
     expect(objects).toHaveLength(1);
     expect(objects[0].type).toBe("blob");
@@ -565,7 +647,7 @@ describe("pack decoding", () => {
 describe("pack encoding", () => {
   it("round-trips all fixture objects through buildPackBytes/decodePackStream", async () => {
     let pack = concatBytes(await buildPackBytes(PACKED_OIDS.map(fixture)));
-    expect((await decodePack(pack)).map(o => o.oid)).toStrictEqual(PACKED_OIDS);
+    expect((await decodePack(pack)).map((o) => o.oid)).toStrictEqual(PACKED_OIDS);
   });
 
   it("round-trips an empty pack", async () => {
@@ -581,11 +663,20 @@ describe("applyGitDelta", () => {
   it("applies copy and insert ops", () => {
     // target = base[4..9] ("quick") + " red " + base[10..15] ("brown")
     let delta = new Uint8Array([
-      BASE.length,        // base size
-      15,                 // target size
-      0x90 | 0x01, 4, 5,  // copy offset=4 size=5
-      5, 0x20, 0x72, 0x65, 0x64, 0x20,  // insert " red "
-      0x90 | 0x01, 10, 5, // copy offset=10 size=5
+      BASE.length, // base size
+      15, // target size
+      0x90 | 0x01,
+      4,
+      5, // copy offset=4 size=5
+      5,
+      0x20,
+      0x72,
+      0x65,
+      0x64,
+      0x20, // insert " red "
+      0x90 | 0x01,
+      10,
+      5, // copy offset=10 size=5
     ]);
     expect(new TextDecoder().decode(applyGitDelta(delta, BASE, 1024))).toBe("quick red brown");
   });

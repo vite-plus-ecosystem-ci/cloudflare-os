@@ -1,5 +1,5 @@
 import { promises as fsp } from "node:fs";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const git = vi.hoisted(() => ({
   clone: vi.fn(),
@@ -48,7 +48,9 @@ describe("artifact repository refresh", () => {
     const artifacts = {
       async get() {
         return {
-          async createToken() { return { id: "token", plaintext: "secret" }; },
+          async createToken() {
+            return { id: "token", plaintext: "secret" };
+          },
           revokeToken,
         };
       },
@@ -79,7 +81,9 @@ describe("artifact repository refresh", () => {
     const artifacts = {
       async get() {
         return {
-          async createToken() { return { id: "token", plaintext: "secret" }; },
+          async createToken() {
+            return { id: "token", plaintext: "secret" };
+          },
           revokeToken,
         };
       },

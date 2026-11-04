@@ -1,6 +1,6 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -24,10 +24,7 @@ export default defineConfig({
       {
         test: {
           name: "gadgets",
-          include: [
-            "blueprints/*/__tests__/**/*.test.ts",
-            "libraries/*/__tests__/**/*.test.ts",
-          ],
+          include: ["blueprints/*/__tests__/**/*.test.ts", "libraries/*/__tests__/**/*.test.ts"],
           environment: "jsdom",
         },
         resolve: {

@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 // The real `h` and the controls throw: the sandbox runtime supplies them at load time. These tests
 // exercise how a resource URL is read and written, not the markup.
 vi.mock("@gadgets/configurator-ui", () => ({
-  h: (component: unknown, props: unknown, ...children: unknown[]) =>
-    ({ component, props, children }),
+  h: (component: unknown, props: unknown, ...children: unknown[]) => ({
+    component,
+    props,
+    children,
+  }),
   Section: "Section",
   Field: "Field",
   CheckboxList: "CheckboxList",
@@ -17,10 +20,16 @@ async function loadSpec() {
 }
 
 function propsFor(node: unknown, component: string): Record<string, unknown> {
-  const item = node as { component?: unknown; props?: Record<string, unknown>; children?: unknown[] };
+  const item = node as {
+    component?: unknown;
+    props?: Record<string, unknown>;
+    children?: unknown[];
+  };
   if (item?.component === component) return item.props ?? {};
   for (const child of item?.children ?? []) {
-    try { return propsFor(child, component); } catch {}
+    try {
+      return propsFor(child, component);
+    } catch {}
   }
   throw new Error(`${component} not found`);
 }
@@ -48,8 +57,7 @@ describe("a grant whose tool list is empty", () => {
   it("serializes to a scope allowing nothing, never to the bare endpoint", async () => {
     // Unreachable while `isReady` holds, but this is the line that decides how being wrong fails.
     const spec = await loadSpec();
-    const built = await spec.resourceUrl(
-      { values: { mode: "choose", tools: ",,," }, ui } as never);
+    const built = await spec.resourceUrl({ values: { mode: "choose", tools: ",,," }, ui } as never);
     expect(built).toBe("https://mcp.acme.com/mcp#tool=");
     expect(built).not.toBe("https://mcp.acme.com/mcp");
   });
@@ -58,11 +66,13 @@ describe("a grant whose tool list is empty", () => {
 describe("an ordinary grant", () => {
   it("shows every tool as a disabled preview for an all-tools grant", async () => {
     const spec = await loadSpec();
-    const rendered = JSON.stringify(spec.render({
-      values: { mode: "all", tools: null },
-      setValues: vi.fn(),
-      ui: { listToolOptions: vi.fn() },
-    } as never));
+    const rendered = JSON.stringify(
+      spec.render({
+        values: { mode: "all", tools: null },
+        setValues: vi.fn(),
+        ui: { listToolOptions: vi.fn() },
+      } as never),
+    );
     expect(rendered).toContain("CheckboxList");
     expect(rendered).toContain('"disabled":true');
     expect(rendered).toContain('"allSelected":true');
@@ -70,8 +80,10 @@ describe("an ordinary grant", () => {
 
   it("round-trips the tools it names", async () => {
     const spec = await loadSpec();
-    const built = await spec.resourceUrl(
-      { values: { mode: "choose", tools: "send,list" }, ui } as never);
+    const built = await spec.resourceUrl({
+      values: { mode: "choose", tools: "send,list" },
+      ui,
+    } as never);
     expect(built).toBe("https://mcp.acme.com/mcp#tool=send&tool=list");
 
     const values = spec.initialValuesFromResourceUrl({ resourceUrl: built } as never);
@@ -86,13 +98,15 @@ describe("an ordinary grant", () => {
     } as never);
     expect(values.tools).toBe("a%2Cb,percent%25name");
     await expect(spec.resourceUrl({ values, ui } as never)).resolves.toBe(
-      "https://mcp.acme.com/mcp#tool=a%2Cb&tool=percent%25name");
+      "https://mcp.acme.com/mcp#tool=a%2Cb&tool=percent%25name",
+    );
   });
 
   it("encodes server tool names before passing them to CheckboxList", async () => {
     const spec = await loadSpec();
     const rendered = spec.render({
-      values: { mode: "choose", tools: null }, setValues: vi.fn(),
+      values: { mode: "choose", tools: null },
+      setValues: vi.fn(),
       ui: { listToolOptions: async () => [{ value: "a,b", title: "A, B" }] },
     } as never);
     const loadOptions = propsFor(rendered, "CheckboxList").loadOptions as () => Promise<unknown[]>;
@@ -101,8 +115,9 @@ describe("an ordinary grant", () => {
 
   it("reads a bare endpoint as the whole server", async () => {
     const spec = await loadSpec();
-    const values = spec.initialValuesFromResourceUrl(
-      { resourceUrl: "https://mcp.acme.com/mcp" } as never);
+    const values = spec.initialValuesFromResourceUrl({
+      resourceUrl: "https://mcp.acme.com/mcp",
+    } as never);
     expect(values.mode).toBe("all");
     expect(spec.isReady({ values } as never)).toBe(true);
   });
@@ -113,16 +128,18 @@ describe("a resource URL the form cannot decode", () => {
   // show nothing at all and the grant could not even be repaired by hand.
   it("opens instead of throwing", async () => {
     const spec = await loadSpec();
-    const values = spec.initialValuesFromResourceUrl(
-      { resourceUrl: "https://mcp.acme.com/mcp#tool=%" } as never);
+    const values = spec.initialValuesFromResourceUrl({
+      resourceUrl: "https://mcp.acme.com/mcp#tool=%",
+    } as never);
     expect(values.mode).toBe("choose");
     expect(values.tools).toBe("%25");
   });
 
   it("keeps a well-formed neighbour of a malformed name", async () => {
     const spec = await loadSpec();
-    const values = spec.initialValuesFromResourceUrl(
-      { resourceUrl: "https://mcp.acme.com/mcp#tool=%&tool=send" } as never);
+    const values = spec.initialValuesFromResourceUrl({
+      resourceUrl: "https://mcp.acme.com/mcp#tool=%&tool=send",
+    } as never);
     expect(values.tools).toBe("%25,send");
     expect(spec.isReady({ values } as never)).toBe(true);
   });

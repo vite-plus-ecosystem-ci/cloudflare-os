@@ -1,11 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { matchesToolQuery, toolQueryTerms } from "../src/tool-search.js";
 
-const match = (
-  tool: { name: string; title?: string; description?: string },
-  query: string,
-) => matchesToolQuery(tool, toolQueryTerms(query));
+const match = (tool: { name: string; title?: string; description?: string }, query: string) =>
+  matchesToolQuery(tool, toolQueryTerms(query));
 
 describe("tool query matching", () => {
   it("treats word separators alike on both sides of the comparison", () => {

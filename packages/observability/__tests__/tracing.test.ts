@@ -11,7 +11,7 @@
 //   guards the signal itself: if invocations stop being traced, isTraced starts false and the
 //   test fails rather than silently passing.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { createTracer } from "../src/tracing";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

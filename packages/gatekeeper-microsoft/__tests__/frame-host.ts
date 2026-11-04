@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium, type Browser, type Frame, type Page } from "playwright";
-import { afterAll, afterEach, beforeAll, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, vi } from "vite-plus/test";
 
 /** A gatekeeper call the frame made, answered by the test or by a preset answer. */
 export type Call = {
@@ -28,7 +28,15 @@ const FRAMES = {
   },
   outlook: {
     pattern: "https://outlook.office.com/*",
-    methods: ["getStatus", "openSharedMailbox", "listFolders", "searchPeople", "findConversations", "resourceUrlFor", "locate"],
+    methods: [
+      "getStatus",
+      "openSharedMailbox",
+      "listFolders",
+      "searchPeople",
+      "findConversations",
+      "resourceUrlFor",
+      "locate",
+    ],
   },
   calendar: {
     pattern: "https://outlook.office.com/calendar/*",
@@ -38,7 +46,8 @@ const FRAMES = {
 
 export type FrameName = keyof typeof FRAMES;
 
-const frameHtml = (name: FrameName) => readFileSync(`${import.meta.dirname}/../src/generated/${name}-configurator-ui.txt`, "utf8");
+const frameHtml = (name: FrameName) =>
+  readFileSync(`${import.meta.dirname}/../src/generated/${name}-configurator-ui.txt`, "utf8");
 // The browser build capnweb publishes for `import`, which has no imports of its own.
 const capnwebSource = readFileSync(fileURLToPath(import.meta.resolve("capnweb")), "utf8");
 
@@ -107,7 +116,7 @@ export function useFrameHost(): void {
     browser = await chromium.launch();
   });
   afterEach(async () => {
-    await Promise.all(pages.splice(0).map(page => page.close()));
+    await Promise.all(pages.splice(0).map((page) => page.close()));
   });
   afterAll(async () => {
     await browser?.close();
@@ -121,80 +130,115 @@ export function useFrameHost(): void {
  */
 export async function startFrame(
   name: FrameName,
-  { answers = {}, initialResource }: { answers?: Record<string, Answer>; initialResource?: string } = {},
+  {
+    answers = {},
+    initialResource,
+  }: { answers?: Record<string, Answer>; initialResource?: string } = {},
 ): Promise<Hosted> {
   if (!browser) throw new Error("call useFrameHost() at the top of the suite");
   const { pattern, methods } = FRAMES[name];
   const page = await browser.newPage();
   pages.push(page);
   const consoleErrors: string[] = [];
-  page.on("console", message => {
+  page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
-  page.on("pageerror", error => consoleErrors.push(error.message));
+  page.on("pageerror", (error) => consoleErrors.push(error.message));
 
   const calls: Call[] = [];
-  await page.exposeFunction("gatekeeperCall", (method: string, args: unknown[]) => new Promise((resolve, reject) => {
-    const call: Call = {
-      method, args, answered: false,
-      resolve: value => { call.answered = true; resolve(value); },
-      reject: message => { call.answered = true; reject(new Error(message)); },
-    };
-    calls.push(call);
-    const handler = answers[method];
-    if (handler === undefined) return;
-    try {
-      call.resolve(handler(...args));
-    } catch (error) {
-      call.reject((error as Error).message);
-    }
-  }));
-  await page.addInitScript(({ pattern, initialResource }) => {
-    Object.assign(globalThis, {
-      pattern,
-      initialResource: initialResource === undefined ? null : { resourceUrl: initialResource, resourceUrlPattern: pattern },
-    });
-  }, { pattern, initialResource });
+  await page.exposeFunction(
+    "gatekeeperCall",
+    (method: string, args: unknown[]) =>
+      new Promise((resolve, reject) => {
+        const call: Call = {
+          method,
+          args,
+          answered: false,
+          resolve: (value) => {
+            call.answered = true;
+            resolve(value);
+          },
+          reject: (message) => {
+            call.answered = true;
+            reject(new Error(message));
+          },
+        };
+        calls.push(call);
+        const handler = answers[method];
+        if (handler === undefined) return;
+        try {
+          call.resolve(handler(...args));
+        } catch (error) {
+          call.reject((error as Error).message);
+        }
+      }),
+  );
+  await page.addInitScript(
+    ({ pattern, initialResource }) => {
+      Object.assign(globalThis, {
+        pattern,
+        initialResource:
+          initialResource === undefined
+            ? null
+            : { resourceUrl: initialResource, resourceUrlPattern: pattern },
+      });
+    },
+    { pattern, initialResource },
+  );
   const html = frameHtml(name);
-  await page.route("http://host.test/**", route => {
+  await page.route("http://host.test/**", (route) => {
     const { pathname } = new URL(route.request().url());
     if (pathname === "/frame.html") return route.fulfill({ body: html, contentType: "text/plain" });
-    if (pathname === "/capnweb.js") return route.fulfill({ body: capnwebSource, contentType: "text/javascript" });
+    if (pathname === "/capnweb.js")
+      return route.fulfill({ body: capnwebSource, contentType: "text/javascript" });
     return route.fulfill({ body: hostPage(methods), contentType: "text/html" });
   });
   await page.goto("http://host.test/");
 
   const frame = () => {
-    const child = page.frames().find(candidate => candidate !== page.mainFrame());
+    const child = page.frames().find((candidate) => candidate !== page.mainFrame());
     if (!child) throw new Error("The configurator frame is missing.");
     return child;
   };
-  const callsOf = (method: string) => calls.filter(call => call.method === method);
+  const callsOf = (method: string) => calls.filter((call) => call.method === method);
   const hosted: Hosted = {
-    page, frame, calls, callsOf, consoleErrors,
-    waiting: method => callsOf(method).filter(call => !call.answered),
+    page,
+    frame,
+    calls,
+    callsOf,
+    consoleErrors,
+    waiting: (method) => callsOf(method).filter((call) => !call.answered),
     state: () => page.evaluate(() => (globalThis as unknown as HostGlobals).state),
     text: async () => (await frame().locator("#root").innerText()).replace(/\s+/g, " ").trim(),
-    collect: () => page.evaluate(async () => {
-      try {
-        return { url: String(await (globalThis as unknown as HostGlobals).frameStub.collectResourceUrl()) };
-      } catch (error) {
-        return { error: error instanceof Error ? error.message : String(error) };
-      }
-    }),
+    collect: () =>
+      page.evaluate(async () => {
+        try {
+          return {
+            url: String(
+              await (globalThis as unknown as HostGlobals).frameStub.collectResourceUrl(),
+            ),
+          };
+        } catch (error) {
+          return { error: error instanceof Error ? error.message : String(error) };
+        }
+      }),
     async collected() {
       const before = callsOf("resourceUrlFor").length;
       // Its answer is whatever the test gives the call, and the page may close before it arrives.
       hosted.collect().catch(() => {});
       await vi.waitFor(() => {
-        if (callsOf("resourceUrlFor").length === before) throw new Error("the frame has not asked for its resource URL");
+        if (callsOf("resourceUrlFor").length === before)
+          throw new Error("the frame has not asked for its resource URL");
       });
       return callsOf("resourceUrlFor").at(-1)!.args[0];
     },
   };
   // The frame is up once it has asked the gatekeeper anything.
-  await vi.waitFor(() => {
-    if (calls.length === 0) throw new Error("the frame has not started");
-  }, { timeout: 10_000 });
+  await vi.waitFor(
+    () => {
+      if (calls.length === 0) throw new Error("the frame has not started");
+    },
+    { timeout: 10_000 },
+  );
   return hosted;
 }

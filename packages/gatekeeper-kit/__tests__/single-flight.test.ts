@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { SingleFlight } from "../src/single-flight";
 
 describe("SingleFlight", () => {
@@ -34,7 +34,10 @@ describe("SingleFlight", () => {
     const flights = new SingleFlight();
     const failing = Promise.withResolvers<string>();
 
-    const joined = [flights.run("k", () => failing.promise), flights.run("k", () => failing.promise)];
+    const joined = [
+      flights.run("k", () => failing.promise),
+      flights.run("k", () => failing.promise),
+    ];
     failing.reject(new Error("boom"));
 
     for (const attempt of joined) await expect(attempt).rejects.toThrow("boom");

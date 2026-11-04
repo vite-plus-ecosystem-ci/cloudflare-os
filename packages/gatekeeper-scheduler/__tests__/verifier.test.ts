@@ -3,7 +3,7 @@
 
 import { env } from "cloudflare:workers";
 import { createExecutionContext } from "cloudflare:test";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import type { SchedulerGatekeeper } from "../src/scheduler.js";
 
 // The test config adds a namespace that production reaches only through workspace facets.
@@ -15,10 +15,16 @@ it("admits every scheduler observer, including accounts other than the owner's",
   const collaborator = worker.ScheduleAccount({ props: { accountId: "collaborator-account" } });
   const gatekeeper = testEnv.SCHEDULER_GATEKEEPER.getByName("observer-access");
 
-  await expect(gatekeeper.verifyObserverAccess([
-    { id: "owner", verifier: await owner.getVerifier() },
-    { id: "collaborator", verifier: await collaborator.getVerifier() },
-  ], [])).resolves.toEqual({ allowedObserverIds: ["owner", "collaborator"] });
-  await expect(gatekeeper.verifyObserverAccess([], []))
-    .resolves.toEqual({ allowedObserverIds: [] });
+  await expect(
+    gatekeeper.verifyObserverAccess(
+      [
+        { id: "owner", verifier: await owner.getVerifier() },
+        { id: "collaborator", verifier: await collaborator.getVerifier() },
+      ],
+      [],
+    ),
+  ).resolves.toEqual({ allowedObserverIds: ["owner", "collaborator"] });
+  await expect(gatekeeper.verifyObserverAccess([], [])).resolves.toEqual({
+    allowedObserverIds: [],
+  });
 });

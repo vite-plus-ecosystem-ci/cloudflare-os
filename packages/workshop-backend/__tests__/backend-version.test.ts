@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import worker from "../src/server.js";
@@ -18,7 +18,10 @@ function envWith(vars: object): Cloudflare.Env {
 async function fetchVersion(vars: object, method = "GET"): Promise<Response> {
   const ctx = createExecutionContext();
   const response = await worker.fetch(
-      new Request(`https://workshop.example${VERSION_PATH}`, { method }), envWith(vars), ctx);
+    new Request(`https://workshop.example${VERSION_PATH}`, { method }),
+    envWith(vars),
+    ctx,
+  );
   await waitOnExecutionContext(ctx);
   return response;
 }

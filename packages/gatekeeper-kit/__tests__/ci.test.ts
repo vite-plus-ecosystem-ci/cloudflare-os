@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   AppliedPushLog,
   CI_LOG_MAX_LINES,
@@ -56,23 +56,31 @@ describe("stripAnsi and applyCarriageReturns", () => {
 describe("readCiLog", () => {
   it("splits lines across chunk and multi-byte boundaries and keeps a final line without newline", async () => {
     const bytes = new TextEncoder().encode("é");
-    const log = await readCiLog(stream("fir", "st\nsec", "ond\r", "\n", bytes.slice(0, 1), bytes.slice(1), "nd"),
-      plain);
+    const log = await readCiLog(
+      stream("fir", "st\nsec", "ond\r", "\n", bytes.slice(0, 1), bytes.slice(1), "nd"),
+      plain,
+    );
     expect(log).toEqual({ lines: ["first", "second", "énd"], firstLine: 1, totalLines: 3 });
   });
 
   it("does not count a trailing newline as a line, and counts empty lines", async () => {
-    expect(await readCiLog(stream("a\n\nb\n"), plain))
-      .toEqual({ lines: ["a", "", "b"], firstLine: 1, totalLines: 3 });
+    expect(await readCiLog(stream("a\n\nb\n"), plain)).toEqual({
+      lines: ["a", "", "b"],
+      firstLine: 1,
+      totalLines: 3,
+    });
     expect(await readCiLog(stream(), plain)).toEqual({ lines: [], firstLine: 1, totalLines: 0 });
   });
 
   it("passes each raw line, less a leading BOM, to normalizeLine and counts only the lines it keeps", async () => {
     const seen: string[] = [];
-    const log = await readCiLog(stream("\uFEFF# setup\n", `${ESC}[1mkeep\r\n`, "\uFEFF# done\n", "last"), line => {
-      seen.push(line);
-      return line.startsWith("#") ? null : line.toUpperCase();
-    });
+    const log = await readCiLog(
+      stream("\uFEFF# setup\n", `${ESC}[1mkeep\r\n`, "\uFEFF# done\n", "last"),
+      (line) => {
+        seen.push(line);
+        return line.startsWith("#") ? null : line.toUpperCase();
+      },
+    );
     expect(seen).toEqual(["# setup", `${ESC}[1mkeep\r`, "# done", "last"]);
     expect(log).toEqual({ lines: [`${ESC}[1MKEEP\r`, "LAST"], firstLine: 1, totalLines: 2 });
   });
@@ -89,15 +97,20 @@ describe("readCiLog", () => {
   });
 
   it("refuses a body past maxBytes", async () => {
-    await expect(readCiLog(stream("a".repeat(10), "b".repeat(10)), plain, { maxBytes: 15 }))
-      .rejects.toBeInstanceOf(CiLogTooLargeError);
-    await expect(readCiLog(stream("a".repeat(15)), plain, { maxBytes: 15 })).resolves
-      .toMatchObject({ totalLines: 1 });
+    await expect(
+      readCiLog(stream("a".repeat(10), "b".repeat(10)), plain, { maxBytes: 15 }),
+    ).rejects.toBeInstanceOf(CiLogTooLargeError);
+    await expect(readCiLog(stream("a".repeat(15)), plain, { maxBytes: 15 })).resolves.toMatchObject(
+      { totalLines: 1 },
+    );
   });
 
   it("cuts an over-long line to its start, and keeps progress overwrites of one exactly", async () => {
     const huge = "x".repeat(100_000);
-    const log = await readCiLog(stream(huge.slice(0, 50_000), huge.slice(50_000), "\nnext\n"), plain);
+    const log = await readCiLog(
+      stream(huge.slice(0, 50_000), huge.slice(50_000), "\nnext\n"),
+      plain,
+    );
     expect(log.totalLines).toBe(2);
     expect(log.lines[0]!.startsWith("xxx")).toBe(true);
     expect(log.lines[0]!.endsWith("… [line truncated]")).toBe(true);
@@ -122,7 +135,11 @@ describe("readCiLog", () => {
         }
       },
     });
-    expect(await readCiLog(body, plain)).toEqual({ lines: ["done", "next"], firstLine: 1, totalLines: 2 });
+    expect(await readCiLog(body, plain)).toEqual({
+      lines: ["done", "next"],
+      firstLine: 1,
+      totalLines: 2,
+    });
   });
 
   it("cuts an over-long line before a character that would straddle the cut, not through it", async () => {
@@ -149,10 +166,11 @@ describe("pageCiLog", () => {
 
   it("pages forward from fromLine", () => {
     const page = pageCiLog(log, { fromLine: 10, maxLines: 3 }, false);
-    expect(page.lines.map(line => line.number)).toEqual([10, 11, 12]);
+    expect(page.lines.map((line) => line.number)).toEqual([10, 11, 12]);
     expect(page.complete).toBe(false);
-    expect(pageCiLog(log, { fromLine: 499, maxLines: 5 }, true).lines.map(line => line.number))
-      .toEqual([499, 500]);
+    expect(
+      pageCiLog(log, { fromLine: 499, maxLines: 5 }, true).lines.map((line) => line.number),
+    ).toEqual([499, 500]);
     expect(pageCiLog(log, { fromLine: 501 }, true).lines).toEqual([]);
   });
 
@@ -164,7 +182,7 @@ describe("pageCiLog", () => {
   it("starts at the first available line when fromLine is below it", () => {
     const tail = logOf(numbered(10, 91), 91);
     const page = pageCiLog(tail, { fromLine: 1, maxLines: 2 }, true);
-    expect(page.lines.map(line => line.number)).toEqual([91, 92]);
+    expect(page.lines.map((line) => line.number)).toEqual([91, 92]);
     expect(page).toMatchObject({ totalLines: 100, firstAvailableLine: 91 });
   });
 
@@ -174,10 +192,12 @@ describe("pageCiLog", () => {
       { number: 4, text: "error: two" },
       { number: 5, text: "ERROR three" },
     ]);
-    expect(pageCiLog(mixed, { search: "eRRor", fromLine: 3 }, true).lines.map(line => line.number))
-      .toEqual([4, 5]);
-    expect(pageCiLog(mixed, { search: "error", fromLine: 1, maxLines: 1 }, true).lines)
-      .toEqual([{ number: 2, text: "Error: one" }]);
+    expect(
+      pageCiLog(mixed, { search: "eRRor", fromLine: 3 }, true).lines.map((line) => line.number),
+    ).toEqual([4, 5]);
+    expect(pageCiLog(mixed, { search: "error", fromLine: 1, maxLines: 1 }, true).lines).toEqual([
+      { number: 2, text: "Error: one" },
+    ]);
   });
 
   it("refuses a fromLine or maxLines that is not a positive integer", () => {
@@ -202,7 +222,7 @@ describe("CiLogCache", () => {
     lines[5] = "";
     const log: CiLog = { lines, firstLine: 11, totalLines: 2010 };
     cache.put("job:1", log);
-    expect(kv.keys().filter(key => key.includes(":chunk:")).length).toBeGreaterThan(1);
+    expect(kv.keys().filter((key) => key.includes(":chunk:")).length).toBeGreaterThan(1);
     expect(cache.get("job:1")).toEqual(log);
     expect(cache.get("job:2")).toBeUndefined();
   });
@@ -227,7 +247,7 @@ describe("CiLogCache", () => {
   it("treats an entry another version of the cache wrote as a miss and deletes it", () => {
     const { kv, cache } = makeCache();
     cache.put("job", logOf(["a", "b"]));
-    const metaKey = kv.keys().find(key => key.includes(":meta:"))!;
+    const metaKey = kv.keys().find((key) => key.includes(":meta:"))!;
     kv.put(metaKey, { ...kv.get<object>(metaKey), version: 2 });
     expect(cache.get("job")).toBeUndefined();
     expect(kv.keys()).toEqual(["ciLog:totalBytes"]);

@@ -2,13 +2,17 @@ import { createExecutionContext } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { newWebSocketRpcSession, type RpcStub } from "capnweb";
 import type { PublicApi } from "@gadgets/workshop-shared/api";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import server from "../src/server";
 
 async function connect(): Promise<RpcStub<PublicApi>> {
-  const response = await server.fetch(new Request("https://workshop.invalid/api", {
-    headers: { Upgrade: "websocket" },
-  }), env, createExecutionContext());
+  const response = await server.fetch(
+    new Request("https://workshop.invalid/api", {
+      headers: { Upgrade: "websocket" },
+    }),
+    env,
+    createExecutionContext(),
+  );
   expect(response.status).toBe(101);
   const socket = response.webSocket;
   if (!socket) throw new TypeError("Expected a WebSocket response.");

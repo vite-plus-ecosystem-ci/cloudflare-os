@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { AccessTokenCache, fetchWithAuthRetry, type AccessTokenRequest } from "../src/auth-retry";
 import { getGoogleAccountProfile } from "../src/google-api";
 
@@ -6,7 +6,7 @@ import { getGoogleAccountProfile } from "../src/google-api";
 function authority(initial: string) {
   let requests: (AccessTokenRequest | undefined)[] = [];
   let stored = initial;
-  let cache = new AccessTokenCache(async opts => {
+  let cache = new AccessTokenCache(async (opts) => {
     requests.push(opts);
     return { token: stored, expires: new Date(Date.now() + 3600_000) };
   });
@@ -14,7 +14,9 @@ function authority(initial: string) {
     cache,
     requests,
     /** What a reconnect does: replace the stored token, telling no gatekeeper about it. */
-    restore(token: string) { stored = token; },
+    restore(token: string) {
+      stored = token;
+    },
   };
 }
 
@@ -80,18 +82,29 @@ describe("fetchWithAuthRetry", () => {
 
   it("does not replay a 401 when the provider cannot refresh its token", async () => {
     let requests = 0;
-    vi.stubGlobal("fetch", async () => { requests++; return new Response(null, { status: 401 }); });
-    let response = await fetchWithAuthRetry("https://chat.googleapis.com/v1/spaces", {}, async () => "fixed");
+    vi.stubGlobal("fetch", async () => {
+      requests++;
+      return new Response(null, { status: 401 });
+    });
+    let response = await fetchWithAuthRetry(
+      "https://chat.googleapis.com/v1/spaces",
+      {},
+      async () => "fixed",
+    );
     expect(response.status).toBe(401);
     expect(requests).toBe(1);
   });
 
   it("refreshes an invalidated profile token before checking the account subject", async () => {
-    const provider = vi.fn(async (opts?: AccessTokenRequest) => opts?.forceRefresh ? "fresh" : "stale");
+    const provider = vi.fn(async (opts?: AccessTokenRequest) =>
+      opts?.forceRefresh ? "fresh" : "stale",
+    );
     vi.stubGlobal("fetch", async (_input: string, init: RequestInit) =>
       new Headers(init.headers).get("Authorization") === "Bearer fresh"
-        ? Response.json({sub: "original-account"}) : new Response(null, {status: 401}));
-    expect(await getGoogleAccountProfile(provider)).toEqual({sub: "original-account"});
-    expect(provider).toHaveBeenLastCalledWith({forceRefresh: true, staleToken: "stale"});
+        ? Response.json({ sub: "original-account" })
+        : new Response(null, { status: 401 }),
+    );
+    expect(await getGoogleAccountProfile(provider)).toEqual({ sub: "original-account" });
+    expect(provider).toHaveBeenLastCalledWith({ forceRefresh: true, staleToken: "stale" });
   });
 });

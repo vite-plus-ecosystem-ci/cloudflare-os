@@ -1,5 +1,5 @@
 import { parse as parseYaml } from "yaml";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { prepareSkillUploads, writeSkillUploadMetadata, type SkillUploadFile } from "./skillUpload";
 
 const file = (path: string, body = "Body", contentType = "text/markdown"): SkillUploadFile => ({
@@ -16,11 +16,13 @@ describe("prepareSkillUploads", () => {
       file("notes.txt", "Ignored", "text/plain"),
     ]);
 
-    expect(candidates.map(({ label, name, description }) => ({
-      label,
-      name,
-      description,
-    }))).toEqual([
+    expect(
+      candidates.map(({ label, name, description }) => ({
+        label,
+        name,
+        description,
+      })),
+    ).toEqual([
       { label: "one", name: "one", description: "First" },
       { label: "two", name: "two", description: "Second" },
     ]);
@@ -62,7 +64,9 @@ describe("prepareSkillUploads", () => {
     expect(candidates[0].manifestBody).toBe(original);
     expect(candidates[0].description).not.toBe("");
     const converted = writeSkillUploadMetadata(original, "review", "Review instructions.");
-    expect(converted).toBe(`---\nname: review\ndescription: Review instructions.\n---\n\n${original}`);
+    expect(converted).toBe(
+      `---\nname: review\ndescription: Review instructions.\n---\n\n${original}`,
+    );
   });
 
   it("derives legacy descriptions from the same preserved content used for conversion", () => {
@@ -79,17 +83,21 @@ describe("prepareSkillUploads", () => {
     ["name: 123\ndescription: false", "", ""],
     ["name: INVALID\ndescription: ''", "INVALID", ""],
     [`name: example\ndescription: ${"a".repeat(1025)}`, "example", "a".repeat(1025)],
-  ])("leaves recognized metadata for review rather than inferring replacements: %s", (metadata, name, description) => {
-    const [candidate] = prepareSkillUploads([
-      file("review.md", `---\n${metadata}\n---\nInstructions with a different description.`),
-    ]);
+  ])(
+    "leaves recognized metadata for review rather than inferring replacements: %s",
+    (metadata, name, description) => {
+      const [candidate] = prepareSkillUploads([
+        file("review.md", `---\n${metadata}\n---\nInstructions with a different description.`),
+      ]);
 
-    expect(candidate.name).toBe(name);
-    expect(candidate.description).toBe(description);
-  });
+      expect(candidate.name).toBe(name);
+      expect(candidate.description).toBe(description);
+    },
+  );
 
   it("recognizes BOM, CRLF, and indented fence text inside YAML block scalars", () => {
-    const original = "\uFEFF--- \r\nname: review\r\ndescription: |\r\n  Review carefully.\r\n  ---\r\n  Then verify.\r\nlicense: MIT\r\n--- \r\n\r\nInstructions\r\n";
+    const original =
+      "\uFEFF--- \r\nname: review\r\ndescription: |\r\n  Review carefully.\r\n  ---\r\n  Then verify.\r\nlicense: MIT\r\n--- \r\n\r\nInstructions\r\n";
     const [candidate] = prepareSkillUploads([file("old-name.md", original)]);
 
     expect(candidate.name).toBe("review");

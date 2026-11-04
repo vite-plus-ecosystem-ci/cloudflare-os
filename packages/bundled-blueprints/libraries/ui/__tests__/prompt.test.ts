@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import { PROMPT_STYLES, promptInline } from "../src/prompt.ts";
 
@@ -83,7 +83,9 @@ describe("promptInline", () => {
 
 describe("PROMPT_STYLES", () => {
   it("styles only the dialog's own classes", () => {
-    const selectors = PROMPT_STYLES.split("\n").filter(Boolean).map((rule) => rule.slice(0, rule.indexOf("{")).trim());
+    const selectors = PROMPT_STYLES.split("\n")
+      .filter(Boolean)
+      .map((rule) => rule.slice(0, rule.indexOf("{")).trim());
     expect(selectors.length).toBeGreaterThan(0);
     for (const selector of selectors) expect(selector).toMatch(/^\.prompt-(overlay|card)\b/);
     const style = document.createElement("style");

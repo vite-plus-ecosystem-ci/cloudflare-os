@@ -4,7 +4,7 @@
   "type": "module",
   "main": "./src/slack.ts",
   "scripts": {
-    "test:run": "vitest run",
+    "test:run": "vp test run",
     "dev": "echo \"run 'pnpm dev-server' in the root directory instead\" >&2 && exit 1",
     "deploy": "vp run --no-cache build:configurator && wrangler deploy",
     "clean": "rm -rf dist src/generated"
@@ -17,7 +17,6 @@
     "capnweb-validate": "catalog:"
   },
   "devDependencies": {
-    "vitest": "catalog:",
     "@gadgets/scripts": "workspace:*",
     "typescript": "catalog:",
     "wrangler": "catalog:"

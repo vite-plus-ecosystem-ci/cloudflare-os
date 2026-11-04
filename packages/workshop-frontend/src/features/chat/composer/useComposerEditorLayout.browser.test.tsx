@@ -5,9 +5,11 @@
 
 import { act, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import {
-  ComposerMirror, composerTextareaClass, type ComposerMirrorHandle,
+  ComposerMirror,
+  composerTextareaClass,
+  type ComposerMirrorHandle,
 } from "./inline-items/ComposerMirror";
 import { useComposerEditorLayout } from "./useComposerEditorLayout";
 import styles from "./ChatComposer.module.css";
@@ -21,7 +23,13 @@ const Editor = ({ text }: { text: string }) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const mirrorRef = useRef<ComposerMirrorHandle>(null);
   const { resizeTextarea } = useComposerEditorLayout({
-    textareaRef, wrapperRef, mirrorRef, text, activeTextOffset: undefined, minRows: 2, maxRows: 4,
+    textareaRef,
+    wrapperRef,
+    mirrorRef,
+    text,
+    activeTextOffset: undefined,
+    minRows: 2,
+    maxRows: 4,
   });
   return (
     <div ref={wrapperRef} className={styles.capsuleInputWrapper}>
@@ -34,7 +42,13 @@ const Editor = ({ text }: { text: string }) => {
         value={text}
         readOnly
         className={composerTextareaClass}
-        style={{ boxSizing: "border-box", width: "100%", padding: 0, border: 0, lineHeight: "22px" }}
+        style={{
+          boxSizing: "border-box",
+          width: "100%",
+          padding: 0,
+          border: 0,
+          lineHeight: "22px",
+        }}
       />
     </div>
   );
@@ -55,9 +69,12 @@ describe("composer editor layout", () => {
     container.style.width = "403.3px";
     root = createRoot(container);
     await act(async () => root!.render(<Editor text={text} />));
-    await act(() => new Promise((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(resolve));
-    }));
+    await act(
+      () =>
+        new Promise((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        }),
+    );
     const textarea = container.querySelector("textarea")!;
     const mirror = container.querySelector<HTMLElement>('[aria-hidden="true"] > div')!;
     return { textarea, mirror, clip: mirror.parentElement! };
@@ -68,8 +85,10 @@ describe("composer editor layout", () => {
   it("sizes the mirror to the textarea's fractional width", async () => {
     const { textarea, mirror } = await render(SHORT_TEXT);
 
-    expect(mirror.getBoundingClientRect().width)
-      .toBeCloseTo(textarea.getBoundingClientRect().width, 2);
+    expect(mirror.getBoundingClientRect().width).toBeCloseTo(
+      textarea.getBoundingClientRect().width,
+      2,
+    );
   });
 
   it("leaves out the scrollbar the textarea gains when it scrolls", async () => {
@@ -77,8 +96,10 @@ describe("composer editor layout", () => {
     const scrollbarWidth = textarea.offsetWidth - textarea.clientWidth;
 
     expect(scrollbarWidth).toBeGreaterThan(0);
-    expect(mirror.getBoundingClientRect().width)
-      .toBeCloseTo(textarea.getBoundingClientRect().width - scrollbarWidth, 2);
+    expect(mirror.getBoundingClientRect().width).toBeCloseTo(
+      textarea.getBoundingClientRect().width - scrollbarWidth,
+      2,
+    );
   });
 
   it("clips the mirror to the textarea, hiding scrolled-out lines", async () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   advanceToOAuth,
   claimOAuth,
@@ -34,18 +34,28 @@ describe("two-stage connect handshake", () => {
     const kv = makeKv();
     putInitiation(kv, "init", 100, { firstConnect: true, scopes: ["read"] });
 
-    const oauthNonce = advanceToOAuth(kv, "init", 101, { scopes: ["read", "write"], verifier: "pkce" });
+    const oauthNonce = advanceToOAuth(kv, "init", 101, {
+      scopes: ["read", "write"],
+      verifier: "pkce",
+    });
 
-    expect(claimOAuth<{ firstConnect: true; scopes: string[]; verifier: string }>(kv, oauthNonce!, 102))
-      .toMatchObject({ firstConnect: true, scopes: ["read", "write"], verifier: "pkce", stage: "oauth" });
+    expect(
+      claimOAuth<{ firstConnect: true; scopes: string[]; verifier: string }>(kv, oauthNonce!, 102),
+    ).toMatchObject({
+      firstConnect: true,
+      scopes: ["read", "write"],
+      verifier: "pkce",
+      stage: "oauth",
+    });
   });
 
   it("refuses metadata that would silently lose a reserved field", () => {
     const kv = makeKv();
     putInitiation(kv, "init", 100);
 
-    expect(() => advanceToOAuth(kv, "init", 101, { stage: "oauth" } as never))
-      .toThrow(/reserved key "stage"/);
+    expect(() => advanceToOAuth(kv, "init", 101, { stage: "oauth" } as never)).toThrow(
+      /reserved key "stage"/,
+    );
     // Rejected before the attempt was consumed, so the user's link still works.
     expect(advanceToOAuth(kv, "init", 101)).not.toBeNull();
   });
@@ -53,7 +63,9 @@ describe("two-stage connect handshake", () => {
   it("refuses initiation metadata that would lose a reserved field", () => {
     const kv = makeKv();
 
-    expect(() => putInitiation(kv, "init", 100, { expiresAt: 0 } as never)).toThrow(/reserved key "expiresAt"/);
+    expect(() => putInitiation(kv, "init", 100, { expiresAt: 0 } as never)).toThrow(
+      /reserved key "expiresAt"/,
+    );
     expect(kv.get(NONCE_KEY)).toBeUndefined();
   });
 

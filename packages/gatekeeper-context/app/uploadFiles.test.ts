@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { fileToBase64, readDroppedUploadFiles, readUploadFile } from "./uploadFiles";
 
 describe("fileToBase64", () => {
@@ -40,14 +40,18 @@ describe("readDroppedUploadFiles", () => {
     const skill = new File([body], "standalone.md", { type: "text/markdown" });
     Object.defineProperty(skill, "text", { value: async () => body });
     const transfer = {
-      items: [{
-        webkitGetAsEntry: () => ({
-          isFile: true,
-          isDirectory: false,
-          name: "standalone.md",
-          file: () => { throw new Error("entry API should not be used"); },
-        }),
-      }],
+      items: [
+        {
+          webkitGetAsEntry: () => ({
+            isFile: true,
+            isDirectory: false,
+            name: "standalone.md",
+            file: () => {
+              throw new Error("entry API should not be used");
+            },
+          }),
+        },
+      ],
       files: [skill],
     } as unknown as DataTransfer;
 
@@ -58,13 +62,15 @@ describe("readDroppedUploadFiles", () => {
 
   it("directs dropped folders to the safe folder picker", async () => {
     const transfer = {
-      items: [{
-        webkitGetAsEntry: () => ({
-          isFile: false,
-          isDirectory: true,
-          name: "deployment-check",
-        }),
-      }],
+      items: [
+        {
+          webkitGetAsEntry: () => ({
+            isFile: false,
+            isDirectory: true,
+            name: "deployment-check",
+          }),
+        },
+      ],
       files: [],
     } as unknown as DataTransfer;
 

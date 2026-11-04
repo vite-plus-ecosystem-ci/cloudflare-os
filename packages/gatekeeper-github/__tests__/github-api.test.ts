@@ -1,13 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  GitHubApi,
-  revokeOAuthToken,
-  type GitHubIssueResponse,
-} from "../src/github-api";
-import {
-  assertIssueSearchResultsInRepo,
-  buildIssueSearchQuery,
-} from "../src/github-search";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { GitHubApi, revokeOAuthToken, type GitHubIssueResponse } from "../src/github-api";
+import { assertIssueSearchResultsInRepo, buildIssueSearchQuery } from "../src/github-search";
 
 function issueAt(htmlUrl: string): Pick<GitHubIssueResponse, "html_url"> {
   return { html_url: htmlUrl };
@@ -19,78 +12,97 @@ afterEach(() => {
 
 describe("assertIssueSearchResultsInRepo", () => {
   it("accepts exact repository path segments case-insensitively", () => {
-    expect(() => assertIssueSearchResultsInRepo("Cloudflare", "Workerd", [
-      issueAt("https://github.com/cloudflare/workerd/issues/1"),
-    ])).not.toThrow();
+    expect(() =>
+      assertIssueSearchResultsInRepo("Cloudflare", "Workerd", [
+        issueAt("https://github.com/cloudflare/workerd/issues/1"),
+      ]),
+    ).not.toThrow();
   });
 
   it("rejects results from another repository", () => {
-    expect(() => assertIssueSearchResultsInRepo("cloudflare", "workerd", [
-      issueAt("https://github.com/cloudflare/quiche/issues/1"),
-    ])).toThrow("outside the connected repository");
+    expect(() =>
+      assertIssueSearchResultsInRepo("cloudflare", "workerd", [
+        issueAt("https://github.com/cloudflare/quiche/issues/1"),
+      ]),
+    ).toThrow("outside the connected repository");
   });
 
   it("does not accept repository names that only share a prefix", () => {
-    expect(() => assertIssueSearchResultsInRepo("cloudflare", "workerd", [
-      issueAt("https://github.com/cloudflare/workerd-private/issues/1"),
-    ])).toThrow("outside the connected repository");
+    expect(() =>
+      assertIssueSearchResultsInRepo("cloudflare", "workerd", [
+        issueAt("https://github.com/cloudflare/workerd-private/issues/1"),
+      ]),
+    ).toThrow("outside the connected repository");
   });
 
   it("rejects pull requests returned by an injected search expression", () => {
-    expect(() => assertIssueSearchResultsInRepo("cloudflare", "workerd", [
-      issueAt("https://github.com/cloudflare/workerd/pull/1"),
-    ])).toThrow("non-issue result");
+    expect(() =>
+      assertIssueSearchResultsInRepo("cloudflare", "workerd", [
+        issueAt("https://github.com/cloudflare/workerd/pull/1"),
+      ]),
+    ).toThrow("non-issue result");
   });
 
   it("rejects malformed and non-GitHub result URLs", () => {
-    expect(() => assertIssueSearchResultsInRepo("cloudflare", "workerd", [
-      issueAt("not a URL"),
-    ])).toThrow("outside the connected repository");
-    expect(() => assertIssueSearchResultsInRepo("cloudflare", "workerd", [
-      issueAt("https://example.com/cloudflare/workerd/issues/1"),
-    ])).toThrow("outside the connected repository");
+    expect(() =>
+      assertIssueSearchResultsInRepo("cloudflare", "workerd", [issueAt("not a URL")]),
+    ).toThrow("outside the connected repository");
+    expect(() =>
+      assertIssueSearchResultsInRepo("cloudflare", "workerd", [
+        issueAt("https://example.com/cloudflare/workerd/issues/1"),
+      ]),
+    ).toThrow("outside the connected repository");
   });
 });
 
 describe("buildIssueSearchQuery", () => {
   it("builds a benign literal phrase search with structured filters", () => {
-    expect(buildIssueSearchQuery("cloudflare", "workerd", {
-      text: "durable objects",
-      state: "open",
-      labels: ["bug"],
-      author: "jasnell",
-    })).toBe(
+    expect(
+      buildIssueSearchQuery("cloudflare", "workerd", {
+        text: "durable objects",
+        state: "open",
+        labels: ["bug"],
+        author: "jasnell",
+      }),
+    ).toBe(
       '"durable objects" repo:cloudflare/workerd is:issue state:open label:"bug" author:"jasnell"',
     );
   });
 
   it("quotes every caller-controlled query fragment", () => {
-    expect(buildIssueSearchQuery("cloudflare", "workerd", {
-      text: "repo:cloudflare/quiche OR scheduler",
-      author: "jasnell OR repo:cloudflare/quiche",
-      assignee: "octocat OR repo:cloudflare/quiche",
-    })).toBe(
-      '"repo:cloudflare/quiche OR scheduler" repo:cloudflare/workerd is:issue '
-      + 'author:"jasnell OR repo:cloudflare/quiche" assignee:"octocat OR repo:cloudflare/quiche"',
+    expect(
+      buildIssueSearchQuery("cloudflare", "workerd", {
+        text: "repo:cloudflare/quiche OR scheduler",
+        author: "jasnell OR repo:cloudflare/quiche",
+        assignee: "octocat OR repo:cloudflare/quiche",
+      }),
+    ).toBe(
+      '"repo:cloudflare/quiche OR scheduler" repo:cloudflare/workerd is:issue ' +
+        'author:"jasnell OR repo:cloudflare/quiche" assignee:"octocat OR repo:cloudflare/quiche"',
     );
   });
 
   it("escapes quotes inside plain search text", () => {
-    expect(buildIssueSearchQuery("cloudflare", "workerd", {
-      text: 'bug" OR repo:cloudflare/quiche OR "',
-    })).toBe('"bug\\" OR repo:cloudflare/quiche OR \\"" repo:cloudflare/workerd is:issue');
+    expect(
+      buildIssueSearchQuery("cloudflare", "workerd", {
+        text: 'bug" OR repo:cloudflare/quiche OR "',
+      }),
+    ).toBe('"bug\\" OR repo:cloudflare/quiche OR \\"" repo:cloudflare/workerd is:issue');
   });
 });
 
 describe("GitHubApi.searchIssuesConditional", () => {
   it("enables GitHub advanced search parsing", async () => {
     let requestUrl: URL | undefined;
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-      requestUrl = new URL(String(input));
-      return new Response(JSON.stringify({ items: [] }), {
-        headers: { "content-type": "application/json" },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        requestUrl = new URL(String(input));
+        return new Response(JSON.stringify({ items: [] }), {
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
 
     const api = new GitHubApi(async () => "test-token");
     await api.searchIssuesConditional(
@@ -105,12 +117,15 @@ describe("GitHubApi.searchIssuesConditional", () => {
 
 function captureRequests(body: unknown = []): () => URL {
   let requestUrl: URL | undefined;
-  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-    requestUrl = new URL(String(input));
-    return new Response(JSON.stringify(body), {
-      headers: { "content-type": "application/json" },
-    });
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      requestUrl = new URL(String(input));
+      return new Response(JSON.stringify(body), {
+        headers: { "content-type": "application/json" },
+      });
+    }),
+  );
   return () => {
     if (!requestUrl) throw new Error("no request was made");
     return requestUrl;
@@ -127,13 +142,18 @@ describe("GitHubApi git reads", () => {
 
   it("requests the bare sha media type from the commit sha lookup", async () => {
     let accept: string | null = null;
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      accept = new Headers(init?.headers).get("Accept");
-      expect(new URL(String(input)).pathname).toBe("/repos/cloudflare/workerd/commits/feature%2Fthing");
-      return new Response("a".repeat(40), {
-        headers: { "content-type": "application/vnd.github.sha" },
-      });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        accept = new Headers(init?.headers).get("Accept");
+        expect(new URL(String(input)).pathname).toBe(
+          "/repos/cloudflare/workerd/commits/feature%2Fthing",
+        );
+        return new Response("a".repeat(40), {
+          headers: { "content-type": "application/vnd.github.sha" },
+        });
+      }),
+    );
 
     const api = new GitHubApi(async () => "test-token");
     const result = await api.getCommitShaConditional("cloudflare", "workerd", "feature/thing");
@@ -184,7 +204,11 @@ describe("GitHubApi git reads", () => {
   it("passes the protected filter to the branch list endpoint, omitting it when unset", async () => {
     const url = captureRequests();
     const api = new GitHubApi(async () => "test-token");
-    await api.listBranchesConditional("cloudflare", "workerd", { protected: true, per_page: 100, page: 1 });
+    await api.listBranchesConditional("cloudflare", "workerd", {
+      protected: true,
+      per_page: 100,
+      page: 1,
+    });
     expect(url().pathname).toBe("/repos/cloudflare/workerd/branches");
     expect(url().searchParams.get("protected")).toBe("true");
 
@@ -201,8 +225,10 @@ describe("GitHubApi git reads", () => {
   });
 
   it("reads a branch of an empty repository, which GitHub answers with 409, as missing", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () =>
-      Response.json({ message: "Git Repository is empty." }, { status: 409 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ message: "Git Repository is empty." }, { status: 409 })),
+    );
     const api = new GitHubApi(async () => "test-token");
     expect(await api.getBranchHead("cloudflare", "workerd", "main")).toBeNull();
   });
@@ -210,8 +236,13 @@ describe("GitHubApi git reads", () => {
   it("refuses a branch name that would climb out of the repository, before any request", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const api = new GitHubApi(async () => "test-token");
-    await expect(api.getBranchHead("cloudflare", "workerd", "../../../../../../repos/victim/secret/git/ref/heads/main"))
-      .rejects.toThrow("invalid branch name");
+    await expect(
+      api.getBranchHead(
+        "cloudflare",
+        "workerd",
+        "../../../../../../repos/victim/secret/git/ref/heads/main",
+      ),
+    ).rejects.toThrow("invalid branch name");
     expect(fetch).not.toHaveBeenCalled();
   });
 });
@@ -225,13 +256,16 @@ describe("GitHubApi redirects", () => {
    */
   function redirectOnce(status: number, location: string) {
     const requests: Array<{ url: string; method?: string; body?: unknown }> = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      if (init?.redirect !== "manual") throw new Error("fetch would follow the redirect");
-      requests.push({ url: String(input), method: init.method, body: init.body });
-      return requests.length === 1
-        ? new Response(null, { status, headers: { location } })
-        : new Response("{}", { headers: { "content-type": "application/json" } });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        if (init?.redirect !== "manual") throw new Error("fetch would follow the redirect");
+        requests.push({ url: String(input), method: init.method, body: init.body });
+        return requests.length === 1
+          ? new Response(null, { status, headers: { location } })
+          : new Response("{}", { headers: { "content-type": "application/json" } });
+      }),
+    );
     return requests;
   }
 
@@ -249,7 +283,7 @@ describe("GitHubApi redirects", () => {
     const api = new GitHubApi(async () => "test-token", { repo: pin });
     await api.addLabels("octo", "repo", 5, ["bug"]);
 
-    expect(requests.map(r => [r.method, r.url])).toEqual([
+    expect(requests.map((r) => [r.method, r.url])).toEqual([
       ["POST", "https://api.github.com/repos/octo/repo/issues/5/labels"],
       ["POST", "https://api.github.com/repositories/42/issues/5/labels"],
     ]);
@@ -282,9 +316,10 @@ describe("GitHubApi redirects", () => {
   it("does not turn a redirected POST into a GET", async () => {
     const requests = redirectOnce(301, "https://api.github.com/repos/octo/other/issues/9/labels");
     const api = new GitHubApi(async () => "test-token", { repo: pin });
-    expect(await rejection(api.addLabels("octo", "repo", 5, ["bug"])))
-      .toMatchObject({ status: 301 });
-    expect(requests.map(r => r.method)).toEqual(["POST"]);
+    expect(await rejection(api.addLabels("octo", "repo", 5, ["bug"]))).toMatchObject({
+      status: 301,
+    });
+    expect(requests.map((r) => r.method)).toEqual(["POST"]);
   });
 
   it("refuses every redirect beneath a repository root without a pin", async () => {
@@ -297,7 +332,7 @@ describe("GitHubApi redirects", () => {
   it("follows an unpinned repository root's redirect to its id", async () => {
     const requests = redirectOnce(301, "https://api.github.com/repositories/42");
     await new GitHubApi(async () => "test-token").getRepo("octo", "repo");
-    expect(requests.map(r => r.url)).toEqual([
+    expect(requests.map((r) => r.url)).toEqual([
       "https://api.github.com/repos/octo/repo",
       "https://api.github.com/repositories/42",
     ]);
@@ -309,20 +344,26 @@ describe("GitHubApi redirects", () => {
     ["a path beneath an id", "https://api.github.com/repositories/42/issues/5"],
   ])("refuses an unpinned repository root's redirect to %s", async (_name, location) => {
     const requests = redirectOnce(301, location);
-    expect(await rejection(new GitHubApi(async () => "test-token").getRepo("octo", "repo")))
-      .toMatchObject({ status: 301 });
+    expect(
+      await rejection(new GitHubApi(async () => "test-token").getRepo("octo", "repo")),
+    ).toMatchObject({ status: 301 });
     expect(requests).toHaveLength(1);
   });
 
   it("never reads a refused redirect as a missing branch", async () => {
     redirectOnce(301, "https://api.github.com/repositories/43/git/ref/heads/main");
     const api = new GitHubApi(async () => "test-token", { repo: pin });
-    expect(await rejection(api.getBranchHead("octo", "repo", "main"))).toMatchObject({ status: 301 });
+    expect(await rejection(api.getBranchHead("octo", "repo", "main"))).toMatchObject({
+      status: 301,
+    });
   });
 
   it("refuses a second hop from a followed redirect", async () => {
     const location = "https://api.github.com/repositories/42/issues/5";
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 301, headers: { location } })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 301, headers: { location } })),
+    );
     const api = new GitHubApi(async () => "test-token", { repo: pin });
     expect(await rejection(api.getIssue("octo", "repo", 5))).toMatchObject({ status: 301 });
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -331,29 +372,42 @@ describe("GitHubApi redirects", () => {
   it("refuses a redirected git push", async () => {
     const requests = redirectOnce(301, "https://github.com/octo/other.git/git-receive-pack");
     const api = new GitHubApi(async () => "test-token", { repo: pin });
-    expect(await rejection(api.fetchGitReceivePack("octo", "repo", new Blob(["x"]).stream())))
-      .toMatchObject({ status: 301 });
+    expect(
+      await rejection(api.fetchGitReceivePack("octo", "repo", new Blob(["x"]).stream())),
+    ).toMatchObject({ status: 301 });
     expect(requests).toHaveLength(1);
   });
 
   it("still returns a conditional read's 304", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 304 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 304 })),
+    );
     const api = new GitHubApi(async () => "test-token", { repo: pin });
-    expect(await api.getIssueConditional("octo", "repo", 5, { ifNoneMatch: "\"etag\"" }))
-      .toMatchObject({ status: 304 });
+    expect(
+      await api.getIssueConditional("octo", "repo", 5, { ifNoneMatch: '"etag"' }),
+    ).toMatchObject({ status: 304 });
   });
 });
 
 describe("GitHubApi.listRepoWebhooks", () => {
   it("lists every page of a repository's webhooks", async () => {
     const pages: string[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-      const url = new URL(String(input));
-      pages.push(url.searchParams.get("page") ?? "");
-      const count = url.searchParams.get("page") === "1" ? 100 : 1;
-      const offset = url.searchParams.get("page") === "1" ? 0 : 100;
-      return Response.json(Array.from({ length: count }, (_, i) => ({ id: offset + i, config: { url: "https://x.test/" } })));
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = new URL(String(input));
+        pages.push(url.searchParams.get("page") ?? "");
+        const count = url.searchParams.get("page") === "1" ? 100 : 1;
+        const offset = url.searchParams.get("page") === "1" ? 0 : 100;
+        return Response.json(
+          Array.from({ length: count }, (_, i) => ({
+            id: offset + i,
+            config: { url: "https://x.test/" },
+          })),
+        );
+      }),
+    );
 
     const webhooks = await new GitHubApi(async () => "test-token").listRepoWebhooks(7);
     expect(webhooks).toHaveLength(101);
@@ -367,18 +421,22 @@ describe("revokeOAuthToken", () => {
     // working connection down with the duplicate or abandoned one being dropped.
     let requestUrl: URL | undefined;
     let init: RequestInit | undefined;
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, options?: RequestInit) => {
-      requestUrl = new URL(String(input));
-      init = options;
-      return new Response(null, { status: 204 });
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, options?: RequestInit) => {
+        requestUrl = new URL(String(input));
+        init = options;
+        return new Response(null, { status: 204 });
+      }),
+    );
 
     await revokeOAuthToken("gho_token", "client/id", "client-secret");
 
     expect(init?.method).toBe("DELETE");
     expect(requestUrl?.pathname).toBe("/applications/client%2Fid/token");
     expect(JSON.parse(String(init?.body))).toEqual({ access_token: "gho_token" });
-    expect(new Headers(init?.headers).get("Authorization"))
-      .toBe(`Basic ${btoa("client/id:client-secret")}`);
+    expect(new Headers(init?.headers).get("Authorization")).toBe(
+      `Basic ${btoa("client/id:client-secret")}`,
+    );
   });
 });

@@ -3,7 +3,7 @@
 import { Toasty } from "@cloudflare/kumo";
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { ContextApi, ContextCollectionSharing } from "../../src/context-types";
 import type { SelectUsers, UserSelectionReceiver } from "../bridge";
 import { ShareCollectionDialog } from "./ShareCollectionDialog";
@@ -24,7 +24,9 @@ vi.mock("./useMutationDialog", () => ({
     mocks.closeDialog = onClosed;
     return {
       open: true,
-      requestClose: () => { if (!_busy) onClosed(); },
+      requestClose: () => {
+        if (!_busy) onClosed();
+      },
       closeAfterSuccess: onClosed,
       onOpenChangeComplete: () => {},
     };
@@ -40,15 +42,20 @@ const sharing: ContextCollectionSharing = {
   hasOwner: true,
 };
 
-const button = (label: string) => [...document.querySelectorAll<HTMLButtonElement>("button")]
-  .find((candidate) => candidate.textContent?.trim() === label);
+const button = (label: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>("button")].find(
+    (candidate) => candidate.textContent?.trim() === label,
+  );
 
 const addRole = () => document.querySelector<HTMLElement>("[aria-label='Role for users you add']");
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
   let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
   return { promise, resolve, reject };
 }
 
@@ -57,8 +64,9 @@ const choose = async (trigger: HTMLElement | null | undefined, label: string) =>
     trigger?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
     trigger?.click();
   });
-  const option = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")]
-    .find((candidate) => candidate.textContent === label);
+  const option = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")].find(
+    (candidate) => candidate.textContent === label,
+  );
   expect(option).toBeDefined();
   await act(async () => {
     option?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
@@ -97,21 +105,26 @@ const renderDialog = async (onChanged: () => void = () => {}) => {
   return created;
 };
 
-const flush = () => act(async () => {
-  for (let i = 0; i < 5; i++) await Promise.resolve();
-});
+const flush = () =>
+  act(async () => {
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+  });
 
 const PartialLeaveParent = () => {
   const [reconciled, setReconciled] = React.useState(false);
-  return <Toasty>
-    <p>{reconciled ? "Library refreshed" : "Library unchanged"}</p>
-    <ShareCollectionDialog
-      collection={{ id: "collection", title: "Engineering" }}
-      onChanged={() => setReconciled(true)}
-      onLeft={() => { throw new Error("A rejected leave must not report success"); }}
-      onClose={() => {}}
-    />
-  </Toasty>;
+  return (
+    <Toasty>
+      <p>{reconciled ? "Library refreshed" : "Library unchanged"}</p>
+      <ShareCollectionDialog
+        collection={{ id: "collection", title: "Engineering" }}
+        onChanged={() => setReconciled(true)}
+        onLeft={() => {
+          throw new Error("A rejected leave must not report success");
+        }}
+        onClose={() => {}}
+      />
+    </Toasty>
+  );
 };
 
 describe("ShareCollectionDialog", () => {
@@ -123,9 +136,11 @@ describe("ShareCollectionDialog", () => {
   });
 
   it("delivers picks with the role chosen when the picker opened and surfaces backend refusals", async () => {
-    const shareContextCollection = vi.fn<ContextApi["shareContextCollection"]>(async (_id, ticket) => {
-      if (ticket === "refused") throw new Error("They have no Context account yet.");
-    });
+    const shareContextCollection = vi.fn<ContextApi["shareContextCollection"]>(
+      async (_id, ticket) => {
+        if (ticket === "refused") throw new Error("They have no Context account yet.");
+      },
+    );
     mocks.api = {
       getContextCollectionSharing: async () => sharing,
       getContextCollectionPermissions: async () => ({
@@ -140,7 +155,9 @@ describe("ShareCollectionDialog", () => {
     let closePicker: (() => void) | undefined;
     mocks.selectUsers = vi.fn<SelectUsers>((picked) => {
       receiver = picked;
-      return new Promise<void>((resolve) => { closePicker = resolve; });
+      return new Promise<void>((resolve) => {
+        closePicker = resolve;
+      });
     });
 
     const container = document.createElement("div");
@@ -162,14 +179,16 @@ describe("ShareCollectionDialog", () => {
     expect(receiver).toBeDefined();
 
     // Change the role control while the picker is still open.
-    const roleTrigger = [...document.querySelectorAll<HTMLElement>("button")]
-      .find((candidate) => candidate.textContent?.includes("Viewer"));
+    const roleTrigger = [...document.querySelectorAll<HTMLElement>("button")].find((candidate) =>
+      candidate.textContent?.includes("Viewer"),
+    );
     await act(async () => {
       roleTrigger?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
       roleTrigger?.click();
     });
-    const editorOption = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")]
-      .find((option) => option.textContent === "Editor");
+    const editorOption = [...document.querySelectorAll<HTMLElement>("[role=menuitem]")].find(
+      (option) => option.textContent === "Editor",
+    );
     expect(editorOption).toBeDefined();
     await act(async () => {
       editorOption?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
@@ -181,8 +200,9 @@ describe("ShareCollectionDialog", () => {
     expect(shareContextCollection).toHaveBeenLastCalledWith("collection", "accepted", "viewer");
 
     await act(async () => {
-      await expect(receiver!.receive({ ticket: "refused" }))
-        .rejects.toThrow("They have no Context account yet.");
+      await expect(receiver!.receive({ ticket: "refused" })).rejects.toThrow(
+        "They have no Context account yet.",
+      );
     });
     expect(shareContextCollection).toHaveBeenLastCalledWith("collection", "refused", "viewer");
 
@@ -201,7 +221,9 @@ describe("ShareCollectionDialog", () => {
       shareContextCollection,
     } as unknown as ContextApi;
     let receiver: UserSelectionReceiver | undefined;
-    mocks.selectUsers = vi.fn<SelectUsers>(async (picked) => { receiver = picked; });
+    mocks.selectUsers = vi.fn<SelectUsers>(async (picked) => {
+      receiver = picked;
+    });
     root = await renderDialog();
 
     await choose(addRole(), "Owner");
@@ -218,11 +240,13 @@ describe("ShareCollectionDialog", () => {
 
   it("reports possibly committed rejections on close and surfaces failed refreshes", async () => {
     let loads = 0;
-    const getContextCollectionSharing = vi.fn<ContextApi["getContextCollectionSharing"]>(async () => {
-      loads += 1;
-      if (loads === 2) throw new Error("Network down.");
-      return twoOwners;
-    });
+    const getContextCollectionSharing = vi.fn<ContextApi["getContextCollectionSharing"]>(
+      async () => {
+        loads += 1;
+        if (loads === 2) throw new Error("Network down.");
+        return twoOwners;
+      },
+    );
     mocks.api = {
       getContextCollectionSharing,
       getContextCollectionPermissions: async () => ownerPermissions,
@@ -239,7 +263,9 @@ describe("ShareCollectionDialog", () => {
     expect(document.body.textContent).toContain("Network down.");
     expect(document.body.textContent).toContain("Bob");
     expect(button("Select users")?.disabled).toBe(true);
-    expect(document.querySelector<HTMLButtonElement>("[aria-label='Role for Bob']")?.disabled).toBe(true);
+    expect(document.querySelector<HTMLButtonElement>("[aria-label='Role for Bob']")?.disabled).toBe(
+      true,
+    );
 
     await act(async () => button("Retry")?.click());
     await flush();
@@ -261,7 +287,10 @@ describe("ShareCollectionDialog", () => {
         everyoneCanView: true,
         hasOwner: false,
       }),
-      getContextCollectionPermissions: async () => ({ ...ownerPermissions, canManageOwners: false }),
+      getContextCollectionPermissions: async () => ({
+        ...ownerPermissions,
+        canManageOwners: false,
+      }),
       leaveContextCollection,
     } as unknown as ContextApi;
     const container = document.createElement("div");
@@ -288,55 +317,87 @@ describe("ShareCollectionDialog", () => {
     const refreshedPermissions = deferred<typeof ownerPermissions>();
     let changed = false;
     mocks.api = {
-      getContextCollectionSharing: () => changed ? refreshedSharing.promise : Promise.resolve(twoOwners),
-      getContextCollectionPermissions: () => changed ? refreshedPermissions.promise : Promise.resolve(ownerPermissions),
-      setContextCollectionMemberRole: async () => { changed = true; },
+      getContextCollectionSharing: () =>
+        changed ? refreshedSharing.promise : Promise.resolve(twoOwners),
+      getContextCollectionPermissions: () =>
+        changed ? refreshedPermissions.promise : Promise.resolve(ownerPermissions),
+      setContextCollectionMemberRole: async () => {
+        changed = true;
+      },
     } as unknown as ContextApi;
     root = await renderDialog();
 
     await choose(document.querySelector("[aria-label='Role for you']"), "Can edit");
     expect(button("Select users")?.disabled).toBe(true);
-    expect(document.querySelector<HTMLButtonElement>("[aria-label='Role for Bob']")?.disabled).toBe(true);
-    await act(async () => refreshedSharing.resolve({
-      ...twoOwners,
-      members: twoOwners.members.map((member) => member.isViewer ? { ...member, role: "editor" } : member),
-    }));
+    expect(document.querySelector<HTMLButtonElement>("[aria-label='Role for Bob']")?.disabled).toBe(
+      true,
+    );
+    await act(async () =>
+      refreshedSharing.resolve({
+        ...twoOwners,
+        members: twoOwners.members.map((member) =>
+          member.isViewer ? { ...member, role: "editor" } : member,
+        ),
+      }),
+    );
     expect(button("Select users")?.disabled).toBe(true);
-    await act(async () => refreshedPermissions.resolve({ ...ownerPermissions, canManageOwners: false }));
+    await act(async () =>
+      refreshedPermissions.resolve({ ...ownerPermissions, canManageOwners: false }),
+    );
     expect(button("Select users")?.disabled).toBe(false);
     expect(document.querySelector("[aria-label='Role for Bob']")).toBeNull();
   });
 
-  it.each([false, true])("reconciles late picker deliveries after cancellation (cleanup rejects: %s)", async (rejectCleanup) => {
-    const delivery = deferred<void>();
-    const picker = deferred<void>();
-    let delivered = false;
-    let receiver: UserSelectionReceiver | undefined;
-    mocks.api = {
-      getContextCollectionSharing: async () => delivered ? {
-        ...sharing,
-        members: [...sharing.members, { memberId: "late", role: "viewer", displayName: "Late arrival", isViewer: false }],
-      } : sharing,
-      getContextCollectionPermissions: async () => ownerPermissions,
-      shareContextCollection: async () => {
-        await delivery.promise;
-        delivered = true;
-        if (rejectCleanup) throw new Error("Grant saved, cleanup failed.");
-      },
-    } as unknown as ContextApi;
-    mocks.selectUsers = (picked) => { receiver = picked; return picker.promise; };
-    root = await renderDialog();
-    await act(async () => button("Select users")?.click());
-    const receive = receiver!.receive({ ticket: "late" });
-    const outcome = receive.catch(() => {});
-    await act(async () => picker.resolve());
-    expect(document.body.textContent).not.toContain("Late arrival");
-    expect(button("Select users")?.disabled).toBe(false);
+  it.each([false, true])(
+    "reconciles late picker deliveries after cancellation (cleanup rejects: %s)",
+    async (rejectCleanup) => {
+      const delivery = deferred<void>();
+      const picker = deferred<void>();
+      let delivered = false;
+      let receiver: UserSelectionReceiver | undefined;
+      mocks.api = {
+        getContextCollectionSharing: async () =>
+          delivered
+            ? {
+                ...sharing,
+                members: [
+                  ...sharing.members,
+                  {
+                    memberId: "late",
+                    role: "viewer",
+                    displayName: "Late arrival",
+                    isViewer: false,
+                  },
+                ],
+              }
+            : sharing,
+        getContextCollectionPermissions: async () => ownerPermissions,
+        shareContextCollection: async () => {
+          await delivery.promise;
+          delivered = true;
+          if (rejectCleanup) throw new Error("Grant saved, cleanup failed.");
+        },
+      } as unknown as ContextApi;
+      mocks.selectUsers = (picked) => {
+        receiver = picked;
+        return picker.promise;
+      };
+      root = await renderDialog();
+      await act(async () => button("Select users")?.click());
+      const receive = receiver!.receive({ ticket: "late" });
+      const outcome = receive.catch(() => {});
+      await act(async () => picker.resolve());
+      expect(document.body.textContent).not.toContain("Late arrival");
+      expect(button("Select users")?.disabled).toBe(false);
 
-    await act(async () => { delivery.resolve(); await outcome; });
-    expect(document.body.textContent).toContain("Late arrival");
-    expect(button("Select users")?.disabled).toBe(false);
-  });
+      await act(async () => {
+        delivery.resolve();
+        await outcome;
+      });
+      expect(document.body.textContent).toContain("Late arrival");
+      expect(button("Select users")?.disabled).toBe(false);
+    },
+  );
 
   it("refreshes the parent listing when a delivery finishes after Share has closed", async () => {
     const delivery = deferred<void>();
@@ -346,24 +407,34 @@ describe("ShareCollectionDialog", () => {
     mocks.api = {
       getContextCollectionSharing: async () => sharing,
       getContextCollectionPermissions: async () => ownerPermissions,
-      shareContextCollection: async () => { await delivery.promise; memberCount = 2; },
+      shareContextCollection: async () => {
+        await delivery.promise;
+        memberCount = 2;
+      },
     } as unknown as ContextApi;
-    mocks.selectUsers = (picked) => { receiver = picked; return picker.promise; };
+    mocks.selectUsers = (picked) => {
+      receiver = picked;
+      return picker.promise;
+    };
     const container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
     const Parent = () => {
       const [open, setOpen] = React.useState(true);
       const [count, setCount] = React.useState(memberCount);
-      return <>
-        <p>Members in library: {count}</p>
-        {open && <ShareCollectionDialog
-          collection={{ id: "collection", title: "Engineering" }}
-          onChanged={() => setCount(memberCount)}
-          onLeft={() => {}}
-          onClose={() => setOpen(false)}
-        />}
-      </>;
+      return (
+        <>
+          <p>Members in library: {count}</p>
+          {open && (
+            <ShareCollectionDialog
+              collection={{ id: "collection", title: "Engineering" }}
+              onChanged={() => setCount(memberCount)}
+              onLeft={() => {}}
+              onClose={() => setOpen(false)}
+            />
+          )}
+        </>
+      );
     };
     await act(async () => root?.render(<Parent />));
     await act(async () => button("Select users")?.click());
@@ -371,7 +442,10 @@ describe("ShareCollectionDialog", () => {
     await act(async () => picker.resolve());
     act(() => mocks.closeDialog?.());
     expect(document.body.textContent).toContain("Members in library: 1");
-    await act(async () => { delivery.resolve(); await receive; });
+    await act(async () => {
+      delivery.resolve();
+      await receive;
+    });
     expect(document.body.textContent).toContain("Members in library: 2");
     expect(button("Select users")).toBeUndefined();
   });

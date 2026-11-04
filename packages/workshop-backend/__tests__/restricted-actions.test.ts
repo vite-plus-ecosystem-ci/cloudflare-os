@@ -3,7 +3,7 @@
 // Runs against a real OverseerDurableObject (the TEST_OVERSEER binding); records are seeded
 // directly through the impl.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
 import type { OverseerDurableObject } from "../src/overseer.js";
@@ -66,8 +66,8 @@ const POKE: ActionDescription = {
 
 function actionStates(impl: any): Array<{ gatekeeperId: number; state: string }> {
   return [...impl.storage.actions.list()]
-      .filter((rec: any) => rec.type === "action")
-      .map((rec: any) => ({ gatekeeperId: rec.gatekeeperId, state: rec.state }));
+    .filter((rec: any) => rec.type === "action")
+    .map((rec: any) => ({ gatekeeperId: rec.gatekeeperId, state: rec.state }));
 }
 
 describe("submitAction refusals", () => {
@@ -80,10 +80,17 @@ describe("submitAction refusals", () => {
 
       // Commits cannot be reviewed as text, so the claim does not count. Refused before push
       // ancestry is even checked, which is why an unproven head is fine here.
-      await expect(impl.submitAction(1, 0, {
-        ...POKE,
-        pushedCommits: ["0123456789abcdef0123456789abcdef01234567"],
-      }, CALLER)).rejects.toThrow(/git push cannot be reviewed as of yet/i);
+      await expect(
+        impl.submitAction(
+          1,
+          0,
+          {
+            ...POKE,
+            pushedCommits: ["0123456789abcdef0123456789abcdef01234567"],
+          },
+          CALLER,
+        ),
+      ).rejects.toThrow(/git push cannot be reviewed as of yet/i);
       expect(actionStates(impl)).toEqual([]);
     });
   });
@@ -96,8 +103,9 @@ describe("submitAction refusals", () => {
       impl.storage.gatekeepers.delete(1);
       let nextActionId = impl.storage.nextActionId.get();
 
-      await expect(impl.submitAction(1, 0, POKE, CALLER))
-          .rejects.toThrow(/has been removed from this workspace/i);
+      await expect(impl.submitAction(1, 0, POKE, CALLER)).rejects.toThrow(
+        /has been removed from this workspace/i,
+      );
       expect(actionStates(impl)).toEqual([]);
       expect(impl.storage.nextActionId.get()).toBe(nextActionId);
     });

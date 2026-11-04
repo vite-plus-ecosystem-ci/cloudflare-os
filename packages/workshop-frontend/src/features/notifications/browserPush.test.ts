@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type { AuthenticatedApi, WebPushSubscription } from "@gadgets/workshop-shared/api";
-import { browserPushEnabled, disableBrowserPush, enableBrowserPush, syncBrowserPush } from "./browserPush";
+import {
+  browserPushEnabled,
+  disableBrowserPush,
+  enableBrowserPush,
+  syncBrowserPush,
+} from "./browserPush";
 
 const OWNER_KEY = "gadgets:notifications:browserPushOwner";
 const ENDPOINT = "https://fcm.googleapis.com/wp/new";
@@ -18,7 +23,7 @@ type FakeSubscription = {
 
 const fakeSubscription = (endpoint: string, key = KEY): FakeSubscription => ({
   endpoint,
-  options: { applicationServerKey: Uint8Array.from(atob(key), c => c.charCodeAt(0)).buffer },
+  options: { applicationServerKey: Uint8Array.from(atob(key), (c) => c.charCodeAt(0)).buffer },
   // As browsers serialize it, expirationTime included.
   toJSON: () => ({ endpoint, expirationTime: null, keys: { p256dh: "BP", auth: "AA" } }),
   unsubscribe: vi.fn<() => Promise<boolean>>(async () => true),
@@ -33,22 +38,33 @@ describe("browser push", () => {
   beforeEach(() => {
     current = null;
     subscribe = vi.fn<() => Promise<FakeSubscription>>(
-      async () => (current ??= fakeSubscription(ENDPOINT)));
+      async () => (current ??= fakeSubscription(ENDPOINT)),
+    );
     let pushManager = { getSubscription: async () => current, subscribe };
-    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: {
-      register: async () => ({}),
-      ready: Promise.resolve({ pushManager }),
-      getRegistration: async () => ({ pushManager }),
-    } });
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        register: async () => ({}),
+        ready: Promise.resolve({ pushManager }),
+        getRegistration: async () => ({ pushManager }),
+      },
+    });
     // One transition at a time, as Web Locks grants them.
     let held: Promise<unknown> = Promise.resolve();
-    Object.defineProperty(navigator, "locks", { configurable: true, value: {
-      request: (_name: string, transition: () => Promise<unknown>) =>
-        (held = held.catch(() => {}).then(transition)),
-    } });
-    vi.stubGlobal("Notification", { permission: "granted", requestPermission: async () => "granted" });
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: {
+        request: (_name: string, transition: () => Promise<unknown>) =>
+          (held = held.catch(() => {}).then(transition)),
+      },
+    });
+    vi.stubGlobal("Notification", {
+      permission: "granted",
+      requestPermission: async () => "granted",
+    });
     registerNotificationDevice = vi.fn<(registration: WebPushSubscription) => Promise<void>>(
-      async () => {});
+      async () => {},
+    );
     api = { registerNotificationDevice } as unknown as RpcStub<AuthenticatedApi>;
   });
 
@@ -60,8 +76,9 @@ describe("browser push", () => {
   it("registers only the fields the service accepts and records the owner", async () => {
     await expect(enableBrowserPush(api, "alice", KEY)).resolves.toBe("granted");
 
-    expect(registerNotificationDevice.mock.calls).toEqual(
-      [[{ endpoint: ENDPOINT, keys: { p256dh: "BP", auth: "AA" } }]]);
+    expect(registerNotificationDevice.mock.calls).toEqual([
+      [{ endpoint: ENDPOINT, keys: { p256dh: "BP", auth: "AA" } }],
+    ]);
     await expect(browserPushEnabled("alice")).resolves.toBe(true);
     await expect(browserPushEnabled("bob")).resolves.toBe(false);
   });
@@ -104,12 +121,13 @@ describe("browser push", () => {
     await syncBrowserPush(api, "alice", KEY);
 
     expect(current.unsubscribe).not.toHaveBeenCalled();
-    expect(registerNotificationDevice.mock.calls).toEqual(
-      [[{ endpoint: ENDPOINT, keys: { p256dh: "BP", auth: "AA" } }]]);
+    expect(registerNotificationDevice.mock.calls).toEqual([
+      [{ endpoint: ENDPOINT, keys: { p256dh: "BP", auth: "AA" } }],
+    ]);
   });
 
   it("replaces the user's subscription made with a key the deployment no longer advertises", async () => {
-    let stale = current = fakeSubscription("https://fcm.googleapis.com/wp/stale", "BOld");
+    let stale = (current = fakeSubscription("https://fcm.googleapis.com/wp/stale", "BOld"));
     stale.unsubscribe.mockImplementation(async () => {
       current = null;
       return true;
@@ -119,12 +137,13 @@ describe("browser push", () => {
     await syncBrowserPush(api, "alice", KEY);
 
     expect(stale.unsubscribe).toHaveBeenCalled();
-    expect(registerNotificationDevice.mock.calls).toEqual(
-      [[{ endpoint: ENDPOINT, keys: { p256dh: "BP", auth: "AA" } }]]);
+    expect(registerNotificationDevice.mock.calls).toEqual([
+      [{ endpoint: ENDPOINT, keys: { p256dh: "BP", auth: "AA" } }],
+    ]);
   });
 
   it("subscribes again at the next sign-in after replacing the subscription failed", async () => {
-    let stale = current = fakeSubscription("https://fcm.googleapis.com/wp/stale", "BOld");
+    let stale = (current = fakeSubscription("https://fcm.googleapis.com/wp/stale", "BOld"));
     stale.unsubscribe.mockImplementation(async () => {
       current = null;
       return true;
@@ -135,8 +154,9 @@ describe("browser push", () => {
     await expect(syncBrowserPush(api, "alice", KEY)).rejects.toThrow("push service unavailable");
     await syncBrowserPush(api, "alice", KEY);
 
-    expect(registerNotificationDevice.mock.calls).toEqual(
-      [[{ endpoint: ENDPOINT, keys: { p256dh: "BP", auth: "AA" } }]]);
+    expect(registerNotificationDevice.mock.calls).toEqual([
+      [{ endpoint: ENDPOINT, keys: { p256dh: "BP", auth: "AA" } }],
+    ]);
     await expect(browserPushEnabled("alice")).resolves.toBe(true);
   });
 
@@ -144,7 +164,11 @@ describe("browser push", () => {
     current = fakeSubscription(ENDPOINT);
     localStorage.setItem(OWNER_KEY, "alice");
     let register!: () => void;
-    registerNotificationDevice.mockReturnValue(new Promise(resolve => { register = resolve; }));
+    registerNotificationDevice.mockReturnValue(
+      new Promise((resolve) => {
+        register = resolve;
+      }),
+    );
     let sync = syncBrowserPush(api, "alice", KEY);
     await vi.waitFor(() => expect(registerNotificationDevice).toHaveBeenCalled());
 
