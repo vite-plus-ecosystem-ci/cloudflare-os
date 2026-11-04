@@ -4,11 +4,15 @@
 
 import { act, type ComponentProps, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { newMessagePortRpcSession, RpcPromise, RpcTarget, type RpcStub } from "capnweb";
-import type { AuthenticatedApi, ServerConfig, UserDirectoryRecord } from "@gadgets/workshop-shared/api";
+import type {
+  AuthenticatedApi,
+  ServerConfig,
+  UserDirectoryRecord,
+} from "@gadgets/workshop-shared/api";
 import type { GatekeeperUserSelection } from "@gadgets/workshop-shared/gatekeeper";
-import type * as Kumo from '@cloudflare/kumo';
+import type * as Kumo from "@cloudflare/kumo";
 import type * as UserSearch from "../user-directory/UserSearchCombobox";
 import { ServerConfigContext } from "../../ServerConfigContext";
 import GatekeeperUserPickerDialog from "./GatekeeperUserPickerDialog";
@@ -35,8 +39,11 @@ vi.mock("@cloudflare/kumo", async (importOriginal) => {
 });
 
 vi.mock("../../components/WorkshopControls", () => ({
-  WorkshopIconButton: ({ children, ...props }: { children?: ReactNode }) =>
-    <button type="button" {...props}>{children}</button>,
+  WorkshopIconButton: ({ children, ...props }: { children?: ReactNode }) => (
+    <button type="button" {...props}>
+      {children}
+    </button>
+  ),
 }));
 
 vi.mock("../../components/PersonAvatar", () => ({ PersonAvatar: () => null }));
@@ -85,8 +92,10 @@ describe("GatekeeperUserPickerDialog", () => {
   async function mount(
     mint: Mint,
     deliver: Deliver = async () => {},
-    { searchEnabled = false, searchUsers: search = () => new RpcPromise(Promise.resolve([ALICE, BOB, CAROL])) }:
-      { searchEnabled?: boolean; searchUsers?: SearchUsers } = {},
+    {
+      searchEnabled = false,
+      searchUsers: search = () => new RpcPromise(Promise.resolve([ALICE, BOB, CAROL])),
+    }: { searchEnabled?: boolean; searchUsers?: SearchUsers } = {},
   ) {
     const searchUsers = vi.fn<SearchUsers>(search);
     const createSelection = vi.fn<
@@ -99,25 +108,40 @@ describe("GatekeeperUserPickerDialog", () => {
     if (searchEnabled) {
       // The real combobox debounces searches and scrolls its active option into view.
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-      Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: () => {} });
+      Object.defineProperty(Element.prototype, "scrollIntoView", {
+        configurable: true,
+        value: () => {},
+      });
     }
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    await act(async () => root!.render(
-      <ServerConfigContext.Provider value={{ userSearchEnabled: searchEnabled } as ServerConfig}>
-        <GatekeeperUserPickerDialog
-          authenticatedApi={
-            { searchUsers, createGatekeeperUserSelection: createSelection } as unknown as RpcStub<AuthenticatedApi>
-          }
-          gatekeeperId="context"
-          onSelected={onSelected}
-          onClose={onClose}
-          onCancel={onCancel}
-        />
-      </ServerConfigContext.Provider>,
-    ));
-    return { searchUsers, createSelection, onSelected, onClose, onCancel, props: () => captured.props as CapturedProps };
+    await act(async () =>
+      root!.render(
+        <ServerConfigContext.Provider value={{ userSearchEnabled: searchEnabled } as ServerConfig}>
+          <GatekeeperUserPickerDialog
+            authenticatedApi={
+              {
+                searchUsers,
+                createGatekeeperUserSelection: createSelection,
+              } as unknown as RpcStub<AuthenticatedApi>
+            }
+            gatekeeperId="context"
+            onSelected={onSelected}
+            onClose={onClose}
+            onCancel={onCancel}
+          />
+        </ServerConfigContext.Provider>,
+      ),
+    );
+    return {
+      searchUsers,
+      createSelection,
+      onSelected,
+      onClose,
+      onCancel,
+      props: () => captured.props as CapturedProps,
+    };
   }
 
   async function searchFor(query: string) {
@@ -127,17 +151,22 @@ describe("GatekeeperUserPickerDialog", () => {
 
   const added = () => container!.querySelector('[aria-label="Added people"]')?.textContent ?? "";
   const notice = () => container!.querySelector('p[role="status"]:not([aria-live])')?.textContent;
-  const announcement = () => container!.querySelector('[role="status"][aria-live="polite"]')?.textContent;
+  const announcement = () =>
+    container!.querySelector('[role="status"][aria-live="polite"]')?.textContent;
   const options = () => Array.from(container!.querySelectorAll<HTMLElement>('[role="option"]'));
 
-  const closeButton = () => container!.querySelector<HTMLButtonElement>('[aria-label="Close person picker"]')!;
-  const doneButton = () => Array.from(container!.querySelectorAll('button'))
-    .find(button => button.textContent === 'Done')!;
+  const closeButton = () =>
+    container!.querySelector<HTMLButtonElement>('[aria-label="Close person picker"]')!;
+  const doneButton = () =>
+    Array.from(container!.querySelectorAll("button")).find(
+      (button) => button.textContent === "Done",
+    )!;
 
   it("mints a ticket for each pick and delivers it to the app before the picker closes", async () => {
     const { searchUsers, createSelection, onSelected, onClose, props } = await mount(
       async (vendorId, selectedUserId) =>
-        selectedUserId === BOB.id ? null : await mintFor(vendorId, selectedUserId));
+        selectedUserId === BOB.id ? null : await mintFor(vendorId, selectedUserId),
+    );
 
     await expect(props().search("a")).resolves.toEqual([ALICE, BOB, CAROL]);
     expect(searchUsers).toHaveBeenCalledWith("a", []);
@@ -184,15 +213,20 @@ describe("GatekeeperUserPickerDialog", () => {
   it("keeps the current search when a pick settles, hiding picked people from its results", async () => {
     const delivery = Promise.withResolvers<void>();
     // The directory double ignores exclusions, so anything hidden here is hidden by the picker.
-    const { searchUsers, props } = await mount(mintFor, () => delivery.promise, { searchEnabled: true });
-    const shown = () => options().map(option => option.textContent);
+    const { searchUsers, props } = await mount(mintFor, () => delivery.promise, {
+      searchEnabled: true,
+    });
+    const shown = () => options().map((option) => option.textContent);
 
     await act(async () => props().onSelect(ALICE));
     await searchFor("a");
     expect(searchUsers).toHaveBeenCalledExactlyOnceWith("a", [ALICE.id]);
     expect(shown()).toEqual([`${BOB.name}${BOB.id}`, `${CAROL.name}${CAROL.id}`]);
 
-    await act(async () => { delivery.resolve(); await delivery.promise; });
+    await act(async () => {
+      delivery.resolve();
+      await delivery.promise;
+    });
     await act(async () => vi.advanceTimersByTimeAsync(200));
     expect(added()).toBe("Alice");
     expect(searchUsers).toHaveBeenCalledOnce();
@@ -211,9 +245,8 @@ describe("GatekeeperUserPickerDialog", () => {
     const delivery = Promise.withResolvers<void>();
     const { searchUsers, createSelection, props } = await mount(mintFor, () => delivery.promise, {
       searchEnabled: true,
-      searchUsers: (_query, excludeIds) => new RpcPromise(Promise.resolve(
-        [ALICE].filter(user => !excludeIds.includes(user.id)),
-      )),
+      searchUsers: (_query, excludeIds) =>
+        new RpcPromise(Promise.resolve([ALICE].filter((user) => !excludeIds.includes(user.id)))),
     });
 
     await act(async () => props().onSelect(ALICE));
@@ -225,15 +258,16 @@ describe("GatekeeperUserPickerDialog", () => {
     await act(async () => vi.advanceTimersByTimeAsync(200));
     expect(notice()).toBe("Alice: Try again.");
     expect(searchUsers).toHaveBeenLastCalledWith("alice", []);
-    expect(options().map(option => option.textContent)).toEqual([`${ALICE.name}${ALICE.id}`]);
+    expect(options().map((option) => option.textContent)).toEqual([`${ALICE.name}${ALICE.id}`]);
 
     await act(async () => options()[0].click());
     expect(createSelection).toHaveBeenCalledTimes(2);
   });
 
   it("shows the app's own error for a selection it rejected, leaving the person unselected", async () => {
-    const { searchUsers, createSelection, props } = await mount(
-      mintFor, async () => { throw new Error("Collection not found."); });
+    const { searchUsers, createSelection, props } = await mount(mintFor, async () => {
+      throw new Error("Collection not found.");
+    });
 
     await act(async () => props().onSelect(ALICE));
     expect(notice()).toBe("Alice: Collection not found.");
@@ -247,8 +281,9 @@ describe("GatekeeperUserPickerDialog", () => {
   });
 
   it("releases a rejected mint and lets the person be picked again", async () => {
-    const { searchUsers, createSelection, onSelected, props } = await mount(
-      async () => { throw new Error("Mint failed."); });
+    const { searchUsers, createSelection, onSelected, props } = await mount(async () => {
+      throw new Error("Mint failed.");
+    });
 
     await act(async () => props().onSelect(ALICE));
     expect(notice()).toBe("Alice: Mint failed.");
@@ -265,9 +300,15 @@ describe("GatekeeperUserPickerDialog", () => {
     const minting = Promise.withResolvers<GatekeeperUserSelection | null>();
     const { createSelection, onSelected, props } = await mount(() => minting.promise);
 
-    await act(async () => { props().onSelect(ALICE); props().onSelect(ALICE); });
+    await act(async () => {
+      props().onSelect(ALICE);
+      props().onSelect(ALICE);
+    });
     expect(createSelection).toHaveBeenCalledTimes(1);
-    await act(async () => { minting.resolve(selectionFor(ALICE)); await minting.promise; });
+    await act(async () => {
+      minting.resolve(selectionFor(ALICE));
+      await minting.promise;
+    });
     expect(onSelected).toHaveBeenCalledTimes(1);
     expect(added()).toBe("Alice");
   });
@@ -276,7 +317,9 @@ describe("GatekeeperUserPickerDialog", () => {
     const minting = Promise.withResolvers<GatekeeperUserSelection | null>();
     const delivery = Promise.withResolvers<void>();
     const { createSelection, onSelected, onClose, props } = await mount(
-      () => minting.promise, () => delivery.promise);
+      () => minting.promise,
+      () => delivery.promise,
+    );
 
     await act(async () => props().onSelect(ALICE));
     expect(container!.querySelector('li[role="status"]')?.textContent).toBe("Adding…");
@@ -284,13 +327,19 @@ describe("GatekeeperUserPickerDialog", () => {
     expect(doneButton().disabled).toBe(true);
     expect(onClose).not.toHaveBeenCalled();
 
-    await act(async () => { minting.resolve(selectionFor(ALICE)); await minting.promise; });
+    await act(async () => {
+      minting.resolve(selectionFor(ALICE));
+      await minting.promise;
+    });
     expect(onSelected).toHaveBeenCalledOnce();
     expect(onClose).not.toHaveBeenCalled();
     // The mint's handle is already released even though receiver delivery is still pending.
     await expect(createSelection.mock.results[0].value).rejects.toThrow("disposed");
 
-    await act(async () => { delivery.resolve(); await delivery.promise; });
+    await act(async () => {
+      delivery.resolve();
+      await delivery.promise;
+    });
     expect(added()).toBe("Alice");
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -302,8 +351,8 @@ describe("GatekeeperUserPickerDialog", () => {
       const delivery = Promise.withResolvers<void>();
       let attempts = 0;
       const { onClose, props } = await mount(
-        () => ++attempts === 1 ? minting.promise : Promise.resolve(selectionFor(ALICE)),
-        () => attempts === 1 ? delivery.promise : Promise.resolve(),
+        () => (++attempts === 1 ? minting.promise : Promise.resolve(selectionFor(ALICE))),
+        () => (attempts === 1 ? delivery.promise : Promise.resolve()),
       );
       await act(async () => props().onSelect(ALICE));
       await act(async () => doneButton().click());
@@ -321,7 +370,7 @@ describe("GatekeeperUserPickerDialog", () => {
       expect(notice()).toContain(ALICE.name);
       expect(added()).toBe("");
       expect(doneButton().disabled).toBe(false);
-      expect(container!.querySelector('input')!.disabled).toBe(false);
+      expect(container!.querySelector("input")!.disabled).toBe(false);
 
       await act(async () => props().onSelect(ALICE));
       expect(added()).toBe(ALICE.name);
@@ -339,13 +388,20 @@ describe("GatekeeperUserPickerDialog", () => {
       return pending.promise;
     });
 
-    await act(async () => { props().onSelect(ALICE); props().onSelect(CAROL); });
+    await act(async () => {
+      props().onSelect(ALICE);
+      props().onSelect(CAROL);
+    });
     expect(onSelected).toHaveBeenCalledTimes(2);
     expect(container!.querySelectorAll('li[role="status"]')).toHaveLength(2);
 
-    await act(async () => { deliveries.get(selectionFor(CAROL).ticket)!.resolve(); });
+    await act(async () => {
+      deliveries.get(selectionFor(CAROL).ticket)!.resolve();
+    });
     expect(added()).toBe("CarolAdding…");
-    await act(async () => { deliveries.get(selectionFor(ALICE).ticket)!.resolve(); });
+    await act(async () => {
+      deliveries.get(selectionFor(ALICE).ticket)!.resolve();
+    });
     expect(added()).toBe("CarolAlice");
   });
   it("selects a trimmed exact identifier and displays the backend snapshot", async () => {
@@ -367,7 +423,10 @@ describe("GatekeeperUserPickerDialog", () => {
       const backendSettled = vi.fn<(selection: GatekeeperUserSelection | null) => void>();
       void minting.promise.then(backendSettled);
 
-      class StalledMintApi extends RpcTarget implements Pick<AuthenticatedApi, "createGatekeeperUserSelection"> {
+      class StalledMintApi
+        extends RpcTarget
+        implements Pick<AuthenticatedApi, "createGatekeeperUserSelection">
+      {
         createGatekeeperUserSelection(_vendorId: string, _selectedUserId: string) {
           started.resolve();
           return minting.promise;
@@ -379,16 +438,21 @@ describe("GatekeeperUserPickerDialog", () => {
       const api = newMessagePortRpcSession<StalledMintApi>(port2);
       sessions.push(backend, api);
       const { props, createSelection, onSelected, onClose, onCancel } = await mount(
-        (vendorId, selectedUserId) => api.createGatekeeperUserSelection(vendorId, selectedUserId));
-      await act(async () => { props().onSelect(ALICE); await started.promise; });
+        (vendorId, selectedUserId) => api.createGatekeeperUserSelection(vendorId, selectedUserId),
+      );
+      await act(async () => {
+        props().onSelect(ALICE);
+        await started.promise;
+      });
       const rejected = vi.fn<(error: unknown) => void>();
       // Observe the in-flight remote promise before disposal, rather than reusing a disposed stub.
       void createSelection.mock.results[0].value.catch(rejected);
 
       if (action === "cancel") {
         await act(async () => closeButton().click());
-        const stop = Array.from(container!.querySelectorAll("button"))
-          .find(button => button.textContent === "Stop waiting and close")!;
+        const stop = Array.from(container!.querySelectorAll("button")).find(
+          (button) => button.textContent === "Stop waiting and close",
+        )!;
         await act(async () => stop.click());
       } else {
         await act(async () => root!.unmount());
@@ -397,14 +461,19 @@ describe("GatekeeperUserPickerDialog", () => {
 
       expect(onCancel).toHaveBeenCalledTimes(action === "cancel" ? 1 : 0);
       expect(rejected).toHaveBeenCalledOnce();
-      expect(rejected).toHaveBeenCalledWith(expect.objectContaining({
-        message: "RPC was canceled because the RpcPromise was disposed.",
-      }));
+      expect(rejected).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "RPC was canceled because the RpcPromise was disposed.",
+        }),
+      );
       expect(backendSettled).not.toHaveBeenCalled();
       expect(onSelected).not.toHaveBeenCalled();
       expect(onClose).not.toHaveBeenCalled();
 
-      await act(async () => { minting.resolve(selectionFor(ALICE)); await minting.promise; });
+      await act(async () => {
+        minting.resolve(selectionFor(ALICE));
+        await minting.promise;
+      });
       expect(onSelected).not.toHaveBeenCalled();
       expect(onClose).not.toHaveBeenCalled();
       expect(added()).not.toContain("Alice");
@@ -446,10 +515,15 @@ describe("GatekeeperUserPickerDialog", () => {
         root = undefined;
       }
 
-      expect(rejected).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-        message: "RPC was canceled because the RpcPromise was disposed.",
-      }));
-      await act(async () => { searching.resolve([ALICE]); await searching.promise; });
+      expect(rejected).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          message: "RPC was canceled because the RpcPromise was disposed.",
+        }),
+      );
+      await act(async () => {
+        searching.resolve([ALICE]);
+        await searching.promise;
+      });
       expect(options()).toEqual([]);
       expect(consoleError).not.toHaveBeenCalled();
       consoleError.mockRestore();
@@ -467,10 +541,12 @@ describe("GatekeeperUserPickerDialog", () => {
     expect(createSelection).toHaveBeenCalledTimes(999);
     expect(container!.querySelectorAll('li[role="status"]')).toHaveLength(999);
     expect(container!.textContent).toContain("Close and reopen the picker to continue");
-    await act(async () => { minting.resolve(null); await minting.promise; });
+    await act(async () => {
+      minting.resolve(null);
+      await minting.promise;
+    });
     await act(async () => props().onSelect(ALICE));
     expect(createSelection).toHaveBeenLastCalledWith("context", ALICE.id);
     expect(createSelection).toHaveBeenCalledTimes(1000);
   });
-
 });

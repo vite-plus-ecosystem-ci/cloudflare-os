@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { scanModule } from "../src/scan.ts";
 
 describe("module scan", () => {
@@ -15,9 +15,9 @@ describe("module scan", () => {
     ['type T = typeof import("./a");', "./a"],
     ['const m = import("./a", { with: { type: "json" } });', "./a"],
     ['import /* initialize */ "./a";', "./a"],
-    ["import //x\r\"./a\";", "./a"],
+    ['import //x\r"./a";', "./a"],
   ])("reads the specifier of %s", (source, specifier) => {
-    expect(scanModule("client.ts", source)).toEqual({specifiers: [specifier]});
+    expect(scanModule("client.ts", source)).toEqual({ specifiers: [specifier] });
   });
 
   it.each([
@@ -33,7 +33,7 @@ describe("module scan", () => {
     'import * as require from "./a";',
     'import require = require("./a");',
     "try {} catch (require) {}",
-  ])("sees the module bind require in %s", source => {
+  ])("sees the module bind require in %s", (source) => {
     expect(scanModule("client.ts", source).rebindsRequire).toBe(true);
   });
 
@@ -44,7 +44,7 @@ describe("module scan", () => {
     "type T = { require: number };",
     'import { require as r } from "./a";',
     'require("./a");',
-  ])("does not see a binding of require in %s", source => {
+  ])("does not see a binding of require in %s", (source) => {
     expect(scanModule("client.ts", source).rebindsRequire).toBeUndefined();
   });
 
@@ -66,7 +66,7 @@ describe("module scan", () => {
     ["((require))(p)", "require"],
     ["export const load = (name: string) => import //x\r(`../outside/${name}.js`);", "import"],
   ])("reports %s as a dynamic import of a computed path", (source, keyword) => {
-    expect(scanModule("client.ts", source)).toEqual({specifiers: [], dynamic: keyword});
+    expect(scanModule("client.ts", source)).toEqual({ specifiers: [], dynamic: keyword });
   });
 
   it.each([
@@ -77,14 +77,18 @@ describe("module scan", () => {
     "const t = `require(${p})`;",
     // Not a require call to esbuild either: it becomes the `__require` shim the output check catches.
     "(0, require)(p);",
-  ])("does not read %s as an import", source => {
-    expect(scanModule("client.ts", source)).toEqual({specifiers: []});
+  ])("does not read %s as an import", (source) => {
+    expect(scanModule("client.ts", source)).toEqual({ specifiers: [] });
   });
 
   it("reads the JavaScript a shipped module is written in", () => {
-    let source = 'import { a } from "./a.js";\nconst b = require("./b.cjs");\nconst c = require(p);';
+    let source =
+      'import { a } from "./a.js";\nconst b = require("./b.cjs");\nconst c = require(p);';
     for (let path of ["server.js", "server.mjs", "server.cjs"]) {
-      expect(scanModule(path, source)).toEqual({specifiers: ["./a.js", "./b.cjs"], dynamic: "require"});
+      expect(scanModule(path, source)).toEqual({
+        specifiers: ["./a.js", "./b.cjs"],
+        dynamic: "require",
+      });
     }
   });
 });

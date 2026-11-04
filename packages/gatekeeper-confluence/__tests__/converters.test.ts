@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   contentToMetadata,
   contentToSummary,
@@ -46,7 +46,13 @@ describe("contentToSummary (v2 shape)", () => {
 
   it("maps id/type/title/status and derives the space key + public URL from webui", () => {
     const s = contentToSummary(page, WEB_BASE);
-    expect(s).toMatchObject({ id: "123", type: "page", title: "Release Notes", status: "current", spaceKey: "ENG" });
+    expect(s).toMatchObject({
+      id: "123",
+      type: "page",
+      title: "Release Notes",
+      status: "current",
+      spaceKey: "ENG",
+    });
     expect(s.url).toBe("https://acme.atlassian.net/wiki/spaces/ENG/pages/123/Release-Notes");
     expect(s.createdAt).toEqual(new Date("2024-01-02T03:04:05Z"));
     expect(s.lastUpdatedAt).toEqual(new Date("2024-02-02T03:04:05Z"));

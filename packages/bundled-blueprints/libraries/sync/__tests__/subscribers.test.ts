@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { type PresenceHooks, SubscriberRegistry, type SubscriberStub } from "../src/subscribers.ts";
 
@@ -73,14 +73,19 @@ describe("SubscriberRegistry", () => {
     // Announcements wait for the subscribing call to return.
     expect(bob.received).toEqual([]);
     await settle();
-    expect(bob.received).toEqual([{ type: "join", clientId: "ada" }, { type: "join", clientId: "bob" }]);
+    expect(bob.received).toEqual([
+      { type: "join", clientId: "ada" },
+      { type: "join", clientId: "bob" },
+    ]);
     expect(ada.received.at(-1)).toEqual({ type: "join", clientId: "bob" });
   });
 
   it("broadcasts to everyone, drops a failing subscriber and tells the rest it left", async () => {
     const registry = new SubscriberRegistry<Callbacks, Who>(hooks);
     const ada = fakeStub();
-    const bob = fakeStub((event) => typeof event === "object" && event !== null && "revision" in event);
+    const bob = fakeStub(
+      (event) => typeof event === "object" && event !== null && "revision" in event,
+    );
     registry.add(ada, { clientId: "ada" });
     registry.add(bob, { clientId: "bob" });
     await settle();
@@ -146,7 +151,9 @@ describe("SubscriberRegistry", () => {
     // Both seeds are attempted, ada's failure notwithstanding; the newcomer is then dropped. Its
     // join was never broadcast, but its leave is: it was a member while it seeded, and anyone who
     // subscribed in that window was seeded with it (see the next case).
-    expect(join.mock.calls.filter(([subscriber]) => subscriber === failing).map(([, who]) => who)).toEqual([{ clientId: "ada" }, { clientId: "bob" }]);
+    expect(
+      join.mock.calls.filter(([subscriber]) => subscriber === failing).map(([, who]) => who),
+    ).toEqual([{ clientId: "ada" }, { clientId: "bob" }]);
     expect(join.mock.calls.filter(([subscriber]) => subscriber !== failing)).toEqual([]);
     expect(failing.received).toEqual([{ type: "join", clientId: "bob" }]);
     expect(registry.members()).toEqual([{ clientId: "ada" }, { clientId: "bob" }]);
@@ -171,13 +178,22 @@ describe("SubscriberRegistry", () => {
     // bob subscribes while zed is still seeding: zed is a member, so bob is seeded with it.
     registry.add(failing, { clientId: "zed" });
     registry.add(bob, { clientId: "bob" });
-    expect(registry.members()).toEqual([{ clientId: "ada" }, { clientId: "zed" }, { clientId: "bob" }]);
+    expect(registry.members()).toEqual([
+      { clientId: "ada" },
+      { clientId: "zed" },
+      { clientId: "bob" },
+    ]);
     await settle();
 
     // zed's seed failure drops it; bob, who heard of it, hears that it left rather than keeping a
     // phantom until its own roster expires it.
-    const zedEvents = bob.received.filter((event) => (event as { clientId: string }).clientId === "zed");
-    expect(zedEvents).toEqual([{ type: "join", clientId: "zed" }, { type: "leave", clientId: "zed" }]);
+    const zedEvents = bob.received.filter(
+      (event) => (event as { clientId: string }).clientId === "zed",
+    );
+    expect(zedEvents).toEqual([
+      { type: "join", clientId: "zed" },
+      { type: "leave", clientId: "zed" },
+    ]);
     expect(bob.received.at(-1)).toEqual({ type: "join", clientId: "bob" });
     expect(registry.members()).toEqual([{ clientId: "ada" }, { clientId: "bob" }]);
     expect(failing.disposed).toBe(1);
@@ -201,7 +217,9 @@ describe("SubscriberRegistry", () => {
   it("is a plain fan-out without presence hooks", async () => {
     const registry = new SubscriberRegistry<Callbacks>();
     const ada = fakeStub();
-    const bob = fakeStub((event) => typeof event === "object" && event !== null && "revision" in event);
+    const bob = fakeStub(
+      (event) => typeof event === "object" && event !== null && "revision" in event,
+    );
     registry.add(ada);
     registry.add(bob);
     await settle();
@@ -222,7 +240,8 @@ describe("SubscriberRegistry", () => {
     const inner = reentrant.operation.bind(reentrant);
     reentrant.operation = async (event) => {
       await inner(event);
-      if (event.revision === 1) registry.broadcast((subscriber) => subscriber.operation({ revision: 2 }));
+      if (event.revision === 1)
+        registry.broadcast((subscriber) => subscriber.operation({ revision: 2 }));
     };
     registry.add(ada, { clientId: "ada" });
     registry.add(hung, { clientId: "hung" });
@@ -245,7 +264,9 @@ describe("SubscriberRegistry", () => {
     const registry = new SubscriberRegistry<Callbacks, Who>(hooks);
     const ada = fakeStub();
     const thrower = fakeStub();
-    thrower.operation = () => { throw new Error("sync failure"); };
+    thrower.operation = () => {
+      throw new Error("sync failure");
+    };
     registry.add(ada, { clientId: "ada" });
     registry.add(thrower, { clientId: "thrower" });
     await settle();

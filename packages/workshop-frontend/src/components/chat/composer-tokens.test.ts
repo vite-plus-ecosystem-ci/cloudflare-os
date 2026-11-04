@@ -1,7 +1,5 @@
-import {describe, expect, it} from "vitest";
-import {
-  removeComposerToken, snapCaretOutOfRanges, spliceComposerToken,
-} from "./composer-tokens";
+import { describe, expect, it } from "vite-plus/test";
+import { removeComposerToken, snapCaretOutOfRanges, spliceComposerToken } from "./composer-tokens";
 
 describe("composer tokens", () => {
   it("inserts a token with separators and places the caret outside it", () => {
@@ -29,12 +27,12 @@ describe("composer tokens", () => {
   });
 
   it("removes a whole token without leaving a redundant space", () => {
-    expect(removeComposerToken("Token next", {start: 0, length: 5})).toEqual({
+    expect(removeComposerToken("Token next", { start: 0, length: 5 })).toEqual({
       value: "next",
       caret: 0,
       delta: -6,
     });
-    expect(removeComposerToken("hello Token world", {start: 6, length: 5})).toEqual({
+    expect(removeComposerToken("hello Token world", { start: 6, length: 5 })).toEqual({
       value: "hello world",
       caret: 6,
       delta: -6,
@@ -42,7 +40,7 @@ describe("composer tokens", () => {
   });
 
   it("preserves a newline after a removed token", () => {
-    expect(removeComposerToken("Token\nnext", {start: 0, length: 5})).toEqual({
+    expect(removeComposerToken("Token\nnext", { start: 0, length: 5 })).toEqual({
       value: "\nnext",
       caret: 0,
       delta: -5,
@@ -50,7 +48,7 @@ describe("composer tokens", () => {
   });
 
   it("snaps interior caret positions to the requested edge", () => {
-    const ranges = [{start: 4, length: 6}];
+    const ranges = [{ start: 4, length: 6 }];
     expect(snapCaretOutOfRanges(7, ranges, "left")).toBe(4);
     expect(snapCaretOutOfRanges(7, ranges, "right")).toBe(10);
     expect(snapCaretOutOfRanges(6, ranges, "nearest")).toBe(4);

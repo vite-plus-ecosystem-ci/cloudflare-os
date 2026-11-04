@@ -1,14 +1,37 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { collaboratorFor, normalizeCollaborator } from "../src/collaborator.ts";
-import { HEARTBEAT_MS, type PresenceEvent, PresenceReporter, PresenceRoster, STALE_MS, THROTTLE_MS } from "../src/presence.ts";
+import {
+  HEARTBEAT_MS,
+  type PresenceEvent,
+  PresenceReporter,
+  PresenceRoster,
+  STALE_MS,
+  THROTTLE_MS,
+} from "../src/presence.ts";
 
 type Caret = { blockId: string | null; offset: number };
 
-const join = (clientId: string, name: string, color = "#123456"): PresenceEvent<Caret> => ({ type: "join", clientId, name, color });
-const cursor = (clientId: string, name: string, blockId: string, offset: number): PresenceEvent<Caret> => ({
-  type: "cursor", at: 5, clientId, name, color: "#123456", blockId, offset,
+const join = (clientId: string, name: string, color = "#123456"): PresenceEvent<Caret> => ({
+  type: "join",
+  clientId,
+  name,
+  color,
+});
+const cursor = (
+  clientId: string,
+  name: string,
+  blockId: string,
+  offset: number,
+): PresenceEvent<Caret> => ({
+  type: "cursor",
+  at: 5,
+  clientId,
+  name,
+  color: "#123456",
+  blockId,
+  offset,
 });
 
 describe("PresenceRoster", () => {
@@ -21,15 +44,35 @@ describe("PresenceRoster", () => {
 
     expect(roster.apply(join("ada", "Ada"))).toBe(true);
     expect(roster.people()).toEqual([{ clientId: "ada", name: "Ada", color: "#123456" }]);
-    expect(roster.get("ada")).toEqual({ clientId: "ada", name: "Ada", color: "#123456", cursor: null, seenAt: 1_000 });
+    expect(roster.get("ada")).toEqual({
+      clientId: "ada",
+      name: "Ada",
+      color: "#123456",
+      cursor: null,
+      seenAt: 1_000,
+    });
 
     now = 2_000;
     roster.apply(cursor("ada", "Ada", "b1", 5));
-    expect(roster.entries()).toEqual([{ clientId: "ada", name: "Ada", color: "#123456", cursor: { blockId: "b1", offset: 5 }, seenAt: 2_000 }]);
+    expect(roster.entries()).toEqual([
+      {
+        clientId: "ada",
+        name: "Ada",
+        color: "#123456",
+        cursor: { blockId: "b1", offset: 5 },
+        seenAt: 2_000,
+      },
+    ]);
 
     now = 3_000;
     roster.apply(join("ada", "Ada L.", "#654321"));
-    expect(roster.get("ada")).toEqual({ clientId: "ada", name: "Ada L.", color: "#654321", cursor: { blockId: "b1", offset: 5 }, seenAt: 3_000 });
+    expect(roster.get("ada")).toEqual({
+      clientId: "ada",
+      name: "Ada L.",
+      color: "#654321",
+      cursor: { blockId: "b1", offset: 5 },
+      seenAt: 3_000,
+    });
 
     expect(roster.apply({ type: "leave", clientId: "ada" })).toBe(true);
     expect(roster.apply({ type: "leave", clientId: "ada" })).toBe(false);
@@ -43,7 +86,13 @@ describe("PresenceRoster", () => {
   it("keeps a cursor that arrives before its join", () => {
     const roster = new PresenceRoster<Caret>("me", () => 1_000);
     expect(roster.apply(cursor("bob", "Bob", "b2", 3))).toBe(true);
-    expect(roster.get("bob")).toEqual({ clientId: "bob", name: "Bob", color: "#123456", cursor: { blockId: "b2", offset: 3 }, seenAt: 1_000 });
+    expect(roster.get("bob")).toEqual({
+      clientId: "bob",
+      name: "Bob",
+      color: "#123456",
+      cursor: { blockId: "b2", offset: 3 },
+      seenAt: 1_000,
+    });
     roster.apply(join("bob", "Bob"));
     expect(roster.get("bob")?.cursor).toEqual({ blockId: "b2", offset: 3 });
   });
@@ -67,7 +116,10 @@ describe("PresenceReporter", () => {
   it("throttles a burst into one send and sends nothing when there is nothing to say", async () => {
     const sent: number[] = [];
     let position: number | null = 1;
-    const reporter = new PresenceReporter(() => position, async (update: number) => void sent.push(update));
+    const reporter = new PresenceReporter(
+      () => position,
+      async (update: number) => void sent.push(update),
+    );
     reporter.schedule();
     reporter.schedule();
     position = 2;
@@ -83,7 +135,10 @@ describe("PresenceReporter", () => {
   });
 
   it("swallows a failed send", async () => {
-    const reporter = new PresenceReporter(() => 1, () => Promise.reject(new Error("offline")));
+    const reporter = new PresenceReporter(
+      () => 1,
+      () => Promise.reject(new Error("offline")),
+    );
     reporter.sendNow();
     await vi.advanceTimersByTimeAsync(0);
   });
@@ -91,7 +146,10 @@ describe("PresenceReporter", () => {
   it("heartbeats until stopped, running the gadget's tick after each send", async () => {
     const sent: number[] = [];
     const beats: number[] = [];
-    const reporter = new PresenceReporter(() => 7, async (update: number) => void sent.push(update));
+    const reporter = new PresenceReporter(
+      () => 7,
+      async (update: number) => void sent.push(update),
+    );
     const stop = reporter.startHeartbeat(() => beats.push(sent.length));
     await vi.advanceTimersByTimeAsync(HEARTBEAT_MS * 2);
     expect(sent).toEqual([7, 7]);
@@ -106,16 +164,30 @@ describe("PresenceReporter", () => {
 describe("collaborators", () => {
   it("derives a stable guest identity from a client id", () => {
     const guest = collaboratorFor("k7x2abzz");
-    expect(guest).toEqual({ clientId: "k7x2abzz", name: "Guest K7X2", color: `hsl(${parseInt("k7x2ab", 36) % 360} 62% 48%)` });
+    expect(guest).toEqual({
+      clientId: "k7x2abzz",
+      name: "Guest K7X2",
+      color: `hsl(${parseInt("k7x2ab", 36) % 360} 62% 48%)`,
+    });
     expect(collaboratorFor("k7x2abzz")).toEqual(guest);
   });
 
   it("bounds and defaults what a client says about itself", () => {
-    expect(normalizeCollaborator({ clientId: "c1", name: "  Ada  ", color: "hsl(10 62% 48%)" })).toEqual({ clientId: "c1", name: "Ada", color: "hsl(10 62% 48%)" });
-    expect(normalizeCollaborator({ clientId: "c1", name: "", color: "url(javascript:x)" })).toEqual({ clientId: "c1", name: "Guest", color: "#e1632e" });
+    expect(
+      normalizeCollaborator({ clientId: "c1", name: "  Ada  ", color: "hsl(10 62% 48%)" }),
+    ).toEqual({ clientId: "c1", name: "Ada", color: "hsl(10 62% 48%)" });
+    expect(normalizeCollaborator({ clientId: "c1", name: "", color: "url(javascript:x)" })).toEqual(
+      { clientId: "c1", name: "Guest", color: "#e1632e" },
+    );
     expect(normalizeCollaborator(null)).toEqual({ clientId: "", name: "Guest", color: "#e1632e" });
-    expect(normalizeCollaborator({ clientId: "x".repeat(200), name: "n".repeat(50) })).toEqual({ clientId: "x".repeat(100), name: "n".repeat(40), color: "#e1632e" });
-    expect(normalizeCollaborator({ clientId: "c1", color: "hsl(10deg, 62%, 48%)" }).color).toBe("hsl(10deg, 62%, 48%)");
+    expect(normalizeCollaborator({ clientId: "x".repeat(200), name: "n".repeat(50) })).toEqual({
+      clientId: "x".repeat(100),
+      name: "n".repeat(40),
+      color: "#e1632e",
+    });
+    expect(normalizeCollaborator({ clientId: "c1", color: "hsl(10deg, 62%, 48%)" }).color).toBe(
+      "hsl(10deg, 62%, 48%)",
+    );
   });
 
   it("rejects an over-long colour before matching it, so a hostile one cannot stall the server", () => {
@@ -123,7 +195,9 @@ describe("collaborators", () => {
     const hostile = `hsl(1${" ".repeat(20_000)}x${" ".repeat(20_000)}x${" ".repeat(20_000)}x`;
     const started = performance.now();
     expect(normalizeCollaborator({ clientId: "c1", color: hostile }).color).toBe("#e1632e");
-    expect(normalizeCollaborator({ clientId: "c1", color: `hsl(1 ${" ".repeat(30)}50% 50% x` }).color).toBe("#e1632e");
+    expect(
+      normalizeCollaborator({ clientId: "c1", color: `hsl(1 ${" ".repeat(30)}50% 50% x` }).color,
+    ).toBe("#e1632e");
     expect(performance.now() - started).toBeLessThan(500);
   });
 });

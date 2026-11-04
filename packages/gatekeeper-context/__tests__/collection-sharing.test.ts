@@ -1,5 +1,10 @@
-import { createExecutionContext, env, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import {
+  createExecutionContext,
+  env,
+  runDurableObjectAlarm,
+  runInDurableObject,
+} from "cloudflare:test";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { ObservationGate, privateObservers } from "@gadgets/gatekeeper-kit/observers";
 import type { GatekeeperUserSelectionExchange } from "@gadgets/workshop-shared/gatekeeper";
 import { ContextApiImpl } from "../src/context-api.js";
@@ -45,24 +50,37 @@ let nextId = 0;
 async function createCollection(owner: string): Promise<string> {
   let id = `collection-${nextId++}`;
   let now = new Date();
-  await collection(id).initialize({
-    id, title: "Runbooks", description: "", visibility: "private",
-    created: now, lastUpdated: now, documentCount: 0, content: { source: "web" },
-  }, domain, owner);
+  await collection(id).initialize(
+    {
+      id,
+      title: "Runbooks",
+      description: "",
+      visibility: "private",
+      created: now,
+      lastUpdated: now,
+      documentCount: 0,
+      content: { source: "web" },
+    },
+    domain,
+    owner,
+  );
   await library(owner).createOwnedCollection(id);
   return id;
 }
 
 async function libraryIds(accountId: string): Promise<string[]> {
-  return (await library(accountId).listLibrary(domain, accountId)).map(entry => entry.id);
+  return (await library(accountId).listLibrary(domain, accountId)).map((entry) => entry.id);
 }
 
 /** Every collection ID in an account's library index, whether or not the account still has access. */
 async function indexedIds(accountId: string): Promise<string[]> {
   return runInDurableObject(library(accountId), (_instance, state) =>
     ["ownedCollections:", "sharedCollections:"]
-      .flatMap(prefix => [...state.storage.kv.list({ prefix })].map(([key]) => key.slice(prefix.length)))
-      .toSorted());
+      .flatMap((prefix) =>
+        [...state.storage.kv.list({ prefix })].map(([key]) => key.slice(prefix.length)),
+      )
+      .toSorted(),
+  );
 }
 
 async function permissions(id: string, accountId: string) {
@@ -75,8 +93,13 @@ function readSession(accountId: string): LibraryReadSession {
     [Symbol.dispose]() {},
   } as unknown as ConstructorParameters<typeof ObservationGate>[0];
   return new LibraryReadSession(
-    testEnv, testEnv.COLLECTIONS, testEnv.USER_LIBRARIES, domain, accountId,
-    new ObservationGate(authorizer, privateObservers("No observers in this access-check fixture.")));
+    testEnv,
+    testEnv.COLLECTIONS,
+    testEnv.USER_LIBRARIES,
+    domain,
+    accountId,
+    new ObservationGate(authorizer, privateObservers("No observers in this access-check fixture.")),
+  );
 }
 
 /**
@@ -84,13 +107,15 @@ function readSession(accountId: string): LibraryReadSession {
  * `unreachable` account's verifier fails as an outage would.
  */
 function api(
-    accountId: string, accounts: { domain: string; accountId: string; unreachable?: true }[],
-    spentTickets = new Set<string>()) {
+  accountId: string,
+  accounts: { domain: string; accountId: string; unreachable?: true }[],
+  spentTickets = new Set<string>(),
+) {
   let exchange = {
     async redeem(ticket: string) {
       if (spentTickets.has(ticket)) throw new Error("Ticket already spent.");
       spentTickets.add(ticket);
-      return accounts.map(account => ({
+      return accounts.map((account) => ({
         verifier: {
           async getAccountId(sharingDomain: string) {
             if (account.unreachable) throw new Error("Verifier unavailable.");
@@ -102,8 +127,15 @@ function api(
     },
   } as unknown as Fetcher<GatekeeperUserSelectionExchange>;
   return new ContextApiImpl(
-    testEnv, domain, accountId, false,
-    testEnv.COLLECTIONS, testEnv.USER_LIBRARIES, testEnv.REGISTRIES, exchange);
+    testEnv,
+    domain,
+    accountId,
+    false,
+    testEnv.COLLECTIONS,
+    testEnv.USER_LIBRARIES,
+    testEnv.REGISTRIES,
+    exchange,
+  );
 }
 
 /** An Artifacts binding whose token mints can be held, and whose revocations can be made to fail. */
@@ -128,13 +160,19 @@ function fakeArtifacts() {
     holdNextRevocation() {
       let entered = Promise.withResolvers<void>();
       let resume = Promise.withResolvers<void>();
-      nextRevocation = async () => { entered.resolve(); await resume.promise; };
+      nextRevocation = async () => {
+        entered.resolve();
+        await resume.promise;
+      };
       return { entered: entered.promise, release: resume.resolve };
     },
     holdNextDeletion() {
       let entered = Promise.withResolvers<void>();
       let resume = Promise.withResolvers<void>();
-      nextDeletion = async () => { entered.resolve(); await resume.promise; };
+      nextDeletion = async () => {
+        entered.resolve();
+        await resume.promise;
+      };
       return { entered: entered.promise, release: resume.resolve };
     },
     binding: undefined as unknown as Artifacts,
@@ -158,8 +196,11 @@ function fakeArtifacts() {
     async listTokens() {
       if (fake.failRevocations || fake.failListing) throw new Error("Artifacts is unavailable.");
       return {
-        tokens: [...fake.activeTokens].map(id => ({
-          id, scope: "write", state: "active", expiresAt: new Date().toISOString(),
+        tokens: [...fake.activeTokens].map((id) => ({
+          id,
+          scope: "write",
+          state: "active",
+          expiresAt: new Date().toISOString(),
         })),
       };
     },
@@ -168,7 +209,9 @@ function fakeArtifacts() {
     async create(name: string) {
       return { remote: `https://artifacts.example/${name}.git`, token: "initial" };
     },
-    async get() { return repo; },
+    async get() {
+      return repo;
+    },
     async delete() {
       let pause = nextDeletion;
       nextDeletion = undefined;
@@ -181,7 +224,10 @@ function fakeArtifacts() {
 }
 
 /** A git collection backed by `artifacts`; private ones are owned by alice and edited by bob. */
-async function createGitCollection(artifacts: Artifacts, visibility: "private" | "public" = "private") {
+async function createGitCollection(
+  artifacts: Artifacts,
+  visibility: "private" | "public" = "private",
+) {
   let id = `collection-${nextId++}`;
   let stub = collection(id);
   await runInDurableObject(stub, (instance: ContextCollectionDurableObject) => {
@@ -189,11 +235,20 @@ async function createGitCollection(artifacts: Artifacts, visibility: "private" |
     object.env = { ...object.env, ARTIFACTS: artifacts };
   });
   let now = new Date();
-  await stub.initialize({
-    id, title: "Mirror", description: "", visibility,
-    created: now, lastUpdated: now, documentCount: 0,
-    content: { source: "git", remote: "", branch: "main", lastRefreshedAt: now },
-  }, domain, visibility === "private" ? "alice" : "");
+  await stub.initialize(
+    {
+      id,
+      title: "Mirror",
+      description: "",
+      visibility,
+      created: now,
+      lastUpdated: now,
+      documentCount: 0,
+      content: { source: "git", remote: "", branch: "main", lastRefreshedAt: now },
+    },
+    domain,
+    visibility === "private" ? "alice" : "",
+  );
   if (visibility === "private") {
     await library("alice").createOwnedCollection(id);
     await stub.share("alice", [{ accountId: "bob", displayName: "bob" }], "editor");
@@ -204,23 +259,37 @@ async function createGitCollection(artifacts: Artifacts, visibility: "private" |
 describe("collection sharing", () => {
   it("lets a viewer read everything but change nothing", async () => {
     let id = await createCollection("alice");
-    await api("alice", [{ domain, accountId: "bob" }])
-      .shareContextCollection(id, "ticket", "viewer");
+    await api("alice", [{ domain, accountId: "bob" }]).shareContextCollection(
+      id,
+      "ticket",
+      "viewer",
+    );
 
     expect(await libraryIds("bob")).toEqual([id]);
-    expect((await library("bob").listLibrary(domain, "bob"))[0]?.membership)
-      .toEqual({ role: "viewer", shared: true });
+    expect((await library("bob").listLibrary(domain, "bob"))[0]?.membership).toEqual({
+      role: "viewer",
+      shared: true,
+    });
     expect(canReadCollection(await collection(id).getAccess("bob"))).toBe(true);
     expect(await permissions(id, "bob")).toEqual({
-      canEdit: false, canShare: false, canManageOwners: false, canDelete: false,
+      canEdit: false,
+      canShare: false,
+      canManageOwners: false,
+      canDelete: false,
     });
-    await expect(api("bob", []).putContextDocument(id, "a.md", { description: "", body: "x" }))
-      .rejects.toThrow("Collection not found or you don't have access.");
-    await expect(settled(collection(id).share("bob", [{ accountId: "carol", displayName: "carol" }], "viewer")))
-      .rejects.toThrow("Only editors and owners");
+    await expect(
+      api("bob", []).putContextDocument(id, "a.md", { description: "", body: "x" }),
+    ).rejects.toThrow("Collection not found or you don't have access.");
+    await expect(
+      settled(
+        collection(id).share("bob", [{ accountId: "carol", displayName: "carol" }], "viewer"),
+      ),
+    ).rejects.toThrow("Only editors and owners");
     let spent = new Set<string>();
     let selected = api("bob", [{ domain, accountId: "carol" }], spent);
-    await expect(selected.shareContextCollection(id, "unspent", "viewer")).rejects.toThrow("not found");
+    await expect(selected.shareContextCollection(id, "unspent", "viewer")).rejects.toThrow(
+      "not found",
+    );
     expect(spent.has("unspent")).toBe(false);
     await collection(id).setMemberRole("alice", "bob", "editor");
     await selected.shareContextCollection(id, "unspent", "viewer");
@@ -234,17 +303,23 @@ describe("collection sharing", () => {
 
     expect(await libraryIds("bob")).toEqual([]);
     expect(canReadCollection(await collection(id).getAccess("bob"))).toBe(false);
-    expect((await collection(id).getSharing("alice")).members.map(member => member.memberId))
-      .toEqual(["alice"]);
+    expect(
+      (await collection(id).getSharing("alice")).members.map((member) => member.memberId),
+    ).toEqual(["alice"]);
   });
 
   it("refuses a recipient with no Context account in this sharing domain", async () => {
     let id = await createCollection("alice");
-    await expect(api("alice", [{ domain: "elsewhere", accountId: "bob" }])
-      .shareContextCollection(id, "ticket", "viewer"))
-      .rejects.toThrow("hasn't turned on Skills yet");
-    await expect(api("alice", []).shareContextCollection(id, "ticket", "viewer"))
-      .rejects.toThrow("hasn't turned on Skills yet");
+    await expect(
+      api("alice", [{ domain: "elsewhere", accountId: "bob" }]).shareContextCollection(
+        id,
+        "ticket",
+        "viewer",
+      ),
+    ).rejects.toThrow("hasn't turned on Skills yet");
+    await expect(api("alice", []).shareContextCollection(id, "ticket", "viewer")).rejects.toThrow(
+      "hasn't turned on Skills yet",
+    );
     expect(await libraryIds("bob")).toEqual([]);
   });
 
@@ -254,20 +329,25 @@ describe("collection sharing", () => {
 
     await collection(id).share("bob", [{ accountId: "carol", displayName: "carol" }], "editor");
     expect(await permissions(id, "carol")).toMatchObject({ canEdit: true, canDelete: false });
-    await expect(settled(collection(id).share("bob", [{ accountId: "dave", displayName: "dave" }], "owner")))
-      .rejects.toThrow("Only owners can change who owns this collection.");
-    await expect(settled(collection(id).setMemberRole("bob", "alice", "editor")))
-      .rejects.toThrow("Only owners can change who owns this collection.");
-    await expect(settled(collection(id).removeMember("bob", "alice")))
-      .rejects.toThrow("Only owners can change who owns this collection.");
+    await expect(
+      settled(collection(id).share("bob", [{ accountId: "dave", displayName: "dave" }], "owner")),
+    ).rejects.toThrow("Only owners can change who owns this collection.");
+    await expect(settled(collection(id).setMemberRole("bob", "alice", "editor"))).rejects.toThrow(
+      "Only owners can change who owns this collection.",
+    );
+    await expect(settled(collection(id).removeMember("bob", "alice"))).rejects.toThrow(
+      "Only owners can change who owns this collection.",
+    );
   });
 
   it("keeps an owner, and transfers ownership by granting then leaving", async () => {
     let id = await createCollection("alice");
-    await expect(settled(collection(id).removeMember("alice", "alice")))
-      .rejects.toThrow("A collection needs an owner.");
-    await expect(settled(collection(id).setMemberRole("alice", "alice", "editor")))
-      .rejects.toThrow("A collection needs an owner.");
+    await expect(settled(collection(id).removeMember("alice", "alice"))).rejects.toThrow(
+      "A collection needs an owner.",
+    );
+    await expect(settled(collection(id).setMemberRole("alice", "alice", "editor"))).rejects.toThrow(
+      "A collection needs an owner.",
+    );
 
     await collection(id).share("alice", [{ accountId: "bob", displayName: "bob" }], "owner");
     await collection(id).removeMember("alice", "alice");
@@ -278,27 +358,42 @@ describe("collection sharing", () => {
     // Owners are peers: the new owner may remove another owner, but never the last one.
     await collection(id).share("bob", [{ accountId: "carol", displayName: "carol" }], "owner");
     await collection(id).removeMember("carol", "bob");
-    expect((await collection(id).getSharing("carol")).members.map(member => member.memberId))
-      .toEqual(["carol"]);
+    expect(
+      (await collection(id).getSharing("carol")).members.map((member) => member.memberId),
+    ).toEqual(["carol"]);
   });
 
   it("keeps an owner across all accounts in one user selection", async () => {
     let id = await createCollection("alice");
-    await collection(id).share("alice", [{ accountId: "alice-other", displayName: "Alice" }], "owner");
+    await collection(id).share(
+      "alice",
+      [{ accountId: "alice-other", displayName: "Alice" }],
+      "owner",
+    );
     let selected = api("alice", [
       { domain, accountId: "alice" },
       { domain, accountId: "alice-other" },
     ]);
 
-    await expect(selected.shareContextCollection(id, "ticket", "viewer"))
-      .rejects.toThrow("A collection needs an owner.");
-    expect((await collection(id).getSharing("alice")).members.map(member => member.role))
-      .toEqual(["owner", "owner"]);
+    await expect(selected.shareContextCollection(id, "ticket", "viewer")).rejects.toThrow(
+      "A collection needs an owner.",
+    );
+    expect((await collection(id).getSharing("alice")).members.map((member) => member.role)).toEqual(
+      ["owner", "owner"],
+    );
 
     await collection(id).share("alice", [{ accountId: "bob", displayName: "Bob" }], "owner");
     await selected.shareContextCollection(id, "another-ticket", "viewer");
-    expect((await collection(id).getSharing("bob")).members.map(member => [member.memberId, member.role]))
-      .toEqual([["bob", "owner"], ["alice", "viewer"], ["alice-other", "viewer"]]);
+    expect(
+      (await collection(id).getSharing("bob")).members.map((member) => [
+        member.memberId,
+        member.role,
+      ]),
+    ).toEqual([
+      ["bob", "owner"],
+      ["alice", "viewer"],
+      ["alice-other", "viewer"],
+    ]);
   });
 
   it("revokes access despite a stale library entry", async () => {
@@ -343,10 +438,14 @@ describe("collection sharing", () => {
     let access = await collection(id).getAccess("bob");
     expect(access).toMatchObject({ exists: true, hasOwner: false, role: "editor" });
     expect(await permissions(id, "bob")).toEqual({
-      canEdit: true, canShare: true, canManageOwners: false, canDelete: false,
+      canEdit: true,
+      canShare: true,
+      canManageOwners: false,
+      canDelete: false,
     });
-    await expect(settled(collection(id).share("bob", [{ accountId: "bob", displayName: "bob" }], "owner")))
-      .rejects.toThrow("Only owners can change who owns this collection.");
+    await expect(
+      settled(collection(id).share("bob", [{ accountId: "bob", displayName: "bob" }], "owner")),
+    ).rejects.toThrow("Only owners can change who owns this collection.");
     await expect(api("bob", []).deleteContextCollection(id)).rejects.toThrow();
     expect(await libraryIds("bob")).toEqual([id]);
 
@@ -370,7 +469,10 @@ describe("collection sharing", () => {
       state.storage.kv.delete("aclVersion");
     });
 
-    expect(await collection(id).getAccess("alice")).toMatchObject({ role: "owner", hasOwner: true });
+    expect(await collection(id).getAccess("alice")).toMatchObject({
+      role: "owner",
+      hasOwner: true,
+    });
   });
 
   it("keeps a member's grant and library entry in step when re-sharing races removal", async () => {
@@ -380,7 +482,8 @@ describe("collection sharing", () => {
       Promise.all([
         instance.share("alice", [{ accountId: "bob", displayName: "bob" }], "editor"),
         instance.removeMember("alice", "bob"),
-      ]));
+      ]),
+    );
 
     expect((await collection(id).getAccess("bob")).role).toBeNull();
     expect(await indexedIds("bob")).toEqual([]);
@@ -407,9 +510,14 @@ describe("collection sharing", () => {
     await collection(gone).deleteSelf("alice", false);
     // As a share racing the deletion would leave it.
     await library("alice").addSharedCollection(gone);
-    await runInDurableObject(collection(unreachable), (instance: ContextCollectionDurableObject) => {
-      instance.getLibraryEntry = () => { throw new Error("Collection unavailable."); };
-    });
+    await runInDurableObject(
+      collection(unreachable),
+      (instance: ContextCollectionDurableObject) => {
+        instance.getLibraryEntry = () => {
+          throw new Error("Collection unavailable.");
+        };
+      },
+    );
 
     expect(await libraryIds("alice")).toEqual([kept]);
     expect(await indexedIds("alice")).toEqual([kept, unreachable].toSorted());
@@ -419,9 +527,13 @@ describe("collection sharing", () => {
     let id = await createCollection("alice");
     let bob = [{ accountId: "bob", displayName: "bob" }];
     expect(await library("bob").beginDisconnect()).toEqual([]);
-    await expect(settled(collection(id).share("alice", bob, "viewer"))).rejects.toThrow("disconnected");
+    await expect(settled(collection(id).share("alice", bob, "viewer"))).rejects.toThrow(
+      "disconnected",
+    );
     await library("bob").finishDisconnect();
-    await expect(settled(collection(id).share("alice", bob, "viewer"))).rejects.toThrow("disconnected");
+    await expect(settled(collection(id).share("alice", bob, "viewer"))).rejects.toThrow(
+      "disconnected",
+    );
 
     expect((await collection(id).getAccess("bob")).role).toBeNull();
     expect(await indexedIds("bob")).toEqual([]);
@@ -430,18 +542,30 @@ describe("collection sharing", () => {
   it("shares with all of a person's accounts or none", async () => {
     let id = await createCollection("alice");
     await library("carol").beginDisconnect();
-    await expect(api("alice", [{ domain, accountId: "bob" }, { domain, accountId: "carol" }])
-      .shareContextCollection(id, "ticket", "viewer")).rejects.toThrow("disconnected");
+    await expect(
+      api("alice", [
+        { domain, accountId: "bob" },
+        { domain, accountId: "carol" },
+      ]).shareContextCollection(id, "ticket", "viewer"),
+    ).rejects.toThrow("disconnected");
     expect((await collection(id).getAccess("bob")).role).toBeNull();
 
     // A verifier that can't be asked is an error to retry, not a person without Skills.
-    await expect(api("alice", [{ domain, accountId: "bob", unreachable: true }])
-      .shareContextCollection(id, "ticket", "viewer")).rejects.toThrow("Verifier unavailable.");
+    await expect(
+      api("alice", [{ domain, accountId: "bob", unreachable: true }]).shareContextCollection(
+        id,
+        "ticket",
+        "viewer",
+      ),
+    ).rejects.toThrow("Verifier unavailable.");
   });
 
   it("deletes a memberless web collection after restart during library cleanup", async () => {
     let id = await createCollection("alice");
-    await collection(id).putContextDocument("plan.md", { description: "Launch plan", body: "Ship it." });
+    await collection(id).putContextDocument("plan.md", {
+      description: "Launch plan",
+      body: "Ship it.",
+    });
     await collection(id).share("alice", [{ accountId: "bob", displayName: "Bob" }], "editor");
     await collection(id).setEveryoneCanView("alice", true);
     await collection(id).removeAccount("alice");
@@ -452,7 +576,10 @@ describe("collection sharing", () => {
     await runInDurableObject(memberLibrary, (memberIndex: UserLibraryDurableObject) => {
       let prototype = Object.getPrototypeOf(memberIndex);
       forget = prototype.forgetCollection;
-      prototype.forgetCollection = async function (this: UserLibraryDurableObject, collectionId: string) {
+      prototype.forgetCollection = async function (
+        this: UserLibraryDurableObject,
+        collectionId: string,
+      ) {
         forget.call(this, collectionId);
         if (this === memberIndex) {
           entered.resolve();
@@ -461,23 +588,26 @@ describe("collection sharing", () => {
       };
     });
     try {
-      await runInDurableObject(collection(id), async (instance: ContextCollectionDurableObject, state) => {
-        let removal = instance.removeMember("bob", "bob");
-        try {
-          await entered.promise;
-          expect(instance.getAccess("bob").role).toBeNull();
-          expect(await state.storage.getAlarm()).not.toBeNull();
-          let restarted = new ContextCollectionDurableObject(state, testEnv);
-          await restarted.alarm();
-          expect(canReadCollection(restarted.getAccess("stranger"))).toBe(false);
-          expect(await restarted.getContextDocument("plan.md")).toBeNull();
-          expect((await state.storage.list()).size).toBe(0);
-          expect(await state.storage.getAlarm()).toBeNull();
-        } finally {
-          resume.resolve();
-          await removal;
-        }
-      });
+      await runInDurableObject(
+        collection(id),
+        async (instance: ContextCollectionDurableObject, state) => {
+          let removal = instance.removeMember("bob", "bob");
+          try {
+            await entered.promise;
+            expect(instance.getAccess("bob").role).toBeNull();
+            expect(await state.storage.getAlarm()).not.toBeNull();
+            let restarted = new ContextCollectionDurableObject(state, testEnv);
+            await restarted.alarm();
+            expect(canReadCollection(restarted.getAccess("stranger"))).toBe(false);
+            expect(await restarted.getContextDocument("plan.md")).toBeNull();
+            expect((await state.storage.list()).size).toBe(0);
+            expect(await state.storage.getAlarm()).toBeNull();
+          } finally {
+            resume.resolve();
+            await removal;
+          }
+        },
+      );
     } finally {
       await runInDurableObject(memberLibrary, (memberIndex: UserLibraryDurableObject) => {
         Object.getPrototypeOf(memberIndex).forgetCollection = forget;
@@ -487,7 +617,10 @@ describe("collection sharing", () => {
 
   it("honors revocation in a read session that has already read the collection", async () => {
     let id = await createCollection("alice");
-    await collection(id).putContextDocument("plan.md", { description: "Launch plan", body: "Ship it." });
+    await collection(id).putContextDocument("plan.md", {
+      description: "Launch plan",
+      body: "Ship it.",
+    });
     await collection(id).share("alice", [{ accountId: "bob", displayName: "Bob" }], "viewer");
     using session = readSession("bob");
     expect((await session.read(`${id}/plan.md`))?.content).toBe("Ship it.");
@@ -501,7 +634,8 @@ describe("collection sharing", () => {
 
 describe("git tokens of members who lose write access", () => {
   it.each(["removal", "demotion", "share", "disconnection", "last member"] as const)(
-    "recovers credential cleanup after restart during %s", async (operation) => {
+    "recovers credential cleanup after restart during %s",
+    async (operation) => {
       let artifacts = fakeArtifacts();
       let stub = await createGitCollection(artifacts.binding);
       let token = await stub.createGitToken("bob");
@@ -509,18 +643,26 @@ describe("git tokens of members who lose write access", () => {
 
       await runInDurableObject(stub, async (instance: ContextCollectionDurableObject, state) => {
         let paused = artifacts.holdNextRevocation();
-        let change = operation === "demotion" ? instance.setMemberRole("alice", "bob", "viewer")
-          : operation === "share" ? instance.share("alice", [{ accountId: "bob", displayName: "Bob" }], "viewer")
-          : operation === "disconnection" ? instance.removeAccount("bob")
-          : instance.removeMember(operation === "last member" ? "bob" : "alice", "bob");
+        let change =
+          operation === "demotion"
+            ? instance.setMemberRole("alice", "bob", "viewer")
+            : operation === "share"
+              ? instance.share("alice", [{ accountId: "bob", displayName: "Bob" }], "viewer")
+              : operation === "disconnection"
+                ? instance.removeAccount("bob")
+                : instance.removeMember(operation === "last member" ? "bob" : "alice", "bob");
         try {
           await paused.entered;
           expect(artifacts.activeTokens.has(token.id)).toBe(true);
-          expect((await instance.getAccess("bob")).role)
-            .toBe(operation === "demotion" || operation === "share" ? "viewer" : null);
+          expect((await instance.getAccess("bob")).role).toBe(
+            operation === "demotion" || operation === "share" ? "viewer" : null,
+          );
           expect(await state.storage.getAlarm()).not.toBeNull();
 
-          let restarted = new ContextCollectionDurableObject(state, { ...testEnv, ARTIFACTS: artifacts.binding });
+          let restarted = new ContextCollectionDurableObject(state, {
+            ...testEnv,
+            ARTIFACTS: artifacts.binding,
+          });
           await restarted.alarm();
           expect(artifacts.activeTokens.has(token.id)).toBe(false);
           expect(await state.storage.getAlarm()).toBeNull();
@@ -530,7 +672,8 @@ describe("git tokens of members who lose write access", () => {
           await change;
         }
       });
-    });
+    },
+  );
 
   it("recovers credential cleanup after restart while forgetting the member's library entry", async () => {
     let artifacts = fakeArtifacts();
@@ -559,7 +702,10 @@ describe("git tokens of members who lose write access", () => {
           expect((await instance.getAccess("bob")).role).toBeNull();
           expect(artifacts.activeTokens.has(token.id)).toBe(true);
           expect(await state.storage.getAlarm()).not.toBeNull();
-          let restarted = new ContextCollectionDurableObject(state, { ...testEnv, ARTIFACTS: artifacts.binding });
+          let restarted = new ContextCollectionDurableObject(state, {
+            ...testEnv,
+            ARTIFACTS: artifacts.binding,
+          });
           await restarted.alarm();
           expect(artifacts.activeTokens.has(token.id)).toBe(false);
         } finally {
@@ -575,7 +721,8 @@ describe("git tokens of members who lose write access", () => {
   });
 
   it.each(["leave", "disconnect", "delete"] as const)(
-    "retains cleanup state through an Artifacts outage during %s", async (operation) => {
+    "retains cleanup state through an Artifacts outage during %s",
+    async (operation) => {
       let artifacts = fakeArtifacts();
       let stub = await createGitCollection(artifacts.binding);
       let token = await stub.createGitToken("bob");
@@ -583,8 +730,12 @@ describe("git tokens of members who lose write access", () => {
 
       artifacts.failRevocations = true;
       artifacts.failDeletion = true;
-      let deletion = operation === "leave" ? stub.removeMember("bob", "bob")
-        : operation === "disconnect" ? stub.removeAccount("bob") : stub.deleteSelf("alice", false);
+      let deletion =
+        operation === "leave"
+          ? stub.removeMember("bob", "bob")
+          : operation === "disconnect"
+            ? stub.removeAccount("bob")
+            : stub.deleteSelf("alice", false);
       if (operation === "disconnect") await deletion;
       else await expect(settled(deletion)).rejects.toThrow("Artifacts is unavailable.");
       expect(artifacts.activeTokens.has(token.id)).toBe(true);
@@ -602,7 +753,8 @@ describe("git tokens of members who lose write access", () => {
         expect((await state.storage.list()).size).toBe(0);
         expect(await state.storage.getAlarm()).toBeNull();
       });
-    });
+    },
+  );
 
   it("revokes a token minted while its issuer was being removed", async () => {
     let artifacts = fakeArtifacts();
@@ -628,10 +780,14 @@ describe("git tokens of members who lose write access", () => {
     let token = await stub.createGitToken("bob");
 
     artifacts.failRevocations = true;
-    await expect(settled(stub.removeMember("alice", "bob"))).rejects.toThrow("could not be revoked yet");
+    await expect(settled(stub.removeMember("alice", "bob"))).rejects.toThrow(
+      "could not be revoked yet",
+    );
     expect((await stub.getAccess("bob")).role).toBeNull();
     // Repeating it retries, though the grant is already gone.
-    await expect(settled(stub.removeMember("alice", "bob"))).rejects.toThrow("could not be revoked yet");
+    await expect(settled(stub.removeMember("alice", "bob"))).rejects.toThrow(
+      "could not be revoked yet",
+    );
     expect(artifacts.revoked).not.toContain(token.id);
 
     artifacts.failRevocations = false;
@@ -646,8 +802,9 @@ describe("git tokens of members who lose write access", () => {
     let token = await stub.createGitToken("bob");
 
     artifacts.failRevocations = true;
-    await expect(settled(stub.setMemberRole("alice", "bob", "viewer")))
-      .rejects.toThrow("could not be revoked yet");
+    await expect(settled(stub.setMemberRole("alice", "bob", "viewer"))).rejects.toThrow(
+      "could not be revoked yet",
+    );
     expect((await stub.getAccess("bob")).role).toBe("viewer");
 
     artifacts.failRevocations = false;
@@ -678,7 +835,10 @@ describe("git tokens of members who lose write access", () => {
     await stub.setMemberRole("bob", "alice", "viewer");
     artifacts.failListing = true;
     await runInDurableObject(stub, async (_instance, state) => {
-      let restarted = new ContextCollectionDurableObject(state, { ...testEnv, ARTIFACTS: artifacts.binding });
+      let restarted = new ContextCollectionDurableObject(state, {
+        ...testEnv,
+        ARTIFACTS: artifacts.binding,
+      });
       await restarted.removeMember("bob", "alice");
     });
     expect(artifacts.activeTokens.has("legacy-token")).toBe(false);
@@ -713,16 +873,27 @@ describe("git tokens of members who lose write access", () => {
     artifacts.failDeletion = true;
     artifacts.failRevocations = true;
     let paused = artifacts.holdNextDeletion();
-    let account = new ContextAccount(Object.assign(createExecutionContext(), {
-      props: { sharingDomain: domain, accountId: "bob" },
-    }), testEnv);
+    let account = new ContextAccount(
+      Object.assign(createExecutionContext(), {
+        props: { sharingDomain: domain, accountId: "bob" },
+      }),
+      testEnv,
+    );
     let revocation = account.revoke();
     try {
-      await Promise.race([paused.entered, revocation.then(() => {
-        throw new Error("Revocation finished without reaching repository cleanup.");
-      })]);
-      await expect(api("carol", [{ domain, accountId: "bob" }])
-        .shareContextCollection(other, "racing-share", "viewer")).rejects.toThrow("disconnected");
+      await Promise.race([
+        paused.entered,
+        revocation.then(() => {
+          throw new Error("Revocation finished without reaching repository cleanup.");
+        }),
+      ]);
+      await expect(
+        api("carol", [{ domain, accountId: "bob" }]).shareContextCollection(
+          other,
+          "racing-share",
+          "viewer",
+        ),
+      ).rejects.toThrow("disconnected");
     } finally {
       paused.release();
       await revocation;
@@ -735,7 +906,9 @@ describe("git tokens of members who lose write access", () => {
     artifacts.failRevocations = false;
     await runDurableObjectAlarm(stub);
     expect(artifacts.activeTokens.has(token.id)).toBe(false);
-    await expect(settled(library("bob").addSharedCollection(other))).rejects.toThrow("disconnected");
+    await expect(settled(library("bob").addSharedCollection(other))).rejects.toThrow(
+      "disconnected",
+    );
   });
 
   it("does not postpone a pending deletion's alarm during disconnection", async () => {
@@ -743,7 +916,9 @@ describe("git tokens of members who lose write access", () => {
     let stub = await createGitCollection(artifacts.binding);
     await stub.createGitToken("bob");
     artifacts.failDeletion = true;
-    await expect(settled(stub.deleteSelf("alice", false))).rejects.toThrow("Artifacts is unavailable");
+    await expect(settled(stub.deleteSelf("alice", false))).rejects.toThrow(
+      "Artifacts is unavailable",
+    );
     let retryAt = Date.now() + 60_000;
     await runInDurableObject(stub, async (_instance, state) => {
       state.storage.kv.put("gitTokenRevokeAttempts", 12);
@@ -760,17 +935,26 @@ describe("git tokens of members who lose write access", () => {
     let artifacts = fakeArtifacts();
     let stub = await createGitCollection(artifacts.binding, "public");
     let meta = await stub.getMetadata();
-    await testEnv.CONTEXT_COLLECTIONS.put(publicCollectionsKvKey(domain), JSON.stringify([metadataToSummary(meta)]));
+    await testEnv.CONTEXT_COLLECTIONS.put(
+      publicCollectionsKvKey(domain),
+      JSON.stringify([metadataToSummary(meta)]),
+    );
     await runInDurableObject(stub, (_instance, state) => {
       state.storage.kv.put("documents:plan.md", {
-        path: "plan.md", name: "plan.md", description: "Launch plan", contentType: "text/markdown",
-        body: "Ship it.", lastUpdated: new Date(),
+        path: "plan.md",
+        name: "plan.md",
+        description: "Launch plan",
+        contentType: "text/markdown",
+        body: "Ship it.",
+        lastUpdated: new Date(),
       });
     });
     using session = readSession("reader");
     expect((await session.read(`${meta.id}/plan.md`))?.content).toBe("Ship it.");
     artifacts.failDeletion = true;
-    await expect(settled(stub.deleteSelf("admin", true))).rejects.toThrow("Artifacts is unavailable");
+    await expect(settled(stub.deleteSelf("admin", true))).rejects.toThrow(
+      "Artifacts is unavailable",
+    );
     expect(await stub.getContextDocument("plan.md")).toBeNull();
     expect(await stub.listContextDocuments()).toEqual([]);
     expect(await stub.search("Ship")).toEqual([]);

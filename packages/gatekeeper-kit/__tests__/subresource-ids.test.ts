@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { formatSubresourceId, parseSubresourceId, type SubresourceId } from "../src/subresource-ids";
+import { describe, expect, it } from "vite-plus/test";
+import {
+  formatSubresourceId,
+  parseSubresourceId,
+  type SubresourceId,
+} from "../src/subresource-ids";
 
 describe("subresource IDs", () => {
   it("lead with a namespace only when one is given", () => {
@@ -7,7 +11,12 @@ describe("subresource IDs", () => {
       namespace: "gmail",
       fragments: [{ name: "inbox", id: "mpeterson@cloudflare.com" }],
     };
-    const bare: SubresourceId = { fragments: [{ name: "space", id: "ENG" }, { name: "page", id: "123" }] };
+    const bare: SubresourceId = {
+      fragments: [
+        { name: "space", id: "ENG" },
+        { name: "page", id: "123" },
+      ],
+    };
 
     expect(formatSubresourceId(namespaced)).toBe("gmail/inbox/mpeterson%40cloudflare.com");
     expect(formatSubresourceId(bare)).toBe("space/ENG/page/123");
@@ -18,14 +27,18 @@ describe("subresource IDs", () => {
   it("escape separators so components cannot run together", () => {
     const value: SubresourceId = {
       namespace: "drive",
-      fragments: [{ name: "folder", id: "a/b" }, { name: "file", id: "100%/ü😀 it's(1)*!~.-_" }],
+      fragments: [
+        { name: "folder", id: "a/b" },
+        { name: "file", id: "100%/ü😀 it's(1)*!~.-_" },
+      ],
     };
     const id = formatSubresourceId(value);
 
     expect(id).toBe("drive/folder/a%2Fb/file/100%25%2F%C3%BC%F0%9F%98%80%20it's(1)*!~.-_");
     expect(parseSubresourceId(id)).toStrictEqual(value);
-    expect(formatSubresourceId({ fragments: [{ name: "file", id: "a/b" }] }))
-      .not.toBe(formatSubresourceId({ namespace: "file", fragments: [{ name: "a", id: "b" }] }));
+    expect(formatSubresourceId({ fragments: [{ name: "file", id: "a/b" }] })).not.toBe(
+      formatSubresourceId({ namespace: "file", fragments: [{ name: "a", id: "b" }] }),
+    );
   });
 
   it.each<[string, SubresourceId, RegExp]>([

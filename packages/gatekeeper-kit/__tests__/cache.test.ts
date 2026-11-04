@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { KvTtlCache, type AuthoritySource, type CacheKv } from "../src/cache";
 import { CredentialsExpiredError, CredentialSource } from "../src/credentials";
 import { fakeKv } from "./fake-kv";
@@ -24,7 +24,7 @@ function connectedSource() {
   });
   const source = new CredentialSource<{ token: string }>({
     account: () => ({ getCredentials, reportCredentialsRejected: async () => "expired" as const }),
-    isAuthError: error => error instanceof Error && error.message === "401",
+    isAuthError: (error) => error instanceof Error && error.message === "401",
     expiredMessage: "Reconnect.",
   });
   return { source, account, getCredentials };
@@ -54,11 +54,15 @@ describe("KvTtlCache", () => {
     vi.useFakeTimers();
     const fence = Promise.withResolvers<void>();
     let reads = 0;
-    const cache = new KvTtlCache(makeKv(), async () => {
-      // The entry read runs first; only the one after `load()` is parked.
-      if (++reads === 2) await fence.promise;
-      return "authority";
-    }, { legacyUnnamed: true });
+    const cache = new KvTtlCache(
+      makeKv(),
+      async () => {
+        // The entry read runs first; only the one after `load()` is parked.
+        if (++reads === 2) await fence.promise;
+        return "authority";
+      },
+      { legacyUnnamed: true },
+    );
 
     const loading = cache.cached("project", 60_000, async () => "loaded");
     // The load has resolved and the fence read is parked; the clock runs while it waits.
@@ -83,7 +87,7 @@ describe("KvTtlCache", () => {
     answered.resolve(["a", "b"]);
     expect(await loading).toEqual(["a", "b"]);
 
-    const reload = vi.fn(async (keys: string[]) => keys.map(key => `${key} again`));
+    const reload = vi.fn(async (keys: string[]) => keys.map((key) => `${key} again`));
     await vi.advanceTimersByTimeAsync(4999);
     expect(await cache.cachedMany(["a", "b"], 15_000, reload)).toEqual(["a", "b"]);
     await vi.advanceTimersByTimeAsync(1);
@@ -95,8 +99,13 @@ describe("KvTtlCache", () => {
     await cache.cached("existing", 60_000, async () => false);
 
     // The cached `false` is refused a TTL, after "missing" was found absent.
-    await expect(cache.cachedMany<boolean>(["missing", "existing"], allowed => allowed ? 60_000 : 0,
-      async keys => keys.map(() => true))).rejects.toThrow("ttlMs must be a positive");
+    await expect(
+      cache.cachedMany<boolean>(
+        ["missing", "existing"],
+        (allowed) => (allowed ? 60_000 : 0),
+        async (keys) => keys.map(() => true),
+      ),
+    ).rejects.toThrow("ttlMs must be a positive");
     // A claim stranded by that throw would leave this joining a load that never settles.
     expect(await cache.cached("missing", 60_000, async () => true)).toBe(true);
   });
@@ -123,10 +132,12 @@ describe("KvTtlCache", () => {
     const issues = new KvTtlCache(kv, () => "authority", { name: "issues" });
 
     // Concurrent, so a load key missing the cache's own prefix would collapse them into one.
-    expect(await Promise.all([
-      projects.cached("a", 60_000, async () => "from projects"),
-      issues.cached("a", 60_000, async () => "from issues"),
-    ])).toEqual(["from projects", "from issues"]);
+    expect(
+      await Promise.all([
+        projects.cached("a", 60_000, async () => "from projects"),
+        issues.cached("a", 60_000, async () => "from issues"),
+      ]),
+    ).toEqual(["from projects", "from issues"]);
   });
 
   it("reloads every entry after invalidating all", async () => {
@@ -169,10 +180,12 @@ describe("KvTtlCache", () => {
 
     authority = undefined;
     // A stored entry is not served, and every caller loads for itself.
-    expect(await cache.cached("project", 60_000, async () => "unpartitioned 1"))
-      .toBe("unpartitioned 1");
-    expect(await cache.cached("project", 60_000, async () => "unpartitioned 2"))
-      .toBe("unpartitioned 2");
+    expect(await cache.cached("project", 60_000, async () => "unpartitioned 1")).toBe(
+      "unpartitioned 1",
+    );
+    expect(await cache.cached("project", 60_000, async () => "unpartitioned 2")).toBe(
+      "unpartitioned 2",
+    );
 
     // Nothing was stored either: back under a known authority, its own entry still stands.
     authority = "a";
@@ -230,7 +243,8 @@ describe("KvTtlCache", () => {
 
     expect(await ported.cached("home", 60_000, async () => "legacy")).toBe("legacy");
     expect(await ported.cached("generation", 60_000, async () => "counter-shaped")).toBe(
-      "counter-shaped");
+      "counter-shaped",
+    );
     expect(await named.cached("home", 60_000, async () => "named")).toBe("named");
     named.invalidateAll();
 
@@ -313,10 +327,14 @@ describe("KvTtlCache", () => {
   it("loads only the missing keys of a batch, together, and answers in the order asked", async () => {
     const cache = new KvTtlCache(makeKv(), () => "authority", { name: "access" });
     await cache.cached("a", 60_000, async () => "cached a");
-    const load = vi.fn(async (keys: string[]) => keys.map(key => `loaded ${key}`));
+    const load = vi.fn(async (keys: string[]) => keys.map((key) => `loaded ${key}`));
 
-    expect(await cache.cachedMany(["b", "a", "c", "b"], 60_000, load))
-      .toEqual(["loaded b", "cached a", "loaded c", "loaded b"]);
+    expect(await cache.cachedMany(["b", "a", "c", "b"], 60_000, load)).toEqual([
+      "loaded b",
+      "cached a",
+      "loaded c",
+      "loaded b",
+    ]);
     expect(load).toHaveBeenCalledExactlyOnceWith(["b", "c"]);
 
     // Each key was stored on its own, so a differently shaped batch reuses them.
@@ -326,17 +344,18 @@ describe("KvTtlCache", () => {
 
   it("cuts batches from the missing keys alone, loading one batch at a time", async () => {
     const cache = new KvTtlCache(makeKv(), () => "authority", { name: "access" });
-    await cache.cachedMany(["a", "c"], 60_000, async keys => keys.map(key => `cached ${key}`));
+    await cache.cachedMany(["a", "c"], 60_000, async (keys) => keys.map((key) => `cached ${key}`));
     let loading = 0;
     const load = vi.fn(async (keys: string[]) => {
       expect(++loading).toBe(1);
       await Promise.resolve();
       loading--;
-      return keys.map(key => `loaded ${key}`);
+      return keys.map((key) => `loaded ${key}`);
     });
 
-    expect(await cache.cachedMany(["a", "b", "c", "d", "e"], 60_000, load, { batchSize: 2 }))
-      .toEqual(["cached a", "loaded b", "cached c", "loaded d", "loaded e"]);
+    expect(
+      await cache.cachedMany(["a", "b", "c", "d", "e"], 60_000, load, { batchSize: 2 }),
+    ).toEqual(["cached a", "loaded b", "cached c", "loaded d", "loaded e"]);
     expect(load.mock.calls).toEqual([[["b", "d"]], [["e"]]]);
   });
 
@@ -347,13 +366,17 @@ describe("KvTtlCache", () => {
       return [key];
     });
 
-    await expect(cache.cachedMany(["a", "b", "c"], 60_000, failing, { batchSize: 1 }))
-      .rejects.toThrow("b failed");
+    await expect(
+      cache.cachedMany(["a", "b", "c"], 60_000, failing, { batchSize: 1 }),
+    ).rejects.toThrow("b failed");
     expect(failing.mock.calls).toEqual([[["a"]], [["b"]]]);
 
     const retry = vi.fn(async (keys: string[]) => keys);
-    expect(await cache.cachedMany(["a", "b", "c"], 60_000, retry, { batchSize: 1 }))
-      .toEqual(["a", "b", "c"]);
+    expect(await cache.cachedMany(["a", "b", "c"], 60_000, retry, { batchSize: 1 })).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
     expect(retry.mock.calls).toEqual([[["b"]], [["c"]]]);
   });
 
@@ -361,24 +384,30 @@ describe("KvTtlCache", () => {
     const cache = new KvTtlCache(makeKv(), () => undefined, { name: "access" });
     const load = vi.fn(async (keys: string[]) => keys);
 
-    expect(await cache.cachedMany(["a", "b", "a", "c"], 60_000, load, { batchSize: 2 }))
-      .toEqual(["a", "b", "a", "c"]);
+    expect(await cache.cachedMany(["a", "b", "a", "c"], 60_000, load, { batchSize: 2 })).toEqual([
+      "a",
+      "b",
+      "a",
+      "c",
+    ]);
     expect(load.mock.calls).toEqual([[["a", "b"]], [["c"]]]);
   });
 
   it("refuses a batch size that is not a positive integer", async () => {
     const cache = new KvTtlCache(makeKv(), () => "authority", { name: "access" });
 
-    await expect(cache.cachedMany(["a"], 60_000, async keys => keys, { batchSize: 0 }))
-      .rejects.toThrow("batchSize must be a positive");
+    await expect(
+      cache.cachedMany(["a"], 60_000, async (keys) => keys, { batchSize: 0 }),
+    ).rejects.toThrow("batchSize must be a positive");
   });
 
   it("fails a load whose value its TTL refuses, storing nothing", async () => {
     const cache = new KvTtlCache(makeKv(), () => "authority", { name: "access" });
-    const ttl = (allowed: boolean) => allowed ? 60_000 : 0;
+    const ttl = (allowed: boolean) => (allowed ? 60_000 : 0);
 
-    await expect(cache.cachedMany(["key"], ttl, async () => [false]))
-      .rejects.toThrow("ttlMs must be a positive");
+    await expect(cache.cachedMany(["key"], ttl, async () => [false])).rejects.toThrow(
+      "ttlMs must be a positive",
+    );
     // Stored, the refused value would fail every later read of the key without loading it again.
     expect(await cache.cachedMany(["key"], ttl, async () => [true])).toEqual([true]);
   });
@@ -404,9 +433,10 @@ describe("KvTtlCache", () => {
   it("refuses a batch answer of the wrong length, storing none of it", async () => {
     const cache = new KvTtlCache(makeKv(), () => "authority", { name: "access" });
 
-    await expect(cache.cachedMany(["a", "b"], 60_000, async () => ["a"]))
-      .rejects.toThrow("different number of values");
-    expect(await cache.cachedMany(["a", "b"], 60_000, async keys => keys)).toEqual(["a", "b"]);
+    await expect(cache.cachedMany(["a", "b"], 60_000, async () => ["a"])).rejects.toThrow(
+      "different number of values",
+    );
+    expect(await cache.cachedMany(["a", "b"], 60_000, async (keys) => keys)).toEqual(["a", "b"]);
   });
 
   it("does not store a batch whose authority was replaced during the load", async () => {
@@ -420,14 +450,15 @@ describe("KvTtlCache", () => {
     expect(await loading).toEqual(["from a", "from a"]);
 
     authority = "a";
-    expect(await cache.cachedMany(["x", "y"], 60_000, async keys => keys.map(() => "fresh a")))
-      .toEqual(["fresh a", "fresh a"]);
+    expect(
+      await cache.cachedMany(["x", "y"], 60_000, async (keys) => keys.map(() => "fresh a")),
+    ).toEqual(["fresh a", "fresh a"]);
   });
 
   it("expires each entry by the TTL its value is given", async () => {
     vi.useFakeTimers();
     const cache = new KvTtlCache(makeKv(), () => "authority", { name: "access" });
-    const load = vi.fn(async (keys: string[]) => keys.map(key => key === "allowed"));
+    const load = vi.fn(async (keys: string[]) => keys.map((key) => key === "allowed"));
 
     expect(await cache.cachedMany(["allowed", "denied"], accessTtl, load)).toEqual([true, false]);
     vi.advanceTimersByTime(999);
@@ -457,7 +488,9 @@ describe("KvTtlCache", () => {
     await expect(cache.cached("a", 0, load)).rejects.toThrow("ttlMs must be a positive");
     // One chosen by the value is checked for each entry it is asked about.
     await cache.cached("b", 60_000, async () => 2);
-    await expect(cache.cached("b", () => Infinity, load)).rejects.toThrow("ttlMs must be a positive");
+    await expect(cache.cached("b", () => Infinity, load)).rejects.toThrow(
+      "ttlMs must be a positive",
+    );
     expect(load).not.toHaveBeenCalled();
   });
 });
@@ -481,7 +514,11 @@ describe("KvTtlCache.partitionedBy", () => {
   it("returns a load whose fence moved during it, without caching the value", async () => {
     let generation = "gen-a";
     const kv = fakeKv();
-    const cache = KvTtlCache.partitionedBy(kv, { cacheAuthority: async () => generation }, { legacyUnnamed: true });
+    const cache = KvTtlCache.partitionedBy(
+      kv,
+      { cacheAuthority: async () => generation },
+      { legacyUnnamed: true },
+    );
     const { promise, resolve } = Promise.withResolvers<string>();
 
     const loading = cache.cached("project", 60_000, () => promise);
@@ -498,12 +535,16 @@ describe("KvTtlCache.partitionedBy", () => {
     const kv = fakeKv();
     const parked = Promise.withResolvers<void>();
     let reads = 0;
-    const cache = KvTtlCache.partitionedBy(kv, {
-      cacheAuthority: async () => {
-        if (++reads === 2) await parked.promise;
-        return "gen-a";
+    const cache = KvTtlCache.partitionedBy(
+      kv,
+      {
+        cacheAuthority: async () => {
+          if (++reads === 2) await parked.promise;
+          return "gen-a";
+        },
       },
-    }, { legacyUnnamed: true });
+      { legacyUnnamed: true },
+    );
 
     const loading = cache.cached("project", 60_000, async () => "loaded");
     await vi.waitFor(() => expect(reads).toBe(2));
@@ -536,10 +577,12 @@ describe("KvTtlCache.partitionedBy", () => {
     getCredentials.mockClear();
     const load = vi.fn(async () => "reloaded");
 
-    expect(await Promise.all([
-      cache.cached("project", 60_000, load),
-      cache.cached("project", 60_000, load),
-    ])).toEqual(["from a", "from a"]);
+    expect(
+      await Promise.all([
+        cache.cached("project", 60_000, load),
+        cache.cached("project", 60_000, load),
+      ]),
+    ).toEqual(["from a", "from a"]);
     expect(getCredentials).toHaveBeenCalledOnce();
     expect(load).not.toHaveBeenCalled();
   });
@@ -551,8 +594,11 @@ describe("KvTtlCache.partitionedBy", () => {
 
     // The account may keep serving a dead grant until reconnect. The source already knows that
     // identity is dead, so a cache hit must not hide the outage for the rest of the entry's TTL.
-    await expect(source.run(async () => { throw new Error("401"); }))
-      .rejects.toThrow(CredentialsExpiredError);
+    await expect(
+      source.run(async () => {
+        throw new Error("401");
+      }),
+    ).rejects.toThrow(CredentialsExpiredError);
     const load = vi.fn(async () => "reloaded");
     expect(await cache.cached("project", 60_000, load)).toBe("reloaded");
     expect(load).toHaveBeenCalledOnce();

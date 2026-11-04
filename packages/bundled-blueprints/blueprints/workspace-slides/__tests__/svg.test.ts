@@ -1,9 +1,12 @@
 // The inline SVG sanitizer: deck SVG is untrusted (pasted, or written by an agent or a collaborator).
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { parseSvgMarkup, scopeSvgIds, svgArtworkSize } from "../files/lib/svg.ts";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
-const svg = (body: string, attrs = "") => parseSvgMarkup(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"${attrs}>${body}</svg>`)!;
+const svg = (body: string, attrs = "") =>
+  parseSvgMarkup(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"${attrs}>${body}</svg>`,
+  )!;
 
 describe("parseSvgMarkup", () => {
   it("returns null without an <svg>", () => {
@@ -11,24 +14,31 @@ describe("parseSvgMarkup", () => {
   });
 
   it("drops scripts, and frames inside foreignObject", () => {
-    const node = svg('<script>alert(1)</script><foreignObject><iframe srcdoc="<script>alert(2)</script>"></iframe><p>text</p></foreignObject>');
+    const node = svg(
+      '<script>alert(1)</script><foreignObject><iframe srcdoc="<script>alert(2)</script>"></iframe><p>text</p></foreignObject>',
+    );
     expect(node.querySelector("script, iframe")).toBeNull();
     expect(node.querySelector("foreignObject p")?.textContent).toBe("text");
     expect(node.outerHTML).not.toMatch(/alert/);
   });
 
   it("drops event handler attributes", () => {
-    const node = svg('<rect onclick="alert(1)" onmouseover="alert(2)" width="5"/>', ' onload="alert(3)"');
+    const node = svg(
+      '<rect onclick="alert(1)" onmouseover="alert(2)" width="5"/>',
+      ' onload="alert(3)"',
+    );
     const rect = node.querySelector("rect")!;
     expect(rect.getAttribute("width")).toBe("5");
-    expect([node, rect].flatMap((n) => n.getAttributeNames()).filter((name) => name.startsWith("on"))).toEqual([]);
+    expect(
+      [node, rect].flatMap((n) => n.getAttributeNames()).filter((name) => name.startsWith("on")),
+    ).toEqual([]);
   });
 
   it("drops script and outside links, and animations that would write a link", () => {
     const node = svg(
       '<a href="javascript:alert(1)"><text>a</text></a><a xlink:href=" javascript:alert(2)"><text>b</text></a>' +
-      '<a href="#top"><animate attributeName="href" values="javascript:alert(3)"/><set attributeName="xlink:href" to="javascript:alert(4)"/><text>c</text></a>' +
-      '<image href="https://tracker.test/p.png"/><image src="https://tracker.test/q.png"/><use href="https://x.test/s.svg#a"/>',
+        '<a href="#top"><animate attributeName="href" values="javascript:alert(3)"/><set attributeName="xlink:href" to="javascript:alert(4)"/><text>c</text></a>' +
+        '<image href="https://tracker.test/p.png"/><image src="https://tracker.test/q.png"/><use href="https://x.test/s.svg#a"/>',
       ' xmlns:xlink="http://www.w3.org/1999/xlink"',
     );
     const links = Array.from(node.querySelectorAll("a"));
@@ -43,7 +53,7 @@ describe("parseSvgMarkup", () => {
   it("keeps fragment references and image data", () => {
     const node = svg(
       '<defs><linearGradient id="g"><stop offset="0"/></linearGradient><path id="p" d="M0 0h1"/></defs>' +
-      `<rect fill="url(#g)" style="fill: url('#g')" width="10" height="10"/><use href="#p"/><image href="${PNG}"/>`,
+        `<rect fill="url(#g)" style="fill: url('#g')" width="10" height="10"/><use href="#p"/><image href="${PNG}"/>`,
     );
     const rect = node.querySelector("rect")!;
     expect(rect.getAttribute("fill")).toBe("url(#g)");
@@ -53,27 +63,33 @@ describe("parseSvgMarkup", () => {
   });
 });
 
-const art = () => svg(
-  '<defs><linearGradient id="sky"><stop/></linearGradient><clipPath id="c"><rect/></clipPath></defs>' +
-  '<style>#sun { fill: url(#sky) } .dot { fill: #fff }</style>' +
-  '<circle id="sun"/><rect fill="url(#sky)" style="clip-path: url(\'#c\')"/><use href="#sun"/><path fill="url(#elsewhere)"/>',
-);
+const art = () =>
+  svg(
+    '<defs><linearGradient id="sky"><stop/></linearGradient><clipPath id="c"><rect/></clipPath></defs>' +
+      "<style>#sun { fill: url(#sky) } .dot { fill: #fff }</style>" +
+      '<circle id="sun"/><rect fill="url(#sky)" style="clip-path: url(\'#c\')"/><use href="#sun"/><path fill="url(#elsewhere)"/>',
+  );
 
 const idsOf = (n: SVGSVGElement) => Array.from(n.querySelectorAll("[id]"), (e) => e.id);
 
 describe("scopeSvgIds", () => {
   it("gives each copy its own ids and keeps every reference pointing inside that copy", () => {
-    const a = art(), b = art();
+    const a = art(),
+      b = art();
     scopeSvgIds(a);
     scopeSvgIds(b);
     expect(idsOf(a).filter((id) => idsOf(b).includes(id))).toEqual([]);
-    const sky = a.querySelector("linearGradient")!.id, sun = a.querySelector("circle")!.id, clip = a.querySelector("clipPath")!.id;
+    const sky = a.querySelector("linearGradient")!.id,
+      sun = a.querySelector("circle")!.id,
+      clip = a.querySelector("clipPath")!.id;
     expect(sky).toMatch(/-sky$/);
     const rect = a.querySelector("rect[fill]")!;
     expect(rect.getAttribute("fill")).toBe(`url(#${sky})`);
     expect(rect.getAttribute("style")).toBe(`clip-path: url('#${clip}')`);
     expect(a.querySelector("use")!.getAttribute("href")).toBe(`#${sun}`);
-    expect(a.querySelector("style")!.textContent).toBe(`#${sun} { fill: url(#${sky}) } .dot { fill: #fff }`);
+    expect(a.querySelector("style")!.textContent).toBe(
+      `#${sun} { fill: url(#${sky}) } .dot { fill: #fff }`,
+    );
   });
 
   it("leaves references to ids the SVG doesn't define alone", () => {
@@ -85,7 +101,10 @@ describe("scopeSvgIds", () => {
 
 // Drawn at another size (in its block, or rasterized for PowerPoint), artwork must scale with it.
 describe("svgArtworkSize", () => {
-  const bare = (attrs: string) => parseSvgMarkup(`<svg xmlns="http://www.w3.org/2000/svg" ${attrs}><rect width="100" height="100"/></svg>`)!;
+  const bare = (attrs: string) =>
+    parseSvgMarkup(
+      `<svg xmlns="http://www.w3.org/2000/svg" ${attrs}><rect width="100" height="100"/></svg>`,
+    )!;
 
   it("gives an SVG with only a width and height the viewBox they imply", () => {
     const node = bare('width="100" height="50px"');

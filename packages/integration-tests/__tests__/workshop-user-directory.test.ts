@@ -1,5 +1,5 @@
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { AdminApi } from "@gadgets/workshop-shared/api";
 import { ADMIN_USERNAME, startHarness, type Harness } from "../src/harness.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
@@ -30,8 +30,7 @@ afterAll(async () => {
   }
 });
 
-it("user search tracks display names and honours the admin switch without dropping the index",
-    async () => {
+it("user search tracks display names and honours the admin switch without dropping the index", async () => {
   using stack = new DisposableStack();
   const publicApi = stack.use(connect(harness.url));
   const [viewer, target] = nextUsernames("viewer", "target");
@@ -44,17 +43,23 @@ it("user search tracks display names and honours the admin switch without droppi
   expect((await publicApi.getServerConfig()).userSearchEnabled).toBe(true);
   // Each capability caches the search policy, so every phase logs in afresh.
   let viewerApi = stack.use(await logIn(publicApi, viewer!));
-  await waitFor("the target to be indexed", async () =>
-    (await viewerApi.searchUsers("target before", [])).length > 0 || null);
+  await waitFor(
+    "the target to be indexed",
+    async () => (await viewerApi.searchUsers("target before", [])).length > 0 || null,
+  );
   await expect(viewerApi.searchUsers("target before", [])).resolves.toEqual(before);
-  await waitFor("the viewer to be indexed", async () =>
-    (await targetApi.searchUsers(viewer!, [])).length > 0 || null);
+  await waitFor(
+    "the viewer to be indexed",
+    async () => (await targetApi.searchUsers(viewer!, [])).length > 0 || null,
+  );
   await expect(viewerApi.searchUsers(viewer!, [])).resolves.toEqual([]);
   await expect(viewerApi.searchUsers("target before", [target!])).resolves.toEqual([]);
 
   await targetApi.setOwnDisplayName("Directory Target After");
-  await waitFor("the rename to be indexed", async () =>
-    (await viewerApi.searchUsers("target after", [])).length > 0 || null);
+  await waitFor(
+    "the rename to be indexed",
+    async () => (await viewerApi.searchUsers("target after", [])).length > 0 || null,
+  );
   await expect(viewerApi.searchUsers("target after", [])).resolves.toEqual(after);
   await expect(viewerApi.searchUsers("target before", [])).resolves.toEqual([]);
 
@@ -76,7 +81,8 @@ it("closing signups refuses new accounts but keeps existing ones", async () => {
 
   await admin.setSignupsEnabled(false);
   expect((await publicApi.getServerConfig()).signupsEnabled).toBe(false);
-  await expect(signUp(publicApi, late!))
-    .rejects.toThrow("New signups are currently disabled on this deployment.");
+  await expect(signUp(publicApi, late!)).rejects.toThrow(
+    "New signups are currently disabled on this deployment.",
+  );
   stack.use(await logIn(publicApi, existing!));
 });

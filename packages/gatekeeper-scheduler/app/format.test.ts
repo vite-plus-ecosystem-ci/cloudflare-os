@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { formatCadence, formatOccurrences, formatTiming } from "./format";
 import type { ManagementSchedule } from "../src/management-types";
 
@@ -95,10 +95,10 @@ describe("formatOccurrences", () => {
   } as const satisfies Partial<ManagementSchedule> as ManagementSchedule;
 
   it("reports progress toward a counted bound", () => {
-    expect(formatOccurrences({ ...hourly, occurrences: { count: 3 }, occurrenceCount: 1 }))
-      .toBe("1 of 3 occurrences");
-    expect(formatOccurrences({ ...hourly, occurrences: { count: 1 } }))
-      .toBe("0 of 1 occurrence");
+    expect(formatOccurrences({ ...hourly, occurrences: { count: 3 }, occurrenceCount: 1 })).toBe(
+      "1 of 3 occurrences",
+    );
+    expect(formatOccurrences({ ...hourly, occurrences: { count: 1 } })).toBe("0 of 1 occurrence");
   });
 
   it("renders a time bound in the schedule's own timezone", () => {
@@ -132,20 +132,20 @@ describe("formatTiming terminal copy", () => {
   } as const satisfies Partial<ManagementSchedule> as ManagementSchedule;
 
   it("distinguishes a used bound from a delivered one-shot", () => {
-    expect(formatTiming({ ...base, occurrences: { count: 2 } }, 0).diagnostic)
-      .toBe("This recurring task used its last scheduled occurrence.");
+    expect(formatTiming({ ...base, occurrences: { count: 2 } }, 0).diagnostic).toBe(
+      "This recurring task used its last scheduled occurrence.",
+    );
     expect(
-      formatTiming(
-        { ...base, cadence: { kind: "once", fireAt: 0, timeZone: "UTC" } },
-        0,
-      ).diagnostic,
+      formatTiming({ ...base, cadence: { kind: "once", fireAt: 0, timeZone: "UTC" } }, 0)
+        .diagnostic,
     ).toBe("This one-time task completed.");
   });
 
   it("explains a recurrence that expired before its first occurrence", () => {
     const expired = { ...base, status: "expired", expiredAt: 0 } as ManagementSchedule;
 
-    expect(formatTiming(expired, 0).diagnostic)
-      .toBe("This recurring task's cutoff passed before its first occurrence.");
+    expect(formatTiming(expired, 0).diagnostic).toBe(
+      "This recurring task's cutoff passed before its first occurrence.",
+    );
   });
 });

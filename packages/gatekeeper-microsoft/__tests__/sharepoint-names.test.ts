@@ -1,11 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { checkName } from "../src/sharepoint-session";
 
 describe("checkName", () => {
-  it.each(["plan.md", "Q3 budget (final).xlsx", "Café notes", "a", "x".repeat(255), "con2.txt", ".github", "readme.lock"])(
-    "accepts %j", name => {
-      expect(checkName(name)).toBe(name);
-    });
+  it.each([
+    "plan.md",
+    "Q3 budget (final).xlsx",
+    "Café notes",
+    "a",
+    "x".repeat(255),
+    "con2.txt",
+    ".github",
+    "readme.lock",
+  ])("accepts %j", (name) => {
+    expect(checkName(name)).toBe(name);
+  });
 
   it.each([
     ["", /required/],

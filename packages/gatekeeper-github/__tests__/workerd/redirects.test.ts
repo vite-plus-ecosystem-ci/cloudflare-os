@@ -3,7 +3,7 @@
 // keeps working while a transferred issue never leaks another repository's content.
 
 import { env, runInDurableObject } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { GatekeeperProps } from "./worker";
 
 const SHA = "a".repeat(40);
@@ -19,9 +19,10 @@ describe("getGatekeeperClassFor", () => {
     ["https://github.com/octo/repo/issues/new"],
     ["https://github.com/octo/repo/issues"],
     ["https://github.com/octo/repo/pull/12abc"],
-  ])("refuses the malformed issue or PR URL %s", async url => {
-    expect(await hooks().resourcePatternFor(url))
-      .toEqual({ error: `Unsupported GitHub URL: ${url}` });
+  ])("refuses the malformed issue or PR URL %s", async (url) => {
+    expect(await hooks().resourcePatternFor(url)).toEqual({
+      error: `Unsupported GitHub URL: ${url}`,
+    });
   });
 
   it.each([
@@ -61,7 +62,10 @@ async function repoGatekeeper() {
     state.storage.kv.put("accessToken", "test-token");
   });
   const props: GatekeeperProps = {
-    userObjectId: accountId.toString(), resourceKind: "repo", owner: "octo", repo: "repo",
+    userObjectId: accountId.toString(),
+    resourceKind: "repo",
+    owner: "octo",
+    repo: "repo",
   };
   const hooks = env.TEST_HOOKS.getByName(scenario);
   return { resolveRef: (ref: string) => hooks.resolveRef(scenario, props, ref) };
@@ -101,8 +105,10 @@ describe("GitHubGatekeeperImpl redirects", () => {
 
     expect(await gk.resolveRef("main")).toEqual({ ok: { id: SHA, fromCache: false } });
     expect(requested).toEqual([
-      "/repos/octo/repo", "/repositories/42",
-      "/repos/octo/repo/commits/main", "/repositories/42/commits/main",
+      "/repos/octo/repo",
+      "/repositories/42",
+      "/repos/octo/repo/commits/main",
+      "/repositories/42/commits/main",
     ]);
   });
 
@@ -113,13 +119,17 @@ describe("GitHubGatekeeperImpl redirects", () => {
     });
     const gk = await repoGatekeeper();
 
-    expect(await gk.resolveRef("main"))
-      .toEqual({ error: expect.stringContaining("out of the bound repository") });
-    expect(await gk.resolveRef("main"))
-      .toEqual({ error: expect.stringContaining("out of the bound repository") });
+    expect(await gk.resolveRef("main")).toEqual({
+      error: expect.stringContaining("out of the bound repository"),
+    });
+    expect(await gk.resolveRef("main")).toEqual({
+      error: expect.stringContaining("out of the bound repository"),
+    });
     // The failed probe is not repeated by the second read.
     expect(requested).toEqual([
-      "/repos/octo/repo", "/repos/octo/repo/commits/main", "/repos/octo/repo/commits/main",
+      "/repos/octo/repo",
+      "/repos/octo/repo/commits/main",
+      "/repos/octo/repo/commits/main",
     ]);
   });
 });

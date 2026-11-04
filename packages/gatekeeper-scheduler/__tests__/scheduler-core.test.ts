@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   initialNextFire,
   normalizeCalendarRule,
@@ -38,7 +38,14 @@ describe("schedule input validation", () => {
         {
           ...options,
           occurrences: {
-            until: { timeZone: "America/New_York", year: 2026, month: 8, day: 3, hour: 9, minute: 0 },
+            until: {
+              timeZone: "America/New_York",
+              year: 2026,
+              month: 8,
+              day: 3,
+              hour: 9,
+              minute: 0,
+            },
           },
         },
         normalizeCalendarRule(

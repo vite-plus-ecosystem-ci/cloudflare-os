@@ -1,7 +1,14 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { DEBOUNCE_MS, RETRY_BASE_MS, RETRY_MAX_MS, type SaveOutcome, SaveScheduler, retryDelay } from "../src/save-scheduler.ts";
+import {
+  DEBOUNCE_MS,
+  RETRY_BASE_MS,
+  RETRY_MAX_MS,
+  type SaveOutcome,
+  SaveScheduler,
+  retryDelay,
+} from "../src/save-scheduler.ts";
 
 function setup(options: { readOnly?: boolean; debounceMs?: number } = {}) {
   const statuses: string[] = [];
@@ -23,7 +30,16 @@ function setup(options: { readOnly?: boolean; debounceMs?: number } = {}) {
     },
     ...options,
   });
-  return { scheduler, save, statuses, messages, outcomes, dirty: (value: boolean) => { dirty = value; } };
+  return {
+    scheduler,
+    save,
+    statuses,
+    messages,
+    outcomes,
+    dirty: (value: boolean) => {
+      dirty = value;
+    },
+  };
 }
 
 describe("retryDelay", () => {
@@ -106,7 +122,12 @@ describe("SaveScheduler", () => {
   it("folds a flush during a save into one more save", async () => {
     const { scheduler, save } = setup();
     let release!: (outcome: SaveOutcome) => void;
-    save.mockImplementationOnce(() => new Promise<SaveOutcome>((resolve) => { release = resolve; }));
+    save.mockImplementationOnce(
+      () =>
+        new Promise<SaveOutcome>((resolve) => {
+          release = resolve;
+        }),
+    );
     const first = scheduler.flush();
     await scheduler.flush();
     await scheduler.flush();

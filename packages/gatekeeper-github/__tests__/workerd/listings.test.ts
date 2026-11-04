@@ -7,7 +7,7 @@
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import { env, runInDurableObject } from "cloudflare:test";
 import type { ApprovalQueue } from "@gadgets/workshop-shared/gatekeeper";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { GitHubGatekeeperImpl } from "../../src/github";
 import { GitHubRepoSessionImpl } from "../../src/github";
 import type { GatekeeperProps, ListingMethod, Outcome } from "./worker";
@@ -74,7 +74,8 @@ class FakeGitHub {
 
   constructor() {
     vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) =>
-      this.#handle(new Request(input, init)));
+      this.#handle(new Request(input, init)),
+    );
   }
 
   async #handle(request: Request): Promise<Response> {
@@ -83,12 +84,18 @@ class FakeGitHub {
     const path = url.pathname.startsWith("/repos/")
       ? url.pathname.slice(new URL(API_BASE).pathname.length)
       : url.pathname;
-    this.requests.push(`${request.method} ${path}${url.searchParams.has("page") ? ` p${page}` : ""}`);
+    this.requests.push(
+      `${request.method} ${path}${url.searchParams.has("page") ? ` p${page}` : ""}`,
+    );
 
     if (path === "") {
       // Repo metadata, which also pins the repository id.
       return Response.json({
-        id: 1, description: null, visibility: "public", private: false, default_branch: "main",
+        id: 1,
+        description: null,
+        visibility: "public",
+        private: false,
+        default_branch: "main",
       });
     }
     if (path === "/user") return Response.json({ login: "ada" });
@@ -104,7 +111,7 @@ class FakeGitHub {
     if (issueMatch) {
       const number = Number(issueMatch[1]);
       if (request.method === "PATCH") {
-        this.issues.set(number, { ...this.issues.get(number)!, ...await request.json<object>() });
+        this.issues.set(number, { ...this.issues.get(number)!, ...(await request.json<object>()) });
         return Response.json(this.issues.get(number));
       }
       const body = this.issues.get(number);
@@ -118,8 +125,13 @@ class FakeGitHub {
     if (pullMatch) {
       return Response.json({
         ...this.pulls.get(Number(pullMatch[1])),
-        comments: 0, commits: 1, additions: 0, deletions: 0, changed_files: 0,
-        requested_reviewers: [], mergeable: null,
+        comments: 0,
+        commits: 1,
+        additions: 0,
+        deletions: 0,
+        changed_files: 0,
+        requested_reviewers: [],
+        mergeable: null,
       });
     }
     throw new Error(`test: unexpected fetch ${request.method} ${request.url}`);
@@ -149,19 +161,42 @@ async function repoGatekeeper() {
     state.storage.kv.put("accessToken", "test-token");
   });
   const props: GatekeeperProps = {
-    userObjectId: accountId.toString(), resourceKind: "repo", owner: OWNER, repo: REPO,
+    userObjectId: accountId.toString(),
+    resourceKind: "repo",
+    owner: OWNER,
+    repo: REPO,
   };
   const hooks = env.TEST_HOOKS.getByName(scenario);
   return {
     pages: async <T>(method: ListingMethod, query: unknown, pageSize = 100, calls?: number) =>
-      await unwrap(hooks.listingPages(scenario, props, method, query, pageSize, calls)) as (T[] | null | string)[],
+      (await unwrap(hooks.listingPages(scenario, props, method, query, pageSize, calls))) as (
+        | T[]
+        | null
+        | string
+      )[],
     all: async <T>(method: ListingMethod, query: unknown) =>
-      (await unwrap(hooks.listingPages(scenario, props, method, query, 100)) as (T[] | null)[])
-        .flatMap(page => page ?? []),
-    queueEdit: (kind: "issue" | "pull", id: string, edit: { title: string } | { state: "open" | "closed" }) =>
-      unwrap(hooks.queueEdit(scenario, props, new RpcStub(new TestApprovalQueue()) as never, kind, id, edit)),
+      (
+        (await unwrap(hooks.listingPages(scenario, props, method, query, 100))) as (T[] | null)[]
+      ).flatMap((page) => page ?? []),
+    queueEdit: (
+      kind: "issue" | "pull",
+      id: string,
+      edit: { title: string } | { state: "open" | "closed" },
+    ) =>
+      unwrap(
+        hooks.queueEdit(
+          scenario,
+          props,
+          new RpcStub(new TestApprovalQueue()) as never,
+          kind,
+          id,
+          edit,
+        ),
+      ),
     applyAction: (actionId: number) =>
-      unwrap(hooks.applyAction(scenario, props, actionId, new RpcStub(new UnusedGitCache()) as never)),
+      unwrap(
+        hooks.applyAction(scenario, props, actionId, new RpcStub(new UnusedGitCache()) as never),
+      ),
     openIssue: (id: string) => unwrap(hooks.openIssue(scenario, props, id)),
   };
 }
@@ -174,12 +209,12 @@ describe("listing walks", () => {
   it("listIssues continues past a page that contains a pull request", async () => {
     const github = new FakeGitHub();
     github.pages.set("/issues", [
-      range(1, 100).map(n => issue(n, n === 50 ? { pull_request: {} } : {})),
+      range(1, 100).map((n) => issue(n, n === 50 ? { pull_request: {} } : {})),
       [issue(101)],
     ]);
     const gk = await repoGatekeeper();
 
-    const ids = (await gk.all<{ id: string }>("listIssues", undefined)).map(item => item.id);
+    const ids = (await gk.all<{ id: string }>("listIssues", undefined)).map((item) => item.id);
 
     expect(ids).toHaveLength(100);
     expect(ids).not.toContain("50");
@@ -189,46 +224,57 @@ describe("listing walks", () => {
   it("listPullRequests continues past a page with a touched row", async () => {
     const github = new FakeGitHub();
     github.pulls.set(5, pull(5));
-    github.pages.set("/pulls", [range(1, 100).map(n => pull(n)), [pull(101)]]);
+    github.pages.set("/pulls", [range(1, 100).map((n) => pull(n)), [pull(101)]]);
     const gk = await repoGatekeeper();
     await gk.queueEdit("pull", "5", { title: "Renamed" });
 
-    const rows = await gk.all<{ id: string, title: string }>("listPullRequests", { state: "all" });
+    const rows = await gk.all<{ id: string; title: string }>("listPullRequests", { state: "all" });
 
     expect(rows).toHaveLength(101);
-    expect(rows.find(row => row.id === "5")?.title).toBe("Renamed");
-    expect(rows.map(row => row.id)).toContain("101");
+    expect(rows.find((row) => row.id === "5")?.title).toBe("Renamed");
+    expect(rows.map((row) => row.id)).toContain("101");
   });
 
   it("loses no rows when a fetch fails partway through a page", async () => {
     const github = new FakeGitHub();
-    github.pages.set("/issues", [range(1, 100).map(n => issue(n)), range(101, 100).map(n => issue(n))]);
+    github.pages.set("/issues", [
+      range(1, 100).map((n) => issue(n)),
+      range(101, 100).map((n) => issue(n)),
+    ]);
     github.failing.add("/issues p2");
     const gk = await repoGatekeeper();
 
     // The second call holds rows 61-100 when page 2's fetch fails; the retry still serves them.
     const pages = await gk.pages<{ id: string }>("listIssues", undefined, 60);
     expect(pages[1]).toContain("Bad Gateway");
-    expect(pages.flatMap(page => Array.isArray(page) ? page.map(item => item.id) : []))
-      .toEqual(range(1, 200).map(String));
+    expect(
+      pages.flatMap((page) => (Array.isArray(page) ? page.map((item) => item.id) : [])),
+    ).toEqual(range(1, 200).map(String));
   });
 });
 
 describe("pull request text search", () => {
   it("bounds each next() and still finds a match on a later page", async () => {
     const github = new FakeGitHub();
-    github.pages.set("/pulls", range(0, 25).map(page => range(page * 100 + 1, 100)
-      .map(n => pull(n, n === 1450 ? { body: "the NEEDLE is here" } : {}))));
+    github.pages.set(
+      "/pulls",
+      range(0, 25).map((page) =>
+        range(page * 100 + 1, 100).map((n) =>
+          pull(n, n === 1450 ? { body: "the NEEDLE is here" } : {}),
+        ),
+      ),
+    );
     const gk = await repoGatekeeper();
-    const fetched = () => github.requests.filter(request => request.startsWith("GET /pulls p"));
+    const fetched = () => github.requests.filter((request) => request.startsWith("GET /pulls p"));
 
     // The first call spends its fetch window without a match: `[]`, not the end.
     expect(await gk.pages("searchPullRequests", { text: "needle" }, 50, 1)).toEqual([[]]);
     expect(fetched()).toHaveLength(10);
 
     const pages = await gk.pages<{ id: string }>("searchPullRequests", { text: "needle" }, 50);
-    expect(pages.map(page => Array.isArray(page) ? page.map(item => item.id) : page))
-      .toEqual([[], ["1450"], null]);
+    expect(pages.map((page) => (Array.isArray(page) ? page.map((item) => item.id) : page))).toEqual(
+      [[], ["1450"], null],
+    );
     // Pages 1-10 came from the cache; 26 is the empty page that ends the walk.
     expect(fetched()).toHaveLength(26);
   });
@@ -237,13 +283,14 @@ describe("pull request text search", () => {
 describe("filters", () => {
   it("matches a creator login case-insensitively", async () => {
     const github = new FakeGitHub();
-    github.pages.set("/issues", [[
-      issue(1, { user: { login: "octocat" } }),
-      issue(2, { user: { login: "someone" } }),
-    ]]);
+    github.pages.set("/issues", [
+      [issue(1, { user: { login: "octocat" } }), issue(2, { user: { login: "someone" } })],
+    ]);
     const gk = await repoGatekeeper();
 
-    const ids = (await gk.all<{ id: string }>("listIssues", { author: "OctoCat" })).map(item => item.id);
+    const ids = (await gk.all<{ id: string }>("listIssues", { author: "OctoCat" })).map(
+      (item) => item.id,
+    );
 
     expect(ids).toEqual(["1"]);
   });
@@ -255,8 +302,9 @@ describe("filters", () => {
     const gk = await repoGatekeeper();
     await gk.queueEdit("issue", "3", { state: "closed" });
 
-    const ids = (await gk.all<{ id: string }>("searchIssues", { text: "bug", state: "open" }))
-      .map(item => item.id);
+    const ids = (await gk.all<{ id: string }>("searchIssues", { text: "bug", state: "open" })).map(
+      (item) => item.id,
+    );
 
     expect(ids).toEqual(["4"]);
   });
@@ -285,7 +333,8 @@ describe("session page size", () => {
     const gatekeeper = { listIssues: async () => ({ next: async () => null }) };
     using session = new GitHubRepoSessionImpl(
       gatekeeper as unknown as GitHubGatekeeperImpl,
-      new RpcStub(new TestApprovalQueue()) as unknown as RpcStub<ApprovalQueue>);
+      new RpcStub(new TestApprovalQueue()) as unknown as RpcStub<ApprovalQueue>,
+    );
 
     await expect(session.listIssues({ resultsPerPage: 0 })).rejects.toThrow(/resultsPerPage/);
   });

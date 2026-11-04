@@ -11,7 +11,7 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { Route as GadgetRedirectRouteImport } from "./routes/gadget.$id";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -76,5 +76,4 @@ describe("legacy workspace URL redirects", () => {
     expect(router.state.location.search).toEqual({});
     expect(router.state.location.hash).toBe("");
   });
-
 });
