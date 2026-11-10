@@ -4,7 +4,7 @@
 import { KvTtlCache } from "@gadgets/gatekeeper-kit/cache";
 import type { RpcStub } from "cloudflare:workers";
 import type { ApprovalQueue, ObservationDescription } from "@gadgets/workshop-shared/gatekeeper";
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite-plus/test";
 import { NotionApiError } from "../src/notion-api";
 import {
   ITEM_ACCESS_ALLOWED_TTL_MS,
@@ -36,7 +36,7 @@ class FakeKv {
   entries = new Map<string, unknown>();
   get<T>(key: string): T | undefined {
     const value = this.entries.get(key);
-    return value === undefined ? undefined : structuredClone(value) as T;
+    return value === undefined ? undefined : (structuredClone(value) as T);
   }
   put<T>(key: string, value: T): void {
     this.entries.set(key, structuredClone(value));
@@ -49,7 +49,8 @@ class FakeKv {
 function recordingQueue() {
   const observations: ObservationDescription[] = [];
   const queue = {
-    authorizeObservation: async (observation: ObservationDescription) => void observations.push(observation),
+    authorizeObservation: async (observation: ObservationDescription) =>
+      void observations.push(observation),
   } as unknown as RpcStub<ApprovalQueue>;
   return { queue, observations };
 }
@@ -60,9 +61,15 @@ describe("Notion subresource IDs", () => {
   it("names an item by its normalized id within its workspace", () => {
     expect(pageId).toBe(`workspace/${WORKSPACE}/item/${PAGE_NORMALIZED}`);
     expect(itemSubresourceId(WORKSPACE, PAGE_NORMALIZED.toUpperCase())).toBe(pageId);
-    expect(parseNotionSubresource(pageId))
-      .toEqual({ kind: "item", workspaceId: WORKSPACE, itemId: PAGE_NORMALIZED });
-    expect(parseNotionSubresource(workspaceId)).toEqual({ kind: "workspace", workspaceId: WORKSPACE });
+    expect(parseNotionSubresource(pageId)).toEqual({
+      kind: "item",
+      workspaceId: WORKSPACE,
+      itemId: PAGE_NORMALIZED,
+    });
+    expect(parseNotionSubresource(workspaceId)).toEqual({
+      kind: "workspace",
+      workspaceId: WORKSPACE,
+    });
   });
 
   it("refuses to name a provisional page", () => {
@@ -77,7 +84,7 @@ describe("Notion subresource IDs", () => {
     `workspace/${WORKSPACE}/item/${PAGE_NORMALIZED}/item/${PAGE_NORMALIZED}`,
     `item/${PAGE_NORMALIZED}`,
     "repo/1",
-  ])("refuses %s", id => {
+  ])("refuses %s", (id) => {
     expect(() => parseNotionSubresource(id)).toThrow();
   });
 });
@@ -91,9 +98,14 @@ describe("NotionObservationScope", () => {
     await scope.authorize(queue, [PAGE, CHILD, ROW], read);
     await scope.authorize(queue, ["~2"], read);
 
-    expect(observations.map(observation => observation.subresources))
-      .toEqual([[pageId], [pageId], [pageId]]);
-    expect(observations.every(observation => observation.excludeObservers === undefined)).toBe(true);
+    expect(observations.map((observation) => observation.subresources)).toEqual([
+      [pageId],
+      [pageId],
+      [pageId],
+    ]);
+    expect(observations.every((observation) => observation.excludeObservers === undefined)).toBe(
+      true,
+    );
   });
 
   it("reports workspace membership plus each real item a workspace read reveals", async () => {
@@ -101,8 +113,11 @@ describe("NotionObservationScope", () => {
 
     expect(await scope.subresources([])).toEqual([workspaceId]);
     expect(await scope.subresources(["~1"])).toEqual([workspaceId]);
-    expect(await scope.subresources([PAGE, PAGE_NORMALIZED, CHILD, "~3"]))
-      .toEqual([workspaceId, pageId, childId]);
+    expect(await scope.subresources([PAGE, PAGE_NORMALIZED, CHILD, "~3"])).toEqual([
+      workspaceId,
+      pageId,
+      childId,
+    ]);
   });
 
   it("fails reads closed while the owner's workspace id is unknown, and asks again", async () => {
@@ -117,7 +132,10 @@ describe("NotionObservationScope", () => {
     stored = WORKSPACE;
     await scope.authorize(queue, [], read);
     await scope.authorize(queue, [], read);
-    expect(observations.map(observation => observation.subresources)).toEqual([[workspaceId], [workspaceId]]);
+    expect(observations.map((observation) => observation.subresources)).toEqual([
+      [workspaceId],
+      [workspaceId],
+    ]);
     expect(loads).toHaveBeenCalledTimes(2);
   });
 });
@@ -128,7 +146,9 @@ describe("assertBindingSubresources", () => {
 
   it("accepts what each binding reports", () => {
     expect(() => assertBindingSubresources(item, [pageId])).not.toThrow();
-    expect(() => assertBindingSubresources(workspace, [workspaceId, pageId, childId])).not.toThrow();
+    expect(() =>
+      assertBindingSubresources(workspace, [workspaceId, pageId, childId]),
+    ).not.toThrow();
   });
 
   it("refuses anything but the bound item on an item binding", () => {
@@ -137,9 +157,15 @@ describe("assertBindingSubresources", () => {
   });
 
   it("accepts IDs recorded under a workspace the owner's connection has since left", () => {
-    expect(() => assertBindingSubresources(workspace,
-      [workspaceSubresourceId(OTHER_WORKSPACE), itemSubresourceId(OTHER_WORKSPACE, CHILD)])).not.toThrow();
-    expect(() => assertBindingSubresources(item, [itemSubresourceId(OTHER_WORKSPACE, PAGE)])).not.toThrow();
+    expect(() =>
+      assertBindingSubresources(workspace, [
+        workspaceSubresourceId(OTHER_WORKSPACE),
+        itemSubresourceId(OTHER_WORKSPACE, CHILD),
+      ]),
+    ).not.toThrow();
+    expect(() =>
+      assertBindingSubresources(item, [itemSubresourceId(OTHER_WORKSPACE, PAGE)]),
+    ).not.toThrow();
   });
 
   it("refuses unknown IDs", () => {
@@ -192,17 +218,23 @@ describe("checkNotionSubresourceAccess", () => {
 
   let workspaceLookups = 0;
   const check = (ids: string[], ownWorkspace: { id?: string } = { id: WORKSPACE }) =>
-    checkNotionSubresourceAccess({
-      access,
-      workspaceId: async () => {
-        workspaceLookups++;
-        return ownWorkspace.id;
+    checkNotionSubresourceAccess(
+      {
+        access,
+        workspaceId: async () => {
+          workspaceLookups++;
+          return ownWorkspace.id;
+        },
+        api: { detectKind },
       },
-      api: { detectKind },
-    }, ids);
+      ids,
+    );
 
   it("compares workspace membership without asking Notion", async () => {
-    expect(await check([workspaceId, workspaceSubresourceId(OTHER_WORKSPACE)])).toEqual([true, false]);
+    expect(await check([workspaceId, workspaceSubresourceId(OTHER_WORKSPACE)])).toEqual([
+      true,
+      false,
+    ]);
     expect(await check([workspaceId], {})).toEqual([false]);
     expect(detectKind).not.toHaveBeenCalled();
   });
@@ -211,8 +243,11 @@ describe("checkNotionSubresourceAccess", () => {
     workspaceLookups = 0;
     expect(await check([pageId, childId])).toEqual([true, true]);
     expect(workspaceLookups).toBe(0);
-    expect(await check([workspaceId, pageId, workspaceSubresourceId(OTHER_WORKSPACE)]))
-      .toEqual([true, true, false]);
+    expect(await check([workspaceId, pageId, workspaceSubresourceId(OTHER_WORKSPACE)])).toEqual([
+      true,
+      true,
+      false,
+    ]);
     expect(workspaceLookups).toBe(1);
   });
 
@@ -251,7 +286,7 @@ describe("checkNotionSubresourceAccess", () => {
     new NotionApiError(404, "Not found", "object_not_found"),
     new NotionApiError(403, "Restricted", "restricted_resource"),
     new NotionApiError(400, "Invalid id", "validation_error"),
-  ])("treats %s as a definite denial", async error => {
+  ])("treats %s as a definite denial", async (error) => {
     visible.set(PAGE_NORMALIZED, error);
     expect(await check([pageId])).toEqual([false]);
   });
@@ -262,7 +297,7 @@ describe("checkNotionSubresourceAccess", () => {
     new NotionApiError(502, "Bad gateway"),
     new NotionApiError(400, "Bad JSON", "invalid_json"),
     new Error("No Notion credentials set."),
-  ])("throws %s without caching it", async error => {
+  ])("throws %s without caching it", async (error) => {
     visible.set(PAGE_NORMALIZED, error);
     await expect(check([pageId])).rejects.toBe(error);
 

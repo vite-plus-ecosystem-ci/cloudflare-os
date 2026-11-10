@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { isDeploymentAdmin } from "../src/auth/config.js";
 
 const withAdmins = (admins: unknown) => ({ ADMINS: admins }) as unknown as Cloudflare.Env;
@@ -26,7 +26,8 @@ describe("isDeploymentAdmin", () => {
 
   it("names no admin while the binding is unset, and refuses one that is not a list", () => {
     expect(isDeploymentAdmin(withAdmins(undefined), "admin")).toBe(false);
-    expect(() => isDeploymentAdmin(withAdmins(JSON.stringify({ admin: true })), "admin"))
-        .toThrow("ADMINS must be configured as an array of usernames.");
+    expect(() => isDeploymentAdmin(withAdmins(JSON.stringify({ admin: true })), "admin")).toThrow(
+      "ADMINS must be configured as an array of usernames.",
+    );
   });
 });

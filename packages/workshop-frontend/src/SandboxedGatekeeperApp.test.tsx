@@ -12,7 +12,7 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { newMessagePortRpcSession, RpcStub, RpcTarget } from "capnweb";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type {
   GatekeeperAppTheme,
   GatekeeperAppThemeReceiver,
@@ -37,10 +37,12 @@ vi.mock("./features/gatekeeper-sharing/GatekeeperUserPickerDialog", async (impor
     default: (props: PickerProps) => {
       picker.props = props;
       if (picker.real) return <RealPicker {...props} />;
-      return <>
-        <button type="button" aria-label="Close person picker" onClick={props.onClose} />
-        <button type="button" aria-label="Cancel person picker" onClick={props.onCancel} />
-      </>;
+      return (
+        <>
+          <button type="button" aria-label="Close person picker" onClick={props.onClose} />
+          <button type="button" aria-label="Cancel person picker" onClick={props.onCancel} />
+        </>
+      );
     },
   };
 });
@@ -121,7 +123,10 @@ class TestReceiver extends RpcTarget implements GatekeeperUserSelectionReceiver 
   }
 }
 
-const ALICE: GatekeeperUserSelection = { ticket: "a".repeat(64), profile: { displayName: "Alice" } };
+const ALICE: GatekeeperUserSelection = {
+  ticket: "a".repeat(64),
+  profile: { displayName: "Alice" },
+};
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -186,7 +191,14 @@ describe("SandboxedGatekeeperApp navigation", () => {
   // Whether `promise` has settled by the next macrotask, without waiting for it.
   async function settled(promise: Promise<unknown>): Promise<boolean> {
     let done = false;
-    promise.then(() => { done = true; }, () => { done = true; });
+    promise.then(
+      () => {
+        done = true;
+      },
+      () => {
+        done = true;
+      },
+    );
     await tick();
     return done;
   }
@@ -202,14 +214,18 @@ describe("SandboxedGatekeeperApp navigation", () => {
     });
     expect(picker.props).not.toBeNull();
     const refusedReceiver = new TestReceiver();
-    await expect(host!.selectUsers(refusedReceiver)).rejects.toThrow("A person picker is already open.");
+    await expect(host!.selectUsers(refusedReceiver)).rejects.toThrow(
+      "A person picker is already open.",
+    );
     await vi.waitFor(() => expect(refusedReceiver.disposeCount).toBe(1));
     await expect(host!.selectUsers("collection-1")).rejects.toThrow(TypeError);
 
     // The receiver decides when a selection counts as taken: it awaits its own backend call, and
     // the picker's delivery stays pending until then, while selectUsers() itself stays pending.
     let releaseBackend!: () => void;
-    receiver.backend = new Promise<void>((resolve) => { releaseBackend = resolve; });
+    receiver.backend = new Promise<void>((resolve) => {
+      releaseBackend = resolve;
+    });
     const delivery = picker.props!.onSelected(ALICE);
     await vi.waitFor(() => expect(receiver.received).toEqual([ALICE]));
     expect(await settled(delivery)).toBe(false);
@@ -254,12 +270,16 @@ describe("SandboxedGatekeeperApp navigation", () => {
       first = host!.selectUsers(new TestReceiver());
       await tick();
     });
-    const input = container!.querySelector('input')!;
+    const input = container!.querySelector("input")!;
     await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'previous@example.com');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(
+        input,
+        "previous@example.com",
+      );
+      input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    const done = () => [...container!.querySelectorAll('button')].find(button => button.textContent === 'Done')!;
+    const done = () =>
+      [...container!.querySelectorAll("button")].find((button) => button.textContent === "Done")!;
     let second!: Promise<void>;
     await act(async () => {
       done().click();
@@ -268,7 +288,7 @@ describe("SandboxedGatekeeperApp navigation", () => {
       await tick();
     });
     await first;
-    expect(container!.querySelector('input')?.value).toBe('');
+    expect(container!.querySelector("input")?.value).toBe("");
     expect(done().disabled).toBe(false);
     expect(await settled(second)).toBe(false);
     await act(async () => done().click());
@@ -279,7 +299,9 @@ describe("SandboxedGatekeeperApp navigation", () => {
     await mountApp();
     const receiver = new TestReceiver();
     let releaseBackend!: () => void;
-    receiver.backend = new Promise<void>((resolve) => { releaseBackend = resolve; });
+    receiver.backend = new Promise<void>((resolve) => {
+      releaseBackend = resolve;
+    });
     let pendingPick!: Promise<void>;
     await act(async () => {
       pendingPick = host!.selectUsers(receiver);
@@ -333,7 +355,9 @@ describe("SandboxedGatekeeperApp navigation", () => {
     await mountApp();
     const receiver = new TestReceiver();
     let releaseBackend!: () => void;
-    receiver.backend = new Promise<void>((resolve) => { releaseBackend = resolve; });
+    receiver.backend = new Promise<void>((resolve) => {
+      releaseBackend = resolve;
+    });
     let pendingPick!: Promise<void>;
     await act(async () => {
       pendingPick = host!.selectUsers(receiver);

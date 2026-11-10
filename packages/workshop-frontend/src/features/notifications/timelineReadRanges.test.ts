@@ -1,9 +1,17 @@
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 import type { AiChatMessage, AiChatMessageBody } from "@gadgets/workshop-shared/api";
 import { timelineReadRanges } from "./timelineReadRanges";
 
-const message = (sequence: number, body: AiChatMessageBody = {type: "message", message: "Visible"}): AiChatMessage =>
-  ({chatId: 1, sequence, timestamp: new Date(), author: {type: "agent", id: "test", name: "Test"}, ...body});
+const message = (
+  sequence: number,
+  body: AiChatMessageBody = { type: "message", message: "Visible" },
+): AiChatMessage => ({
+  chatId: 1,
+  sequence,
+  timestamp: new Date(),
+  author: { type: "agent", id: "test", name: "Test" },
+  ...body,
+});
 
 it("places catalog gaps before the next visible row without changing its mark-unread position", () => {
   expect(
@@ -11,9 +19,9 @@ it("places catalog gaps before the next visible row without changing its mark-un
       [9, 11],
       [
         message(9),
-        message(10, {type: "catalogChange", resources: []}),
+        message(10, { type: "catalogChange", resources: [] }),
         message(11),
-        message(12, {type: "catalogChange", resources: []}),
+        message(12, { type: "catalogChange", resources: [] }),
       ],
     ),
   ).toEqual([
@@ -28,11 +36,11 @@ it("includes folded work and checkpoint bookkeeping but not decorative labels", 
       [2, undefined, 7],
       [
         message(2),
-        message(3, {type: "action", actionId: 1}),
-        message(4, {type: "changes"}),
-        message(5, {type: "catalogChange", resources: []}),
+        message(3, { type: "action", actionId: 1 }),
+        message(4, { type: "changes" }),
+        message(5, { type: "catalogChange", resources: [] }),
         message(7),
-        message(8, {type: "changes"}),
+        message(8, { type: "changes" }),
       ],
     ),
   ).toEqual([
@@ -46,11 +54,7 @@ it("keeps ranges ordered when older pages arrive", () => {
   expect(
     timelineReadRanges(
       [0, 3],
-      [
-        message(0),
-        message(1, {type: "catalogChange", resources: []}),
-        message(3),
-      ],
+      [message(0), message(1, { type: "catalogChange", resources: [] }), message(3)],
     ),
   ).toEqual([
     { start: 0, end: 0, unreadEnd: 0, previousUnreadEnd: -1 },
@@ -60,27 +64,42 @@ it("keeps ranges ordered when older pages arrive", () => {
 });
 
 it("keeps bookkeeping and reasoning after a read response out of unread navigation", () => {
-  expect(timelineReadRanges([0, 3, 5], [
-    message(0), message(1, {type: "action", actionId: 1}), message(2, {type: "changes"}),
-    message(3, {type: "message", message: "", reasoning: "Not a visible message"}),
-    message(4, {type: "changes"}), message(5),
-  ])).toEqual([
-    {start: 0, end: 2, unreadEnd: 0, previousUnreadEnd: -1},
-    {start: 3, end: 4, unreadEnd: null, previousUnreadEnd: 0},
-    {start: 5, end: 5, unreadEnd: 5, previousUnreadEnd: 0},
+  expect(
+    timelineReadRanges(
+      [0, 3, 5],
+      [
+        message(0),
+        message(1, { type: "action", actionId: 1 }),
+        message(2, { type: "changes" }),
+        message(3, { type: "message", message: "", reasoning: "Not a visible message" }),
+        message(4, { type: "changes" }),
+        message(5),
+      ],
+    ),
+  ).toEqual([
+    { start: 0, end: 2, unreadEnd: 0, previousUnreadEnd: -1 },
+    { start: 3, end: 4, unreadEnd: null, previousUnreadEnd: 0 },
+    { start: 5, end: 5, unreadEnd: 5, previousUnreadEnd: 0 },
   ]);
 });
 
 it("counts attachment-only messages but excludes slash-command output", () => {
-  expect(timelineReadRanges([0, 1, 2], [
-    message(0),
-    message(1, {type: "message", message: "Generated", generatedBySlashCommandSequence: 0}),
-    message(2, {type: "message", message: "", attachments: [
-      {id: "attachment", mimeType: "text/plain", name: "notes.txt", size: 1},
-    ]}),
-  ])).toEqual([
-    {start: 0, end: 0, unreadEnd: 0, previousUnreadEnd: -1},
-    {start: 1, end: 1, unreadEnd: null, previousUnreadEnd: 0},
-    {start: 2, end: 2, unreadEnd: 2, previousUnreadEnd: 0},
+  expect(
+    timelineReadRanges(
+      [0, 1, 2],
+      [
+        message(0),
+        message(1, { type: "message", message: "Generated", generatedBySlashCommandSequence: 0 }),
+        message(2, {
+          type: "message",
+          message: "",
+          attachments: [{ id: "attachment", mimeType: "text/plain", name: "notes.txt", size: 1 }],
+        }),
+      ],
+    ),
+  ).toEqual([
+    { start: 0, end: 0, unreadEnd: 0, previousUnreadEnd: -1 },
+    { start: 1, end: 1, unreadEnd: null, previousUnreadEnd: 0 },
+    { start: 2, end: 2, unreadEnd: 2, previousUnreadEnd: 0 },
   ]);
 });

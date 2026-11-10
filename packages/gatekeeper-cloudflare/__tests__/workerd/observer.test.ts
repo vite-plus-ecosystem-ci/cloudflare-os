@@ -3,7 +3,7 @@
 // the refusal to treat an infrastructure failure as a denial, are both asserted here.
 
 import { env } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 const ACCOUNT_ID = "0123456789abcdef0123456789abcdef";
 const WORKER_PROPS = { userObjectId: "user-1", accountId: ACCOUNT_ID, workerName: "api-worker" };
@@ -20,8 +20,9 @@ describe("addObserver", () => {
   });
 
   it("refuses a collaborator whose own credentials cannot", async () => {
-    expect(await hooks.addObserver("deny", WORKER_PROPS, false))
-      .toMatch(/does not have access to the bound Workers telemetry/);
+    expect(await hooks.addObserver("deny", WORKER_PROPS, false)).toMatch(
+      /does not have access to the bound Workers telemetry/,
+    );
   });
 
   it("refuses rather than admits when the verification itself fails", async () => {
@@ -36,8 +37,12 @@ describe("addObserver", () => {
 
 describe("verifyObserverAccess", () => {
   it("allows only observers whose own credentials can read the account, even on a Worker binding", async () => {
-    const { result, asked } = await hooks.verifyObserverAccess("verify",
-      WORKER_PROPS, { allowed: true, denied: false }, [ACCOUNT_SUBRESOURCE]);
+    const { result, asked } = await hooks.verifyObserverAccess(
+      "verify",
+      WORKER_PROPS,
+      { allowed: true, denied: false },
+      [ACCOUNT_SUBRESOURCE],
+    );
 
     expect(result).toEqual(["allowed"]);
     // The account itself is asked about, not the binding's Worker.
@@ -45,15 +50,23 @@ describe("verifyObserverAccess", () => {
   });
 
   it("fails the whole call when an observer's access cannot be determined", async () => {
-    const { result } = await hooks.verifyObserverAccess("verify-explode",
-      ACCOUNT_PROPS, { allowed: true, broken: "verifier exploded" }, [ACCOUNT_SUBRESOURCE]);
+    const { result } = await hooks.verifyObserverAccess(
+      "verify-explode",
+      ACCOUNT_PROPS,
+      { allowed: true, broken: "verifier exploded" },
+      [ACCOUNT_SUBRESOURCE],
+    );
 
     expect(result).toContain("verifier exploded");
   });
 
   it("refuses an ID it never reports without asking anyone", async () => {
-    const { result, asked } = await hooks.verifyObserverAccess("verify-unknown", ACCOUNT_PROPS,
-      { observer: true }, [ACCOUNT_SUBRESOURCE, `${ACCOUNT_SUBRESOURCE}/worker/${"a".repeat(32)}`]);
+    const { result, asked } = await hooks.verifyObserverAccess(
+      "verify-unknown",
+      ACCOUNT_PROPS,
+      { observer: true },
+      [ACCOUNT_SUBRESOURCE, `${ACCOUNT_SUBRESOURCE}/worker/${"a".repeat(32)}`],
+    );
 
     expect(result).toContain("Not a Cloudflare Workers Observability subresource");
     expect(asked).toEqual({ observer: [] });
@@ -65,7 +78,8 @@ describe("resource description", () => {
     const described = await hooks.describeResource("describe-worker", WORKER_PROPS);
 
     expect(described.url).toBe(
-      `https://dash.cloudflare.com/${ACCOUNT_ID}/workers/services/view/api-worker/production/observability`);
+      `https://dash.cloudflare.com/${ACCOUNT_ID}/workers/services/view/api-worker/production/observability`,
+    );
     expect(described.title).toBe("api-worker observability");
     expect(described.suggestedBindingName).toBe("WORKER_OBSERVABILITY");
   });
@@ -73,8 +87,9 @@ describe("resource description", () => {
   it("describes an account binding with the account-wide URL", async () => {
     const described = await hooks.describeResource("describe-account", ACCOUNT_PROPS);
 
-    expect(described.url)
-      .toBe(`https://dash.cloudflare.com/${ACCOUNT_ID}/workers-and-pages/observability`);
+    expect(described.url).toBe(
+      `https://dash.cloudflare.com/${ACCOUNT_ID}/workers-and-pages/observability`,
+    );
     expect(described.title).toBe("Workers Observability");
     expect(described.suggestedBindingName).toBe("CLOUDFLARE_OBSERVABILITY");
   });

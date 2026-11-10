@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 
 // What only real storage and RPC show: stubs are read back out of storage and called, and a firing's
 // own stubs are handed on to the delivery. A loopback entrypoint's stub has nothing to dispose, and
@@ -19,7 +19,11 @@ it("delivers through the stubs it stored, across deliveries and a replacement", 
 // A throw alone undoes no write, so the stubs `set()` stores first would outlive it.
 it("leaves a hook as it was when the driver's transaction around set() fails", async () => {
   const host = env.HOOK_HOST.getByName("rolls-back");
-  const refused = (key: string) => host.enable(key, false).then(() => false, () => true);
+  const refused = (key: string) =>
+    host.enable(key, false).then(
+      () => false,
+      () => true,
+    );
 
   expect(await refused("new")).toBe(true);
   expect(await host.holdsStubs("new")).toBe(false);

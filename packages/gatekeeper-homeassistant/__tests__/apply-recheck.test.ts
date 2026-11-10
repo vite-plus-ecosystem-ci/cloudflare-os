@@ -1,11 +1,16 @@
 // A device-control call can be queued while a manual action holds the drain, and Home Assistant
 // resolves its area target only when it runs. These drive the real gatekeeper class with a stubbed
 // Home Assistant registry and transport.
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { RegistrySnapshot } from "../src/homeassistant-api";
 
 vi.mock("cloudflare:workers", () => ({
-  DurableObject: class { constructor(public ctx: unknown, public env: unknown) {} },
+  DurableObject: class {
+    constructor(
+      public ctx: unknown,
+      public env: unknown,
+    ) {}
+  },
   RpcTarget: class {},
   WorkerEntrypoint: class {},
 }));
@@ -18,14 +23,17 @@ for (const name of ["instance", "area", "label", "device", "entity"]) {
 }
 vi.mock("../src/types.txt", () => ({ default: "" }));
 
-const live = vi.hoisted(() => ({ registry: undefined as unknown as RegistrySnapshot, failCalls: false }));
-vi.mock("../src/homeassistant-api", async importOriginal => ({
-  ...await importOriginal<typeof import("../src/homeassistant-api")>(),
+const live = vi.hoisted(() => ({
+  registry: undefined as unknown as RegistrySnapshot,
+  failCalls: false,
+}));
+vi.mock("../src/homeassistant-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/homeassistant-api")>()),
   fetchRegistrySnapshot: async () => live.registry,
 }));
 const executed = vi.hoisted(() => [] as unknown[]);
-vi.mock("../src/approvals", async importOriginal => ({
-  ...await importOriginal<typeof import("../src/approvals")>(),
+vi.mock("../src/approvals", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/approvals")>()),
   executeAction: async (action: unknown) => {
     if (live.failCalls) throw new Error("Home Assistant is unavailable");
     executed.push(action);
@@ -37,7 +45,9 @@ const { HomeAssistantGatekeeperImpl } = await import("../src/homeassistant");
 
 function home(extra: Record<string, unknown>[] = []): RegistrySnapshot {
   return {
-    floors: [], labels: [], devices: [],
+    floors: [],
+    labels: [],
+    devices: [],
     areas: [{ area_id: "lounge" }],
     entities: [{ entity_id: "switch.plug", area_id: "lounge", platform: "hue" }, ...extra],
     states: new Map(),
@@ -48,7 +58,12 @@ function gatekeeper() {
   const kv = new Map<string, unknown>();
   const ctx = {
     props: { userObjectId: "user", resourceKind: "instance" },
-    exports: { UserAccount: { idFromString: (id: string) => id, get: () => ({ getCredentials: async () => ({ baseUrl: "https://ha", token: "t" }) }) } },
+    exports: {
+      UserAccount: {
+        idFromString: (id: string) => id,
+        get: () => ({ getCredentials: async () => ({ baseUrl: "https://ha", token: "t" }) }),
+      },
+    },
     storage: {
       kv: {
         get: (key: string) => structuredClone(kv.get(key)),
@@ -62,26 +77,42 @@ function gatekeeper() {
 }
 
 // A queue that records each submission and replies, optionally applying first or losing the reply.
-function queue(onSubmit: (id: number, description: { autoApprovable: boolean }) => Promise<void> = async () => {}) {
+function queue(
+  onSubmit: (
+    id: number,
+    description: { autoApprovable: boolean },
+  ) => Promise<void> = async () => {},
+) {
   const q = { submitAction: onSubmit, dup: () => q, [Symbol.dispose]: () => {} };
   return q as never;
 }
 
 const turnOnLounge = { domain: "switch", service: "turn_on", target: { areaId: "lounge" } };
 
-beforeEach(() => { executed.length = 0; });
+beforeEach(() => {
+  executed.length = 0;
+});
 
 describe("applying a queued device-control call", () => {
   it("is refused when a script-backed entity joined its area after it was queued", async () => {
     const { gk } = gatekeeper();
     live.registry = home();
     let id = 0;
-    const session = await gk.startSession(queue(async (submitted, description) => {
-      id = submitted;
-      expect(description.autoApprovable).toBe(true);
-    })) as any;
-    await session.callService(turnOnLounge.domain, turnOnLounge.service, undefined, turnOnLounge.target);
-    live.registry = home([{ entity_id: "switch.scene_runner", area_id: "lounge", platform: "template" }]);
+    const session = (await gk.startSession(
+      queue(async (submitted, description) => {
+        id = submitted;
+        expect(description.autoApprovable).toBe(true);
+      }),
+    )) as any;
+    await session.callService(
+      turnOnLounge.domain,
+      turnOnLounge.service,
+      undefined,
+      turnOnLounge.target,
+    );
+    live.registry = home([
+      { entity_id: "switch.scene_runner", area_id: "lounge", platform: "template" },
+    ]);
     await expect(gk.applyAction(id)).rejects.toThrow(/no longer only device control/);
     expect(executed).toEqual([]);
   });
@@ -90,21 +121,39 @@ describe("applying a queued device-control call", () => {
     const { gk } = gatekeeper();
     live.registry = home();
     let id = 0;
-    const session = await gk.startSession(queue(async submitted => { id = submitted; })) as any;
-    await session.callService(turnOnLounge.domain, turnOnLounge.service, undefined, turnOnLounge.target);
+    const session = (await gk.startSession(
+      queue(async (submitted) => {
+        id = submitted;
+      }),
+    )) as any;
+    await session.callService(
+      turnOnLounge.domain,
+      turnOnLounge.service,
+      undefined,
+      turnOnLounge.target,
+    );
     await gk.applyAction(id);
     expect(executed).toHaveLength(1);
   });
 
   it("leaves a call a person had to review to that person's approval", async () => {
     const { gk } = gatekeeper();
-    live.registry = home([{ entity_id: "switch.scene_runner", area_id: "lounge", platform: "template" }]);
+    live.registry = home([
+      { entity_id: "switch.scene_runner", area_id: "lounge", platform: "template" },
+    ]);
     let id = 0;
-    const session = await gk.startSession(queue(async (submitted, description) => {
-      id = submitted;
-      expect(description.autoApprovable).toBe(false);
-    })) as any;
-    await session.callService(turnOnLounge.domain, turnOnLounge.service, undefined, turnOnLounge.target);
+    const session = (await gk.startSession(
+      queue(async (submitted, description) => {
+        id = submitted;
+        expect(description.autoApprovable).toBe(false);
+      }),
+    )) as any;
+    await session.callService(
+      turnOnLounge.domain,
+      turnOnLounge.service,
+      undefined,
+      turnOnLounge.target,
+    );
     await gk.applyAction(id);
     expect(executed).toHaveLength(1);
   });
@@ -113,8 +162,16 @@ describe("applying a queued device-control call", () => {
 describe("applying a queued dashboard save", () => {
   function queueDashboard(kv: Map<string, unknown>, config: unknown) {
     kv.set("pending:1", {
-      id: 1, submittedAt: 0, autoApprovable: true,
-      action: { id: 1, type: "saveDashboard", urlPath: null, config, origin: { kind: "dashboard", urlPath: "lovelace" } },
+      id: 1,
+      submittedAt: 0,
+      autoApprovable: true,
+      action: {
+        id: 1,
+        type: "saveDashboard",
+        urlPath: null,
+        config,
+        origin: { kind: "dashboard", urlPath: "lovelace" },
+      },
     });
   }
   const plugButton = { views: [{ cards: [{ type: "button", entity: "switch.plug" }] }] };
@@ -141,13 +198,22 @@ describe("submitting a call that is applied before the reply arrives", () => {
   it("reports success when the reply is lost after it applied", async () => {
     const { gk, kv } = gatekeeper();
     live.registry = home();
-    const session = await gk.startSession(queue(async submitted => {
-      await gk.applyAction(submitted);
-      throw new Error("Network connection lost.");
-    })) as any;
-    await expect(session.callService(turnOnLounge.domain, turnOnLounge.service, undefined, turnOnLounge.target)).resolves.toBeUndefined();
+    const session = (await gk.startSession(
+      queue(async (submitted) => {
+        await gk.applyAction(submitted);
+        throw new Error("Network connection lost.");
+      }),
+    )) as any;
+    await expect(
+      session.callService(
+        turnOnLounge.domain,
+        turnOnLounge.service,
+        undefined,
+        turnOnLounge.target,
+      ),
+    ).resolves.toBeUndefined();
     expect(executed).toHaveLength(1);
-    expect([...kv.keys()].filter(key => key.startsWith("applied:"))).toHaveLength(1);
+    expect([...kv.keys()].filter((key) => key.startsWith("applied:"))).toHaveLength(1);
   });
 
   it("keeps a call whose apply failed before the reply was lost, for a retry", async () => {
@@ -155,12 +221,21 @@ describe("submitting a call that is applied before the reply arrives", () => {
     live.registry = home();
     live.failCalls = true;
     try {
-      const session = await gk.startSession(queue(async submitted => {
-        await gk.applyAction(submitted).catch(() => {});
-        throw new Error("Network connection lost.");
-      })) as any;
-      await expect(session.callService(turnOnLounge.domain, turnOnLounge.service, undefined, turnOnLounge.target)).resolves.toBeUndefined();
-      expect([...kv.keys()].filter(key => key.startsWith("pending:"))).toHaveLength(1);
+      const session = (await gk.startSession(
+        queue(async (submitted) => {
+          await gk.applyAction(submitted).catch(() => {});
+          throw new Error("Network connection lost.");
+        }),
+      )) as any;
+      await expect(
+        session.callService(
+          turnOnLounge.domain,
+          turnOnLounge.service,
+          undefined,
+          turnOnLounge.target,
+        ),
+      ).resolves.toBeUndefined();
+      expect([...kv.keys()].filter((key) => key.startsWith("pending:"))).toHaveLength(1);
     } finally {
       live.failCalls = false;
     }
@@ -170,8 +245,17 @@ describe("submitting a call that is applied before the reply arrives", () => {
     const { gk } = gatekeeper();
     live.registry = home();
     let actionId = 0;
-    const session = await gk.startSession(queue(async submitted => { actionId = submitted; })) as any;
-    await session.callService(turnOnLounge.domain, turnOnLounge.service, undefined, turnOnLounge.target);
+    const session = (await gk.startSession(
+      queue(async (submitted) => {
+        actionId = submitted;
+      }),
+    )) as any;
+    await session.callService(
+      turnOnLounge.domain,
+      turnOnLounge.service,
+      undefined,
+      turnOnLounge.target,
+    );
     await gk.applyAction(actionId);
     await expect(gk.applyAction(actionId)).resolves.toBeUndefined();
     expect(executed).toHaveLength(1);
@@ -180,8 +264,19 @@ describe("submitting a call that is applied before the reply arrives", () => {
   it("still fails when the submit fails without applying", async () => {
     const { gk, kv } = gatekeeper();
     live.registry = home();
-    const session = await gk.startSession(queue(async () => { throw new Error("queue gone"); })) as any;
-    await expect(session.callService(turnOnLounge.domain, turnOnLounge.service, undefined, turnOnLounge.target)).rejects.toThrow("queue gone");
-    expect([...kv.keys()].filter(key => key.startsWith("pending:"))).toEqual([]);
+    const session = (await gk.startSession(
+      queue(async () => {
+        throw new Error("queue gone");
+      }),
+    )) as any;
+    await expect(
+      session.callService(
+        turnOnLounge.domain,
+        turnOnLounge.service,
+        undefined,
+        turnOnLounge.target,
+      ),
+    ).rejects.toThrow("queue gone");
+    expect([...kv.keys()].filter((key) => key.startsWith("pending:"))).toEqual([]);
   });
 });

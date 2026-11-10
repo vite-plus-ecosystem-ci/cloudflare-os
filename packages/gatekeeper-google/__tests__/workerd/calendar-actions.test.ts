@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { CalendarEventDraft } from "../../src/calendar-types";
 import { TEST_CALENDAR_ID } from "../calendar-hooks";
 
@@ -49,35 +49,38 @@ class CalendarModel {
   }
 
   install(): void {
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      let request = new Request(input, init);
-      let url = new URL(request.url);
-      let prefix = `/calendar/v3/calendars/${encodeURIComponent(TEST_CALENDAR_ID)}/events/`;
-      if (request.method === "POST" && `${url.pathname}/` === prefix) {
-        if (this.failCreates) return new Response("Bad Request", { status: 400 });
-        let body = await request.json();
-        this.created.push(body);
-        return Response.json({ ...body as object, id: `created-${this.created.length}` });
-      }
-      if (!url.pathname.startsWith(prefix)) throw new Error(`Unexpected request: ${request.url}`);
-      let eventId = decodeURIComponent(url.pathname.slice(prefix.length));
-      let event = this.events.get(eventId);
-      if (!event) return new Response("Not Found", { status: 404 });
-      let etag = () => `"${this.versions.get(eventId) ?? 0}"`;
-      if (request.method === "PATCH") {
-        let ifMatch = request.headers.get("If-Match");
-        if (ifMatch !== null && ifMatch !== etag()) {
-          return new Response("Precondition Failed", { status: 412 });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        let request = new Request(input, init);
+        let url = new URL(request.url);
+        let prefix = `/calendar/v3/calendars/${encodeURIComponent(TEST_CALENDAR_ID)}/events/`;
+        if (request.method === "POST" && `${url.pathname}/` === prefix) {
+          if (this.failCreates) return new Response("Bad Request", { status: 400 });
+          let body = await request.json();
+          this.created.push(body);
+          return Response.json({ ...(body as object), id: `created-${this.created.length}` });
         }
-        let body = await request.json<Partial<GoogleEvent>>();
-        this.patches.push({ eventId, body });
-        this.edit(eventId, body);
-        return Response.json({ ...event, etag: etag() });
-      }
-      let read = this.omitEtags ? { ...event } : { ...event, etag: etag() };
-      this.afterRead?.(event);
-      return Response.json(read);
-    }));
+        if (!url.pathname.startsWith(prefix)) throw new Error(`Unexpected request: ${request.url}`);
+        let eventId = decodeURIComponent(url.pathname.slice(prefix.length));
+        let event = this.events.get(eventId);
+        if (!event) return new Response("Not Found", { status: 404 });
+        let etag = () => `"${this.versions.get(eventId) ?? 0}"`;
+        if (request.method === "PATCH") {
+          let ifMatch = request.headers.get("If-Match");
+          if (ifMatch !== null && ifMatch !== etag()) {
+            return new Response("Precondition Failed", { status: 412 });
+          }
+          let body = await request.json<Partial<GoogleEvent>>();
+          this.patches.push({ eventId, body });
+          this.edit(eventId, body);
+          return Response.json({ ...event, etag: etag() });
+        }
+        let read = this.omitEtags ? { ...event } : { ...event, etag: etag() };
+        this.afterRead?.(event);
+        return Response.json(read);
+      }),
+    );
   }
 }
 
@@ -115,17 +118,25 @@ describe("Google Calendar auto-approval", () => {
   });
 
   it("lets creating a meeting be auto-approved as an invitation, whatever sendUpdates is", async () => {
-    let call = await hooks().createEvent(
-      "create-meeting", { ...draft, attendees: [{ email: "guest@example.com" }] });
+    let call = await hooks().createEvent("create-meeting", {
+      ...draft,
+      attendees: [{ email: "guest@example.com" }],
+    });
     expect(call.action).toMatchObject({ actionKind: INVITATION, autoApprovable: true });
     let quiet = await hooks().createEvent(
-      "create-meeting-quiet", { ...draft, attendees: [{ email: "guest@example.com" }] }, { sendUpdates: "none" });
+      "create-meeting-quiet",
+      { ...draft, attendees: [{ email: "guest@example.com" }] },
+      { sendUpdates: "none" },
+    );
     expect(quiet.action).toMatchObject({ actionKind: INVITATION, autoApprovable: true });
   });
 
   it("holds creating a public meeting", async () => {
-    let call = await hooks().createEvent(
-      "create-public-meeting", { ...draft, attendees: [{ email: "guest@example.com" }], visibility: "public" });
+    let call = await hooks().createEvent("create-public-meeting", {
+      ...draft,
+      attendees: [{ email: "guest@example.com" }],
+      visibility: "public",
+    });
     expect(call.action).toMatchObject({ actionKind: INVITATION, autoApprovable: false });
   });
 
@@ -150,7 +161,9 @@ describe("Google Calendar auto-approval", () => {
     let calendar = new CalendarModel();
     calendar.add("own");
     calendar.install();
-    let call = await hooks().updateEventLosingReply("update-lost-reply", "own", { title: "Deep work" });
+    let call = await hooks().updateEventLosingReply("update-lost-reply", "own", {
+      title: "Deep work",
+    });
     expect(call.error).toBeUndefined();
     expect(calendar.patches).toHaveLength(1);
   });
@@ -165,19 +178,26 @@ describe("Google Calendar auto-approval", () => {
     calendar.add("private", { visibility: "private" });
     calendar.install();
 
-    expect((await hooks().updateEvent("update", "own", { title: "Deep work" })).action)
-      .toMatchObject({ actionKind: OWN_EVENT, autoApprovable: true });
-    expect((await hooks().updateEvent("update", "meeting", { title: "Moved" })).action)
-      .toMatchObject({ actionKind: INVITATION, autoApprovable: true });
-    expect((await hooks().updateEvent(
-      "update", "own", { attendees: [{ email: "guest@example.com" }] })).action)
-      .toMatchObject({ actionKind: INVITATION, autoApprovable: true });
-    expect((await hooks().updateEvent("update", "meeting", { visibility: "public" })).action)
-      .toMatchObject({ actionKind: INVITATION, autoApprovable: false });
-    expect((await hooks().updateEvent("update", "away", { title: "Away" })).action)
-      .toMatchObject({ actionKind: OWN_EVENT, autoApprovable: false });
-    expect((await hooks().updateEvent("update", "private", { visibility: "default" })).action)
-      .toMatchObject({ actionKind: OWN_EVENT, autoApprovable: false });
+    expect(
+      (await hooks().updateEvent("update", "own", { title: "Deep work" })).action,
+    ).toMatchObject({ actionKind: OWN_EVENT, autoApprovable: true });
+    expect(
+      (await hooks().updateEvent("update", "meeting", { title: "Moved" })).action,
+    ).toMatchObject({ actionKind: INVITATION, autoApprovable: true });
+    expect(
+      (await hooks().updateEvent("update", "own", { attendees: [{ email: "guest@example.com" }] }))
+        .action,
+    ).toMatchObject({ actionKind: INVITATION, autoApprovable: true });
+    expect(
+      (await hooks().updateEvent("update", "meeting", { visibility: "public" })).action,
+    ).toMatchObject({ actionKind: INVITATION, autoApprovable: false });
+    expect((await hooks().updateEvent("update", "away", { title: "Away" })).action).toMatchObject({
+      actionKind: OWN_EVENT,
+      autoApprovable: false,
+    });
+    expect(
+      (await hooks().updateEvent("update", "private", { visibility: "default" })).action,
+    ).toMatchObject({ actionKind: OWN_EVENT, autoApprovable: false });
   });
 
   it("judges an update queued behind one that adds guests as reaching them", async () => {
@@ -185,8 +205,9 @@ describe("Google Calendar auto-approval", () => {
     calendar.add("own");
     calendar.install();
 
-    let invite = await hooks().updateEvent(
-      "queued", "own", { attendees: [{ email: "guest@example.com" }] });
+    let invite = await hooks().updateEvent("queued", "own", {
+      attendees: [{ email: "guest@example.com" }],
+    });
     expect(invite.action).toMatchObject({ actionKind: INVITATION });
     let move = await hooks().updateEvent("queued", "own", { title: "Moved" });
     expect(move.action).toMatchObject({ actionKind: INVITATION });
@@ -201,8 +222,9 @@ describe("Google Calendar auto-approval", () => {
     expect(call.action).toMatchObject({ autoApprovable: true });
     calendar.events.get("own")!.attendees = [{ email: "guest@example.com" }];
 
-    expect(await hooks().applyAction("recheck", call.actionId!))
-      .toMatch(/who is on it has changed.*This attempt changed nothing/);
+    expect(await hooks().applyAction("recheck", call.actionId!)).toMatch(
+      /who is on it has changed.*This attempt changed nothing/,
+    );
     expect(calendar.patches).toEqual([]);
   });
 
@@ -215,8 +237,9 @@ describe("Google Calendar auto-approval", () => {
     expect(call.action).toMatchObject({ autoApprovable: true });
     calendar.omitEtags = true;
 
-    expect(await hooks().applyAction("no-etag", call.actionId!))
-      .toMatch(/without the version tag.*This attempt changed nothing/);
+    expect(await hooks().applyAction("no-etag", call.actionId!)).toMatch(
+      /without the version tag.*This attempt changed nothing/,
+    );
     expect(calendar.patches).toEqual([]);
   });
 
@@ -229,8 +252,9 @@ describe("Google Calendar auto-approval", () => {
     expect(call.action).toMatchObject({ autoApprovable: true });
     calendar.events.get("own")!.visibility = "private";
 
-    expect(await hooks().applyAction("recheck-visibility", call.actionId!))
-      .toMatch(/widen who can see it/);
+    expect(await hooks().applyAction("recheck-visibility", call.actionId!)).toMatch(
+      /widen who can see it/,
+    );
     expect(calendar.patches).toEqual([]);
   });
 
@@ -241,10 +265,12 @@ describe("Google Calendar auto-approval", () => {
 
     let call = await hooks().updateEvent("race", "own", { title: "Deep work" });
     expect(call.action).toMatchObject({ autoApprovable: true });
-    calendar.afterRead = () => calendar.edit("own", { attendees: [{ email: "guest@example.com" }] });
+    calendar.afterRead = () =>
+      calendar.edit("own", { attendees: [{ email: "guest@example.com" }] });
 
-    expect(await hooks().applyAction("race", call.actionId!))
-      .toMatch(/who is on it has changed.*This attempt changed nothing/);
+    expect(await hooks().applyAction("race", call.actionId!)).toMatch(
+      /who is on it has changed.*This attempt changed nothing/,
+    );
     expect(calendar.patches).toEqual([]);
   });
 
@@ -257,8 +283,9 @@ describe("Google Calendar auto-approval", () => {
     expect(call.action).toMatchObject({ actionKind: INVITATION, autoApprovable: true });
     calendar.edit("meeting", { attendees: [] });
 
-    expect(await hooks().applyAction("recheck-invitation", call.actionId!))
-      .toMatch(/who is on it has changed.*This attempt changed nothing/);
+    expect(await hooks().applyAction("recheck-invitation", call.actionId!)).toMatch(
+      /who is on it has changed.*This attempt changed nothing/,
+    );
     expect(calendar.patches).toEqual([]);
   });
 
@@ -269,7 +296,9 @@ describe("Google Calendar auto-approval", () => {
 
     let call = await hooks().updateEvent("apply-invitation", "meeting", { title: "Moved" });
     expect(call.action).toMatchObject({ actionKind: INVITATION, autoApprovable: true });
-    calendar.edit("meeting", { attendees: [{ email: "guest@example.com" }, { email: "other@example.com" }] });
+    calendar.edit("meeting", {
+      attendees: [{ email: "guest@example.com" }, { email: "other@example.com" }],
+    });
     expect(await hooks().applyAction("apply-invitation", call.actionId!)).toBeNull();
     expect(calendar.patches).toEqual([{ eventId: "meeting", body: { summary: "Moved" } }]);
   });

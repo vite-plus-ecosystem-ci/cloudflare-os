@@ -8,7 +8,7 @@ import { env, runInDurableObject } from "cloudflare:test";
 import { stageCredentials } from "@gadgets/gatekeeper-kit/credential-stage";
 import { FLUSH_PKT, encodePktLine } from "@gadgets/gatekeeper-kit/git-transport";
 import type { GitPullTransfer } from "@gadgets/workshop-shared/gatekeeper";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { GatekeeperProps, SessionCall } from "./worker";
 
 const OWNER = "octo";
@@ -21,9 +21,12 @@ const OTHER_ID = 43;
 const HEAD = "a".repeat(40);
 const PULL_OPTIONS = { type: "commit", commitHistory: { kind: "depth", depth: 1 } } as const;
 /** An upload-pack answer carrying a pack of one byte. */
-const uploadPackResponse = () => new Blob([
-  encodePktLine("packfile"), new Uint8Array([0x30, 0x30, 0x30, 0x36, 1, 0x50]), FLUSH_PKT,
-]);
+const uploadPackResponse = () =>
+  new Blob([
+    encodePktLine("packfile"),
+    new Uint8Array([0x30, 0x30, 0x30, 0x36, 1, 0x50]),
+    FLUSH_PKT,
+  ]);
 
 const MINUTE = 60_000;
 
@@ -31,32 +34,61 @@ type Row = Record<string, unknown>;
 
 function issue(number: number, fullName = `${OWNER}/${REPO}`): Row {
   return {
-    number, html_url: `https://github.com/${fullName}/issues/${number}`, title: `Issue ${number}`,
-    state: "open", body: "", user: { login: "someone" }, labels: [], assignees: [],
-    created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z", closed_at: null, comments: 0,
+    number,
+    html_url: `https://github.com/${fullName}/issues/${number}`,
+    title: `Issue ${number}`,
+    state: "open",
+    body: "",
+    user: { login: "someone" },
+    labels: [],
+    assignees: [],
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    closed_at: null,
+    comments: 0,
   };
 }
 
 const workflowRun = {
-  id: 900, name: "CI", event: "push", head_branch: "main", head_sha: HEAD, status: "completed",
-  conclusion: "failure", run_attempt: 1, created_at: "2026-01-01T00:00:00Z",
-  updated_at: "2026-01-01T00:05:00Z", run_started_at: "2026-01-01T00:00:00Z",
-  html_url: `https://github.com/${OWNER}/${REPO}/actions/runs/900`, actor: null,
+  id: 900,
+  name: "CI",
+  event: "push",
+  head_branch: "main",
+  head_sha: HEAD,
+  status: "completed",
+  conclusion: "failure",
+  run_attempt: 1,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:05:00Z",
+  run_started_at: "2026-01-01T00:00:00Z",
+  html_url: `https://github.com/${OWNER}/${REPO}/actions/runs/900`,
+  actor: null,
 };
 
 function job(id: number): Row {
   return {
-    id, run_id: 900, run_attempt: 1, head_sha: HEAD, name: `test-${id}`, workflow_name: "CI",
-    status: "completed", conclusion: "failure", started_at: "2026-01-01T00:00:00Z",
-    completed_at: "2026-01-01T00:05:00Z", html_url: `https://github.com/${OWNER}/${REPO}/actions/runs/900/job/${id}`,
-    check_run_url: `https://api.github.com/repositories/${REPO_ID}/check-runs/${id}`, steps: [],
+    id,
+    run_id: 900,
+    run_attempt: 1,
+    head_sha: HEAD,
+    name: `test-${id}`,
+    workflow_name: "CI",
+    status: "completed",
+    conclusion: "failure",
+    started_at: "2026-01-01T00:00:00Z",
+    completed_at: "2026-01-01T00:05:00Z",
+    html_url: `https://github.com/${OWNER}/${REPO}/actions/runs/900/job/${id}`,
+    check_run_url: `https://api.github.com/repositories/${REPO_ID}/check-runs/${id}`,
+    steps: [],
   };
 }
 
 /** GitHub's REST API as each token sees it. */
 class FakeGitHub {
   /** The repositories that exist, by id, with their owner and name now. */
-  readonly repos = new Map<number, { owner: string; name: string }>([[REPO_ID, { owner: OWNER, name: REPO }]]);
+  readonly repos = new Map<number, { owner: string; name: string }>([
+    [REPO_ID, { owner: OWNER, name: REPO }],
+  ]);
   /** Names repositories have left, by full name, with the id each belonged to. */
   readonly formerNames = new Map<string, number>();
   /** The repositories each token can read; the binding's own account reads them all. */
@@ -94,7 +126,9 @@ class FakeGitHub {
 
   /** The requests made with `token`, by path. */
   requestsWith(token: string): string[] {
-    return this.requests.filter(request => request.token === token).map(request => request.path);
+    return this.requests
+      .filter((request) => request.token === token)
+      .map((request) => request.path);
   }
 
   #handle(request: Request): Response {
@@ -104,25 +138,33 @@ class FakeGitHub {
     if (url.hostname === "github.com") {
       // github.com serves git by the name a repository has now, as it does any repository.
       const named = /^\/([^/]+)\/([^/]+)\.git\/git-upload-pack$/.exec(url.pathname);
-      if (!named || this.#idNamed(`${named[1]}/${named[2]}`) === undefined) return new Response("Not Found", { status: 404 });
+      if (!named || this.#idNamed(`${named[1]}/${named[2]}`) === undefined)
+        return new Response("Not Found", { status: 404 });
       this.gitRequests.push(`${named[1]}/${named[2]}`);
       this.onGit?.();
-      return new Response(uploadPackResponse(), { headers: { "Content-Type": "application/x-git-upload-pack-result" } });
+      return new Response(uploadPackResponse(), {
+        headers: { "Content-Type": "application/x-git-upload-pack-result" },
+      });
     }
     const notFound = Response.json({ message: "Not Found" }, { status: 404 });
-    const canRead = (id: number) => this.repos.has(id) &&
+    const canRead = (id: number) =>
+      this.repos.has(id) &&
       (this.publicRepos.has(id) || (this.readable.get(token)?.has(id) ?? false));
 
     if (url.pathname === "/user") return Response.json({ id: 9, login: "someone" });
     const byName = /^\/repos\/([^/]+)\/([^/]+)$/.exec(url.pathname);
     if (byName) {
-      if (this.probeStatus !== undefined) return Response.json({ message: "Server Error" }, { status: this.probeStatus });
+      if (this.probeStatus !== undefined)
+        return Response.json({ message: "Server Error" }, { status: this.probeStatus });
       const fullName = `${byName[1]}/${byName[2]}`;
       const id = this.#idNamed(fullName);
       // A name a repository left redirects to it by id, until another repository takes the name.
       const moved = this.formerNames.get(fullName);
       if (id === undefined && moved !== undefined && this.repos.has(moved)) {
-        return new Response(null, { status: 301, headers: { location: `https://api.github.com/repositories/${moved}` } });
+        return new Response(null, {
+          status: 301,
+          headers: { location: `https://api.github.com/repositories/${moved}` },
+        });
       }
       return id !== undefined && canRead(id) ? Response.json(this.#repository(id)) : notFound;
     }
@@ -138,38 +180,49 @@ class FakeGitHub {
       const firstPage = (url.searchParams.get("page") ?? "1") === "1";
       if (rest === "/issues") {
         const open = url.searchParams.get("state") !== "closed";
-        return Response.json(firstPage && open ? this.issues.map(number => issue(number, this.#fullName(id))) : []);
+        return Response.json(
+          firstPage && open ? this.issues.map((number) => issue(number, this.#fullName(id))) : [],
+        );
       }
       const issueNumber = /^\/issues\/(\d+)$/.exec(rest)?.[1];
       if (issueNumber) return Response.json(issue(Number(issueNumber), this.#fullName(id)));
       const pull = (number: number) => ({
-        ...issue(number, this.#fullName(id)), html_url: `https://github.com/${this.#fullName(id)}/pull/${number}`,
-        draft: false, merged_at: null, requested_reviewers: [],
+        ...issue(number, this.#fullName(id)),
+        html_url: `https://github.com/${this.#fullName(id)}/pull/${number}`,
+        draft: false,
+        merged_at: null,
+        requested_reviewers: [],
         // A removed branch repository uses the pull request's repository as its fallback.
-        head: { ref: "fix", sha: HEAD, repo: null }, base: { ref: "main", sha: HEAD, repo: this.#repository(id) },
-        commits: 1, additions: 0, deletions: 0, changed_files: 0,
+        head: { ref: "fix", sha: HEAD, repo: null },
+        base: { ref: "main", sha: HEAD, repo: this.#repository(id) },
+        commits: 1,
+        additions: 0,
+        deletions: 0,
+        changed_files: 0,
       });
       if (rest === "/pulls") return Response.json(firstPage ? this.pulls.map(pull) : []);
       const pullNumber = /^\/pulls\/(\d+)$/.exec(rest)?.[1];
       if (pullNumber) return Response.json(pull(Number(pullNumber)));
       if (rest === "/actions/runs/900") return Response.json(workflowRun);
-      if (rest === "/actions/runs/900/jobs") return Response.json({ jobs: firstPage ? [job(71), job(72)] : [] });
+      if (rest === "/actions/runs/900/jobs")
+        return Response.json({ jobs: firstPage ? [job(71), job(72)] : [] });
       return notFound;
     }
     if (url.pathname === "/search/issues") {
       // GitHub's search finds a repository by the name it has now.
       const named = this.#idNamed(/repo:(\S+)/.exec(url.searchParams.get("q") ?? "")?.[1] ?? "");
       const firstPage = (url.searchParams.get("page") ?? "1") === "1";
-      const items = named === REPO_ID && canRead(REPO_ID) && firstPage
-        ? this.issues.map(number => issue(number, this.#fullName(REPO_ID)))
-        : [];
+      const items =
+        named === REPO_ID && canRead(REPO_ID) && firstPage
+          ? this.issues.map((number) => issue(number, this.#fullName(REPO_ID)))
+          : [];
       return Response.json({ items });
     }
     throw new Error(`test: unexpected fetch to ${url}`);
   }
 
   #idNamed(fullName: string): number | undefined {
-    return [...this.repos.keys()].find(id => this.#fullName(id) === fullName);
+    return [...this.repos.keys()].find((id) => this.#fullName(id) === fullName);
   }
 
   #fullName(id: number): string {
@@ -181,8 +234,15 @@ class FakeGitHub {
     const { owner, name } = this.repos.get(id)!;
     const visibility = this.publicRepos.has(id) ? "public" : "private";
     return {
-      id, name, full_name: `${owner}/${name}`, owner: { login: owner }, html_url: `https://github.com/${owner}/${name}`,
-      description: null, visibility, private: visibility === "private", default_branch: "main",
+      id,
+      name,
+      full_name: `${owner}/${name}`,
+      owner: { login: owner },
+      html_url: `https://github.com/${owner}/${name}`,
+      description: null,
+      visibility,
+      private: visibility === "private",
+      default_branch: "main",
     };
   }
 }
@@ -198,7 +258,10 @@ class RecordingQueue extends RpcTarget {
   readonly refuse = new Set<number>();
   #asked = 0;
 
-  async authorizeObservation(observation: { title: string; subresources?: string[] }): Promise<void> {
+  async authorizeObservation(observation: {
+    title: string;
+    subresources?: string[];
+  }): Promise<void> {
     if (this.refuse.has(++this.#asked)) throw new Error("test: the audience was refused");
     this.observations.push({ title: observation.title, subresources: observation.subresources });
   }
@@ -228,7 +291,10 @@ let scenarios = 0;
 async function binding(options: { pinned?: boolean } = {}) {
   const scenario = `observers-${++scenarios}`;
   const props: GatekeeperProps = {
-    userObjectId: await account("owner-token"), resourceKind: "repo", owner: OWNER, repo: REPO,
+    userObjectId: await account("owner-token"),
+    resourceKind: "repo",
+    owner: OWNER,
+    repo: REPO,
   };
   const hooks = env.TEST_HOOKS.getByName(scenario);
   if (options.pinned) await hooks.seedGatekeeper(scenario, props, { repoId: REPO_ID });
@@ -239,7 +305,8 @@ async function binding(options: { pinned?: boolean } = {}) {
     queue,
     read: (calls: SessionCall[], drain = false) =>
       hooks.sessionRead(scenario, props, new RpcStub(queue) as never, calls, drain),
-    pages: (calls: SessionCall[]) => hooks.sessionPages(scenario, props, new RpcStub(queue) as never, calls),
+    pages: (calls: SessionCall[]) =>
+      hooks.sessionPages(scenario, props, new RpcStub(queue) as never, calls),
     /** Writes `entries` into the binding's storage, then restarts it, as an upgrade would. */
     upgradeFrom: async (entries: Record<string, unknown>) => {
       await hooks.seedGatekeeper(scenario, props, entries);
@@ -254,14 +321,22 @@ async function binding(options: { pinned?: boolean } = {}) {
       return { ok: await transfer.status() };
     },
     /** verifyObserverAccess for observers named by id, each with the account given. */
-    verify: (observers: Record<string, string>, subresources = [SUBRESOURCE]) => hooks.verifyObservers(
-      scenario, props, Object.entries(observers).map(([id, userObjectId]) => ({ id, userObjectId })), subresources),
+    verify: (observers: Record<string, string>, subresources = [SUBRESOURCE]) =>
+      hooks.verifyObservers(
+        scenario,
+        props,
+        Object.entries(observers).map(([id, userObjectId]) => ({ id, userObjectId })),
+        subresources,
+      ),
     admit: (userObjectId: string) => hooks.addObserver(scenario, props, userObjectId),
   };
 }
 
-const rateLimited = () => Response.json({ message: "API rate limit exceeded for user ID 9." },
-  { status: 403, headers: { "x-ratelimit-remaining": "0" } });
+const rateLimited = () =>
+  Response.json(
+    { message: "API rate limit exceeded for user ID 9." },
+    { status: 403, headers: { "x-ratelimit-remaining": "0" } },
+  );
 
 afterEach(() => {
   vi.useRealTimers();
@@ -275,21 +350,33 @@ describe("reads", () => {
     const gk = await binding();
 
     // The first read pins the repository's id, by its name, before anything is disclosed.
-    expect(await gk.read([{ method: "getMetadata" }])).toMatchObject({ ok: { fullName: "octo/repo" } });
+    expect(await gk.read([{ method: "getMetadata" }])).toMatchObject({
+      ok: { fullName: "octo/repo" },
+    });
     // Served from the cache, without asking GitHub again.
-    expect(await gk.read([{ method: "getMetadata" }])).toMatchObject({ ok: { fullName: "octo/repo" } });
-    expect(github.requestsWith("owner-token")).toEqual([`/repos/${OWNER}/${REPO}`, `/repositories/${REPO_ID}`]);
+    expect(await gk.read([{ method: "getMetadata" }])).toMatchObject({
+      ok: { fullName: "octo/repo" },
+    });
+    expect(github.requestsWith("owner-token")).toEqual([
+      `/repos/${OWNER}/${REPO}`,
+      `/repositories/${REPO_ID}`,
+    ]);
     // Every page of a listing as it leaves, one served from the buffer of an earlier fetch
     // included; the listing's end, after them, discloses nothing more.
-    expect(await gk.read([{ method: "listIssues", args: [{ resultsPerPage: 1 }] }], true))
-      .toMatchObject({ ok: [{ id: "1" }, { id: "2" }] });
+    expect(
+      await gk.read([{ method: "listIssues", args: [{ resultsPerPage: 1 }] }], true),
+    ).toMatchObject({ ok: [{ id: "1" }, { id: "2" }] });
     // A listing that finds nothing answers too.
-    expect(await gk.read([{ method: "listIssues", args: [{ state: "closed" }] }], true)).toEqual({ ok: [] });
+    expect(await gk.read([{ method: "listIssues", args: [{ state: "closed" }] }], true)).toEqual({
+      ok: [],
+    });
     // CI, through the stub opening a workflow run returns.
-    expect(await gk.read([{ method: "getWorkflowRun", args: ["900"] }, { method: "listJobs" }], true))
-      .toMatchObject({ ok: [{ id: "71" }, { id: "72" }] });
-    expect(await gk.read([{ method: "getWorkflowRun", args: ["900"] }, { method: "getDetails" }]))
-      .toMatchObject({ ok: { id: "900" } });
+    expect(
+      await gk.read([{ method: "getWorkflowRun", args: ["900"] }, { method: "listJobs" }], true),
+    ).toMatchObject({ ok: [{ id: "71" }, { id: "72" }] });
+    expect(
+      await gk.read([{ method: "getWorkflowRun", args: ["900"] }, { method: "getDetails" }]),
+    ).toMatchObject({ ok: { id: "900" } });
 
     expect(gk.queue.observations).toEqual([
       { title: "Read repository metadata for octo/repo", subresources: [SUBRESOURCE] },
@@ -309,12 +396,17 @@ describe("reads", () => {
     gk.queue.refuse.add(2);
 
     // The second page is refused, and so is the retry; a new listing goes through.
-    expect(await gk.pages([{ method: "listIssues", args: [{ resultsPerPage: 1 }] }]))
-      .toEqual({ error: expect.stringContaining("audience was refused") });
-    expect(await gk.read([{ method: "listIssues", args: [{ resultsPerPage: 1 }] }], true))
-      .toMatchObject({ ok: [{ id: "1" }, { id: "2" }] });
-    expect(gk.queue.observations.map(observation => observation.title))
-      .toEqual(["List issues", "List issues", "List issues (page 2)"]);
+    expect(await gk.pages([{ method: "listIssues", args: [{ resultsPerPage: 1 }] }])).toEqual({
+      error: expect.stringContaining("audience was refused"),
+    });
+    expect(
+      await gk.read([{ method: "listIssues", args: [{ resultsPerPage: 1 }] }], true),
+    ).toMatchObject({ ok: [{ id: "1" }, { id: "2" }] });
+    expect(gk.queue.observations.map((observation) => observation.title)).toEqual([
+      "List issues",
+      "List issues",
+      "List issues (page 2)",
+    ]);
   });
 
   it("returns the pinned repository's current identity after a rename, transfer, and name reuse", async () => {
@@ -325,33 +417,53 @@ describe("reads", () => {
     github.repos.set(REPO_ID, { owner: "acme", name: "renamed" });
     github.repos.set(OTHER_ID, { owner: OWNER, name: REPO });
     const repository = {
-      owner: "acme", name: "renamed", fullName: "acme/renamed", url: "https://github.com/acme/renamed",
+      owner: "acme",
+      name: "renamed",
+      fullName: "acme/renamed",
+      url: "https://github.com/acme/renamed",
     };
-    const expectedIssue = { id: "1", repo: repository, url: "https://github.com/acme/renamed/issues/1" };
+    const expectedIssue = {
+      id: "1",
+      repo: repository,
+      url: "https://github.com/acme/renamed/issues/1",
+    };
 
     expect(await gk.read([{ method: "getMetadata" }])).toMatchObject({ ok: repository });
-    expect(await gk.read([{ method: "getIssue", args: ["1"] }, { method: "getDetails" }]))
-      .toMatchObject({ ok: expectedIssue });
+    expect(
+      await gk.read([{ method: "getIssue", args: ["1"] }, { method: "getDetails" }]),
+    ).toMatchObject({ ok: expectedIssue });
     expect(await gk.read([{ method: "listIssues" }], true)).toMatchObject({ ok: [expectedIssue] });
     // Search names a repository only by name, so it is asked by the one the id has now.
-    expect(await gk.read([{ method: "searchIssues", args: [{ text: "crash" }] }], true))
-      .toMatchObject({ ok: [expectedIssue] });
+    expect(
+      await gk.read([{ method: "searchIssues", args: [{ text: "crash" }] }], true),
+    ).toMatchObject({ ok: [expectedIssue] });
     const expectedPull = {
-      id: "2", repo: repository, url: "https://github.com/acme/renamed/pull/2",
-      head: { repo: repository }, base: { repo: repository },
+      id: "2",
+      repo: repository,
+      url: "https://github.com/acme/renamed/pull/2",
+      head: { repo: repository },
+      base: { repo: repository },
     };
-    expect(await gk.read([{ method: "getPullRequest", args: ["2"] }, { method: "getDetails" }]))
-      .toMatchObject({ ok: expectedPull });
-    expect(await gk.read([{ method: "listPullRequests" }], true)).toMatchObject({ ok: [expectedPull] });
-    expect(await gk.read([{ method: "searchPullRequests", args: [{ text: "Issue" }] }], true))
-      .toMatchObject({ ok: [expectedPull] });
+    expect(
+      await gk.read([{ method: "getPullRequest", args: ["2"] }, { method: "getDetails" }]),
+    ).toMatchObject({ ok: expectedPull });
+    expect(await gk.read([{ method: "listPullRequests" }], true)).toMatchObject({
+      ok: [expectedPull],
+    });
+    expect(
+      await gk.read([{ method: "searchPullRequests", args: [{ text: "Issue" }] }], true),
+    ).toMatchObject({ ok: [expectedPull] });
     // A simulated issue must identify the repository its approval will create it in too.
-    expect(await gk.read([
-      { method: "createIssue", args: [{ title: "A new issue" }] }, { method: "getDetails" },
-    ])).toMatchObject({ ok: { repo: repository, url: "https://github.com/acme/renamed/issues/~1" } });
-    expect(github.requests.find(request => request.path === "/search/issues")?.query.get("q"))
-      .toContain("repo:acme/renamed");
-    expect(github.requests.filter(request => request.path.startsWith("/repos/"))).toEqual([]);
+    expect(
+      await gk.read([
+        { method: "createIssue", args: [{ title: "A new issue" }] },
+        { method: "getDetails" },
+      ]),
+    ).toMatchObject({ ok: { repo: repository, url: "https://github.com/acme/renamed/issues/~1" } });
+    expect(
+      github.requests.find((request) => request.path === "/search/issues")?.query.get("q"),
+    ).toContain("repo:acme/renamed");
+    expect(github.requests.filter((request) => request.path.startsWith("/repos/"))).toEqual([]);
   });
 
   it("disclose nothing once the repository is deleted and another takes its name", async () => {
@@ -363,12 +475,18 @@ describe("reads", () => {
 
     expect(await gk.read([{ method: "getMetadata" }])).toEqual({ error: expect.any(String) });
     expect(await gk.read([{ method: "listIssues" }], true)).toEqual({ error: expect.any(String) });
-    expect(await gk.read([{ method: "searchIssues", args: [{ text: "crash" }] }], true))
-      .toEqual({ error: expect.any(String) });
+    expect(await gk.read([{ method: "searchIssues", args: [{ text: "crash" }] }], true)).toEqual({
+      error: expect.any(String),
+    });
     expect(gk.queue.observations).toEqual([]);
     // Never asked of the repository the name now names, by that name or its id.
-    expect(github.requests.filter(request => request.path !== `/repositories/${REPO_ID}`
-      && !request.path.startsWith(`/repositories/${REPO_ID}/`))).toEqual([]);
+    expect(
+      github.requests.filter(
+        (request) =>
+          request.path !== `/repositories/${REPO_ID}` &&
+          !request.path.startsWith(`/repositories/${REPO_ID}/`),
+      ),
+    ).toEqual([]);
   });
 
   it("pull git by the name the repository's id has now, and never by a name it left", async () => {
@@ -390,7 +508,9 @@ describe("reads", () => {
     const gk = await binding({ pinned: true });
     // Renamed as the request reaches GitHub: the name it was sent to may name another repository.
     github.onGit = () => github.repos.set(REPO_ID, { owner: "acme", name: "renamed" });
-    expect(await gk.pull()).toEqual({ error: expect.stringContaining("was renamed from octo/repo") });
+    expect(await gk.pull()).toEqual({
+      error: expect.stringContaining("was renamed from octo/repo"),
+    });
 
     github.onGit = undefined;
     expect(await gk.pull()).toEqual({ ok: { state: "complete" } });
@@ -420,7 +540,10 @@ describe("reads", () => {
     expect(await gk.read([{ method: "listIssues" }], true)).toEqual({ error: expect.any(String) });
     expect(gk.queue.observations).toEqual([]);
     // Nothing was read in the meantime, by name or by any id.
-    expect(github.requestsWith("owner-token")).toEqual([`/repos/${OWNER}/${REPO}`, `/repos/${OWNER}/${REPO}`]);
+    expect(github.requestsWith("owner-token")).toEqual([
+      `/repos/${OWNER}/${REPO}`,
+      `/repos/${OWNER}/${REPO}`,
+    ]);
 
     github.probeStatus = undefined;
     expect(await gk.read([{ method: "getMetadata" }])).toMatchObject({ ok: {} });
@@ -433,11 +556,19 @@ describe("reads", () => {
 describe("verifyObserverAccess", () => {
   it("allows an observer whose account can read the repository, by its id, and denies one that can't", async () => {
     const github = new FakeGitHub();
-    const [alice, bob, sam] = await Promise.all([account("alice-token"), account("bob-token"), account("sam-token")]);
+    const [alice, bob, sam] = await Promise.all([
+      account("alice-token"),
+      account("bob-token"),
+      account("sam-token"),
+    ]);
     github.readable.set("alice-token", new Set([REPO_ID]));
     // An organization's SAML enforcement keeps this token out of the repository.
-    github.refusals.set("sam-token", () => Response.json(
-      { message: "Resource protected by organization SAML enforcement." }, { status: 403 }));
+    github.refusals.set("sam-token", () =>
+      Response.json(
+        { message: "Resource protected by organization SAML enforcement." },
+        { status: 403 },
+      ),
+    );
     const gk = await binding();
 
     expect(await gk.verify({ alice, bob, sam })).toEqual({ ok: { allowedObserverIds: ["alice"] } });
@@ -462,7 +593,9 @@ describe("verifyObserverAccess", () => {
     expect(await gk.verify({ alice, carol })).toEqual({ error: expect.any(String) });
     // Not remembered as a denial: once GitHub answers, carol is allowed.
     github.refusals.delete("carol-token");
-    expect(await gk.verify({ alice, carol })).toEqual({ ok: { allowedObserverIds: ["alice", "carol"] } });
+    expect(await gk.verify({ alice, carol })).toEqual({
+      ok: { allowedObserverIds: ["alice", "carol"] },
+    });
   });
 
   it("reuses an account's answer, a grant for 15 minutes and a denial for 15 seconds", async () => {
@@ -484,7 +617,9 @@ describe("verifyObserverAccess", () => {
     github.readable.set("bob-token", new Set([REPO_ID]));
     github.readable.delete("alice-token");
     at(16_000);
-    expect(await first.verify({ alice, bob })).toEqual({ ok: { allowedObserverIds: ["alice", "bob"] } });
+    expect(await first.verify({ alice, bob })).toEqual({
+      ok: { allowedObserverIds: ["alice", "bob"] },
+    });
     // Each answer is dated from when GitHub was asked: alice's grant has expired, bob's not yet.
     at(15 * MINUTE + 1_000);
     expect(await first.verify({ alice, bob })).toEqual({ ok: { allowedObserverIds: ["bob"] } });
@@ -503,7 +638,9 @@ describe("verifyObserverAccess", () => {
     expect(await aliceAccount.reportTokenRejected("alice-token")).toBe("expired");
 
     // Access can no longer be determined, so the check fails rather than reuse the grant.
-    expect(await gk.verify({ alice })).toEqual({ error: expect.stringMatching(/expired|revoked/i) });
+    expect(await gk.verify({ alice })).toEqual({
+      error: expect.stringMatching(/expired|revoked/i),
+    });
     expect(github.requestsWith("alice-token")).toEqual([`/repositories/${REPO_ID}`]);
   });
 
@@ -513,23 +650,40 @@ describe("verifyObserverAccess", () => {
     github.readable.set("alice-token", new Set([REPO_ID]));
     const gk = await binding();
 
-    expect(await gk.verify({ observer: alice })).toEqual({ ok: { allowedObserverIds: ["observer"] } });
+    expect(await gk.verify({ observer: alice })).toEqual({
+      ok: { allowedObserverIds: ["observer"] },
+    });
     // The same observer, with another account's verifier.
     expect(await gk.verify({ observer: bob })).toEqual({ ok: { allowedObserverIds: [] } });
 
     // Alice's connection is replaced by one signed in as another GitHub user, who can't read it.
-    await runInDurableObject(env.USER_ACCOUNT.get(env.USER_ACCOUNT.idFromString(alice)), async (instance, state) => {
-      await instance.commitReconnect(
-        stageCredentials(state.storage.kv, { accessToken: "mallory-token", scopes: ["repo"] }, Date.now()));
-    });
+    await runInDurableObject(
+      env.USER_ACCOUNT.get(env.USER_ACCOUNT.idFromString(alice)),
+      async (instance, state) => {
+        await instance.commitReconnect(
+          stageCredentials(
+            state.storage.kv,
+            { accessToken: "mallory-token", scopes: ["repo"] },
+            Date.now(),
+          ),
+        );
+      },
+    );
     expect(await gk.verify({ observer: alice })).toEqual({ ok: { allowedObserverIds: [] } });
     expect(github.requestsWith("mallory-token")).toContain(`/repositories/${REPO_ID}`);
   });
 
   it.each([
-    "github/repo/42", "repo/042", "repo/abc", "repo/-1", "repo/0", "repo/9007199254740993", "repo/42/issue/7",
-    "issue/42", "repo/4%32",
-  ])("refuses the whole call for %s, asking no one", async id => {
+    "github/repo/42",
+    "repo/042",
+    "repo/abc",
+    "repo/-1",
+    "repo/0",
+    "repo/9007199254740993",
+    "repo/42/issue/7",
+    "issue/42",
+    "repo/4%32",
+  ])("refuses the whole call for %s, asking no one", async (id) => {
     const github = new FakeGitHub();
     const alice = await account("alice-token");
     github.readable.set("alice-token", new Set([REPO_ID]));
@@ -549,7 +703,9 @@ describe("verifyObserverAccess", () => {
       expect(await aliceAccount.reportTokenRejected("alice-token")).toBe("expired");
       const gk = await binding({ pinned: true });
 
-      expect(await gk.verify({ alice, bob })).toEqual({ ok: { allowedObserverIds: ["alice", "bob"] } });
+      expect(await gk.verify({ alice, bob })).toEqual({
+        ok: { allowedObserverIds: ["alice", "bob"] },
+      });
       expect(github.requestsWith("alice-token")).toEqual([]);
       expect(github.requestsWith("bob-token")).toEqual([]);
       expect(github.requestsWith("owner-token")).toEqual([`/repositories/${REPO_ID}`]);
@@ -583,7 +739,7 @@ describe("verifyObserverAccess", () => {
       const start = Date.now();
       // GitHub answers public, then the repository goes private while the answer is in flight, and
       // the answer arrives 20 minutes after it was asked for.
-      github.onAnswered = token => {
+      github.onAnswered = (token) => {
         if (token !== "owner-token") return;
         github.onAnswered = undefined;
         github.publicRepos.delete(REPO_ID);
@@ -601,20 +757,25 @@ describe("verifyObserverAccess", () => {
     it.each([
       ["a rate limit", rateLimited],
       ["an outage", () => Response.json({ message: "Server Error" }, { status: 500 })],
-    ])("leaves observers to their own accounts when %s keeps the owner from answering", async (_, answer) => {
-      const github = new FakeGitHub();
-      github.publicRepos.add(REPO_ID);
-      github.refusals.set("owner-token", answer);
-      const [alice, bob] = await Promise.all([account("alice-token"), account("bob-token")]);
-      github.refusals.set("bob-token", () => Response.json({ message: "Not Found" }, { status: 404 }));
-      const gk = await binding({ pinned: true });
+    ])(
+      "leaves observers to their own accounts when %s keeps the owner from answering",
+      async (_, answer) => {
+        const github = new FakeGitHub();
+        github.publicRepos.add(REPO_ID);
+        github.refusals.set("owner-token", answer);
+        const [alice, bob] = await Promise.all([account("alice-token"), account("bob-token")]);
+        github.refusals.set("bob-token", () =>
+          Response.json({ message: "Not Found" }, { status: 404 }),
+        );
+        const gk = await binding({ pinned: true });
 
-      // The unanswered owner check is not remembered as private: bob is denied by his own answer.
-      expect(await gk.verify({ alice, bob })).toEqual({ ok: { allowedObserverIds: ["alice"] } });
-      expect(github.requestsWith("alice-token")).toEqual([`/repositories/${REPO_ID}`]);
-      github.refusals.delete("owner-token");
-      expect(await gk.verify({ bob })).toEqual({ ok: { allowedObserverIds: ["bob"] } });
-    });
+        // The unanswered owner check is not remembered as private: bob is denied by his own answer.
+        expect(await gk.verify({ alice, bob })).toEqual({ ok: { allowedObserverIds: ["alice"] } });
+        expect(github.requestsWith("alice-token")).toEqual([`/repositories/${REPO_ID}`]);
+        github.refusals.delete("owner-token");
+        expect(await gk.verify({ bob })).toEqual({ ok: { allowedObserverIds: ["bob"] } });
+      },
+    );
 
     it("asks the owner nothing for a binding not yet pinned", async () => {
       const github = new FakeGitHub();
@@ -632,7 +793,11 @@ describe("verifyObserverAccess", () => {
 describe("addObserver", () => {
   it("requires the pinned repository by its id, and the one its name names, asked each time", async () => {
     const github = new FakeGitHub();
-    const [alice, bob, carol] = await Promise.all([account("alice-token"), account("bob-token"), account("carol-token")]);
+    const [alice, bob, carol] = await Promise.all([
+      account("alice-token"),
+      account("bob-token"),
+      account("carol-token"),
+    ]);
     const gk = await binding({ pinned: true });
     github.readable.set("alice-token", new Set([REPO_ID]));
     github.readable.set("bob-token", new Set([OTHER_ID]));
@@ -645,18 +810,28 @@ describe("addObserver", () => {
     expect(await gk.admit(alice)).toEqual({ ok: undefined });
     expect(await gk.admit(alice)).toEqual({ ok: undefined });
     expect(github.requestsWith("alice-token").toSorted()).toEqual([
-      `/repos/${OWNER}/${REPO}`, `/repos/${OWNER}/${REPO}`, `/repositories/${REPO_ID}`, `/repositories/${REPO_ID}`,
-      `/repositories/${REPO_ID}`, `/repositories/${REPO_ID}`,
+      `/repos/${OWNER}/${REPO}`,
+      `/repos/${OWNER}/${REPO}`,
+      `/repositories/${REPO_ID}`,
+      `/repositories/${REPO_ID}`,
+      `/repositories/${REPO_ID}`,
+      `/repositories/${REPO_ID}`,
     ]);
-    expect(await gk.admit(bob)).toEqual({ error: expect.stringContaining("does not have read access") });
+    expect(await gk.admit(bob)).toEqual({
+      error: expect.stringContaining("does not have read access"),
+    });
     // An answer that says nothing about access fails admission, as an error rather than a denial.
     expect(await gk.admit(carol)).toEqual({ error: expect.stringContaining("rate limit") });
 
     // Another repository takes the old name. A release that read by name may have read it, so an
     // observer must be able to read it too: alice no longer can, bob still can't read the pinned one.
     github.repos.set(OTHER_ID, { owner: OWNER, name: REPO });
-    expect(await gk.admit(alice)).toEqual({ error: expect.stringContaining("does not have read access") });
-    expect(await gk.admit(bob)).toEqual({ error: expect.stringContaining("does not have read access") });
+    expect(await gk.admit(alice)).toEqual({
+      error: expect.stringContaining("does not have read access"),
+    });
+    expect(await gk.admit(bob)).toEqual({
+      error: expect.stringContaining("does not have read access"),
+    });
     github.readable.set("alice-token", new Set([REPO_ID, OTHER_ID]));
     expect(await gk.admit(alice)).toEqual({ ok: undefined });
   });
@@ -672,7 +847,9 @@ describe("addObserver", () => {
     expect(await owner.reportTokenRejected("owner-token")).toBe("expired");
 
     expect(await gk.admit(alice)).toEqual({ ok: undefined });
-    expect(await gk.admit(bob)).toEqual({ error: expect.stringContaining("does not have read access") });
+    expect(await gk.admit(bob)).toEqual({
+      error: expect.stringContaining("does not have read access"),
+    });
     expect(github.requestsWith("alice-token")).toEqual([`/repos/${OWNER}/${REPO}`]);
     expect(github.requestsWith("owner-token")).toEqual([]);
   });

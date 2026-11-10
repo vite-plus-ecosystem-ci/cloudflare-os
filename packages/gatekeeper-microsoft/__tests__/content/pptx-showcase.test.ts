@@ -5,7 +5,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { editPptx } from "../../src/content/pptx-edit";
 import type { PptxImage } from "../../src/content/pptx-images";
 import { markdownToPptx } from "../../src/content/pptx-write";
@@ -14,7 +14,8 @@ import { validatePptx } from "./pptx-validate";
 
 const OUT = process.env.M365_SHOWCASE_OUT;
 const TEMPLATE = process.env.M365_SHOWCASE_TEMPLATE;
-const fixture = (name: string) => new Uint8Array(readFileSync(new URL(`../fixtures/${name}`, import.meta.url).pathname));
+const fixture = (name: string) =>
+  new Uint8Array(readFileSync(new URL(`../fixtures/${name}`, import.meta.url).pathname));
 
 const images = new Map<string, PptxImage>([
   ["Reports/q3-revenue.png", { bytes: chartPng(), mimeType: "image/png" }],
@@ -130,37 +131,77 @@ describe.skipIf(!OUT)("showcase decks", () => {
   };
 
   it("writes the default-design deck", async () => {
-    await write("showcase.pptx", await markdownToPptx(SHOWCASE_DECK, { images, author: "Avery Chen" }));
+    await write(
+      "showcase.pptx",
+      await markdownToPptx(SHOWCASE_DECK, { images, author: "Avery Chen" }),
+    );
   });
 
   it("writes a deck on a PowerPoint-authored template", async () => {
-    await write("template-python-pptx.pptx", await markdownToPptx(SHOWCASE_DECK, { images, template: fixture("python-pptx-template.potx") }));
+    await write(
+      "template-python-pptx.pptx",
+      await markdownToPptx(SHOWCASE_DECK, {
+        images,
+        template: fixture("python-pptx-template.potx"),
+      }),
+    );
     if (TEMPLATE && existsSync(TEMPLATE)) {
-      await write("template-real.pptx", await markdownToPptx(SHOWCASE_DECK, { images, template: new Uint8Array(readFileSync(TEMPLATE)) }));
+      await write(
+        "template-real.pptx",
+        await markdownToPptx(SHOWCASE_DECK, {
+          images,
+          template: new Uint8Array(readFileSync(TEMPLATE)),
+        }),
+      );
     }
   });
 
   it("writes an edited PowerPoint-authored deck", async () => {
-    const { bytes, changes } = await editPptx(fixture("python-pptx-deck.pptx"), [
-      { setText: { slide: 1, placeholder: "title", markdown: "Northwind Quarterly Review — FY26 Q3" } },
-      { find: "Quarterly revenue grew 12%", replace: "Quarterly revenue grew 14%" },
-      { setText: { slide: 2, placeholder: "body", markdown: "- Revenue grew **14%**\n- Churn fell in every region\n  - EMEA fell the most\n- Margin up 2 points" } },
-      { duplicateSlide: 2 },
-      { setText: { slide: 3, placeholder: "title", markdown: "Highlights (EMEA)" } },
-      { moveSlide: 5, to: 2 },
-      { setNotes: { slide: 1, markdown: "Welcome everyone; introduce the finance team." } },
-      { addSlides: "# Revenue by quarter\n\n- Enterprise drove the growth\n\n+++\n\n![Revenue by quarter](Reports/q3-revenue.png)", after: 3 },
-    ], { images });
+    const { bytes, changes } = await editPptx(
+      fixture("python-pptx-deck.pptx"),
+      [
+        {
+          setText: {
+            slide: 1,
+            placeholder: "title",
+            markdown: "Northwind Quarterly Review — FY26 Q3",
+          },
+        },
+        { find: "Quarterly revenue grew 12%", replace: "Quarterly revenue grew 14%" },
+        {
+          setText: {
+            slide: 2,
+            placeholder: "body",
+            markdown:
+              "- Revenue grew **14%**\n- Churn fell in every region\n  - EMEA fell the most\n- Margin up 2 points",
+          },
+        },
+        { duplicateSlide: 2 },
+        { setText: { slide: 3, placeholder: "title", markdown: "Highlights (EMEA)" } },
+        { moveSlide: 5, to: 2 },
+        { setNotes: { slide: 1, markdown: "Welcome everyone; introduce the finance team." } },
+        {
+          addSlides:
+            "# Revenue by quarter\n\n- Enterprise drove the growth\n\n+++\n\n![Revenue by quarter](Reports/q3-revenue.png)",
+          after: 3,
+        },
+      ],
+      { images },
+    );
     expect(changes.length).toBeGreaterThan(5);
     await write("edited-python-pptx.pptx", bytes);
     if (TEMPLATE && existsSync(TEMPLATE)) {
-      const real = await editPptx(new Uint8Array(readFileSync(TEMPLATE)), [
-        { duplicateSlide: 1 },
-        { setText: { slide: 2, placeholder: "title", markdown: "A copy, retitled" } },
-        { moveSlide: 2, to: 3 },
-        { setNotes: { slide: 1, markdown: "Notes added by the editor." } },
-        { addSlides: "# Added slide\n\n- On this deck's own layout\n- With its own fonts" },
-      ], { images });
+      const real = await editPptx(
+        new Uint8Array(readFileSync(TEMPLATE)),
+        [
+          { duplicateSlide: 1 },
+          { setText: { slide: 2, placeholder: "title", markdown: "A copy, retitled" } },
+          { moveSlide: 2, to: 3 },
+          { setNotes: { slide: 1, markdown: "Notes added by the editor." } },
+          { addSlides: "# Added slide\n\n- On this deck's own layout\n- With its own fonts" },
+        ],
+        { images },
+      );
       await write("edited-real.pptx", real.bytes);
     }
   });

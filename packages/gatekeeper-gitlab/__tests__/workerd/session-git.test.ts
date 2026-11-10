@@ -7,10 +7,15 @@
 
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import type { ApprovalQueue } from "@gadgets/workshop-shared/gatekeeper";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { GitLabGatekeeperImpl } from "../../src/gitlab-gatekeeper";
 import { GitLabMergeRequestImpl, GitLabProjectSessionImpl } from "../../src/gitlab-sessions";
-import type { Cursor, GitLabCommitSummary, GitLabMergeRequestSummary, GitLabProjectRef } from "../../src/types";
+import type {
+  Cursor,
+  GitLabCommitSummary,
+  GitLabMergeRequestSummary,
+  GitLabProjectRef,
+} from "../../src/types";
 
 function oid(n: number): string {
   return n.toString(16).padStart(40, "0");
@@ -21,7 +26,9 @@ type EventLog = string[];
 
 class TestGitCache extends RpcTarget {
   readonly advertised: string[] = [];
-  constructor(readonly events: EventLog) { super(); }
+  constructor(readonly events: EventLog) {
+    super();
+  }
   async advertiseCommit(commitId: string): Promise<void> {
     this.advertised.push(commitId);
     this.events.push(`advertise ${commitId}`);
@@ -49,21 +56,40 @@ function queueStub(queue: TestApprovalQueue): RpcStub<ApprovalQueue> {
 
 function pagesCursor<T>(pages: T[][]): Cursor<T> {
   let index = 0;
-  return { async next() { return index >= pages.length ? null : pages[index++]; } };
+  return {
+    async next() {
+      return index >= pages.length ? null : pages[index++];
+    },
+  };
 }
 
 async function drain<T>(cursor: Cursor<T>): Promise<T[]> {
   const items: T[] = [];
-  for (let page = await cursor.next(); page !== null; page = await cursor.next()) items.push(...page);
+  for (let page = await cursor.next(); page !== null; page = await cursor.next())
+    items.push(...page);
   return items;
 }
 
-const PROJECT: GitLabProjectRef = { path: "group/project", name: "project", namespace: "group", url: "https://gitlab.example.com/group/project" };
+const PROJECT: GitLabProjectRef = {
+  path: "group/project",
+  name: "project",
+  namespace: "group",
+  url: "https://gitlab.example.com/group/project",
+};
 
 function mrSummary(id: number, sourceSha: string, targetSha: string): GitLabMergeRequestSummary {
   return {
-    project: PROJECT, id: String(id), url: `${PROJECT.url}/-/merge_requests/${id}`, title: `MR ${id}`,
-    state: "opened", labels: [], author: null, assignees: [], createdAt: new Date(0), updatedAt: new Date(0), commentCount: 0,
+    project: PROJECT,
+    id: String(id),
+    url: `${PROJECT.url}/-/merge_requests/${id}`,
+    title: `MR ${id}`,
+    state: "opened",
+    labels: [],
+    author: null,
+    assignees: [],
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    commentCount: 0,
     draft: false,
     source: { branch: "feature", sha: sourceSha, project: PROJECT },
     target: { branch: "main", sha: targetSha, project: PROJECT },
@@ -71,7 +97,14 @@ function mrSummary(id: number, sourceSha: string, targetSha: string): GitLabMerg
 }
 
 function commitSummary(id: string, parents: string[]): GitLabCommitSummary {
-  return { id, message: `commit ${id.slice(0, 7)}`, author: {}, committer: {}, parents, url: `${PROJECT.url}/-/commit/${id}` };
+  return {
+    id,
+    message: `commit ${id.slice(0, 7)}`,
+    author: {},
+    committer: {},
+    parents,
+    url: `${PROJECT.url}/-/commit/${id}`,
+  };
 }
 
 /** The subresource the fake gatekeepers report for a read that names none: the bound project. */
@@ -81,8 +114,15 @@ function fakeGatekeeper(methods: Partial<Record<string, unknown>>): GitLabGateke
   return {
     isSimulatedCommitId: () => false,
     // As GitLabGatekeeperImpl.authorizeRead: forward the observation with the subresource it depends on.
-    authorizeRead: async (queue: RpcStub<ApprovalQueue>, observation: object, subresource?: string) =>
-      await queue.authorizeObservation({ ...observation, subresources: [subresource ?? BOUND] } as never),
+    authorizeRead: async (
+      queue: RpcStub<ApprovalQueue>,
+      observation: object,
+      subresource?: string,
+    ) =>
+      await queue.authorizeObservation({
+        ...observation,
+        subresources: [subresource ?? BOUND],
+      } as never),
     ...methods,
   } as unknown as GitLabGatekeeperImpl;
 }
@@ -91,7 +131,11 @@ function projectSession(queue: TestApprovalQueue, methods: Partial<Record<string
   return new GitLabProjectSessionImpl(fakeGatekeeper(methods), queueStub(queue));
 }
 
-function mrSession(queue: TestApprovalQueue, id: string, methods: Partial<Record<string, unknown>>) {
+function mrSession(
+  queue: TestApprovalQueue,
+  id: string,
+  methods: Partial<Record<string, unknown>>,
+) {
   return new GitLabMergeRequestImpl(fakeGatekeeper(methods), queueStub(queue), id);
 }
 
@@ -99,7 +143,10 @@ describe("page size", () => {
   it("passes a caller's resultsPerPage through capped at one remote page, defaults to 50, and refuses what no cursor can serve", async () => {
     const sizes: number[] = [];
     const session = projectSession(new TestApprovalQueue(), {
-      listBranches: async (_filter: unknown, pageSize: number) => { sizes.push(pageSize); return pagesCursor([]); },
+      listBranches: async (_filter: unknown, pageSize: number) => {
+        sizes.push(pageSize);
+        return pagesCursor([]);
+      },
     });
     await session.listBranches();
     await session.listBranches({ resultsPerPage: 7 });
@@ -108,7 +155,9 @@ describe("page size", () => {
     // A zero page would make the streaming cursor answer null at once (hiding every row) and the
     // array cursor answer [] forever; neither is a page size, so the call is refused up front.
     for (const resultsPerPage of [0, -1, 2.5, Number.NaN]) {
-      await expect(session.listBranches({ resultsPerPage })).rejects.toThrow(/resultsPerPage must be a positive integer/);
+      await expect(session.listBranches({ resultsPerPage })).rejects.toThrow(
+        /resultsPerPage must be a positive integer/,
+      );
     }
     expect(sizes).toHaveLength(3);
   });
@@ -117,15 +166,25 @@ describe("page size", () => {
     const sizes: number[] = [];
     const queue = new TestApprovalQueue();
     const session = mrSession(queue, "7", {
-      mergeRequestDiff: async (_id: string, pageSize: number) => { sizes.push(pageSize); return { revision: { baseSha: oid(1), headSha: oid(2) }, files: pagesCursor([]) }; },
-      mergeRequestThreads: async (_id: string, pageSize: number) => { sizes.push(pageSize); return pagesCursor([]); },
+      mergeRequestDiff: async (_id: string, pageSize: number) => {
+        sizes.push(pageSize);
+        return { revision: { baseSha: oid(1), headSha: oid(2) }, files: pagesCursor([]) };
+      },
+      mergeRequestThreads: async (_id: string, pageSize: number) => {
+        sizes.push(pageSize);
+        return pagesCursor([]);
+      },
     });
     await session.readDiff();
     await session.readDiffThreads();
     await session.readDiff({ resultsPerPage: 500 });
     expect(sizes).toEqual([20, 20, 100]);
-    await expect(session.readDiff({ resultsPerPage: 0 })).rejects.toThrow(/resultsPerPage must be a positive integer/);
-    await expect(session.readDiffThreads({ resultsPerPage: 0 })).rejects.toThrow(/resultsPerPage must be a positive integer/);
+    await expect(session.readDiff({ resultsPerPage: 0 })).rejects.toThrow(
+      /resultsPerPage must be a positive integer/,
+    );
+    await expect(session.readDiffThreads({ resultsPerPage: 0 })).rejects.toThrow(
+      /resultsPerPage must be a positive integer/,
+    );
   });
 });
 
@@ -133,7 +192,8 @@ describe("GitLabProjectSessionImpl advertising", () => {
   it("authorizes and then advertises source and target shas per fetched page of listMergeRequests, withholding simulated ones", async () => {
     const queue = new TestApprovalQueue();
     const session = projectSession(queue, {
-      listMergeRequests: async () => pagesCursor([[mrSummary(1, oid(1), oid(2))], [mrSummary(2, oid(3), oid(2))]]),
+      listMergeRequests: async () =>
+        pagesCursor([[mrSummary(1, oid(1), oid(2))], [mrSummary(2, oid(3), oid(2))]]),
       isSimulatedCommitId: (id: string) => id === oid(3),
     });
     const cursor = await session.listMergeRequests();
@@ -141,7 +201,10 @@ describe("GitLabProjectSessionImpl advertising", () => {
     expect(queue.events).toEqual([]);
     await cursor.next();
     expect(queue.events[0]).toBe("authorize List merge requests");
-    expect(queue.events.slice(1).toSorted()).toEqual([`advertise ${oid(1)}`, `advertise ${oid(2)}`]);
+    expect(queue.events.slice(1).toSorted()).toEqual([
+      `advertise ${oid(1)}`,
+      `advertise ${oid(2)}`,
+    ]);
     await drain(cursor);
     // oid(3) is a queued push's head: withheld. oid(2) not re-advertised. The second page is
     // authorized as it leaves, under its own title; the closing null after it is not.
@@ -154,7 +217,8 @@ describe("GitLabProjectSessionImpl advertising", () => {
   it("advertises searchMergeRequests results the same way", async () => {
     const queue = new TestApprovalQueue();
     const session = projectSession(queue, {
-      searchMergeRequests: async () => pagesCursor([[mrSummary(1, oid(1), oid(2)), mrSummary(2, oid(3), oid(2))]]),
+      searchMergeRequests: async () =>
+        pagesCursor([[mrSummary(1, oid(1), oid(2)), mrSummary(2, oid(3), oid(2))]]),
       isSimulatedCommitId: (id: string) => id === oid(3),
     });
     await drain(await session.searchMergeRequests({ text: "fix" }));
@@ -164,7 +228,8 @@ describe("GitLabProjectSessionImpl advertising", () => {
   it("advertises branch heads, tags, and history commits (with parents) per page", async () => {
     const queue = new TestApprovalQueue();
     const session = projectSession(queue, {
-      listBranches: async () => pagesCursor([[{ name: "main", headCommit: oid(1), protected: true, default: true }]]),
+      listBranches: async () =>
+        pagesCursor([[{ name: "main", headCommit: oid(1), protected: true, default: true }]]),
       listTags: async () => pagesCursor([[{ name: "v1", commit: oid(2) }]]),
       listCommits: async () => pagesCursor([[commitSummary(oid(3), [oid(4)])]]),
     });
@@ -177,7 +242,10 @@ describe("GitLabProjectSessionImpl advertising", () => {
   it("advertises getCommit and resolveRef results only when served from GitLab", async () => {
     const queue = new TestApprovalQueue();
     const session = projectSession(queue, {
-      getCommit: async (ref: string) => ({ details: commitSummary(oid(1), [oid(2)]), fromCache: ref === "pending" }),
+      getCommit: async (ref: string) => ({
+        details: commitSummary(oid(1), [oid(2)]),
+        fromCache: ref === "pending",
+      }),
       resolveRef: async (ref: string) => ({ id: oid(5), fromCache: ref === "pending" }),
     });
     await session.getCommit("main");
@@ -187,8 +255,10 @@ describe("GitLabProjectSessionImpl advertising", () => {
     await session.resolveRef("pending");
     expect(queue.cache.advertised).toHaveLength(3);
     expect(queue.observations).toEqual([
-      `Read commit ${oid(1).slice(0, 12)}`, "Resolve main to a commit id",
-      `Read commit ${oid(1).slice(0, 12)}`, "Resolve pending to a commit id",
+      `Read commit ${oid(1).slice(0, 12)}`,
+      "Resolve main to a commit id",
+      `Read commit ${oid(1).slice(0, 12)}`,
+      "Resolve pending to a commit id",
     ]);
   });
 
@@ -196,14 +266,29 @@ describe("GitLabProjectSessionImpl advertising", () => {
     const queue = new TestApprovalQueue();
     const submitted: Array<{ action: unknown; presentation: object }> = [];
     const session = projectSession(queue, {
-      preparePush: async () => ({ type: "push", approvalId: 1, submittedAt: 0, projectPath: "group/project", branch: "main", expectedOldSha: oid(1), newSha: oid(2), force: false }),
-      submitActionForApproval: async (_q: unknown, action: unknown, presentation: object) => { submitted.push({ action, presentation }); },
+      preparePush: async () => ({
+        type: "push",
+        approvalId: 1,
+        submittedAt: 0,
+        projectPath: "group/project",
+        branch: "main",
+        expectedOldSha: oid(1),
+        newSha: oid(2),
+        force: false,
+      }),
+      submitActionForApproval: async (_q: unknown, action: unknown, presentation: object) => {
+        submitted.push({ action, presentation });
+      },
     });
     await session.push("main", oid(2));
     expect(queue.observations).toEqual([]);
     // The session supplies only the title and flags; the gatekeeper renders the description.
     expect(submitted[0]).toMatchObject({
-      presentation: { title: `Push ${oid(2).slice(0, 12)} to main`, pushedCommits: [oid(2)], implementsRevert: true },
+      presentation: {
+        title: `Push ${oid(2).slice(0, 12)} to main`,
+        pushedCommits: [oid(2)],
+        implementsRevert: true,
+      },
     });
     expect(submitted[0].presentation).not.toHaveProperty("description");
     await expect(session.push("main", "abc123")).rejects.toThrow(/full 40-character commit id/);
@@ -215,8 +300,18 @@ describe("GitLabMergeRequestImpl advertising", () => {
   it("advertises the revision shas of readDiff and the merge base, and details' branch shas", async () => {
     const queue = new TestApprovalQueue();
     const session = mrSession(queue, "7", {
-      mergeRequestDetails: async () => ({ ...mrSummary(7, oid(1), oid(2)), bodyMarkdown: "", mergeStatus: "mergeable", hasConflicts: false, reviewers: [], approvedBy: [] }),
-      mergeRequestDiff: async () => ({ revision: { baseSha: oid(2), headSha: oid(1), mergeBaseSha: oid(3) }, files: pagesCursor([]) }),
+      mergeRequestDetails: async () => ({
+        ...mrSummary(7, oid(1), oid(2)),
+        bodyMarkdown: "",
+        mergeStatus: "mergeable",
+        hasConflicts: false,
+        reviewers: [],
+        approvedBy: [],
+      }),
+      mergeRequestDiff: async () => ({
+        revision: { baseSha: oid(2), headSha: oid(1), mergeBaseSha: oid(3) },
+        files: pagesCursor([]),
+      }),
       mergeRequestMergeBase: async () => oid(3),
       mergeRequestCommits: async () => pagesCursor([[commitSummary(oid(4), [oid(3)])]]),
     });
@@ -225,18 +320,27 @@ describe("GitLabMergeRequestImpl advertising", () => {
     await session.readDiff();
     expect(queue.cache.advertised.toSorted()).toEqual([oid(1), oid(1), oid(2), oid(2), oid(3)]);
     await session.getMergeBase();
-    expect(queue.cache.advertised.filter(id => id === oid(3))).toHaveLength(2);
+    expect(queue.cache.advertised.filter((id) => id === oid(3))).toHaveLength(2);
     await drain(await session.listCommits());
-    expect(queue.cache.advertised.filter(id => id === oid(4))).toHaveLength(1);
+    expect(queue.cache.advertised.filter((id) => id === oid(4))).toHaveLength(1);
   });
 
   it("records no observation for the read that binds a merge's head", async () => {
     const queue = new TestApprovalQueue();
     const submitted: unknown[] = [];
     const session = mrSession(queue, "7", {
-      prepareMergeMergeRequest: async (id: string, options: unknown) =>
-        ({ type: "mergeMergeRequest", approvalId: 1, submittedAt: 0, projectPath: "group/project", mergeRequestId: id, options, expectedHeadSha: oid(9) }),
-      submitActionForApproval: async (_q: unknown, _action: unknown, presentation: unknown) => { submitted.push(presentation); },
+      prepareMergeMergeRequest: async (id: string, options: unknown) => ({
+        type: "mergeMergeRequest",
+        approvalId: 1,
+        submittedAt: 0,
+        projectPath: "group/project",
+        mergeRequestId: id,
+        options,
+        expectedHeadSha: oid(9),
+      }),
+      submitActionForApproval: async (_q: unknown, _action: unknown, presentation: unknown) => {
+        submitted.push(presentation);
+      },
     });
     await session.merge({ squash: true });
     expect(queue.observations).toEqual([]);
@@ -263,7 +367,9 @@ describe("observation logging", () => {
       prepareRemoveLabels: prepare("removeLabels"),
       prepareChangeState: prepare("changeState"),
       prepareCreateMergeRequest: async () => ({ type: "createMergeRequest", provisionalId: "~1" }),
-      submitActionForApproval: async (_queue: unknown, action: { type: string }) => { submitted.push(action.type); },
+      submitActionForApproval: async (_queue: unknown, action: { type: string }) => {
+        submitted.push(action.type);
+      },
     });
 
     for (const item of [await session.getIssue("1"), await session.getMergeRequest("2")]) {
@@ -274,7 +380,11 @@ describe("observation logging", () => {
       await item.close();
       await item.reopen();
     }
-    await session.createMergeRequest({ title: "MR", sourceBranch: "feature", targetBranch: "main" });
+    await session.createMergeRequest({
+      title: "MR",
+      sourceBranch: "feature",
+      targetBranch: "main",
+    });
 
     expect(submitted).toHaveLength(13);
     expect(queue.observations).toEqual([]);

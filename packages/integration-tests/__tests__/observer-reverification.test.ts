@@ -12,17 +12,29 @@
 // speaking the real protocol -- one whose verification outcome the tests set, which is the whole reason
 // the fixture exists (see fixtures/gatekeeper-test/src/test-gatekeeper.ts).
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import * as fc from "fast-check";
 import type { AuthenticatedApi, Overseer, PublicApi } from "@gadgets/workshop-shared/api";
 import { PROPERTY_RUN_OPTIONS } from "@gadgets/scripts/property-runs";
 import {
-  startTestGatekeeperHarness, TEST_GATEKEEPER_WORKER, TEST_VENDOR_ID, testControl, type Harness,
+  startTestGatekeeperHarness,
+  TEST_GATEKEEPER_WORKER,
+  TEST_VENDOR_ID,
+  testControl,
+  type Harness,
 } from "../src/harness.js";
 import {
-  accountLabel, connect, listConnectedAccounts, MAX_OBSERVER_PROMPTS, nextUsernames,
-  ObserverConfigRecorder, signUp, stubFor, waitFor, type ConnectedAccount,
+  accountLabel,
+  connect,
+  listConnectedAccounts,
+  MAX_OBSERVER_PROMPTS,
+  nextUsernames,
+  ObserverConfigRecorder,
+  signUp,
+  stubFor,
+  waitFor,
+  type ConnectedAccount,
 } from "../src/rpc-client.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 
@@ -72,7 +84,7 @@ async function provisionAccount(api: RpcStub<AuthenticatedApi>): Promise<Connect
   await api.provisionAmbientAccount(TEST_VENDOR_ID);
   return waitFor("the test account to be provisioned", async () => {
     const accounts = await listConnectedAccounts(api);
-    return accounts.find(a => a.vendorId === TEST_VENDOR_ID) ?? null;
+    return accounts.find((a) => a.vendorId === TEST_VENDOR_ID) ?? null;
   });
 }
 
@@ -81,8 +93,10 @@ async function provisionAccount(api: RpcStub<AuthenticatedApi>): Promise<Connect
  * everywhere, or only at the binding `resourceUrl` names (a resource-specific outcome wins).
  */
 function setVerifyOutcome(
-    label: string, outcome: { allow: true } | { allow: false; reason: string },
-    resourceUrl?: string): Promise<void> {
+  label: string,
+  outcome: { allow: true } | { allow: false; reason: string },
+  resourceUrl?: string,
+): Promise<void> {
   return testControl(harness, "verify-outcome", { label, resourceUrl, ...outcome });
 }
 
@@ -90,8 +104,9 @@ type ObserverEvent = { resourceUrl: string; type: "add" | "remove"; id: string }
 
 /** The addObserver()/removeObserver() calls one binding's gatekeeper has seen, in order. */
 async function observerEvents(resourceUrl: string): Promise<ObserverEvent[]> {
-  return (await testControl<{ events: ObserverEvent[] }>(harness, "observer-events", { resourceUrl }))
-    .events;
+  return (
+    await testControl<{ events: ObserverEvent[] }>(harness, "observer-events", { resourceUrl })
+  ).events;
 }
 
 async function ambientVerificationCount(label: string): Promise<number> {
@@ -116,7 +131,9 @@ type SharedGadget = {
 // thingUrl() turns each name into a resource URL. They also end up in the failure message the last
 // two cases assert on ("Test Thing multi-a"), so pass something recognisable per test.
 async function shareGadgetWithBob(
-    publicApi: RpcStub<PublicApi>, thingNames: string[]): Promise<SharedGadget> {
+  publicApi: RpcStub<PublicApi>,
+  thingNames: string[],
+): Promise<SharedGadget> {
   const [alice, bob] = nextUsernames("alice", "bob");
 
   const aliceApi = await signUp(publicApi, alice);
@@ -142,13 +159,15 @@ async function shareGadgetWithBob(
     bobApi,
     bobAccount,
     bobLabel,
-    failBob: reason => setVerifyOutcome(bobLabel, { allow: false, reason }),
+    failBob: (reason) => setVerifyOutcome(bobLabel, { allow: false, reason }),
   };
 }
 
 // Bob opens the gadget, answering any observer prompt from `recorder`.
 async function bobOpens(
-    shared: SharedGadget, recorder: ObserverConfigRecorder): Promise<RpcStub<Overseer>> {
+  shared: SharedGadget,
+  recorder: ObserverConfigRecorder,
+): Promise<RpcStub<Overseer>> {
   const callback = stubFor(recorder);
   try {
     return await shared.bobApi.openWorkspace(shared.gadgetId, undefined, callback);
@@ -159,15 +178,17 @@ async function bobOpens(
 
 /** Open once and answer the prompt, which is what persists Bob's account choice. */
 async function bobOpensAndCloses(shared: SharedGadget): Promise<ObserverConfigRecorder> {
-  const recorder =
-      new ObserverConfigRecorder().alwaysChoose(shared.bobAccount.id, MAX_OBSERVER_PROMPTS);
+  const recorder = new ObserverConfigRecorder().alwaysChoose(
+    shared.bobAccount.id,
+    MAX_OBSERVER_PROMPTS,
+  );
   (await bobOpens(shared, recorder))[Symbol.dispose]();
   return recorder;
 }
 
 describe("observer re-verification", () => {
   it.concurrent("lists the connections each grant must verify", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const [alice] = nextUsernames("alice");
       using aliceApi = await signUp(publicApi, alice);
       const account = await provisionAccount(aliceApi);
@@ -184,19 +205,19 @@ describe("observer re-verification", () => {
       await otherGadget.bind("TEST_THING", await other.getId());
 
       // Each gadget's recipients verify only what that gadget reaches.
-      await expect(overseer.listObserverRequirements({ gadgetId: await gadget.getId() }))
-          .resolves.toEqual([
-            expect.objectContaining({
-              gatekeeperId: await bound.getId(),
-              vendorId: TEST_VENDOR_ID,
-              resourceTitle: "Test Thing bound",
-              resourceUrl: thingUrl("bound"),
-            }),
-          ]);
-      await expect(overseer.listObserverRequirements({ gadgetId: await otherGadget.getId() }))
-          .resolves.toEqual([
-            expect.objectContaining({ gatekeeperId: await other.getId() }),
-          ]);
+      await expect(
+        overseer.listObserverRequirements({ gadgetId: await gadget.getId() }),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          gatekeeperId: await bound.getId(),
+          vendorId: TEST_VENDOR_ID,
+          resourceTitle: "Test Thing bound",
+          resourceUrl: thingUrl("bound"),
+        }),
+      ]);
+      await expect(
+        overseer.listObserverRequirements({ gadgetId: await otherGadget.getId() }),
+      ).resolves.toEqual([expect.objectContaining({ gatekeeperId: await other.getId() })]);
       await expect(overseer.listObserverRequirements("workspace")).resolves.toEqual([
         expect.objectContaining({ resourceTitle: "Test Ambient" }),
         expect.objectContaining({ resourceTitle: "Test Thing bound" }),
@@ -204,14 +225,14 @@ describe("observer re-verification", () => {
         expect.objectContaining({ resourceTitle: "Test Thing unbound" }),
       ]);
       // A connection is not a gadget, so it cannot be granted.
-      await expect(overseer.listObserverRequirements({ gadgetId: await bound.getId() }))
-          .rejects.toThrow(`No such gadget: ${await bound.getId()}`);
+      await expect(
+        overseer.listObserverRequirements({ gadgetId: await bound.getId() }),
+      ).rejects.toThrow(`No such gadget: ${await bound.getId()}`);
     });
   });
 
-  it.concurrent("automatically uses the collaborator's ambient account without prompting",
-      async () => {
-    await withSession(async publicApi => {
+  it.concurrent("automatically uses the collaborator's ambient account without prompting", async () => {
+    await withSession(async (publicApi) => {
       const [alice, bob] = nextUsernames("ambientalice", "ambientbob");
       const aliceApi = await signUp(publicApi, alice);
       const bobApi = await signUp(publicApi, bob);
@@ -233,12 +254,13 @@ describe("observer re-verification", () => {
     });
   });
 
-  it.concurrent("prompts once on the collaborator's first open, with no failure attached",
-      async () => {
-    await withSession(async publicApi => {
+  it.concurrent("prompts once on the collaborator's first open, with no failure attached", async () => {
+    await withSession(async (publicApi) => {
       const shared = await shareGadgetWithBob(publicApi, ["first"]);
-      const recorder =
-      new ObserverConfigRecorder().alwaysChoose(shared.bobAccount.id, MAX_OBSERVER_PROMPTS);
+      const recorder = new ObserverConfigRecorder().alwaysChoose(
+        shared.bobAccount.id,
+        MAX_OBSERVER_PROMPTS,
+      );
       using overseer = await bobOpens(shared, recorder);
 
       expect(recorder.callCount).toBe(1);
@@ -249,9 +271,8 @@ describe("observer re-verification", () => {
     });
   });
 
-  it.concurrent("re-prompts with the failed account when verification fails since the last open",
-      async () => {
-    await withSession(async publicApi => {
+  it.concurrent("re-prompts with the failed account when verification fails since the last open", async () => {
+    await withSession(async (publicApi) => {
       const shared = await shareGadgetWithBob(publicApi, ["expire"]);
       // First open persists Bob's account choice, which is the state the bug lives in.
       expect((await bobOpensAndCloses(shared)).callCount).toBe(1);
@@ -261,8 +282,10 @@ describe("observer re-verification", () => {
       // Second open: the choice is already persisted, so previously no prompt was built at all and the
       // open dead-ended. Now the overseer must re-prompt and say which account failed. Answering with
       // the same still-failing account spends the re-prompt budget, so the open then rejects.
-      const second =
-          new ObserverConfigRecorder().alwaysChoose(shared.bobAccount.id, MAX_OBSERVER_PROMPTS);
+      const second = new ObserverConfigRecorder().alwaysChoose(
+        shared.bobAccount.id,
+        MAX_OBSERVER_PROMPTS,
+      );
       await expect(bobOpens(shared, second)).rejects.toThrow(/could not confirm/i);
 
       expect(second.callCount).toBe(1);
@@ -274,16 +297,22 @@ describe("observer re-verification", () => {
   });
 
   it.concurrent("names the connection and account when the re-prompt budget is spent", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const shared = await shareGadgetWithBob(publicApi, ["named"]);
       await bobOpensAndCloses(shared);
       await shared.failBob(EXPIRED_REASON);
 
-      const second =
-          new ObserverConfigRecorder().alwaysChoose(shared.bobAccount.id, MAX_OBSERVER_PROMPTS);
+      const second = new ObserverConfigRecorder().alwaysChoose(
+        shared.bobAccount.id,
+        MAX_OBSERVER_PROMPTS,
+      );
       const error = await bobOpens(shared, second).then(
-        overseer => { overseer[Symbol.dispose](); return null; },
-        (err: unknown) => err as Error);
+        (overseer) => {
+          overseer[Symbol.dispose]();
+          return null;
+        },
+        (err: unknown) => err as Error,
+      );
 
       expect(error).not.toBeNull();
       // The whole point of the change: the failure is attributable. It names the binding, Bob's own
@@ -292,12 +321,12 @@ describe("observer re-verification", () => {
       expect(error!.message).toContain(shared.bobLabel);
       expect(error!.message).toContain(EXPIRED_REASON);
       // One line per failed binding, so a single failure must not introduce stray newlines.
-      expect(error!.message.split("\n").filter(l => l.includes(shared.bobLabel))).toHaveLength(1);
+      expect(error!.message.split("\n").filter((l) => l.includes(shared.bobLabel))).toHaveLength(1);
     });
   });
 
   it.concurrent("reports every failing binding in one re-prompt, not just the first", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const shared = await shareGadgetWithBob(publicApi, ["multi-a", "multi-b"]);
 
       // Both bindings were uncovered on the first open, so both were asked about at once.
@@ -308,11 +337,17 @@ describe("observer re-verification", () => {
 
       // Both bindings now fail in the same verification pass. The old code kept only the first error
       // and dropped the rest, so a second failing connection was invisible.
-      const second =
-          new ObserverConfigRecorder().alwaysChoose(shared.bobAccount.id, MAX_OBSERVER_PROMPTS);
+      const second = new ObserverConfigRecorder().alwaysChoose(
+        shared.bobAccount.id,
+        MAX_OBSERVER_PROMPTS,
+      );
       const error = await bobOpens(shared, second).then(
-        overseer => { overseer[Symbol.dispose](); return null; },
-        (err: unknown) => err as Error);
+        (overseer) => {
+          overseer[Symbol.dispose]();
+          return null;
+        },
+        (err: unknown) => err as Error,
+      );
 
       expect(second.callCount).toBe(1);
       const needs = second.calls[0];
@@ -323,29 +358,37 @@ describe("observer re-verification", () => {
       // And the terminal message accounts for both, one line each.
       expect(error!.message).toContain("Test Thing multi-a");
       expect(error!.message).toContain("Test Thing multi-b");
-      expect(error!.message.split("\n").filter(l => l.includes(shared.bobLabel))).toHaveLength(2);
+      expect(error!.message.split("\n").filter((l) => l.includes(shared.bobLabel))).toHaveLength(2);
     });
   });
 
-  it.concurrent("keeps a repaired pre-existing registration when another binding fails terminally",
-      async () => {
-    await withSession(async publicApi => {
+  it.concurrent("keeps a repaired pre-existing registration when another binding fails terminally", async () => {
+    await withSession(async (publicApi) => {
       const shared = await shareGadgetWithBob(publicApi, ["keep-a", "keep-b"]);
       // First open persists Bob's choices and registers him with both gatekeepers.
       expect((await bobOpensAndCloses(shared)).callCount).toBe(1);
 
       // Between opens, only binding a lapses; b still verifies.
       await setVerifyOutcome(
-        shared.bobLabel, { allow: false, reason: EXPIRED_REASON }, thingUrl("keep-a"));
+        shared.bobLabel,
+        { allow: false, reason: EXPIRED_REASON },
+        thingUrl("keep-a"),
+      );
 
       // Second open. Pass 1: a fails, b passes -> one re-prompt, about a alone. The responder --
       // which runs exactly between the two passes -- repairs a just as b lapses, so pass 2 has a
       // passing again and b failing terminally (the re-prompt budget is spent).
-      const second = new ObserverConfigRecorder().respondWith(async needs => {
+      const second = new ObserverConfigRecorder().respondWith(async (needs) => {
         await setVerifyOutcome(shared.bobLabel, { allow: true }, thingUrl("keep-a"));
         await setVerifyOutcome(
-          shared.bobLabel, { allow: false, reason: EXPIRED_REASON }, thingUrl("keep-b"));
-        return needs.map(n => ({ gatekeeperId: n.gatekeeperId, accountId: shared.bobAccount.id }));
+          shared.bobLabel,
+          { allow: false, reason: EXPIRED_REASON },
+          thingUrl("keep-b"),
+        );
+        return needs.map((n) => ({
+          gatekeeperId: n.gatekeeperId,
+          accountId: shared.bobAccount.id,
+        }));
       });
       await expect(bobOpens(shared, second)).rejects.toThrow(/could not confirm/i);
 
@@ -357,25 +400,26 @@ describe("observer re-verification", () => {
       // predates the call and the persisted record still asserts it exists, so repairing it must
       // not reclassify it as newly added. The buggy rollback emitted exactly one remove here.
       const events = await observerEvents(thingUrl("keep-a"));
-      expect(events.filter(e => e.type === "remove")).toEqual([]);
+      expect(events.filter((e) => e.type === "remove")).toEqual([]);
       // Both successful verifications registered it: the first open and the pass-2 repair.
-      expect(events.filter(e => e.type === "add")).toHaveLength(2);
+      expect(events.filter((e) => e.type === "add")).toHaveLength(2);
     });
   });
 
-  it.concurrent("denies terminally with no prompt when the client offers no config channel",
-      async () => {
+  it.concurrent("denies terminally with no prompt when the client offers no config channel", async () => {
     // The path a collaborator hits by favouriting or sharing a workspace from the sidebar, where
     // openWorkspace() is called without a callback. This message is the only thing they ever see.
     //
     // Uses a settled denial rather than an expiry, since there is nothing to repair here anyway.
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const shared = await shareGadgetWithBob(publicApi, ["nocb"]);
       await bobOpensAndCloses(shared);
       await shared.failBob(DENIED_REASON);
 
       const error = await shared.bobApi.openWorkspace(shared.gadgetId).then(
-        () => null, (err: unknown) => err as Error);
+        () => null,
+        (err: unknown) => err as Error,
+      );
 
       expect(error).not.toBeNull();
       expect(error!.message).toMatch(/could not confirm/i);
@@ -398,93 +442,142 @@ type ObserverOpen = { firstPass: boolean[]; afterReprompt: boolean[] };
 
 // Credentials mostly work, so a collaborator also gets to be a returning observer.
 const verifies = fc.oneof({ arbitrary: fc.constant(true), weight: 3 }, fc.constant(false));
-const observerOpens: fc.Arbitrary<ObserverOpen[]> = fc.integer({ min: 1, max: 3 })
-  .chain(bindings => fc.array(fc.record({
-    firstPass: fc.array(verifies, { minLength: bindings, maxLength: bindings }),
-    afterReprompt: fc.array(verifies, { minLength: bindings, maxLength: bindings }),
-  }), { minLength: 1, maxLength: 3 }));
+const observerOpens: fc.Arbitrary<ObserverOpen[]> = fc
+  .integer({ min: 1, max: 3 })
+  .chain((bindings) =>
+    fc.array(
+      fc.record({
+        firstPass: fc.array(verifies, { minLength: bindings, maxLength: bindings }),
+        afterReprompt: fc.array(verifies, { minLength: bindings, maxLength: bindings }),
+      }),
+      { minLength: 1, maxLength: 3 },
+    ),
+  );
 
 describe("observer re-verification over a collaborator's opens", () => {
-  it.concurrent("registers, re-prompts and reports exactly as the bindings verify, removing nothing",
-      async () => {
-    await fc.assert(fc.asyncProperty(observerOpens, async opens => withSession(async publicApi => {
-      const [prefix] = nextUsernames("obsprop");
-      const names = opens[0]!.firstPass.map((_, i) => `${prefix}-${i}`);
-      const urls = names.map(thingUrl);
-      const shared = await shareGadgetWithBob(publicApi, names);
-      const bob = shared.bobAccount.id;
-      const setOutcomes = (outcomes: boolean[]) => Promise.all(outcomes.map((allow, i) =>
-        setVerifyOutcome(shared.bobLabel,
-          allow ? { allow: true } : { allow: false, reason: EXPIRED_REASON }, urls[i])));
+  it.concurrent("registers, re-prompts and reports exactly as the bindings verify, removing nothing", async () => {
+    await fc.assert(
+      fc.asyncProperty(observerOpens, async (opens) =>
+        withSession(async (publicApi) => {
+          const [prefix] = nextUsernames("obsprop");
+          const names = opens[0]!.firstPass.map((_, i) => `${prefix}-${i}`);
+          const urls = names.map(thingUrl);
+          const shared = await shareGadgetWithBob(publicApi, names);
+          const bob = shared.bobAccount.id;
+          const setOutcomes = (outcomes: boolean[]) =>
+            Promise.all(
+              outcomes.map((allow, i) =>
+                setVerifyOutcome(
+                  shared.bobLabel,
+                  allow ? { allow: true } : { allow: false, reason: EXPIRED_REASON },
+                  urls[i],
+                ),
+              ),
+            );
 
-      // Whether an earlier open succeeded, which is what publishes Bob's account choices.
-      let returning = false;
-      // How many passes verified each binding; each registers Bob there.
-      const registrations = urls.map(() => 0);
+          // Whether an earlier open succeeded, which is what publishes Bob's account choices.
+          let returning = false;
+          // How many passes verified each binding; each registers Bob there.
+          const registrations = urls.map(() => 0);
 
-      for (const [k, { firstPass, afterReprompt }] of opens.entries()) {
-        await setOutcomes(firstPass);
-        const recorder = new ObserverConfigRecorder();
-        if (!returning) recorder.alwaysChoose(bob, 1);
-        recorder.respondWith(async needs => {
-          await setOutcomes(afterReprompt);
-          return needs.map(need => ({ gatekeeperId: need.gatekeeperId, accountId: bob }));
-        });
-        const opened = await bobOpens(shared, recorder).then(
-          overseer => { overseer[Symbol.dispose](); return null; },
-          (error: unknown) => error as Error);
+          for (const [k, { firstPass, afterReprompt }] of opens.entries()) {
+            await setOutcomes(firstPass);
+            const recorder = new ObserverConfigRecorder();
+            if (!returning) recorder.alwaysChoose(bob, 1);
+            recorder.respondWith(async (needs) => {
+              await setOutcomes(afterReprompt);
+              return needs.map((need) => ({ gatekeeperId: need.gatekeeperId, accountId: bob }));
+            });
+            const opened = await bobOpens(shared, recorder).then(
+              (overseer) => {
+                overseer[Symbol.dispose]();
+                return null;
+              },
+              (error: unknown) => error as Error,
+            );
 
-        const passes = firstPass.every(Boolean) ? [firstPass] : [firstPass, afterReprompt];
-        for (const pass of passes) pass.forEach((ok, i) => { if (ok) registrations[i]!++; });
-        const failing = names.filter((_, i) => !passes.at(-1)![i]);
+            const passes = firstPass.every(Boolean) ? [firstPass] : [firstPass, afterReprompt];
+            for (const pass of passes)
+              pass.forEach((ok, i) => {
+                if (ok) registrations[i]!++;
+              });
+            const failing = names.filter((_, i) => !passes.at(-1)![i]);
 
-        const prompts = recorder.calls.map(needs => needs
-          .filter(need => urls.includes(need.resourceUrl!))
-          .map(need => ({ name: names[urls.indexOf(need.resourceUrl!)], failure: need.failure })));
-        const expectedPrompts = [
-          ...returning ? [] : [names.map(name => ({ name, failure: undefined }))],
-          ...passes.length === 1 ? [] : [names.filter((_, i) => !firstPass[i]).map(name => ({
-            name,
-            failure: { accountId: bob, reason: expect.stringContaining(EXPIRED_REASON) },
-          }))],
-        ];
-        expect(prompts, `prompts of open ${k}`).toEqual(expectedPrompts);
+            const prompts = recorder.calls.map((needs) =>
+              needs
+                .filter((need) => urls.includes(need.resourceUrl!))
+                .map((need) => ({
+                  name: names[urls.indexOf(need.resourceUrl!)],
+                  failure: need.failure,
+                })),
+            );
+            const expectedPrompts = [
+              ...(returning ? [] : [names.map((name) => ({ name, failure: undefined }))]),
+              ...(passes.length === 1
+                ? []
+                : [
+                    names
+                      .filter((_, i) => !firstPass[i])
+                      .map((name) => ({
+                        name,
+                        failure: {
+                          accountId: bob,
+                          reason: expect.stringContaining(EXPIRED_REASON),
+                        },
+                      })),
+                  ]),
+            ];
+            expect(prompts, `prompts of open ${k}`).toEqual(expectedPrompts);
 
-        if (failing.length === 0) {
-          expect(opened, `open ${k}`).toBeNull();
-          returning = true;
-        } else {
-          expect(opened?.message, `open ${k}`).toMatch(/could not confirm/i);
-          const named = opened!.message.split("\n")
-            .filter(line => line.includes(shared.bobLabel))
-            .map(line => /^Test Thing (\S+) \(/.exec(line)?.[1]);
-          expect(named.toSorted(), `bindings named by open ${k}`).toEqual(failing.toSorted());
-        }
-      }
+            if (failing.length === 0) {
+              expect(opened, `open ${k}`).toBeNull();
+              returning = true;
+            } else {
+              expect(opened?.message, `open ${k}`).toMatch(/could not confirm/i);
+              const named = opened!.message
+                .split("\n")
+                .filter((line) => line.includes(shared.bobLabel))
+                .map((line) => /^Test Thing (\S+) \(/.exec(line)?.[1]);
+              expect(named.toSorted(), `bindings named by open ${k}`).toEqual(failing.toSorted());
+            }
+          }
 
-      // Each verified pass registered Bob at its binding, nothing removed him, and every
-      // registration names the one observer id.
-      const ids = new Set<string>();
-      for (const [i, url] of urls.entries()) {
-        const events = await observerEvents(url);
-        expect(events.map(({ type }) => type), `events at ${names[i]}`)
-          .toEqual(Array.from({ length: registrations[i]! }, () => "add"));
-        for (const { id } of events) ids.add(id);
-      }
-      expect(ids.size, "distinct observer ids").toBeLessThanOrEqual(1);
-    })), {
-      ...PROPERTY_RUN_OPTIONS,
-      numRuns: 8,
-      examples: [
-        // The 0d7793c reproduction: a lapses and is repaired as b lapses for good.
-        [[{ firstPass: [true, true], afterReprompt: [true, true] },
-          { firstPass: [false, true], afterReprompt: [true, false] }]],
-        // A first-ever open fails terminally and keeps what it registered; the next succeeds under
-        // the same observer id.
-        [[{ firstPass: [false, true], afterReprompt: [false, true] },
-          { firstPass: [true, true], afterReprompt: [true, true] }]],
-      ],
-    });
+          // Each verified pass registered Bob at its binding, nothing removed him, and every
+          // registration names the one observer id.
+          const ids = new Set<string>();
+          for (const [i, url] of urls.entries()) {
+            const events = await observerEvents(url);
+            expect(
+              events.map(({ type }) => type),
+              `events at ${names[i]}`,
+            ).toEqual(Array.from({ length: registrations[i]! }, () => "add"));
+            for (const { id } of events) ids.add(id);
+          }
+          expect(ids.size, "distinct observer ids").toBeLessThanOrEqual(1);
+        }),
+      ),
+      {
+        ...PROPERTY_RUN_OPTIONS,
+        numRuns: 8,
+        examples: [
+          // The 0d7793c reproduction: a lapses and is repaired as b lapses for good.
+          [
+            [
+              { firstPass: [true, true], afterReprompt: [true, true] },
+              { firstPass: [false, true], afterReprompt: [true, false] },
+            ],
+          ],
+          // A first-ever open fails terminally and keeps what it registered; the next succeeds under
+          // the same observer id.
+          [
+            [
+              { firstPass: [false, true], afterReprompt: [false, true] },
+              { firstPass: [true, true], afterReprompt: [true, true] },
+            ],
+          ],
+        ],
+      },
+    );
   });
 });
 
@@ -495,14 +588,14 @@ describe("harness", () => {
   });
 
   it.concurrent("accepts an RPC session and reports server config", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const config = await publicApi.getServerConfig();
       expect(config.signupsEnabled).toBe(true);
     });
   });
 
   it.concurrent("provisions a test-gatekeeper account with no auth flow", async () => {
-    await withSession(async publicApi => {
+    await withSession(async (publicApi) => {
       const [name] = nextUsernames("smoke");
       using api = await signUp(publicApi, name);
       const account = await provisionAccount(api);
@@ -522,8 +615,10 @@ describe("harness", () => {
     // fail whether or not the interception worked, which proves nothing.
     const target = "https://example.com/definitely-not-mocked";
     const res = await harness.fetchWorker(
-      TEST_GATEKEEPER_WORKER, "http://gatekeeper-test.test/control/fetch-probe",
-      { method: "POST", body: JSON.stringify({ url: target }) });
+      TEST_GATEKEEPER_WORKER,
+      "http://gatekeeper-test.test/control/fetch-probe",
+      { method: "POST", body: JSON.stringify({ url: target }) },
+    );
 
     // The interceptor's throw doesn't surface as a rejection inside the Worker: the harness proxies
     // outbound requests, and a proxy-side failure comes back as a synthetic 500. Either way the

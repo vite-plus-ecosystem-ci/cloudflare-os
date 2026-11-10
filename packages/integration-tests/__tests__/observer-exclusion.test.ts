@@ -1,19 +1,33 @@
 // `excludeObservers` blocks an observation only for a current collaborator whose access's
 // forward reach covers the producing connection.
 
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type {
-  AuthenticatedApi, CollaboratorGrant, Overseer, PublicApi,
+  AuthenticatedApi,
+  CollaboratorGrant,
+  Overseer,
+  PublicApi,
 } from "@gadgets/workshop-shared/api";
 import type { TestSession } from "../fixtures/gatekeeper-test/src/test-gatekeeper.js";
 import {
-  startTestGatekeeperHarness, TEST_VENDOR_ID, testControl, type Harness,
+  startTestGatekeeperHarness,
+  TEST_VENDOR_ID,
+  testControl,
+  type Harness,
 } from "../src/harness.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 import {
-  connect, listConnectedAccounts, logIn, MAX_OBSERVER_PROMPTS, nextUsernames,
-  ObserverConfigRecorder, signUp, stubFor, waitFor, type ConnectedAccount,
+  connect,
+  listConnectedAccounts,
+  logIn,
+  MAX_OBSERVER_PROMPTS,
+  nextUsernames,
+  ObserverConfigRecorder,
+  signUp,
+  stubFor,
+  waitFor,
+  type ConnectedAccount,
 } from "../src/rpc-client.js";
 
 let harness: Harness;
@@ -33,8 +47,9 @@ afterAll(async () => {
   }
 });
 
-const BLOCKED = "This observation was blocked because it contains data that a current " +
-    "collaborator is not permitted to see.";
+const BLOCKED =
+  "This observation was blocked because it contains data that a current " +
+  "collaborator is not permitted to see.";
 
 const thingUrl = (name: string) => `https://gadgets-test.example/things/${name}`;
 
@@ -45,8 +60,11 @@ async function withSession<T>(body: (api: RpcStub<PublicApi>) => Promise<T>): Pr
 
 async function provisionAccount(api: RpcStub<AuthenticatedApi>): Promise<ConnectedAccount> {
   await api.provisionAmbientAccount(TEST_VENDOR_ID);
-  return waitFor("the test account to be provisioned", async () =>
-    (await listConnectedAccounts(api)).find(a => a.vendorId === TEST_VENDOR_ID) ?? null);
+  return waitFor(
+    "the test account to be provisioned",
+    async () =>
+      (await listConnectedAccounts(api)).find((a) => a.vendorId === TEST_VENDOR_ID) ?? null,
+  );
 }
 
 type Workspace = Disposable & {
@@ -66,10 +84,15 @@ async function newWorkspace(publicApi: RpcStub<PublicApi>, thingName: string): P
   using gatekeeper = await overseer.newGatekeeper(account.id, thingUrl(thingName));
   if (!gatekeeper) throw new Error("Failed to create the test connection");
   const gatekeeperId = await gatekeeper.getId();
-  const session = await gatekeeper.openSession() as RpcStub<TestSession>;
+  const session = (await gatekeeper.openSession()) as RpcStub<TestSession>;
   const { id: gadgetId } = await overseer.getMetadata();
   return {
-    gadgetId, overseer, alice, session, gatekeeperId, account,
+    gadgetId,
+    overseer,
+    alice,
+    session,
+    gatekeeperId,
+    account,
     [Symbol.dispose]() {
       for (const stub of [session, overseer, aliceApi]) stub[Symbol.dispose]();
     },
@@ -79,7 +102,11 @@ async function newWorkspace(publicApi: RpcStub<PublicApi>, thingName: string): P
 // The restart fells every client of the workspace, so reconnect on a fresh connection.
 async function reopenAfterRestart(ws: Workspace) {
   await waitFor("the restart to fell the old workspace instance", () =>
-    ws.session.readValue().then(() => null, () => true));
+    ws.session.readValue().then(
+      () => null,
+      () => true,
+    ),
+  );
   return waitFor("the workspace to come back after the restart", async () => {
     using stack = new DisposableStack();
     try {
@@ -88,7 +115,7 @@ async function reopenAfterRestart(ws: Workspace) {
       // Keep the workspace's native RPC session alive until the returned read session is done.
       const overseer = stack.use(await api.openWorkspace(ws.gadgetId));
       const gatekeeper = stack.use(await overseer.getGatekeeperById(ws.gatekeeperId));
-      const session = stack.use(await gatekeeper.openSession() as RpcStub<TestSession>);
+      const session = stack.use((await gatekeeper.openSession()) as RpcStub<TestSession>);
       await session.readValue();
       return Object.assign(stack.move(), { session });
     } catch {
@@ -101,8 +128,9 @@ type ObserverEvent = { resourceUrl: string; type: "add" | "remove"; id: string }
 
 /** The addObserver()/removeObserver() calls one binding's gatekeeper has seen, in order. */
 async function observerEvents(resourceUrl: string): Promise<ObserverEvent[]> {
-  return (await testControl<{ events: ObserverEvent[] }>(harness, "observer-events", { resourceUrl }))
-    .events;
+  return (
+    await testControl<{ events: ObserverEvent[] }>(harness, "observer-events", { resourceUrl })
+  ).events;
 }
 
 /**
@@ -111,15 +139,20 @@ async function observerEvents(resourceUrl: string): Promise<ObserverEvent[]> {
  * produced at `resourceUrl` (the owner is never registered).
  */
 async function verifiedCollaborator(
-    publicApi: RpcStub<PublicApi>, ws: Workspace, grant: CollaboratorGrant, resourceUrl: string) {
+  publicApi: RpcStub<PublicApi>,
+  ws: Workspace,
+  grant: CollaboratorGrant,
+  resourceUrl: string,
+) {
   const [name] = nextUsernames(grant === "workspace" ? "bob" : "carol");
   using api = await signUp(publicApi, name);
   const account = await provisionAccount(api);
   const added = await ws.overseer.addCollaborator(name, grant);
   if (!added) throw new Error(`Failed to share the workspace with ${name}`);
   const before = await observerEvents(resourceUrl);
-  using callback =
-      stubFor(new ObserverConfigRecorder().alwaysChoose(account.id, MAX_OBSERVER_PROMPTS));
+  using callback = stubFor(
+    new ObserverConfigRecorder().alwaysChoose(account.id, MAX_OBSERVER_PROMPTS),
+  );
   using opened = await api.openWorkspace(ws.gadgetId, undefined, callback);
   if (grant !== "workspace") (await opened.getGadget(grant.gadgetId, callback))[Symbol.dispose]();
   const events = (await observerEvents(resourceUrl)).slice(before.length);
@@ -128,7 +161,7 @@ async function verifiedCollaborator(
 }
 
 it("an excluded build collaborator blocks the observation until removed", async () => {
-  await withSession(async publicApi => {
+  await withSession(async (publicApi) => {
     using ws = await newWorkspace(publicApi, "exclude-build");
     const url = thingUrl("exclude-build");
     const bob = await verifiedCollaborator(publicApi, ws, "workspace", url);
@@ -138,21 +171,23 @@ it("an excluded build collaborator blocks the observation until removed", async 
     const metadata = await ws.overseer.getMetadata();
     expect(metadata.containsRestrictedData).toBeFalsy();
     expect(metadata.ownerInvitesOnly).toBeFalsy();
-    expect(await observerEvents(url)).toEqual([{ resourceUrl: url, type: "add", id: bob.observerId }]);
+    expect(await observerEvents(url)).toEqual([
+      { resourceUrl: url, type: "add", id: bob.observerId },
+    ]);
 
     // The revocation restart can overtake its ACK on a loaded runner. The fresh session below
     // verifies the persisted removal by observing data Bob previously blocked.
-    await ws.overseer.removeCollaborator(bob.profileId, []).catch(error => {
-      if (!(error instanceof Error && error.message.startsWith("Peer closed WebSocket: 3000 "))) throw error;
+    await ws.overseer.removeCollaborator(bob.profileId, []).catch((error) => {
+      if (!(error instanceof Error && error.message.startsWith("Peer closed WebSocket: 3000 ")))
+        throw error;
     });
     using reopened = await reopenAfterRestart(ws);
     await expect(reopened.session.readValue(false, false, [bob.observerId])).resolves.toBe(42);
   });
 });
 
-it("a gadget collaborator blocks only observations from connections their gadgets reach",
-    async () => {
-  await withSession(async publicApi => {
+it("a gadget collaborator blocks only observations from connections their gadgets reach", async () => {
+  await withSession(async (publicApi) => {
     using ws = await newWorkspace(publicApi, "exclude-use-unbound");
     const unboundUrl = thingUrl("exclude-use-unbound");
     const boundUrl = thingUrl("exclude-use-bound");
@@ -162,22 +197,28 @@ it("a gadget collaborator blocks only observations from connections their gadget
     if (!bound) throw new Error("Failed to create the bound connection");
     using gadget = await ws.overseer.createGadget("Test Gadget", undefined, "TEST_GADGET");
     await gadget.bind("TEST_THING", await bound.getId());
-    using boundSession = await bound.openSession() as RpcStub<TestSession>;
+    using boundSession = (await bound.openSession()) as RpcStub<TestSession>;
     // Another gadget, not shared with Carol, reaches a connection of its own.
     using other = await ws.overseer.newGatekeeper(ws.account.id, otherUrl);
     if (!other) throw new Error("Failed to create the other connection");
     using otherGadget = await ws.overseer.createGadget("Other Gadget", undefined, "OTHER_GADGET");
     await otherGadget.bind("TEST_THING", await other.getId());
-    using otherSession = await other.openSession() as RpcStub<TestSession>;
+    using otherSession = (await other.openSession()) as RpcStub<TestSession>;
     const carol = await verifiedCollaborator(
-        publicApi, ws, { gadgetId: await gadget.getId() }, boundUrl);
+      publicApi,
+      ws,
+      { gadgetId: await gadget.getId() },
+      boundUrl,
+    );
 
     await expect(ws.session.readValue(false, false, [carol.observerId])).resolves.toBe(42);
-    expect(await observerEvents(unboundUrl))
-        .toEqual([{ resourceUrl: unboundUrl, type: "remove", id: carol.observerId }]);
+    expect(await observerEvents(unboundUrl)).toEqual([
+      { resourceUrl: unboundUrl, type: "remove", id: carol.observerId },
+    ]);
     await expect(otherSession.readValue(false, false, [carol.observerId])).resolves.toBe(42);
-    expect(await observerEvents(otherUrl))
-        .toEqual([{ resourceUrl: otherUrl, type: "remove", id: carol.observerId }]);
+    expect(await observerEvents(otherUrl)).toEqual([
+      { resourceUrl: otherUrl, type: "remove", id: carol.observerId },
+    ]);
     await expect(boundSession.readValue(false, false, [carol.observerId])).rejects.toThrow(BLOCKED);
   });
 });

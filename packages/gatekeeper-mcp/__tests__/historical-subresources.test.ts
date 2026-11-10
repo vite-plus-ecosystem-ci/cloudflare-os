@@ -1,9 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 // `cloudflare:workers` exists only inside workerd; the base classes are enough to construct the
 // facet with a fake `ctx`.
 vi.mock("cloudflare:workers", () => {
-  class Base { constructor(readonly ctx: unknown, readonly env: unknown) {} }
+  class Base {
+    constructor(
+      readonly ctx: unknown,
+      readonly env: unknown,
+    ) {}
+  }
   return { DurableObject: Base, WorkerEntrypoint: Base, RpcTarget: class {}, RpcStub: class {} };
 });
 vi.mock("capnweb-validate", () => ({
@@ -20,12 +25,14 @@ describe("getHistoricalSubresources", () => {
     const storage = { kv: { get: vi.fn(), put: vi.fn(), delete: vi.fn(), list: vi.fn() } };
     const facet = new McpGatekeeperImpl(
       { props: { serverId: "linear", endpoint: "https://mcp.linear.app/mcp" }, storage } as never,
-      {} as never);
+      {} as never,
+    );
 
     const exported = await facet.getHistoricalSubresources();
     expect(exported).toEqual(["server/linear"]);
-    await expect(facet.verifyObserverAccess([{ id: "someone", verifier: {} as never }], exported))
-      .resolves.toEqual({ allowedObserverIds: [] });
+    await expect(
+      facet.verifyObserverAccess([{ id: "someone", verifier: {} as never }], exported),
+    ).resolves.toEqual({ allowedObserverIds: [] });
     expect(storage.kv.put).not.toHaveBeenCalled();
   });
 });

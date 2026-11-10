@@ -1,7 +1,9 @@
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import {
-  type AdminApi, type AdminAuditRecord, type AuthenticatedApi,
+  type AdminApi,
+  type AdminAuditRecord,
+  type AuthenticatedApi,
 } from "@gadgets/workshop-shared/api";
 import { ADMIN_USERNAME, startHarness, type Harness } from "../src/harness.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
@@ -28,12 +30,13 @@ beforeAll(async () => {
   network.install();
   harness = await startHarness({
     gatekeepers: [],
-    patchWorkshop: config => {
+    patchWorkshop: (config) => {
       config.vars = { ...config.vars, ADMINS: [ADMIN_USERNAME, DEMOTED_USERNAME] };
     },
   });
   admin = await adminApiOf(
-      fileScope.use(await signUp(fileScope.use(connect(harness.url)), ADMIN_USERNAME)));
+    fileScope.use(await signUp(fileScope.use(connect(harness.url)), ADMIN_USERNAME)),
+  );
   demotedApi = fileScope.use(await signUp(fileScope.use(connect(harness.url)), DEMOTED_USERNAME));
 });
 
@@ -48,8 +51,10 @@ afterAll(async () => {
 });
 
 /** The newest record of the deployment-wide audit log of `kind`, if any. */
-async function newest(api: RpcStub<AdminApi>, kind: AdminAuditRecord["kind"])
-    : Promise<AdminAuditRecord | undefined> {
+async function newest(
+  api: RpcStub<AdminApi>,
+  kind: AdminAuditRecord["kind"],
+): Promise<AdminAuditRecord | undefined> {
   return (await api.listAdminAudit({ kind, limit: 1 })).records[0];
 }
 
@@ -58,32 +63,41 @@ it("holds the admins' choice within the deployment's default", async () => {
   expect(settings.adminAuditRetentionDays).toEqual({ effective: 90, chosen: 90, min: 90 });
 
   const before = await newest(admin, "setting");
-  await expect(admin.setAdminAuditRetentionDays(89))
-      .rejects.toThrow(/ADMIN_AUDIT_RETENTION_MIN_DAYS/);
+  await expect(admin.setAdminAuditRetentionDays(89)).rejects.toThrow(
+    /ADMIN_AUDIT_RETENTION_MIN_DAYS/,
+  );
   expect(await newest(admin, "setting")).toEqual(before);
 });
 
 it("keeps a demoted admin's records", async () => {
   const demoted = await adminApiOf(demotedApi);
   await demoted.setSiteName("Bounds check");
-  expect(await newest(admin, "setting")).toMatchObject(
-      { kind: "setting", admin: DEMOTED_USERNAME, method: "setSiteName" });
+  expect(await newest(admin, "setting")).toMatchObject({
+    kind: "setting",
+    admin: DEMOTED_USERNAME,
+    method: "setSiteName",
+  });
 });
 
 it("applies a redeploy's raised minimum and demotion", async () => {
-  await harness.redeployWorkshop(config => {
-    config.vars = { ...config.vars, ADMINS: [ADMIN_USERNAME], ADMIN_AUDIT_RETENTION_MIN_DAYS: "120" };
+  await harness.redeployWorkshop((config) => {
+    config.vars = {
+      ...config.vars,
+      ADMINS: [ADMIN_USERNAME],
+      ADMIN_AUDIT_RETENTION_MIN_DAYS: "120",
+    };
   });
 
   // The redeploy restarts every Worker, ending every session open at the time.
   using stack = new DisposableStack();
-  const logInAfresh = (username: string) => waitFor(`${username} to log in again`, async () => {
-    try {
-      return stack.use(await logIn(stack.use(connect(harness.url)), username));
-    } catch {
-      return null;
-    }
-  });
+  const logInAfresh = (username: string) =>
+    waitFor(`${username} to log in again`, async () => {
+      try {
+        return stack.use(await logIn(stack.use(connect(harness.url)), username));
+      } catch {
+        return null;
+      }
+    });
 
   const demoted = await logInAfresh(DEMOTED_USERNAME);
   expect(await demoted.getAdminApi()).toBeNull();
@@ -93,9 +107,12 @@ it("applies a redeploy's raised minimum and demotion", async () => {
   const fresh = await adminApi.getAdminApi();
   if (fresh === null) throw new Error("The admin API was unavailable after the redeploy");
   stack.use(fresh);
-  expect((await fresh.getSettings()).adminAuditRetentionDays)
-      .toEqual({ effective: 120, chosen: 90, min: 120 });
+  expect((await fresh.getSettings()).adminAuditRetentionDays).toEqual({
+    effective: 120,
+    chosen: 90,
+    min: 120,
+  });
 
   const demotedRecords = (await fresh.listAdminAudit({ admin: DEMOTED_USERNAME })).records;
-  expect(demotedRecords.map(record => record.method)).toEqual(["setSiteName"]);
+  expect(demotedRecords.map((record) => record.method)).toEqual(["setSiteName"]);
 });

@@ -6,10 +6,22 @@
 // exported by getHistoricalSubresources().
 
 import { runInDurableObject } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { generateNonce } from "@gadgets/gatekeeper-kit/connect-nonce";
 import { scopesFor } from "../../src/x-env";
-import { ALICE, BOB, CAROL, FakeX, accountStub, failure, hooks, json, reconnectAs, seedAccount, unwrap } from "./fake-x";
+import {
+  ALICE,
+  BOB,
+  CAROL,
+  FakeX,
+  accountStub,
+  failure,
+  hooks,
+  json,
+  reconnectAs,
+  seedAccount,
+  unwrap,
+} from "./fake-x";
 import type { GatekeeperProps } from "./worker";
 
 afterEach(() => {
@@ -21,23 +33,31 @@ const ALICE_USER = `user/${ALICE.id}`;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function accountBinding(x: FakeX) {
-  const props: GatekeeperProps = { userObjectId: await seedAccount(x), resourceKind: "account", redactsActionPreviews: true };
+  const props: GatekeeperProps = {
+    userObjectId: await seedAccount(x),
+    resourceKind: "account",
+    redactsActionPreviews: true,
+  };
   return { props, name: crypto.randomUUID() };
 }
 
 async function subresources(name: string): Promise<(string[] | undefined)[]> {
-  return (await hooks().queueLog(name)).observations.map(o => o.subresources);
+  return (await hooks().queueLog(name)).observations.map((o) => o.subresources);
 }
 
 async function readsUsed(userObjectId: string): Promise<number | undefined> {
-  return await runInDurableObject(accountStub(userObjectId), async (_instance, state) =>
-    state.storage.kv.get<{ used: number }>("reads")?.used);
+  return await runInDurableObject(
+    accountStub(userObjectId),
+    async (_instance, state) => state.storage.kv.get<{ used: number }>("reads")?.used,
+  );
 }
 
 /** An observer whose connection is gone: its account no longer names anyone. */
 async function disconnected(x: FakeX): Promise<string> {
   const gone = await seedAccount(x, ALICE);
-  await runInDurableObject(accountStub(gone), async (_instance, state) => state.storage.kv.delete("identity"));
+  await runInDurableObject(accountStub(gone), async (_instance, state) =>
+    state.storage.kv.delete("identity"),
+  );
   return gone;
 }
 
@@ -45,7 +65,9 @@ async function disconnected(x: FakeX): Promise<string> {
 async function deadGrant(x: FakeX, user = ALICE): Promise<string> {
   const dead = await seedAccount(x, user, { expiresInMs: 0 });
   await hooks().installCallback(dead, generateNonce(), scopesFor());
-  x.on("POST", /^\/2\/oauth2\/token/, () => json({ error: "invalid_grant", error_description: "Token was revoked." }, { status: 400 }));
+  x.on("POST", /^\/2\/oauth2\/token/, () =>
+    json({ error: "invalid_grant", error_description: "Token was revoked." }, { status: 400 }),
+  );
   return dead;
 }
 
@@ -58,13 +80,24 @@ describe("verifyObserverAccess", () => {
     expect(await subresources(name)).toEqual([[ALICE_USER]]);
 
     // Identities a day old, which a read of the identity would refresh at X.
-    const aliceElsewhere = await seedAccount(x, ALICE, { identity: { fetchedAt: Date.now() - 2 * DAY_MS } });
+    const aliceElsewhere = await seedAccount(x, ALICE, {
+      identity: { fetchedAt: Date.now() - 2 * DAY_MS },
+    });
     const bob = await seedAccount(x, BOB, { identity: { fetchedAt: Date.now() - 2 * DAY_MS } });
     const before = x.requests.length;
-    expect(unwrap(await hooks().verifyObserverAccess(name, props, [
-      { id: "alice-elsewhere", userObjectId: aliceElsewhere },
-      { id: "bob", userObjectId: bob },
-    ], [ALICE_USER]))).toEqual({ allowedObserverIds: ["alice-elsewhere"] });
+    expect(
+      unwrap(
+        await hooks().verifyObserverAccess(
+          name,
+          props,
+          [
+            { id: "alice-elsewhere", userObjectId: aliceElsewhere },
+            { id: "bob", userObjectId: bob },
+          ],
+          [ALICE_USER],
+        ),
+      ),
+    ).toEqual({ allowedObserverIds: ["alice-elsewhere"] });
     expect(x.requests).toHaveLength(before);
     expect(await readsUsed(aliceElsewhere)).toBeUndefined();
     expect(await readsUsed(bob)).toBeUndefined();
@@ -76,8 +109,16 @@ describe("verifyObserverAccess", () => {
     unwrap(await hooks().run(name, props, [["getUser", "bob"], ["isMuted"]]));
     const owner = { id: "alice-elsewhere", userObjectId: await seedAccount(x, ALICE) };
     for (const userObjectId of [await disconnected(x), await deadGrant(x)]) {
-      expect(failure(await hooks().verifyObserverAccess(name, props, [owner, { id: "alice", userObjectId }], [ALICE_USER])))
-        .toMatch(/X connection has expired\. They need to reconnect it/);
+      expect(
+        failure(
+          await hooks().verifyObserverAccess(
+            name,
+            props,
+            [owner, { id: "alice", userObjectId }],
+            [ALICE_USER],
+          ),
+        ),
+      ).toMatch(/X connection has expired\. They need to reconnect it/);
     }
   });
 
@@ -86,8 +127,17 @@ describe("verifyObserverAccess", () => {
     const { props, name } = await accountBinding(x);
     unwrap(await hooks().run(name, props, [["getUser", "bob"], ["isMuted"]]));
     const flaky = await seedAccount(x, ALICE, { expiresInMs: 0 });
-    x.on("POST", /^\/2\/oauth2\/token/, () => json({ error: "temporarily_unavailable" }, { status: 503 }));
-    const message = failure(await hooks().verifyObserverAccess(name, props, [{ id: "alice", userObjectId: flaky }], [ALICE_USER]));
+    x.on("POST", /^\/2\/oauth2\/token/, () =>
+      json({ error: "temporarily_unavailable" }, { status: 503 }),
+    );
+    const message = failure(
+      await hooks().verifyObserverAccess(
+        name,
+        props,
+        [{ id: "alice", userObjectId: flaky }],
+        [ALICE_USER],
+      ),
+    );
     expect(message).not.toMatch(/expired/);
   });
 
@@ -112,18 +162,23 @@ describe("verifyObserverAccess", () => {
       "gmail/user/1001",
       "server/1001",
     ]) {
-      expect(failure(await hooks().verifyObserverAccess(name, props, observers, [ALICE_USER, id])), id)
-        .toMatch(/subresource ID/);
+      expect(
+        failure(await hooks().verifyObserverAccess(name, props, observers, [ALICE_USER, id])),
+        id,
+      ).toMatch(/subresource ID/);
     }
-    expect(failure(await hooks().verifyObserverAccess(name, props, observers, []))).toMatch(/no subresources/);
+    expect(failure(await hooks().verifyObserverAccess(name, props, observers, []))).toMatch(
+      /no subresources/,
+    );
   });
 
   it("refuses to answer for a binding that has never named its X user", async () => {
     const x = new FakeX().install();
     const { props, name } = await accountBinding(x);
     const observers = [{ id: "alice-elsewhere", userObjectId: await seedAccount(x, ALICE) }];
-    expect(failure(await hooks().verifyObserverAccess(name, props, observers, [ALICE_USER])))
-      .toMatch(/has not read anything as its X account/);
+    expect(
+      failure(await hooks().verifyObserverAccess(name, props, observers, [ALICE_USER])),
+    ).toMatch(/has not read anything as its X account/);
   });
 
   it("names the same X user across same-user reconnects, the binding's and the observer's", async () => {
@@ -133,7 +188,7 @@ describe("verifyObserverAccess", () => {
     const observer = await seedAccount(x, ALICE);
     for (const account of [props.userObjectId, observer]) {
       await hooks().installCallback(account, generateNonce(), scopesFor());
-      const { handoff } = await reconnectAs(x, account, ALICE) as { handoff: { ticket: string } };
+      const { handoff } = (await reconnectAs(x, account, ALICE)) as { handoff: { ticket: string } };
       unwrap(await hooks().account(account, "commitReconnect", handoff.ticket));
     }
     // A reconnect as anyone else is refused, so neither pin moves.
@@ -142,8 +197,16 @@ describe("verifyObserverAccess", () => {
     hooks().restart(name);
     unwrap(await hooks().run(name, props, [["getUser", "bob"], ["isMuted"]]));
     expect(await subresources(name)).toEqual([[ALICE_USER], [ALICE_USER]]);
-    expect(unwrap(await hooks().verifyObserverAccess(name, props, [{ id: "alice", userObjectId: observer }], [ALICE_USER])))
-      .toEqual({ allowedObserverIds: ["alice"] });
+    expect(
+      unwrap(
+        await hooks().verifyObserverAccess(
+          name,
+          props,
+          [{ id: "alice", userObjectId: observer }],
+          [ALICE_USER],
+        ),
+      ),
+    ).toEqual({ allowedObserverIds: ["alice"] });
   });
 });
 
@@ -154,9 +217,15 @@ describe("a Post or List binding", () => {
     const protectedPost = x.post(CAROL, "followers only");
     const publicPost = x.post(BOB, "public");
     const bob = await seedAccount(x, BOB);
-    for (const [post, expected] of [[protectedPost, [ALICE_USER]], [publicPost, []]] as const) {
+    for (const [post, expected] of [
+      [protectedPost, [ALICE_USER]],
+      [publicPost, []],
+    ] as const) {
       const props: GatekeeperProps = {
-        userObjectId: await seedAccount(x), resourceKind: "post", postId: post.id, redactsActionPreviews: true,
+        userObjectId: await seedAccount(x),
+        resourceKind: "post",
+        postId: post.id,
+        redactsActionPreviews: true,
       };
       const name = crypto.randomUUID();
       unwrap(await hooks().run(name, props, [["getInfo"]]));
@@ -173,7 +242,10 @@ describe("a Post or List binding", () => {
     const x = new FakeX().install();
     x.lists.set("5", { id: "5", name: "Mine", private: true, owner_id: ALICE.id, member_count: 0 });
     const props: GatekeeperProps = {
-      userObjectId: await seedAccount(x), resourceKind: "list", listId: "5", redactsActionPreviews: true,
+      userObjectId: await seedAccount(x),
+      resourceKind: "list",
+      listId: "5",
+      redactsActionPreviews: true,
     };
     const name = crypto.randomUUID();
     unwrap(await hooks().run(name, props, [["getInfo"]]));
@@ -181,8 +253,16 @@ describe("a Post or List binding", () => {
     const bob = await seedAccount(x, BOB);
     const before = x.requests.length;
     unwrap(await hooks().addObserver(name, props, "bob", bob));
-    expect(unwrap(await hooks().verifyObserverAccess(name, props, [{ id: "bob", userObjectId: bob }], [ALICE_USER])))
-      .toEqual({ allowedObserverIds: [] });
+    expect(
+      unwrap(
+        await hooks().verifyObserverAccess(
+          name,
+          props,
+          [{ id: "bob", userObjectId: bob }],
+          [ALICE_USER],
+        ),
+      ),
+    ).toEqual({ allowedObserverIds: [] });
     expect(x.requests).toHaveLength(before);
   });
 });
@@ -204,37 +284,49 @@ describe("addObserver", () => {
     expect(unwrap(await hooks().historicalSubresources(name, props))).toEqual([]);
   });
 
-  it.each(["post", "list"] as const)("keeps a legacy %s binding same-account-only, actions or not", async resourceKind => {
-    const x = new FakeX().install();
-    const userObjectId = await seedAccount(x);
-    const props: GatekeeperProps = resourceKind === "post"
-      ? { userObjectId, resourceKind, postId: "5" } : { userObjectId, resourceKind, listId: "5" };
-    const name = crypto.randomUUID();
-    await hooks().putStorage(name, props, "pinnedUserId", ALICE.id);
-    const bob = await seedAccount(x, BOB);
-    const owner = await seedAccount(x, ALICE);
-    for (let attempt = 0; attempt < 2; attempt++) {
-      expect(failure(await hooks().addObserver(name, props, "bob", bob))).toMatch(/details X returned about a post or List/);
-      unwrap(await hooks().addObserver(name, props, "owner", owner));
-      expect(unwrap(await hooks().historicalSubresources(name, props))).toEqual([ALICE_USER]);
-      await hooks().restart(name);
-    }
-    expect(x.requests).toHaveLength(0);
-  });
+  it.each(["post", "list"] as const)(
+    "keeps a legacy %s binding same-account-only, actions or not",
+    async (resourceKind) => {
+      const x = new FakeX().install();
+      const userObjectId = await seedAccount(x);
+      const props: GatekeeperProps =
+        resourceKind === "post"
+          ? { userObjectId, resourceKind, postId: "5" }
+          : { userObjectId, resourceKind, listId: "5" };
+      const name = crypto.randomUUID();
+      await hooks().putStorage(name, props, "pinnedUserId", ALICE.id);
+      const bob = await seedAccount(x, BOB);
+      const owner = await seedAccount(x, ALICE);
+      for (let attempt = 0; attempt < 2; attempt++) {
+        expect(failure(await hooks().addObserver(name, props, "bob", bob))).toMatch(
+          /details X returned about a post or List/,
+        );
+        unwrap(await hooks().addObserver(name, props, "owner", owner));
+        expect(unwrap(await hooks().historicalSubresources(name, props))).toEqual([ALICE_USER]);
+        await hooks().restart(name);
+      }
+      expect(x.requests).toHaveLength(0);
+    },
+  );
 
-  it.each(["account", "profile"] as const)("admits other X users to a legacy %s binding with action history", async resourceKind => {
-    const x = new FakeX().install();
-    const userObjectId = await seedAccount(x);
-    const props: GatekeeperProps = resourceKind === "profile"
-      ? { userObjectId, resourceKind, username: "bob" } : { userObjectId, resourceKind };
-    const name = crypto.randomUUID();
-    await hooks().putStorage(name, props, "pinnedUserId", ALICE.id);
-    // An allocated action proves nothing was read from X; drafts are the workspace's own.
-    await hooks().putStorage(name, props, "x:nextActionId", 2);
-    unwrap(await hooks().addObserver(name, props, "bob", await seedAccount(x, BOB)));
-    expect(unwrap(await hooks().historicalSubresources(name, props))).toEqual([]);
-    expect(x.requests).toHaveLength(0);
-  });
+  it.each(["account", "profile"] as const)(
+    "admits other X users to a legacy %s binding with action history",
+    async (resourceKind) => {
+      const x = new FakeX().install();
+      const userObjectId = await seedAccount(x);
+      const props: GatekeeperProps =
+        resourceKind === "profile"
+          ? { userObjectId, resourceKind, username: "bob" }
+          : { userObjectId, resourceKind };
+      const name = crypto.randomUUID();
+      await hooks().putStorage(name, props, "pinnedUserId", ALICE.id);
+      // An allocated action proves nothing was read from X; drafts are the workspace's own.
+      await hooks().putStorage(name, props, "x:nextActionId", 2);
+      unwrap(await hooks().addObserver(name, props, "bob", await seedAccount(x, BOB)));
+      expect(unwrap(await hooks().historicalSubresources(name, props))).toEqual([]);
+      expect(x.requests).toHaveLength(0);
+    },
+  );
 
   it("admits other X users to a legacy account binding that never pinned its X user", async () => {
     const x = new FakeX().install();
@@ -246,50 +338,70 @@ describe("addObserver", () => {
 
   it("fails closed for a legacy Post binding with no stored identity", async () => {
     const x = new FakeX().install();
-    const props: GatekeeperProps = { userObjectId: await seedAccount(x), resourceKind: "post", postId: "5" };
-    expect(failure(await hooks().addObserver(crypto.randomUUID(), props, "owner", await seedAccount(x, ALICE))))
-      .toMatch(/has not read anything as its X account/);
+    const props: GatekeeperProps = {
+      userObjectId: await seedAccount(x),
+      resourceKind: "post",
+      postId: "5",
+    };
+    expect(
+      failure(
+        await hooks().addObserver(crypto.randomUUID(), props, "owner", await seedAccount(x, ALICE)),
+      ),
+    ).toMatch(/has not read anything as its X account/);
     expect(x.requests).toHaveLength(0);
   });
 
-  it.each(["protected", "unknown", "public"] as const)("redacts only private provider data in %s action previews", async privacy => {
-    const x = new FakeX().install();
-    const author = privacy === "protected" ? CAROL : BOB;
-    x.following.add(`${ALICE.id}:${CAROL.id}`);
-    // Mentioning the account makes the post one X takes an API reply to.
-    const post = x.post(author, "Provider source text @alice");
-    if (privacy === "unknown") x.on("GET", /^\/2\/tweets\//, () => json({
-      data: post, includes: { users: [{ id: author.id, username: author.username, name: author.name }] },
-    }));
-    const props: GatekeeperProps = {
-      userObjectId: await seedAccount(x), resourceKind: "post", postId: post.id, redactsActionPreviews: true,
-    };
-    const name = crypto.randomUUID();
-    const bob = await seedAccount(x, BOB);
-    unwrap(await hooks().addObserver(name, props, "bob", bob));
-    unwrap(await hooks().run(name, props, [["bookmark"]]));
-    unwrap(await hooks().run(name, props, [["reply", { text: "My reply" }]]));
-    const log = await hooks().queueLog(name);
-    expect(log.observations).toEqual([]);
-    expect(log.submitted).toHaveLength(2);
-    for (const { description } of log.submitted) {
-      const preview = JSON.stringify(description);
-      if (privacy === "public") expect(preview).toContain("Provider source text");
-      else {
-        expect(preview).not.toContain("Provider source text");
-        expect(preview).not.toContain(`@${author.username}`);
-        expect(preview).not.toContain(`x.com/${author.username}`);
+  it.each(["protected", "unknown", "public"] as const)(
+    "redacts only private provider data in %s action previews",
+    async (privacy) => {
+      const x = new FakeX().install();
+      const author = privacy === "protected" ? CAROL : BOB;
+      x.following.add(`${ALICE.id}:${CAROL.id}`);
+      // Mentioning the account makes the post one X takes an API reply to.
+      const post = x.post(author, "Provider source text @alice");
+      if (privacy === "unknown")
+        x.on("GET", /^\/2\/tweets\//, () =>
+          json({
+            data: post,
+            includes: { users: [{ id: author.id, username: author.username, name: author.name }] },
+          }),
+        );
+      const props: GatekeeperProps = {
+        userObjectId: await seedAccount(x),
+        resourceKind: "post",
+        postId: post.id,
+        redactsActionPreviews: true,
+      };
+      const name = crypto.randomUUID();
+      const bob = await seedAccount(x, BOB);
+      unwrap(await hooks().addObserver(name, props, "bob", bob));
+      unwrap(await hooks().run(name, props, [["bookmark"]]));
+      unwrap(await hooks().run(name, props, [["reply", { text: "My reply" }]]));
+      const log = await hooks().queueLog(name);
+      expect(log.observations).toEqual([]);
+      expect(log.submitted).toHaveLength(2);
+      for (const { description } of log.submitted) {
+        const preview = JSON.stringify(description);
+        if (privacy === "public") expect(preview).toContain("Provider source text");
+        else {
+          expect(preview).not.toContain("Provider source text");
+          expect(preview).not.toContain(`@${author.username}`);
+          expect(preview).not.toContain(`x.com/${author.username}`);
+        }
       }
-    }
-    expect(unwrap(await hooks().historicalSubresources(name, props))).toEqual([]);
-    expect(x.requests).toHaveLength(1);
-  });
+      expect(unwrap(await hooks().historicalSubresources(name, props))).toEqual([]);
+      expect(x.requests).toHaveLength(1);
+    },
+  );
 
   it("keeps provider-private List names redacted while a public change is pending", async () => {
     const x = new FakeX().install();
     x.lists.set("5", { id: "5", name: "Private List title", private: true, owner_id: ALICE.id });
     const props: GatekeeperProps = {
-      userObjectId: await seedAccount(x), resourceKind: "list", listId: "5", redactsActionPreviews: true,
+      userObjectId: await seedAccount(x),
+      resourceKind: "list",
+      listId: "5",
+      redactsActionPreviews: true,
     };
     const name = crypto.randomUUID();
     unwrap(await hooks().run(name, props, [["update", { private: false }]]));
@@ -302,23 +414,36 @@ describe("addObserver", () => {
     expect(log.submitted[1].description.description).toMatch(/X may tell them/);
   });
 
-  it.each([["observed", "observed"], ["pending", "pending"], ["legacy true", true]] as const)(
+  it.each([
+    ["observed", "observed"],
+    ["pending", "pending"],
+    ["legacy true", true],
+  ] as const)(
     "keeps a private read recorded before reads reported subresources (%s) for the same X user",
     async (_label, recorded) => {
       const x = new FakeX().install();
       const { props, name } = await accountBinding(x);
       unwrap(await hooks().run(name, props, [["getProfile"]]));
       await hooks().putStorage(name, props, "observed:owner", recorded);
-      expect(failure(await hooks().addObserver(name, props, "bob", await seedAccount(x, BOB))))
-        .toMatch(/isn't connected as the X account this workspace read private data from/);
-      expect(failure(await hooks().addObserver(name, props, "gone", await disconnected(x))))
-        .toMatch(/X connection has expired/);
-      unwrap(await hooks().addObserver(name, props, "alice-elsewhere", await seedAccount(x, ALICE)));
-    });
+      expect(
+        failure(await hooks().addObserver(name, props, "bob", await seedAccount(x, BOB))),
+      ).toMatch(/isn't connected as the X account this workspace read private data from/);
+      expect(
+        failure(await hooks().addObserver(name, props, "gone", await disconnected(x))),
+      ).toMatch(/X connection has expired/);
+      unwrap(
+        await hooks().addObserver(name, props, "alice-elsewhere", await seedAccount(x, ALICE)),
+      );
+    },
+  );
 });
 
 describe("getHistoricalSubresources", () => {
-  it.each([["observed", "observed"], ["pending", "pending"], ["legacy true", true]] as const)(
+  it.each([
+    ["observed", "observed"],
+    ["pending", "pending"],
+    ["legacy true", true],
+  ] as const)(
     "exports a private read recorded before reads reported subresources (%s) as the pinned X user",
     async (_label, recorded) => {
       const x = new FakeX().install();
@@ -328,17 +453,30 @@ describe("getHistoricalSubresources", () => {
       const exported = unwrap(await hooks().historicalSubresources(name, props));
       expect(exported).toEqual([ALICE_USER]);
       // Every exported ID is one verifyObserverAccess() checks.
-      expect(unwrap(await hooks().verifyObserverAccess(name, props, [
-        { id: "alice-elsewhere", userObjectId: await seedAccount(x, ALICE) },
-        { id: "bob", userObjectId: await seedAccount(x, BOB) },
-      ], exported))).toEqual({ allowedObserverIds: ["alice-elsewhere"] });
-    });
+      expect(
+        unwrap(
+          await hooks().verifyObserverAccess(
+            name,
+            props,
+            [
+              { id: "alice-elsewhere", userObjectId: await seedAccount(x, ALICE) },
+              { id: "bob", userObjectId: await seedAccount(x, BOB) },
+            ],
+            exported,
+          ),
+        ),
+      ).toEqual({ allowedObserverIds: ["alice-elsewhere"] });
+    },
+  );
 
   it("exports nothing for a binding that recorded no private read, whatever it reads now", async () => {
     const x = new FakeX().install();
     x.lists.set("5", { id: "5", name: "Mine", private: true, owner_id: ALICE.id, member_count: 0 });
     const props: GatekeeperProps = {
-      userObjectId: await seedAccount(x), resourceKind: "list", listId: "5", redactsActionPreviews: true,
+      userObjectId: await seedAccount(x),
+      resourceKind: "list",
+      listId: "5",
+      redactsActionPreviews: true,
     };
     const name = crypto.randomUUID();
     expect(unwrap(await hooks().historicalSubresources(name, props))).toEqual([]);
@@ -350,6 +488,8 @@ describe("getHistoricalSubresources", () => {
     const x = new FakeX().install();
     const { props, name } = await accountBinding(x);
     await hooks().putStorage(name, props, "observed:owner", "observed");
-    expect(failure(await hooks().historicalSubresources(name, props))).toMatch(/has not read anything as its X account/);
+    expect(failure(await hooks().historicalSubresources(name, props))).toMatch(
+      /has not read anything as its X account/,
+    );
   });
 });

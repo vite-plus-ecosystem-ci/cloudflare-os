@@ -1,6 +1,6 @@
 // @ts-expect-error node builtin without @types/node
 import { readFileSync } from "node:fs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { HANDOFF_PATH } from "../../connectHandoff";
 
 // public/sw.js is served as is, so it runs here against a stand-in for its global scope.
@@ -25,12 +25,17 @@ describe("service worker", () => {
   // Dispatches an event and waits for the work it hands to waitUntil().
   const dispatch = async (type: string, event: object) => {
     let work: Promise<unknown>[] = [];
-    listeners.get(type)!({ ...event, waitUntil: (promise: Promise<unknown>) => work.push(promise) });
+    listeners.get(type)!({
+      ...event,
+      waitUntil: (promise: Promise<unknown>) => work.push(promise),
+    });
     await Promise.all(work);
   };
   const push = (text: string) => dispatch("push", { data: { json: () => JSON.parse(text) } });
-  const click = () => dispatch("notificationclick",
-    { notification: { close: vi.fn<() => void>(), data: { path: PATH } } });
+  const click = () =>
+    dispatch("notificationclick", {
+      notification: { close: vi.fn<() => void>(), data: { path: PATH } },
+    });
   const windowAt = (path: string) => ({
     url: `https://os.example${path}`,
     focus: vi.fn<WindowClient["focus"]>(async () => {}),
@@ -58,18 +63,29 @@ describe("service worker", () => {
   });
 
   it("shows the notification a push carries", async () => {
-    await push(JSON.stringify(
-      { title: "Cloudflare OS", body: "Build the demo is complete.", path: PATH, tag: "t1" }));
+    await push(
+      JSON.stringify({
+        title: "Cloudflare OS",
+        body: "Build the demo is complete.",
+        path: PATH,
+        tag: "t1",
+      }),
+    );
 
-    expect(scope.registration.showNotification).toHaveBeenCalledWith(
-      "Cloudflare OS", { body: "Build the demo is complete.", tag: "t1", data: { path: PATH } });
+    expect(scope.registration.showNotification).toHaveBeenCalledWith("Cloudflare OS", {
+      body: "Build the demo is complete.",
+      tag: "t1",
+      data: { path: PATH },
+    });
   });
 
   it("still shows a notification for a push it can't read", async () => {
     await push("Test push message from DevTools.");
 
     expect(scope.registration.showNotification).toHaveBeenCalledWith(
-      "Cloudflare OS", expect.objectContaining({ data: { path: "/" } }));
+      "Cloudflare OS",
+      expect.objectContaining({ data: { path: "/" } }),
+    );
   });
 
   it.each([
@@ -81,7 +97,9 @@ describe("service worker", () => {
     await push(JSON.stringify({ title: "Cloudflare OS", path }));
 
     expect(scope.registration.showNotification).toHaveBeenCalledWith(
-      "Cloudflare OS", expect.objectContaining({ data: { path: "/" } }));
+      "Cloudflare OS",
+      expect.objectContaining({ data: { path: "/" } }),
+    );
   });
 
   it("brings an open window forward to open the chat", async () => {
@@ -91,8 +109,10 @@ describe("service worker", () => {
     await click();
 
     expect(client.focus).toHaveBeenCalled();
-    expect(client.postMessage).toHaveBeenCalledWith(
-      { type: "cloudflare-os:open-notification", path: PATH });
+    expect(client.postMessage).toHaveBeenCalledWith({
+      type: "cloudflare-os:open-notification",
+      path: PATH,
+    });
     expect(scope.clients.openWindow).not.toHaveBeenCalled();
   });
 
@@ -106,8 +126,10 @@ describe("service worker", () => {
     await click();
 
     expect(standalone.focus).not.toHaveBeenCalled();
-    expect(workshop.postMessage).toHaveBeenCalledWith(
-      { type: "cloudflare-os:open-notification", path: PATH });
+    expect(workshop.postMessage).toHaveBeenCalledWith({
+      type: "cloudflare-os:open-notification",
+      path: PATH,
+    });
   });
 
   it("opens the chat in a new window when none is open", async () => {

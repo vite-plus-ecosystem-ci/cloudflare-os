@@ -1,18 +1,21 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { exactRange, FILE_CHANGED, FILE_READ_IDLE_MS } from "../src/drive-file-read";
 
 /** An endless body of `chunkBytes`-byte chunks, counting what is pulled from it. */
 function countedBody(chunkBytes: number) {
   let state = { pulls: 0, cancelled: false };
-  let body = new ReadableStream<Uint8Array>({
-    pull(controller) {
-      state.pulls += 1;
-      controller.enqueue(new Uint8Array(chunkBytes).fill(state.pulls));
+  let body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        state.pulls += 1;
+        controller.enqueue(new Uint8Array(chunkBytes).fill(state.pulls));
+      },
+      cancel() {
+        state.cancelled = true;
+      },
     },
-    cancel() {
-      state.cancelled = true;
-    },
-  }, { highWaterMark: 0 });
+    { highWaterMark: 0 },
+  );
   return { body, state };
 }
 
@@ -22,15 +25,18 @@ const bytesOf = async (content: ReadableStream<Uint8Array>) =>
 /** A body that sends `sent` 4-byte chunks and then goes silent without ending. */
 function stallingBody(sent: number) {
   let state = { pulls: 0, cancelled: false };
-  let body = new ReadableStream<Uint8Array>({
-    pull(controller) {
-      if (state.pulls++ < sent) return controller.enqueue(new Uint8Array(4));
-      return new Promise<void>(() => undefined);
+  let body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        if (state.pulls++ < sent) return controller.enqueue(new Uint8Array(4));
+        return new Promise<void>(() => undefined);
+      },
+      cancel() {
+        state.cancelled = true;
+      },
     },
-    cancel() {
-      state.cancelled = true;
-    },
-  }, { highWaterMark: 0 });
+    { highWaterMark: 0 },
+  );
   return { body, state };
 }
 
@@ -75,9 +81,12 @@ describe("exactRange", () => {
   });
 
   it("passes on a download that breaks off", async () => {
-    let broken = new ReadableStream<Uint8Array>({
-      pull: controller => controller.error(new Error("connection lost")),
-    }, { highWaterMark: 0 });
+    let broken = new ReadableStream<Uint8Array>(
+      {
+        pull: (controller) => controller.error(new Error("connection lost")),
+      },
+      { highWaterMark: 0 },
+    );
 
     await expect(bytesOf(exactRange(broken, 4))).rejects.toThrow("connection lost");
   });
@@ -124,11 +133,18 @@ describe("exactRange", () => {
   it("starts its wait over when Drive is asked and again when its bytes are handed on", async () => {
     vi.useFakeTimers();
     let sends: (() => void)[] = [];
-    let body = new ReadableStream<Uint8Array>({
-      pull: controller => new Promise<void>(resolve => {
-        sends.push(() => { controller.enqueue(new Uint8Array(4)); resolve(); });
-      }),
-    }, { highWaterMark: 0 });
+    let body = new ReadableStream<Uint8Array>(
+      {
+        pull: (controller) =>
+          new Promise<void>((resolve) => {
+            sends.push(() => {
+              controller.enqueue(new Uint8Array(4));
+              resolve();
+            });
+          }),
+      },
+      { highWaterMark: 0 },
+    );
     let reader = exactRange(body, 100).getReader();
 
     for (let round = 0; round < 3; round++) {
@@ -154,10 +170,20 @@ describe("exactRange", () => {
   });
 
   it.each([
-    ["is read to its end", 8, async (content: ReadableStream<Uint8Array>) => { await bytesOf(content); }],
+    [
+      "is read to its end",
+      8,
+      async (content: ReadableStream<Uint8Array>) => {
+        await bytesOf(content);
+      },
+    ],
     ["is cancelled", 8, (content: ReadableStream<Uint8Array>) => content.cancel()],
-    ["ends short", 9, (content: ReadableStream<Uint8Array>) =>
-      expect(bytesOf(content)).rejects.toThrow(FILE_CHANGED)],
+    [
+      "ends short",
+      9,
+      (content: ReadableStream<Uint8Array>) =>
+        expect(bytesOf(content)).rejects.toThrow(FILE_CHANGED),
+    ],
   ])("leaves no wait running once it %s", async (_name, length, use) => {
     vi.useFakeTimers();
 
@@ -168,9 +194,12 @@ describe("exactRange", () => {
 
   it("leaves no wait running once the download breaks off", async () => {
     vi.useFakeTimers();
-    let broken = new ReadableStream<Uint8Array>({
-      pull: controller => controller.error(new Error("connection lost")),
-    }, { highWaterMark: 0 });
+    let broken = new ReadableStream<Uint8Array>(
+      {
+        pull: (controller) => controller.error(new Error("connection lost")),
+      },
+      { highWaterMark: 0 },
+    );
 
     await expect(bytesOf(exactRange(broken, 8))).rejects.toThrow("connection lost");
 

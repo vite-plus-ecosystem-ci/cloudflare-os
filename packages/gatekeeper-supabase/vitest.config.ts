@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   test: {
@@ -10,11 +10,15 @@ export default defineConfig({
     alias: [
       {
         find: "cloudflare:workers",
-        replacement: fileURLToPath(new URL("./__tests__/stubs/cloudflare-workers.ts", import.meta.url)),
+        replacement: fileURLToPath(
+          new URL("./__tests__/stubs/cloudflare-workers.ts", import.meta.url),
+        ),
       },
       {
         find: /^\.\/generated\/.+-configurator-ui\.txt$/,
-        replacement: fileURLToPath(new URL("./__tests__/stubs/configurator-ui.ts", import.meta.url)),
+        replacement: fileURLToPath(
+          new URL("./__tests__/stubs/configurator-ui.ts", import.meta.url),
+        ),
       },
     ],
   },

@@ -1,11 +1,13 @@
 import type { WorkpieceSummary } from "@gadgets/workshop-shared/api";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { EvalVerifier, resolveGadget, type VerifierSession } from "./verifier.js";
 import type { EvalCheck } from "./task.js";
 import { ViewHostError } from "./view-host.js";
 
 const unusedSession: VerifierSession = {
-  openGadget: async () => { throw new Error("openGadget is not used by this test"); },
+  openGadget: async () => {
+    throw new Error("openGadget is not used by this test");
+  },
   connectionDrops: 0,
 };
 
@@ -14,8 +16,9 @@ function gadget(id: number, title: string): WorkpieceSummary {
 }
 
 function collect(
-    verify: (verifier: EvalVerifier) => Promise<void>,
-    workpieces: readonly WorkpieceSummary[] = []): Promise<EvalCheck[]> {
+  verify: (verifier: EvalVerifier) => Promise<void>,
+  workpieces: readonly WorkpieceSummary[] = [],
+): Promise<EvalCheck[]> {
   return new EvalVerifier(unusedSession, workpieces).collect(verify);
 }
 
@@ -25,39 +28,47 @@ describe("resolveGadget", () => {
   });
 
   it("reports what was built when the title is missing", () => {
-    expect(() => resolveGadget([gadget(3, "Splitter")], "Split"))
-      .toThrow('found 0 among ["Splitter"]');
+    expect(() => resolveGadget([gadget(3, "Splitter")], "Split")).toThrow(
+      'found 0 among ["Splitter"]',
+    );
   });
 
   it("refuses an ambiguous title", () => {
-    expect(() => resolveGadget([gadget(3, "Split"), gadget(4, "Split")], "Split"))
-      .toThrow("found 2");
+    expect(() => resolveGadget([gadget(3, "Split"), gadget(4, "Split")], "Split")).toThrow(
+      "found 2",
+    );
   });
 });
 
 describe("EvalVerifier", () => {
   it("records outcomes with and without evidence", async () => {
-    expect(await collect(async verifier => {
-      await verifier.check("bare", async () => ({ pass: true }));
-      await verifier.check("detailed", async () => ({ pass: false, evidence: { seen: 2 } }));
-    })).toEqual([
+    expect(
+      await collect(async (verifier) => {
+        await verifier.check("bare", async () => ({ pass: true }));
+        await verifier.check("detailed", async () => ({ pass: false, evidence: { seen: 2 } }));
+      }),
+    ).toEqual([
       { id: "bare", pass: true },
       { id: "detailed", pass: false, evidence: { seen: 2 } },
     ]);
   });
 
   it("records a failed check and continues", async () => {
-    expect(await collect(async verifier => {
-      await verifier.check("explodes", async () => { throw new Error("RPC refused"); });
-      await verifier.check("still-runs", async () => ({ pass: true }));
-    })).toEqual([
+    expect(
+      await collect(async (verifier) => {
+        await verifier.check("explodes", async () => {
+          throw new Error("RPC refused");
+        });
+        await verifier.check("still-runs", async () => ({ pass: true }));
+      }),
+    ).toEqual([
       { id: "explodes", pass: false, evidence: "Error: RPC refused" },
       { id: "still-runs", pass: true },
     ]);
   });
 
   it("keeps checks recorded before the verifier body fails", async () => {
-    const checks = await collect(async verifier => {
+    const checks = await collect(async (verifier) => {
       await verifier.check("recorded", async () => ({ pass: true }));
       throw new Error("resolveGadget failed outside a check");
     });
@@ -67,7 +78,7 @@ describe("EvalVerifier", () => {
 
   it("keeps registration order when checks finish out of order", async () => {
     const gate = Promise.withResolvers<void>();
-    const checks = await collect(async verifier => {
+    const checks = await collect(async (verifier) => {
       const slow = verifier.check("slow", async () => {
         await gate.promise;
         return { pass: true };
@@ -77,13 +88,15 @@ describe("EvalVerifier", () => {
       gate.resolve();
       await slow;
     });
-    expect(checks.map(check => check.id)).toEqual(["slow", "fast"]);
+    expect(checks.map((check) => check.id)).toEqual(["slow", "fast"]);
   });
 
   it("settles a check the author did not await", async () => {
-    expect(await collect(async verifier => {
-      void verifier.check("forgotten", async () => ({ pass: true }));
-    })).toEqual([{ id: "forgotten", pass: true }]);
+    expect(
+      await collect(async (verifier) => {
+        void verifier.check("forgotten", async () => ({ pass: true }));
+      }),
+    ).toEqual([{ id: "forgotten", pass: true }]);
   });
 
   it("exposes checks that are still pending", async () => {
@@ -101,7 +114,7 @@ describe("EvalVerifier", () => {
   });
 
   it("records a duplicate check ID as a verifier failure", async () => {
-    const checks = await collect(async verifier => {
+    const checks = await collect(async (verifier) => {
       await verifier.check("same", async () => ({ pass: true }));
       await verifier.check("same", async () => ({ pass: true }));
     });
@@ -111,43 +124,57 @@ describe("EvalVerifier", () => {
 
   it("fails verification when a check fails as the Workshop connection drops", async () => {
     const session = { ...unusedSession, connectionDrops: 0 };
-    await expect(new EvalVerifier(session, []).collect(async verifier => {
-      await verifier.check("reads", async () => {
-        session.connectionDrops++;
-        throw new Error("Network connection lost.");
-      });
-    })).rejects.toThrow("The Workshop connection dropped during verification");
+    await expect(
+      new EvalVerifier(session, []).collect(async (verifier) => {
+        await verifier.check("reads", async () => {
+          session.connectionDrops++;
+          throw new Error("Network connection lost.");
+        });
+      }),
+    ).rejects.toThrow("The Workshop connection dropped during verification");
   });
 
   it("keeps a verification whose checks passed while the connection dropped", async () => {
     const session = { ...unusedSession, connectionDrops: 0 };
-    expect(await new EvalVerifier(session, []).collect(async verifier => {
-      await verifier.check("reads", async () => {
-        session.connectionDrops++;
-        return { pass: true };
-      });
-    })).toEqual([{ id: "reads", pass: true }]);
+    expect(
+      await new EvalVerifier(session, []).collect(async (verifier) => {
+        await verifier.check("reads", async () => {
+          session.connectionDrops++;
+          return { pass: true };
+        });
+      }),
+    ).toEqual([{ id: "reads", pass: true }]);
   });
 
   it("fails verification when the browser running a view fails in a check", async () => {
     const failure = new ViewHostError("Chromium closed");
-    await expect(collect(async verifier => {
-      await verifier.check("renders", async () => { throw failure; });
-      await verifier.check("still-runs", async () => ({ pass: true }));
-    })).rejects.toBe(failure);
+    await expect(
+      collect(async (verifier) => {
+        await verifier.check("renders", async () => {
+          throw failure;
+        });
+        await verifier.check("still-runs", async () => ({ pass: true }));
+      }),
+    ).rejects.toBe(failure);
   });
 
   it("fails verification when the browser running a view fails outside a check", async () => {
     const failure = new ViewHostError("Chromium did not start");
-    await expect(collect(async verifier => {
-      await verifier.check("before", async () => ({ pass: true }));
-      throw failure;
-    })).rejects.toBe(failure);
+    await expect(
+      collect(async (verifier) => {
+        await verifier.check("before", async () => ({ pass: true }));
+        throw failure;
+      }),
+    ).rejects.toBe(failure);
   });
 
   it("records a view's own error as a failed check, not a failed verification", async () => {
-    expect(await collect(async verifier => {
-      await verifier.check("renders", async () => { throw new Error("The view never loaded"); });
-    })).toEqual([{ id: "renders", pass: false, evidence: "Error: The view never loaded" }]);
+    expect(
+      await collect(async (verifier) => {
+        await verifier.check("renders", async () => {
+          throw new Error("The view never loaded");
+        });
+      }),
+    ).toEqual([{ id: "renders", pass: false, evidence: "Error: The view never loaded" }]);
   });
 });

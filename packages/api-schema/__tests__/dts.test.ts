@@ -6,34 +6,55 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import ts from "typescript6";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { AWAITABLE, emitDeclarations, PIPELINED, UNTYPED_STUB } from "../src/emit/dts.ts";
 import { extractSchema } from "../src/extract.ts";
-import { type ApiShape, FORMAT, type Schema, type SchemaMethod, type SchemaService, type SchemaShape } from "../src/schema.ts";
+import {
+  type ApiShape,
+  FORMAT,
+  type Schema,
+  type SchemaMethod,
+  type SchemaService,
+  type SchemaShape,
+} from "../src/schema.ts";
 
 /**
  * A schema of `services` (doc and methods defaulting to none, direction to the server's: the
  * emitter reads its own positions from the root) and `shapes`.
  */
-function schemaOf(services: Record<string, Partial<SchemaService>>,
-  shapes: Record<string, SchemaShape> = {}, entry = Object.keys(services)[0]!): Schema {
+function schemaOf(
+  services: Record<string, Partial<SchemaService>>,
+  shapes: Record<string, SchemaShape> = {},
+  entry = Object.keys(services)[0]!,
+): Schema {
   return {
     format: FORMAT,
     entry,
     constants: {},
-    services: Object.fromEntries(Object.entries(services).map(([name, service]) =>
-      [name, { doc: "", direction: "server", methods: [], ...service }])),
+    services: Object.fromEntries(
+      Object.entries(services).map(([name, service]) => [
+        name,
+        { doc: "", direction: "server", methods: [], ...service },
+      ]),
+    ),
     shapes,
   };
 }
 
-function method(name: string, returns: ApiShape, params: SchemaMethod["params"] = [], doc = ""): SchemaMethod {
+function method(
+  name: string,
+  returns: ApiShape,
+  params: SchemaMethod["params"] = [],
+  doc = "",
+): SchemaMethod {
   return { name, doc, params, returns };
 }
 
 /** The names `text` declares at its top level. */
 function declared(text: string): string[] {
-  return [...text.matchAll(/^export (?:interface|type) ([^\s=<]+)/gm)].map((match) => match[1]!).toSorted();
+  return [...text.matchAll(/^export (?:interface|type) ([^\s=<]+)/gm)]
+    .map((match) => match[1]!)
+    .toSorted();
 }
 
 /** Library files, parsed once for every in-memory program. */
@@ -55,25 +76,34 @@ function diagnose(files: Record<string, string>): { file: string; code: number; 
     lib: ["lib.esnext.d.ts", "lib.dom.d.ts"],
     types: [],
     skipDefaultLibCheck: true,
-    paths: { capnweb: [join(import.meta.dirname, "..", "node_modules", "capnweb", "dist", "index.d.ts")] },
+    paths: {
+      capnweb: [join(import.meta.dirname, "..", "node_modules", "capnweb", "dist", "index.d.ts")],
+    },
   };
-  const paths = Object.fromEntries(Object.entries(files).map(([name, text]) => [`/virtual/${name}`, text]));
+  const paths = Object.fromEntries(
+    Object.entries(files).map(([name, text]) => [`/virtual/${name}`, text]),
+  );
   const host = ts.createCompilerHost(options);
   const { getSourceFile, fileExists, readFile, directoryExists } = host;
   host.getSourceFile = (name, language, ...rest) => {
     if (name in paths) return ts.createSourceFile(name, paths[name]!, language);
-    if (!parsedLibs.has(name)) parsedLibs.set(name, getSourceFile.call(host, name, language, ...rest));
+    if (!parsedLibs.has(name))
+      parsedLibs.set(name, getSourceFile.call(host, name, language, ...rest));
     return parsedLibs.get(name);
   };
   host.fileExists = (name) => name in paths || fileExists.call(host, name);
   host.readFile = (name) => paths[name] ?? readFile.call(host, name);
-  host.directoryExists = (name) => name === "/virtual" || (directoryExists?.call(host, name) ?? true);
+  host.directoryExists = (name) =>
+    name === "/virtual" || (directoryExists?.call(host, name) ?? true);
   const program = ts.createProgram({ rootNames: Object.keys(paths), options, host });
   const sources = Object.keys(paths).map((name) => program.getSourceFile(name)!);
   return [
     ...program.getOptionsDiagnostics(),
     ...program.getGlobalDiagnostics(),
-    ...sources.flatMap((source) => [...program.getSyntacticDiagnostics(source), ...program.getSemanticDiagnostics(source)]),
+    ...sources.flatMap((source) => [
+      ...program.getSyntacticDiagnostics(source),
+      ...program.getSemanticDiagnostics(source),
+    ]),
   ].map((diagnostic) => ({
     file: diagnostic.file?.fileName.replace("/virtual/", "") ?? "",
     code: diagnostic.code,
@@ -104,27 +134,62 @@ describe("shapes", () => {
     [{ kind: "literal", value: 3 }, "3"],
     [{ kind: "literal", value: false }, "false"],
     [{ kind: "array", element: { kind: "literal", value: -1 } }, "(-1)[]"],
-    [{ kind: "array", element: { kind: "union", branches: [{ kind: "null" }, { kind: "string" }] } }, "(null | string)[]"],
+    [
+      {
+        kind: "array",
+        element: { kind: "union", branches: [{ kind: "null" }, { kind: "string" }] },
+      },
+      "(null | string)[]",
+    ],
     [{ kind: "array", element: { kind: "array", element: { kind: "number" } } }, "number[][]"],
     [{ kind: "set", element: { kind: "string" } }, "Set<string>"],
-    [{ kind: "map", key: { kind: "string" }, value: { kind: "ref", name: "Item" } }, "Map<string, Item>"],
+    [
+      { kind: "map", key: { kind: "string" }, value: { kind: "ref", name: "Item" } },
+      "Map<string, Item>",
+    ],
     [{ kind: "tuple", elements: [{ kind: "string" }, { kind: "number" }] }, "[string, number]"],
-    [{
-      kind: "tuple",
-      elements: [{ kind: "string" }, { kind: "union", branches: [{ kind: "boolean" }, { kind: "number" }] }],
-      minLength: 1,
-      rest: { kind: "union", branches: [{ kind: "null" }, { kind: "string" }] },
-    }, "[string, (boolean | number)?, ...(null | string)[]]"],
+    [
+      {
+        kind: "tuple",
+        elements: [
+          { kind: "string" },
+          { kind: "union", branches: [{ kind: "boolean" }, { kind: "number" }] },
+        ],
+        minLength: 1,
+        rest: { kind: "union", branches: [{ kind: "null" }, { kind: "string" }] },
+      },
+      "[string, (boolean | number)?, ...(null | string)[]]",
+    ],
     [{ kind: "tuple", elements: [] }, "[]"],
     [{ kind: "object", properties: {} }, "{}"],
-    [object, '{\n    "content-type": string;\n    count?: number;\n    gone?: undefined;\n    nested: {\n      deep: boolean;\n    };\n  }'],
-    [{ kind: "object", properties: {}, index: { kind: "number" } }, "{\n    [key: string]: number;\n  }"],
-    [{
-      kind: "object",
-      properties: { name: { kind: "union", branches: [{ kind: "string" }, { kind: "undefined" }] } },
-      index: { kind: "number" },
-    }, "{\n    name?: string;\n    [key: string]: number | string | undefined;\n  }"],
-    [{ kind: "union", branches: [{ kind: "literal", value: "a" }, { kind: "literal", value: "b" }] }, '"a" | "b"'],
+    [
+      object,
+      '{\n    "content-type": string;\n    count?: number;\n    gone?: undefined;\n    nested: {\n      deep: boolean;\n    };\n  }',
+    ],
+    [
+      { kind: "object", properties: {}, index: { kind: "number" } },
+      "{\n    [key: string]: number;\n  }",
+    ],
+    [
+      {
+        kind: "object",
+        properties: {
+          name: { kind: "union", branches: [{ kind: "string" }, { kind: "undefined" }] },
+        },
+        index: { kind: "number" },
+      },
+      "{\n    name?: string;\n    [key: string]: number | string | undefined;\n  }",
+    ],
+    [
+      {
+        kind: "union",
+        branches: [
+          { kind: "literal", value: "a" },
+          { kind: "literal", value: "b" },
+        ],
+      },
+      '"a" | "b"',
+    ],
     [{ kind: "ref", name: "Item" }, "Item"],
     [{ kind: "date" }, "Date"],
     [{ kind: "bytes" }, "Uint8Array"],
@@ -145,30 +210,49 @@ describe("shapes", () => {
     [{ kind: "typedArray", name: "Float16Array" }, "unknown /* Float16Array */"],
     [{ kind: "stub", service: "Other" }, "Other"],
     [{ kind: "stub" }, UNTYPED_STUB],
-    [{
-      kind: "function",
-      params: [{ name: "a", type: { kind: "string" }, optional: false },
-        { name: "b", type: { kind: "number" }, optional: true }],
-      returns: { kind: "void" },
-    }, "(a: Awaitable<string>, b?: Awaitable<number>) => Promise<void>"],
-    [{
-      kind: "union",
-      branches: [{ kind: "function", params: [], returns: { kind: "string" } }, { kind: "null" }],
-    }, "(() => Promise<string>) | null"],
-    [{ kind: "unsupported", reason: "a */ comment\nacross lines" }, "unknown /* a *\\/ comment across lines */"],
+    [
+      {
+        kind: "function",
+        params: [
+          { name: "a", type: { kind: "string" }, optional: false },
+          { name: "b", type: { kind: "number" }, optional: true },
+        ],
+        returns: { kind: "void" },
+      },
+      "(a: Awaitable<string>, b?: Awaitable<number>) => Promise<void>",
+    ],
+    [
+      {
+        kind: "union",
+        branches: [{ kind: "function", params: [], returns: { kind: "string" } }, { kind: "null" }],
+      },
+      "(() => Promise<string>) | null",
+    ],
+    [
+      { kind: "unsupported", reason: "a */ comment\nacross lines" },
+      "unknown /* a *\\/ comment across lines */",
+    ],
   ];
-  const schema = schemaOf({
-    Api: { methods: cases.map(([shape], i) => method(`m${String(i).padStart(2, "0")}`, shape)) },
-    Other: { methods: [method("ping", { kind: "void" })] },
-  }, { Item: { kind: "object", properties: { id: { kind: "number" } } } });
+  const schema = schemaOf(
+    {
+      Api: { methods: cases.map(([shape], i) => method(`m${String(i).padStart(2, "0")}`, shape)) },
+      Other: { methods: [method("ping", { kind: "void" })] },
+    },
+    { Item: { kind: "object", properties: { id: { kind: "number" } } } },
+  );
   const { full } = emitDeclarations(schema, { root: "Api" });
 
   // A method returning a capability returns it pipelined, every other a promise.
   test.each(cases.map(([shape, expected], i) => [shape.kind, i, expected, shape] as const))(
-    "%s (m%i) renders as its TypeScript type", (_kind, i, expected, shape) => {
-      const result = shape.kind === "stub" && shape.service ? `${PIPELINED}<${expected}>` : `Promise<${expected}>`;
+    "%s (m%i) renders as its TypeScript type",
+    (_kind, i, expected, shape) => {
+      const result =
+        shape.kind === "stub" && shape.service
+          ? `${PIPELINED}<${expected}>`
+          : `Promise<${expected}>`;
       expect(full).toContain(`  m${String(i).padStart(2, "0")}(): ${result};\n`);
-    });
+    },
+  );
 
   test("declares every referenced name, the helper aliases included, and type-checks", () => {
     expect(declared(full)).toEqual(["Api", AWAITABLE, "Item", "Other", PIPELINED, UNTYPED_STUB]);
@@ -177,42 +261,82 @@ describe("shapes", () => {
   });
 
   test("an untyped stub's alias is declared only where one is reached", () => {
-    const { full: none } = emitDeclarations(schemaOf({ Api: { methods: [method("a", { kind: "string" })] } }),
-      { root: "Api" });
+    const { full: none } = emitDeclarations(
+      schemaOf({ Api: { methods: [method("a", { kind: "string" })] } }),
+      { root: "Api" },
+    );
     expect(none).not.toContain(UNTYPED_STUB);
   });
 });
 
 describe("a whole file", () => {
-  const schema = schemaOf({
-    Root: {
-      doc: "The root.",
-      methods: [
-        method("open", { kind: "stub", service: "Child" }, [
-          { name: "id", type: { kind: "string" }, optional: false, doc: "The child's ID." },
-          { name: "mode", type: { kind: "ref", name: "Mode" }, optional: true, doc: "How to open it." },
-          { name: "since", type: { kind: "date" }, optional: false, doc: "" },
-          { name: "onClose", type: { kind: "function", params: [], returns: { kind: "void" } }, optional: true, doc: "" },
-          { name: "last", type: { kind: "boolean" }, optional: false, doc: "" },
-        ], "Opens a child.\n\n    indented, as a code block\n@param id The child's ID."),
-        method("subscribe", { kind: "stub", service: "Handle" }, [
-          { name: "subscriber", type: { kind: "stub", service: "Subscriber" }, optional: false, doc: "" },
-        ]),
-      ],
+  const schema = schemaOf(
+    {
+      Root: {
+        doc: "The root.",
+        methods: [
+          method(
+            "open",
+            { kind: "stub", service: "Child" },
+            [
+              { name: "id", type: { kind: "string" }, optional: false, doc: "The child's ID." },
+              {
+                name: "mode",
+                type: { kind: "ref", name: "Mode" },
+                optional: true,
+                doc: "How to open it.",
+              },
+              { name: "since", type: { kind: "date" }, optional: false, doc: "" },
+              {
+                name: "onClose",
+                type: { kind: "function", params: [], returns: { kind: "void" } },
+                optional: true,
+                doc: "",
+              },
+              { name: "last", type: { kind: "boolean" }, optional: false, doc: "" },
+            ],
+            "Opens a child.\n\n    indented, as a code block\n@param id The child's ID.",
+          ),
+          method("subscribe", { kind: "stub", service: "Handle" }, [
+            {
+              name: "subscriber",
+              type: { kind: "stub", service: "Subscriber" },
+              optional: false,
+              doc: "",
+            },
+          ]),
+        ],
+      },
+      Child: { methods: [method("note", { kind: "ref", name: "Note" })] },
+      Handle: {},
+      Subscriber: {
+        doc: "Implemented by the caller.",
+        methods: [method("changed", { kind: "void" })],
+      },
     },
-    Child: { methods: [method("note", { kind: "ref", name: "Note" })] },
-    Handle: {},
-    Subscriber: { doc: "Implemented by the caller.", methods: [method("changed", { kind: "void" })] },
-  }, {
-    Mode: { kind: "union", branches: [{ kind: "literal", value: "read" }, { kind: "literal", value: "write" }] },
-    Note: {
-      kind: "object",
-      properties: { body: { kind: "string" }, children: { kind: "array", element: { kind: "ref", name: "Note" } } },
+    {
+      Mode: {
+        kind: "union",
+        branches: [
+          { kind: "literal", value: "read" },
+          { kind: "literal", value: "write" },
+        ],
+      },
+      Note: {
+        kind: "object",
+        properties: {
+          body: { kind: "string" },
+          children: { kind: "array", element: { kind: "ref", name: "Note" } },
+        },
+      },
     },
-  });
+  );
 
   test("is the header, the root, then every other declaration by name", () => {
-    const { full } = emitDeclarations(schema, { root: "Root", header: "Generated from a schema.\n\nDo not edit." });
+    const { full } = emitDeclarations(schema, {
+      root: "Root",
+      header: "Generated from a schema.\n\nDo not edit.",
+    });
     expect(full).toBe(`// Generated from a schema.
 //
 // Do not edit.
@@ -274,7 +398,9 @@ export type Pipelined<T> = Promise<T> & T;
   });
 
   test("has no header unless given one", () => {
-    expect(emitDeclarations(schema, { root: "Root" }).full).toMatch(/^\/\*\* The root\. \*\/\nexport interface Root/);
+    expect(emitDeclarations(schema, { root: "Root" }).full).toMatch(
+      /^\/\*\* The root\. \*\/\nexport interface Root/,
+    );
   });
 
   test("is the same for the same schema, however its keys are ordered", () => {
@@ -283,132 +409,197 @@ export type Pipelined<T> = Promise<T> & T;
       services: Object.fromEntries(Object.entries(schema.services).toReversed()),
       shapes: Object.fromEntries(Object.entries(schema.shapes).toReversed()),
     };
-    expect(emitDeclarations(reversed, { root: "Root" })).toEqual(emitDeclarations(schema, { root: "Root" }));
+    expect(emitDeclarations(reversed, { root: "Root" })).toEqual(
+      emitDeclarations(schema, { root: "Root" }),
+    );
   });
 
   test("refuses a root, a service or a shape the schema does not have", () => {
     expect(() => emitDeclarations(schema, { root: "Nowhere" })).toThrow("no service Nowhere");
-    const dangling = schemaOf({ Api: { methods: [method("a", { kind: "ref", name: "Missing" })] } });
+    const dangling = schemaOf({
+      Api: { methods: [method("a", { kind: "ref", name: "Missing" })] },
+    });
     expect(() => emitDeclarations(dangling, { root: "Api" })).toThrow("no shape Missing");
   });
 });
 
 describe("omit", () => {
-  const schema = schemaOf({
-    Public: {
-      methods: [
-        method("authenticate", { kind: "stub", service: "Authed" }),
-        method("login", { kind: "ref", name: "Session" }, [
-          { name: "password", type: { kind: "ref", name: "Secret" }, optional: false, doc: "" },
-        ]),
-        method("ping", { kind: "void" }),
-        method("status", { kind: "string" }),
-      ],
+  const schema = schemaOf(
+    {
+      Public: {
+        methods: [
+          method("authenticate", { kind: "stub", service: "Authed" }),
+          method("login", { kind: "ref", name: "Session" }, [
+            { name: "password", type: { kind: "ref", name: "Secret" }, optional: false, doc: "" },
+          ]),
+          method("ping", { kind: "void" }),
+          method("status", { kind: "string" }),
+        ],
+      },
+      Authed: { methods: [method("whoami", { kind: "string" })] },
     },
-    Authed: { methods: [method("whoami", { kind: "string" })] },
-  }, { Secret: { kind: "object", properties: {} }, Session: { kind: "object", properties: { token: { kind: "string" } } } });
+    {
+      Secret: { kind: "object", properties: {} },
+      Session: { kind: "object", properties: { token: { kind: "string" } } },
+    },
+  );
 
   test("drops the methods named, on every service, and whatever only they reach", () => {
-    const { full, fragments } = emitDeclarations(schema, { root: "Public", omit: ["authenticate", "login"] });
+    const { full, fragments } = emitDeclarations(schema, {
+      root: "Public",
+      omit: ["authenticate", "login"],
+    });
     expect(full).not.toMatch(/authenticate|login|Authed|Secret|Session/);
     expect(declared(full)).toEqual(["Public"]);
     expect(Object.keys(fragments)).toEqual(["Public"]);
   });
 
   test("drops `Service.method` on that service only", () => {
-    const { full } = emitDeclarations(schema, { root: "Public", omit: ["Public.status", "Authed.status"] });
+    const { full } = emitDeclarations(schema, {
+      root: "Public",
+      omit: ["Public.status", "Authed.status"],
+    });
     expect(full).not.toContain("status");
     expect(full).toContain("whoami");
   });
 });
 
 describe("names", () => {
-  const schema = schemaOf({
-    Api: {
-      methods: [
-        method("delete", { kind: "ref", name: "Foo<Bar>" }, [
-          { name: "class", type: { kind: "ref", name: "Foo_Bar" }, optional: false, doc: "A reserved word." },
-          { name: "#2", type: { kind: "ref", name: "Name#2" }, optional: false, doc: "" },
-        ]),
-        method("kebab-case", { kind: "stub", service: "{}" }),
-        method("shadow", { kind: "ref", name: "Promise" }),
-        method("helper", { kind: "ref", name: "Pipelined" }),
-        method("awaitable", { kind: "ref", name: "Awaitable" }),
-        method("generic", { kind: "ref", name: "Map<string, Foo<Bar>[]>" }),
-        method("operator", { kind: "ref", name: "keyof" }, [
-          { name: "x", type: { kind: "ref", name: "Ünicode" }, optional: false, doc: "" },
-        ]),
-        method("new", { kind: "object", properties: { new: { kind: "string" } } }, [
-          { name: "new", type: { kind: "string" }, optional: false, doc: "" },
-        ]),
-      ],
+  const schema = schemaOf(
+    {
+      Api: {
+        methods: [
+          method("delete", { kind: "ref", name: "Foo<Bar>" }, [
+            {
+              name: "class",
+              type: { kind: "ref", name: "Foo_Bar" },
+              optional: false,
+              doc: "A reserved word.",
+            },
+            { name: "#2", type: { kind: "ref", name: "Name#2" }, optional: false, doc: "" },
+          ]),
+          method("kebab-case", { kind: "stub", service: "{}" }),
+          method("shadow", { kind: "ref", name: "Promise" }),
+          method("helper", { kind: "ref", name: "Pipelined" }),
+          method("awaitable", { kind: "ref", name: "Awaitable" }),
+          method("generic", { kind: "ref", name: "Map<string, Foo<Bar>[]>" }),
+          method("operator", { kind: "ref", name: "keyof" }, [
+            { name: "x", type: { kind: "ref", name: "Ünicode" }, optional: false, doc: "" },
+          ]),
+          method("new", { kind: "object", properties: { new: { kind: "string" } } }, [
+            { name: "new", type: { kind: "string" }, optional: false, doc: "" },
+          ]),
+        ],
+      },
+      "{}": {},
     },
-    "{}": {},
-  }, {
-    "Foo<Bar>": { kind: "object", properties: { "x-y": { kind: "string" }, ok: { kind: "number" } } },
-    Foo_Bar: { kind: "literal", value: "taken first" },
-    "Name#2": { kind: "string" },
-    Promise: { kind: "object", properties: { resolved: { kind: "string" } } },
-    Pipelined: { kind: "string" },
-    Awaitable: { kind: "number" },
-    "Map<string, Foo<Bar>[]>": { kind: "string" },
-    keyof: { kind: "string" },
-    Ünicode: { kind: "string" },
-  });
+    {
+      "Foo<Bar>": {
+        kind: "object",
+        properties: { "x-y": { kind: "string" }, ok: { kind: "number" } },
+      },
+      Foo_Bar: { kind: "literal", value: "taken first" },
+      "Name#2": { kind: "string" },
+      Promise: { kind: "object", properties: { resolved: { kind: "string" } } },
+      Pipelined: { kind: "string" },
+      Awaitable: { kind: "number" },
+      "Map<string, Foo<Bar>[]>": { kind: "string" },
+      keyof: { kind: "string" },
+      Ünicode: { kind: "string" },
+    },
+  );
   const { full } = emitDeclarations(schema, { root: "Api" });
 
   test("rewrites the ones that are not identifiers, shadow a global or are type operators, without collisions", () => {
     // A valid name keeps itself, a Unicode one included; a rewritten one takes the next free suffix.
-    expect(declared(full)).toEqual(["Api", AWAITABLE, "Awaitable_2", "Empty", "Foo_Bar", "Foo_Bar_2",
-      "Map_string_Foo_Bar_Array", "Name_2", PIPELINED, "Pipelined_2", "Promise_2", "keyof_2", "Ünicode"]);
+    expect(declared(full)).toEqual([
+      "Api",
+      AWAITABLE,
+      "Awaitable_2",
+      "Empty",
+      "Foo_Bar",
+      "Foo_Bar_2",
+      "Map_string_Foo_Bar_Array",
+      "Name_2",
+      PIPELINED,
+      "Pipelined_2",
+      "Promise_2",
+      "keyof_2",
+      "Ünicode",
+    ]);
     expect(full).toContain("operator(x: Awaitable<Ünicode>): Promise<keyof_2>;");
-    expect(full).toContain("export type Foo_Bar = \"taken first\";");
-    expect(full).toContain("delete(_class: Awaitable<Foo_Bar>, _2: Awaitable<Name_2>): Promise<Foo_Bar_2>;");
+    expect(full).toContain('export type Foo_Bar = "taken first";');
+    expect(full).toContain(
+      "delete(_class: Awaitable<Foo_Bar>, _2: Awaitable<Name_2>): Promise<Foo_Bar_2>;",
+    );
     expect(full).toContain("  /** @param _class A reserved word. */\n");
     expect(full).toContain("shadow(): Promise<Promise_2>;");
     expect(full).toContain(`"kebab-case"(): ${PIPELINED}<Empty>;`);
     expect(full).toContain("helper(): Promise<Pipelined_2>;");
     expect(full).toContain("awaitable(): Promise<Awaitable_2>;");
-    expect(full).toContain("  \"x-y\": string;\n");
+    expect(full).toContain('  "x-y": string;\n');
     // Unquoted in an interface, `new(...)` would declare a construct signature instead.
-    expect(full).toContain("\"new\"(_new: Awaitable<string>): Promise<{\n    new: string;\n  }>;");
-    expect(diagnose({
-      "api.d.ts": full,
-      "caller.ts": `import type { Api } from "./api.js";
+    expect(full).toContain('"new"(_new: Awaitable<string>): Promise<{\n    new: string;\n  }>;');
+    expect(
+      diagnose({
+        "api.d.ts": full,
+        "caller.ts": `import type { Api } from "./api.js";
 declare const api: Api;
 export const created: string = (await api.new("x")).new;`,
-    })).toEqual([]);
+      }),
+    ).toEqual([]);
   });
 
   test("are the same in every fragment", () => {
     const { fragments } = emitDeclarations(schema, { root: "Api" });
     expect(Object.keys(fragments)).toEqual(["Api", "Empty"]);
-    expect(fragments.Api).toContain("delete(_class: Awaitable<Foo_Bar>, _2: Awaitable<Name_2>): Promise<Foo_Bar_2>;");
+    expect(fragments.Api).toContain(
+      "delete(_class: Awaitable<Foo_Bar>, _2: Awaitable<Name_2>): Promise<Foo_Bar_2>;",
+    );
   });
 });
 
 // A `*/` in a doc or reason, or a line terminator in the header, would turn the rest into declarations.
 test("escapes a `*/` in any doc or reason, and a line terminator in the header", () => {
-  const schema = schemaOf({
-    Api: {
-      doc: "Service */ export interface Leaked1 {}",
-      methods: [method("a", { kind: "unsupported", reason: "why */ export interface Leaked2 {}" }, [
-        { name: "x", type: { kind: "string" }, optional: false, doc: "param */ export interface Leaked3 {}" },
-      ], "Method */\nexport interface Leaked4 {}"), method("b", { kind: "ref", name: "Item" })],
+  const schema = schemaOf(
+    {
+      Api: {
+        doc: "Service */ export interface Leaked1 {}",
+        methods: [
+          method(
+            "a",
+            { kind: "unsupported", reason: "why */ export interface Leaked2 {}" },
+            [
+              {
+                name: "x",
+                type: { kind: "string" },
+                optional: false,
+                doc: "param */ export interface Leaked3 {}",
+              },
+            ],
+            "Method */\nexport interface Leaked4 {}",
+          ),
+          method("b", { kind: "ref", name: "Item" }),
+        ],
+      },
     },
-  }, {
-    Item: {
-      doc: "Shape */ export interface Leaked8 {}",
-      kind: "object",
-      properties: { x: { kind: "string" } },
-      propertyDocs: { x: { doc: "Property */ export interface Leaked9 {}" } },
+    {
+      Item: {
+        doc: "Shape */ export interface Leaked8 {}",
+        kind: "object",
+        properties: { x: { kind: "string" } },
+        propertyDocs: { x: { doc: "Property */ export interface Leaked9 {}" } },
+      },
     },
-  });
+  );
   const { full } = emitDeclarations(schema, {
     root: "Api",
-    header: "header */ export interface Leaked5 {}\u2028export interface Leaked6 {}\u2029export interface Leaked7 {}",
+    header:
+      "header */ export interface Leaked5 {}\u2028export interface Leaked6 {}\u2029export interface Leaked7 {}",
   });
-  expect(full).toMatch(/^\/\/ header \*\/ export interface Leaked5 \{\}\n\/\/ export interface Leaked6 \{\}\n\/\/ /);
+  expect(full).toMatch(
+    /^\/\/ header \*\/ export interface Leaked5 \{\}\n\/\/ export interface Leaked6 \{\}\n\/\/ /,
+  );
   expect(full).toContain("/** Service *\\/ export interface Leaked1 {} */");
   expect(full).toContain("   * @param x param *\\/ export interface Leaked3 {}\n");
   expect(full).toContain("/** Shape *\\/ export interface Leaked8 {} */\n");
@@ -424,7 +615,11 @@ describe("functions", () => {
     kind: "function",
     params: [
       { name: "meta", type: { kind: "ref", name: "Meta" }, optional: false },
-      { name: "reply", type: { kind: "function", params: [], returns: { kind: "boolean" } }, optional: false },
+      {
+        name: "reply",
+        type: { kind: "function", params: [], returns: { kind: "boolean" } },
+        optional: false,
+      },
     ],
     returns: { kind: "void" },
   };
@@ -432,22 +627,28 @@ describe("functions", () => {
     kind: "object",
     properties: { onEvent: { kind: "function", params: [], returns: { kind: "string" } } },
   };
-  const schema = schemaOf({
-    Api: {
-      methods: [
-        method("handlers", { kind: "ref", name: "Handlers" }, [
-          { name: "handlers", type: { kind: "ref", name: "Handlers" }, optional: false, doc: "" },
-        ]),
-        method("subscribe", { kind: "void" }, [{ name: "callback", type: callback, optional: false, doc: "" }]),
-        method("unsubscriber", { kind: "function", params: [], returns: { kind: "void" } }),
-      ],
+  const schema = schemaOf(
+    {
+      Api: {
+        methods: [
+          method("handlers", { kind: "ref", name: "Handlers" }, [
+            { name: "handlers", type: { kind: "ref", name: "Handlers" }, optional: false, doc: "" },
+          ]),
+          method("subscribe", { kind: "void" }, [
+            { name: "callback", type: callback, optional: false, doc: "" },
+          ]),
+          method("unsubscriber", { kind: "function", params: [], returns: { kind: "void" } }),
+        ],
+      },
     },
-  }, { Handlers: handlers, Meta: { kind: "object", properties: { id: { kind: "string" } } } });
+    { Handlers: handlers, Meta: { kind: "object", properties: { id: { kind: "string" } } } },
+  );
   const { full, fragments } = emitDeclarations(schema, { root: "Api" });
 
   test("one the caller writes may return its result as is, one it calls returns a promise", () => {
     expect(full).toContain(
-      "subscribe(callback: (meta: Meta, reply: () => Promise<boolean>) => Awaitable<void>): Promise<void>;");
+      "subscribe(callback: (meta: Meta, reply: () => Promise<boolean>) => Awaitable<void>): Promise<void>;",
+    );
     expect(full).toContain("unsubscriber(): Promise<() => Promise<void>>;");
     expect(full).toContain("handlers(handlers: Awaitable<Handlers>): Promise<Handlers>;");
     expect(full).toContain("export type Handlers = {\n  onEvent: () => Awaitable<string>;\n};");
@@ -455,9 +656,10 @@ describe("functions", () => {
   });
 
   test("a synchronous callback type-checks, and so does awaiting what a returned function returns", () => {
-    expect(diagnose({
-      "api.d.ts": full,
-      "caller.ts": `import type { Api } from "./api.js";
+    expect(
+      diagnose({
+        "api.d.ts": full,
+        "caller.ts": `import type { Api } from "./api.js";
 declare const api: Api;
 void api.subscribe((meta) => {
   const id: string = meta.id;
@@ -475,7 +677,8 @@ export async function call(): Promise<string> {
   return await (await api.handlers({ onEvent: async () => "async" })).onEvent();
 }
 `,
-    })).toEqual([]);
+      }),
+    ).toEqual([]);
   });
 });
 
@@ -496,7 +699,9 @@ describe("held and implemented services", () => {
         ]),
         method("child", { kind: "stub", service: "Child" }),
         method("factory", fn({ kind: "stub", service: "Child" })),
-        method("rename", { kind: "void" }, [{ name: "name", type: { kind: "string" }, optional: false, doc: "" }]),
+        method("rename", { kind: "void" }, [
+          { name: "name", type: { kind: "string" }, optional: false, doc: "" },
+        ]),
         method("subscribe", { kind: "stub", service: "Child" }, [
           { name: "sub", type: { kind: "stub", service: "Sub" }, optional: false, doc: "" },
         ]),
@@ -505,13 +710,16 @@ describe("held and implemented services", () => {
     Both: { methods: [method("ping", { kind: "string" })] },
     Child: { methods: [method("name", { kind: "string" })] },
     Sub: {
-      methods: [method("handlerFor", fn({ kind: "string" }), [
-        { name: "lookup", type: fn({ kind: "string" }), optional: false, doc: "" },
-      ])],
+      methods: [
+        method("handlerFor", fn({ kind: "string" }), [
+          { name: "lookup", type: fn({ kind: "string" }), optional: false, doc: "" },
+        ]),
+      ],
     },
   });
   const { full } = emitDeclarations(schema, { root: "Api" });
-  const declaration = (name: string) => full.split("\n\n").find((part) => part.includes(`export interface ${name} `))!;
+  const declaration = (name: string) =>
+    full.split("\n\n").find((part) => part.includes(`export interface ${name} `))!;
 
   test("a held service disposes, and pipelines a returned capability", () => {
     expect(declaration("Api")).toContain("  child(): Pipelined<Child>;\n");
@@ -524,7 +732,8 @@ describe("held and implemented services", () => {
   test("a service the caller implements has no dispose, and its directions are reversed", () => {
     expect(declaration("Sub")).not.toContain("Symbol.dispose");
     expect(declaration("Sub")).toContain(
-      "  handlerFor(lookup: () => Promise<string>): Awaitable<() => Awaitable<string>>;\n");
+      "  handlerFor(lookup: () => Promise<string>): Awaitable<() => Awaitable<string>>;\n",
+    );
   });
 
   test("a service reached both ways may be disposed", () => {
@@ -535,9 +744,10 @@ describe("held and implemented services", () => {
   // An implementation's methods return their results as written, synchronous or `async`, and a
   // call's result is passed on to the next call unawaited.
   test("a caller using each, and implementing those it passes in, type-checks", () => {
-    expect(diagnose({
-      "api.d.ts": full,
-      "caller.ts": `import type { Api, Both, Sub } from "./api.js";
+    expect(
+      diagnose({
+        "api.d.ts": full,
+        "caller.ts": `import type { Api, Both, Sub } from "./api.js";
 declare const api: Api;
 class Subscriber implements Sub {
   async handlerFor(lookup: () => Promise<string>) {
@@ -574,32 +784,47 @@ export async function use(): Promise<string> {
   return name + pong + await child.name() + await api.child().name();
 }
 `,
-    })).toEqual([]);
+      }),
+    ).toEqual([]);
   });
 });
 
 describe("streams", () => {
   // A readable stream's chunks travel as the stream does, a writable one's the other way.
-  const schema = schemaOf({
-    Api: {
-      methods: [
-        method("read", { kind: "readableStream", element: fn({ kind: "string" }) }),
-        method("upload", { kind: "void" }, [
-          { name: "source", type: { kind: "readableStream", element: { kind: "ref", name: "Chunk" } }, optional: false,
-            doc: "" },
-          { name: "sink", type: { kind: "writableStream", element: fn({ kind: "string" }) }, optional: false, doc: "" },
-        ]),
-        method("write", { kind: "writableStream", element: fn({ kind: "string" }) }),
-      ],
+  const schema = schemaOf(
+    {
+      Api: {
+        methods: [
+          method("read", { kind: "readableStream", element: fn({ kind: "string" }) }),
+          method("upload", { kind: "void" }, [
+            {
+              name: "source",
+              type: { kind: "readableStream", element: { kind: "ref", name: "Chunk" } },
+              optional: false,
+              doc: "",
+            },
+            {
+              name: "sink",
+              type: { kind: "writableStream", element: fn({ kind: "string" }) },
+              optional: false,
+              doc: "",
+            },
+          ]),
+          method("write", { kind: "writableStream", element: fn({ kind: "string" }) }),
+        ],
+      },
     },
-  }, { Chunk: { kind: "object", properties: { data: { kind: "bytes" } } } });
+    { Chunk: { kind: "object", properties: { data: { kind: "bytes" } } } },
+  );
   const { full } = emitDeclarations(schema, { root: "Api" });
 
   test("carry their element type, in the position its values travel, and reach the shapes in it", () => {
     expect(full).toContain("  read(): Promise<ReadableStream<() => Promise<string>>>;\n");
     expect(full).toContain("  write(): Promise<WritableStream<() => Awaitable<string>>>;\n");
-    expect(full).toContain("  upload(source: Awaitable<ReadableStream<Chunk>>, "
-      + "sink: Awaitable<WritableStream<() => Promise<string>>>): Promise<void>;\n");
+    expect(full).toContain(
+      "  upload(source: Awaitable<ReadableStream<Chunk>>, " +
+        "sink: Awaitable<WritableStream<() => Promise<string>>>): Promise<void>;\n",
+    );
     expect(declared(full)).toEqual(["Api", AWAITABLE, "Chunk"]);
     expect(diagnose({ "api.d.ts": full })).toEqual([]);
   });
@@ -607,31 +832,39 @@ describe("streams", () => {
 
 describe("properties", () => {
   // `Api` is held, and `Sub`, which has properties of its own, is implemented by the caller.
-  const schema = schemaOf({
-    Api: {
-      properties: [
-        { name: "build", doc: "An optional property.\n@deprecated Read version.", type: { kind: "number" }, optional: true,
-          deprecated: "Read version." },
-        { name: "child", doc: "", type: { kind: "stub", service: "Child" }, optional: false },
-        { name: "meta", doc: "", type: { kind: "ref", name: "Meta" }, optional: false },
-        { name: "spare", doc: "", type: { kind: "stub", service: "Child" }, optional: true },
-        { name: "version", doc: "The version.", type: { kind: "string" }, optional: false },
-      ],
-      methods: [
-        method("subscribe", { kind: "void" }, [
-          { name: "sub", type: { kind: "stub", service: "Sub" }, optional: false, doc: "" },
-        ]),
-      ],
+  const schema = schemaOf(
+    {
+      Api: {
+        properties: [
+          {
+            name: "build",
+            doc: "An optional property.\n@deprecated Read version.",
+            type: { kind: "number" },
+            optional: true,
+            deprecated: "Read version.",
+          },
+          { name: "child", doc: "", type: { kind: "stub", service: "Child" }, optional: false },
+          { name: "meta", doc: "", type: { kind: "ref", name: "Meta" }, optional: false },
+          { name: "spare", doc: "", type: { kind: "stub", service: "Child" }, optional: true },
+          { name: "version", doc: "The version.", type: { kind: "string" }, optional: false },
+        ],
+        methods: [
+          method("subscribe", { kind: "void" }, [
+            { name: "sub", type: { kind: "stub", service: "Sub" }, optional: false, doc: "" },
+          ]),
+        ],
+      },
+      Child: { methods: [method("name", { kind: "string" })] },
+      Sub: {
+        properties: [
+          { name: "id", doc: "", type: { kind: "number" }, optional: false },
+          { name: "label", doc: "", type: { kind: "string" }, optional: true },
+        ],
+        methods: [method("changed", { kind: "void" })],
+      },
     },
-    Child: { methods: [method("name", { kind: "string" })] },
-    Sub: {
-      properties: [
-        { name: "id", doc: "", type: { kind: "number" }, optional: false },
-        { name: "label", doc: "", type: { kind: "string" }, optional: true },
-      ],
-      methods: [method("changed", { kind: "void" })],
-    },
-  }, { Meta: { kind: "object", properties: { tag: { kind: "string" } } } });
+    { Meta: { kind: "object", properties: { tag: { kind: "string" } } } },
+  );
   const { full, fragments } = emitDeclarations(schema, { root: "Api" });
 
   test("a held service's are read as a call's result, there whether or not optional, before its methods", () => {
@@ -665,15 +898,21 @@ describe("properties", () => {
   test("reach the shapes and services in their types, in the full file and the fragments", () => {
     expect(declared(full)).toEqual(["Api", AWAITABLE, "Child", "Meta", "Sub"]);
     expect(declared(fragments.Api!)).toEqual(["Api", "Meta"]);
-    expect(missingNames(fragments)).toEqual({ Api: ["Child", "Child", "Child", "Sub"], Child: [], Sub: [] });
+    expect(missingNames(fragments)).toEqual({
+      Api: ["Child", "Child", "Child", "Sub"],
+      Child: [],
+      Sub: [],
+    });
   });
 
   test("one reached both ways is an Awaitable, which a caller reading it awaits", () => {
     const both = schemaOf({
       Api: {
-        methods: [method("swap", { kind: "stub", service: "Both" }, [
-          { name: "both", type: { kind: "stub", service: "Both" }, optional: false, doc: "" },
-        ])],
+        methods: [
+          method("swap", { kind: "stub", service: "Both" }, [
+            { name: "both", type: { kind: "stub", service: "Both" }, optional: false, doc: "" },
+          ]),
+        ],
       },
       Both: { properties: [{ name: "tag", doc: "", type: { kind: "string" }, optional: true }] },
     });
@@ -684,9 +923,10 @@ describe("properties", () => {
   [Symbol.dispose]?(): void;
 }
 `);
-    expect(diagnose({
-      "api.d.ts": declarations,
-      "caller.ts": `import type { RpcStub, RpcTarget } from "capnweb";
+    expect(
+      diagnose({
+        "api.d.ts": declarations,
+        "caller.ts": `import type { RpcStub, RpcTarget } from "capnweb";
 import type * as Generated from "./api.js";
 interface Both extends RpcTarget {
   tag?: string;
@@ -705,15 +945,17 @@ export async function read(b: Generated.Both): Promise<string | undefined> {
   return await b.tag;
 }
 `,
-    })).toEqual([]);
+      }),
+    ).toEqual([]);
   });
 
   // capnweb types reading a property of a stub as an `RpcPromise` of its value, which pipelines, and
   // takes an implementation's property as the value itself, read from a getter.
   test("capnweb's RpcStub of the interface they come from is assignable to the declaration, and pipelines", () => {
-    expect(diagnose({
-      "api.d.ts": full,
-      "caller.ts": `import type { RpcStub, RpcTarget } from "capnweb";
+    expect(
+      diagnose({
+        "api.d.ts": full,
+        "caller.ts": `import type { RpcStub, RpcTarget } from "capnweb";
 import type * as Generated from "./api.js";
 interface Child extends RpcTarget {
   name(): Promise<string>;
@@ -746,27 +988,34 @@ export async function use(api: Generated.Api): Promise<string> {
   return (await api.child.name()) + (await api.version) + (await api.meta).tag + String(build) + String(spare);
 }
 `,
-    })).toEqual([]);
+      }),
+    ).toEqual([]);
   });
 
   /** The diagnostic codes of a caller using `Api` as `body` does. */
-  const caller = (body: string) => diagnose({
-    "api.d.ts": full,
-    "caller.ts": `import type { Api } from "./api.js";
+  const caller = (body: string) =>
+    diagnose({
+      "api.d.ts": full,
+      "caller.ts": `import type { Api } from "./api.js";
 declare const api: Api;
 export async function use(): Promise<string> {
 ${body}
 }
 `,
-  }).map(({ code }) => code);
+    }).map(({ code }) => code);
 
   // capnweb's promise of a property has no disposer of its own, unlike a call's: the stub it is read
   // from is disposed instead, or the capability once awaited.
   test("a capability one pipelines, and is disposable only once awaited", () => {
-    expect(caller("  using child = await api.child;\n  return (await api.child.name()) + (await child.name());"))
-      .toEqual([]);
-    expect(caller("  api.child[Symbol.dispose]();\n  return \"\";")).toEqual([NO_SUCH_INDEX]);
-    expect(caller("  using child = api.child;\n  return await child.name();")).toEqual([NOT_DISPOSABLE]);
+    expect(
+      caller(
+        "  using child = await api.child;\n  return (await api.child.name()) + (await child.name());",
+      ),
+    ).toEqual([]);
+    expect(caller('  api.child[Symbol.dispose]();\n  return "";')).toEqual([NO_SUCH_INDEX]);
+    expect(caller("  using child = api.child;\n  return await child.name();")).toEqual([
+      NOT_DISPOSABLE,
+    ]);
   });
 });
 
@@ -776,54 +1025,81 @@ const NO_SUCH_INDEX = 7053;
 const NOT_DISPOSABLE = 2850;
 
 describe("tags", () => {
-  const params: SchemaMethod["params"] = [{ name: "x", type: { kind: "string" }, optional: false, doc: "The x." }];
-  const schema = schemaOf({
-    Api: {
-      deprecated: "",
-      methods: [
-        { ...method("both", { kind: "void" }, params), deprecated: "", mutates: true },
-        { ...method("gone", { kind: "void" }), deprecated: "Removed soon." },
-        { ...method("old", { kind: "void" }, [], "Old.\n@deprecated Use new."), deprecated: "Use new." },
-        { ...method("other", { kind: "stub", service: "Other" }) },
-        { ...method("save", { kind: "void" }, [], "Saves."), mutates: true },
-        { ...method("since", { kind: "void" }, [], "New.\n@since 2"), tags: { beta: "", since: "2" } },
-        { ...method("tagged", { kind: "void" }, [], "Writes.\n\n@mutates"), mutates: true },
-      ],
-      properties: [{ name: "version", doc: "", type: { kind: "string" }, optional: false, tags: { since: "1" } }],
-    },
-    Other: {
-      doc: "Kept.\n@deprecated", deprecated: "", tags: { audience: "agents" },
-      methods: [method("entry", { kind: "ref", name: "Entry" })],
-    },
-  }, {
-    Entry: {
-      doc: "One entry.",
-      kind: "object",
-      properties: {
-        id: { kind: "number" },
-        label: { kind: "union", branches: [{ kind: "string" }, { kind: "undefined" }] },
-        role: { kind: "ref", name: "Role" },
-        title: { kind: "string" },
-        token: { kind: "string" },
+  const params: SchemaMethod["params"] = [
+    { name: "x", type: { kind: "string" }, optional: false, doc: "The x." },
+  ];
+  const schema = schemaOf(
+    {
+      Api: {
+        deprecated: "",
+        methods: [
+          { ...method("both", { kind: "void" }, params), deprecated: "", mutates: true },
+          { ...method("gone", { kind: "void" }), deprecated: "Removed soon." },
+          {
+            ...method("old", { kind: "void" }, [], "Old.\n@deprecated Use new."),
+            deprecated: "Use new.",
+          },
+          { ...method("other", { kind: "stub", service: "Other" }) },
+          { ...method("save", { kind: "void" }, [], "Saves."), mutates: true },
+          {
+            ...method("since", { kind: "void" }, [], "New.\n@since 2"),
+            tags: { beta: "", since: "2" },
+          },
+          { ...method("tagged", { kind: "void" }, [], "Writes.\n\n@mutates"), mutates: true },
+        ],
+        properties: [
+          {
+            name: "version",
+            doc: "",
+            type: { kind: "string" },
+            optional: false,
+            tags: { since: "1" },
+          },
+        ],
       },
-      propertyDocs: {
-        id: { doc: "Its ID." }, label: { deprecated: "Read title." }, title: { doc: "Shown.\n\nTwice." },
-        token: { tags: { secret: "" } },
+      Other: {
+        doc: "Kept.\n@deprecated",
+        deprecated: "",
+        tags: { audience: "agents" },
+        methods: [method("entry", { kind: "ref", name: "Entry" })],
       },
     },
-    Role: { deprecated: "", kind: "literal", value: "admin" },
-  });
+    {
+      Entry: {
+        doc: "One entry.",
+        kind: "object",
+        properties: {
+          id: { kind: "number" },
+          label: { kind: "union", branches: [{ kind: "string" }, { kind: "undefined" }] },
+          role: { kind: "ref", name: "Role" },
+          title: { kind: "string" },
+          token: { kind: "string" },
+        },
+        propertyDocs: {
+          id: { doc: "Its ID." },
+          label: { deprecated: "Read title." },
+          title: { doc: "Shown.\n\nTwice." },
+          token: { tags: { secret: "" } },
+        },
+      },
+      Role: { deprecated: "", kind: "literal", value: "admin" },
+    },
+  );
   const { full } = emitDeclarations(schema, { root: "Api" });
 
   test("`@deprecated` and `@mutates` are in the JSDoc once, from the field when the doc lacks them", () => {
     expect(full).toMatch(/^\/\*\* @deprecated \*\/\nexport interface Api \{/);
-    expect(full).toContain("  /**\n   * @param x The x.\n   * @deprecated\n   * @mutates\n   */\n  both(");
+    expect(full).toContain(
+      "  /**\n   * @param x The x.\n   * @deprecated\n   * @mutates\n   */\n  both(",
+    );
     expect(full).toContain("  /** @deprecated Removed soon. */\n  gone(");
     expect(full).toContain("  /**\n   * Old.\n   * @deprecated Use new.\n   */\n  old(");
     expect(full).toContain("  other(): Pipelined<Other>;");
     expect(full).toContain("  /**\n   * Saves.\n   * @mutates\n   */\n  save(");
     expect(full).toContain("  /**\n   * Writes.\n   *\n   * @mutates\n   */\n  tagged(");
-    expect(full).toContain("/**\n * Kept.\n * @deprecated\n * @audience agents\n */\nexport interface Other {");
+    expect(full).toContain(
+      "/**\n * Kept.\n * @deprecated\n * @audience agents\n */\nexport interface Other {",
+    );
   });
 
   test("the other tags are in the JSDoc once, from `tags` when the doc lacks them", () => {
@@ -832,42 +1108,58 @@ describe("tags", () => {
   });
 
   test("a named shape's and an object property's docs and `@deprecated` are in their JSDoc", () => {
-    expect(full).toContain([
-      "/** One entry. */",
-      "export type Entry = {",
-      "  /** Its ID. */",
-      "  id: number;",
-      "  /** @deprecated Read title. */",
-      "  label?: string;",
-      "  role: Role;",
-      "  /**",
-      "   * Shown.",
-      "   *",
-      "   * Twice.",
-      "   */",
-      "  title: string;",
-      "  /** @secret */",
-      "  token: string;",
-      "};",
-      "",
-      "/** @deprecated */",
-      "export type Role = \"admin\";",
-    ].join("\n"));
+    expect(full).toContain(
+      [
+        "/** One entry. */",
+        "export type Entry = {",
+        "  /** Its ID. */",
+        "  id: number;",
+        "  /** @deprecated Read title. */",
+        "  label?: string;",
+        "  role: Role;",
+        "  /**",
+        "   * Shown.",
+        "   *",
+        "   * Twice.",
+        "   */",
+        "  title: string;",
+        "  /** @secret */",
+        "  token: string;",
+        "};",
+        "",
+        "/** @deprecated */",
+        'export type Role = "admin";',
+      ].join("\n"),
+    );
     expect(diagnose({ "api.d.ts": full })).toEqual([]);
   });
 });
 
 // The extractor's own fixture, which has every member and tag the format records.
 test("the extractor's fixture: every tag once, and declarations that type-check", () => {
-  const fixture = JSON.parse(readFileSync(join(import.meta.dirname, "__fixtures__", "schema.json"), "utf8")) as Schema;
+  const fixture = JSON.parse(
+    readFileSync(join(import.meta.dirname, "__fixtures__", "schema.json"), "utf8"),
+  ) as Schema;
   const { full } = emitDeclarations(fixture, { root: fixture.entry });
   const services = Object.values(fixture.services);
-  const members = services.flatMap((service) => [...service.methods, ...service.properties ?? []]);
+  const members = services.flatMap((service) => [
+    ...service.methods,
+    ...(service.properties ?? []),
+  ]);
   const shapes = Object.values(fixture.shapes);
-  const shapeDocs = [...shapes, ...shapes.flatMap((shape) => shape.kind === "object" ? Object.values(shape.propertyDocs ?? {}) : [])];
-  const deprecated = [...services, ...members, ...shapeDocs].filter((item) => item.deprecated !== undefined).length;
+  const shapeDocs = [
+    ...shapes,
+    ...shapes.flatMap((shape) =>
+      shape.kind === "object" ? Object.values(shape.propertyDocs ?? {}) : [],
+    ),
+  ];
+  const deprecated = [...services, ...members, ...shapeDocs].filter(
+    (item) => item.deprecated !== undefined,
+  ).length;
   const mutates = services.flatMap((service) => service.methods).filter((m) => m.mutates).length;
-  const since = [...services, ...members, ...shapeDocs].filter((item) => item.tags?.since !== undefined).length;
+  const since = [...services, ...members, ...shapeDocs].filter(
+    (item) => item.tags?.since !== undefined,
+  ).length;
   expect(deprecated).toBeGreaterThan(0);
   expect(mutates).toBeGreaterThan(0);
   expect(since).toBeGreaterThan(0);
@@ -888,7 +1180,9 @@ test("the extractor's fixture: a documented alias and a documented property keep
   for (const text of [full, fragments.Notebook!]) {
     expect(text).toContain('/** A string-literal union. */\nexport type Mood = "busy" | "calm";\n');
     expect(text).toContain("/** A stored note. */\nexport type Note = {\n");
-    expect(text).toContain("  /**\n   * Its first line, from before titles.\n   * @deprecated Read title.\n   * @since 1\n   */\n  heading?: string;\n");
+    expect(text).toContain(
+      "  /**\n   * Its first line, from before titles.\n   * @deprecated Read title.\n   * @since 1\n   */\n  heading?: string;\n",
+    );
     expect(text).toContain("  /** Optional, so a union with `undefined`. */\n  tags?: string[];\n");
   }
 });
@@ -896,29 +1190,32 @@ test("the extractor's fixture: a documented alias and a documented property keep
 describe("fragments", () => {
   // Root reaches Shared and RootOnly; Child (by a stub) reaches Shared and ChildOnly, which holds
   // a stub of Grandchild inside a shape.
-  const schema = schemaOf({
-    Root: {
-      methods: [
-        method("child", { kind: "stub", service: "Child" }, [
-          { name: "options", type: { kind: "ref", name: "RootOnly" }, optional: false, doc: "" },
-        ]),
-        method("shared", { kind: "ref", name: "Shared" }),
-      ],
+  const schema = schemaOf(
+    {
+      Root: {
+        methods: [
+          method("child", { kind: "stub", service: "Child" }, [
+            { name: "options", type: { kind: "ref", name: "RootOnly" }, optional: false, doc: "" },
+          ]),
+          method("shared", { kind: "ref", name: "Shared" }),
+        ],
+      },
+      Child: {
+        methods: [
+          method("both", { kind: "ref", name: "ChildOnly" }, [
+            { name: "s", type: { kind: "ref", name: "Shared" }, optional: false, doc: "" },
+          ]),
+        ],
+      },
+      Grandchild: { methods: [method("leaf", { kind: "ref", name: "GrandchildOnly" })] },
     },
-    Child: {
-      methods: [
-        method("both", { kind: "ref", name: "ChildOnly" }, [
-          { name: "s", type: { kind: "ref", name: "Shared" }, optional: false, doc: "" },
-        ]),
-      ],
+    {
+      ChildOnly: { kind: "object", properties: { next: { kind: "stub", service: "Grandchild" } } },
+      GrandchildOnly: { kind: "string" },
+      RootOnly: { kind: "object", properties: { s: { kind: "ref", name: "Shared" } } },
+      Shared: { kind: "object", properties: { n: { kind: "number" } } },
     },
-    Grandchild: { methods: [method("leaf", { kind: "ref", name: "GrandchildOnly" })] },
-  }, {
-    ChildOnly: { kind: "object", properties: { next: { kind: "stub", service: "Grandchild" } } },
-    GrandchildOnly: { kind: "string" },
-    RootOnly: { kind: "object", properties: { s: { kind: "ref", name: "Shared" } } },
-    Shared: { kind: "object", properties: { n: { kind: "number" } } },
-  });
+  );
   const { full, fragments } = emitDeclarations(schema, { root: "Root" });
 
   test("hold a service and the shapes it reaches without crossing into another service", () => {
@@ -938,14 +1235,22 @@ describe("fragments", () => {
   });
 
   test("each type-checks, missing only the other services' names", () => {
-    expect(missingNames(fragments)).toEqual({ Child: ["Grandchild"], Grandchild: [], Root: ["Child"] });
+    expect(missingNames(fragments)).toEqual({
+      Child: ["Grandchild"],
+      Grandchild: [],
+      Root: ["Child"],
+    });
   });
 });
 
 /** Per fragment, the names it uses without declaring them (each fragment its own module). */
 function missingNames(fragments: Record<string, string>): Record<string, string[]> {
-  const diagnostics = diagnose(Object.fromEntries(Object.entries(fragments).map(([name, text]) => [`${name}.d.ts`, text])));
-  const missing: Record<string, string[]> = Object.fromEntries(Object.keys(fragments).map((name) => [name, []]));
+  const diagnostics = diagnose(
+    Object.fromEntries(Object.entries(fragments).map(([name, text]) => [`${name}.d.ts`, text])),
+  );
+  const missing: Record<string, string[]> = Object.fromEntries(
+    Object.keys(fragments).map((name) => [name, []]),
+  );
   for (const { file, code, text } of diagnostics) {
     expect(CANNOT_FIND_NAME, `${file}: ${text}`).toContain(code);
     missing[file.replace(/\.d\.ts$/, "")]!.push(/'([^']+)'/.exec(text)![1]!);
@@ -959,7 +1264,9 @@ const CANNOT_FIND_NAME = [2304, 2552];
 
 test("imports nothing but the schema's types, as a pure emitter", () => {
   const source = readFileSync(join(import.meta.dirname, "..", "src", "emit", "dts.ts"), "utf8");
-  expect([...source.matchAll(/^import .* from "([^"]+)";$/gm)].map((match) => match[1])).toEqual(["../schema.ts"]);
+  expect([...source.matchAll(/^import .* from "([^"]+)";$/gm)].map((match) => match[1])).toEqual([
+    "../schema.ts",
+  ]);
 });
 
 describe("workshop-shared's API", () => {
@@ -968,7 +1275,13 @@ describe("workshop-shared's API", () => {
   const API = join(SHARED, "src", "api.ts");
   const TSCONFIG = join(SHARED, "tsconfig.json");
   /** What the generator leaves out: an agent already holds an authenticated stub. */
-  const CREDENTIAL_METHODS = ["authenticate", "authenticateFromCfAccess", "createAccount", "login", "changePassword"];
+  const CREDENTIAL_METHODS = [
+    "authenticate",
+    "authenticateFromCfAccess",
+    "createAccount",
+    "login",
+    "changePassword",
+  ];
   const ROOT = "AuthenticatedApi";
 
   const schema = extractSchema({ entry: API, tsconfig: TSCONFIG, entryName: "PublicApi" });
@@ -980,7 +1293,8 @@ describe("workshop-shared's API", () => {
     expect(/^export (?:interface|type) ([\w$]+)/m.exec(emitted.full)?.[1]).toBe(ROOT);
     expect(declared(emitted.full)).not.toContain("PublicApi");
     expect(declared(emitted.full)).not.toContain("LoginAttempt");
-    for (const name of CREDENTIAL_METHODS) expect(emitted.full).not.toMatch(new RegExp(`^  ${name}\\(`, "m"));
+    for (const name of CREDENTIAL_METHODS)
+      expect(emitted.full).not.toMatch(new RegExp(`^  ${name}\\(`, "m"));
   });
 
   test("fragments: together what the full file declares, each missing only other services", () => {
@@ -1077,55 +1391,87 @@ describe("workshop-shared's API", () => {
   }, 60_000);
 
   function checkProbes(): string[][] {
-    const branded = parameterServices(schema, ROOT, CREDENTIAL_METHODS)
-      .filter((name) => extendsRpcTargetDirectly(API, name));
+    const branded = parameterServices(schema, ROOT, CREDENTIAL_METHODS).filter((name) =>
+      extendsRpcTargetDirectly(API, name),
+    );
     const held = heldServices(schema, ROOT, CREDENTIAL_METHODS);
     const callers = new Set([ROOT, ...held.map(({ service }) => service)]);
-    const callbacks = parameterServices(schema, ROOT, CREDENTIAL_METHODS)
-      .filter((name) => !callers.has(name) && declaresPlainInterface(API, name));
+    const callbacks = parameterServices(schema, ROOT, CREDENTIAL_METHODS).filter(
+      (name) => !callers.has(name) && declaresPlainInterface(API, name),
+    );
     const reverse = [...callers, ...callbacks].flatMap((service) =>
-      schema.services[service]!.methods.filter((m) => !CREDENTIAL_METHODS.includes(m.name)).flatMap((m) => {
-        const key = JSON.stringify(m.name);
-        const called = callers.has(service);
-        const checks = dataParts(schema, m.returns, `Awaited<ReturnType<Real_${service}[${key}]>>`,
-          `Awaited<ReturnType<Generated.${service}[${key}]>>`, `${service}.${m.name}`);
-        if (!called && isData(schema, m.returns)) {
-          checks.push(`Assignable<ReturnType<Generated.${service}[${key}]>, ReturnType<Real_${service}[${key}]>>`);
-        }
-        m.params.forEach((param, i) => {
-          if (!isData(schema, param.type)) return;
-          const real = `Parameters<Real_${service}[${key}]>[${i}]`;
-          const ours = `Parameters<Generated.${service}[${key}]>[${i}]`;
-          checks.push(`Assignable<${ours},\n  ${real}>`,
-            `Assignable<${real},\n  ${called ? `Awaited<${ours}>` : ours}>`);
-          if (called) checks.push(`Assignable<${ours},\n  Promise<Exclude<${real}, undefined>>>`);
-        });
-        return checks;
-      }));
+      schema.services[service]!.methods.filter((m) => !CREDENTIAL_METHODS.includes(m.name)).flatMap(
+        (m) => {
+          const key = JSON.stringify(m.name);
+          const called = callers.has(service);
+          const checks = dataParts(
+            schema,
+            m.returns,
+            `Awaited<ReturnType<Real_${service}[${key}]>>`,
+            `Awaited<ReturnType<Generated.${service}[${key}]>>`,
+            `${service}.${m.name}`,
+          );
+          if (!called && isData(schema, m.returns)) {
+            checks.push(
+              `Assignable<ReturnType<Generated.${service}[${key}]>, ReturnType<Real_${service}[${key}]>>`,
+            );
+          }
+          m.params.forEach((param, i) => {
+            if (!isData(schema, param.type)) return;
+            const real = `Parameters<Real_${service}[${key}]>[${i}]`;
+            const ours = `Parameters<Generated.${service}[${key}]>[${i}]`;
+            checks.push(
+              `Assignable<${ours},\n  ${real}>`,
+              `Assignable<${real},\n  ${called ? `Awaited<${ours}>` : ours}>`,
+            );
+            if (called) checks.push(`Assignable<${ours},\n  Promise<Exclude<${real}, undefined>>>`);
+          });
+          return checks;
+        },
+      ),
+    );
     const probeText = (usage: string) => `import type { RpcStub, RpcTarget } from "capnweb";
 import type { ${ROOT} } from ${JSON.stringify(API.replace(/\.ts$/, ".js"))};
 import type * as Real from ${JSON.stringify(API.replace(/\.ts$/, ".js"))};
 import type * as Generated from "./workshop-api.js";
 import type * as StubView from "./workshop-api-stub-view.js";
 
-${["./workshop-api.js", "./workshop-api-stub-view.js"].map((module) => `declare module ${JSON.stringify(module)} {
+${["./workshop-api.js", "./workshop-api-stub-view.js"]
+  .map(
+    (module) => `declare module ${JSON.stringify(module)} {
 ${branded.map((name) => `  interface ${name} extends RpcTarget {}`).join("\n")}
-}`).join("\n")}
+}`,
+  )
+  .join("\n")}
 
 type Held_${ROOT} = RpcStub<${ROOT}>;
-${held.map((hop) =>
-    `type Held_${hop.service} = NonNullable<Awaited<ReturnType<Held_${hop.from}[${JSON.stringify(hop.method)}]>>>;`)
-    .join("\n")}
+${held
+  .map(
+    (hop) =>
+      `type Held_${hop.service} = NonNullable<Awaited<ReturnType<Held_${hop.from}[${JSON.stringify(hop.method)}]>>>;`,
+  )
+  .join("\n")}
 
-${[...held.map(({ service }) => service).toReversed(), ROOT].map((service) =>
-    `declare const held_${service}: Held_${service};\nexport const generated_${service}: StubView.${service} = held_${service};`)
-    .join("\n")}
+${[...held.map(({ service }) => service).toReversed(), ROOT]
+  .map(
+    (service) =>
+      `declare const held_${service}: Held_${service};\nexport const generated_${service}: StubView.${service} = held_${service};`,
+  )
+  .join("\n")}
 
 /** \`From\`, where it is assignable to \`To\`. */
 type Assignable<To, From extends To> = From;
 type Real_${ROOT} = Real.${ROOT};
-${held.map((hop) => `type Real_${hop.service} = ${declaresPlainInterface(API, hop.service) ? `Real.${hop.service}`
-    : `NonNullable<Awaited<ReturnType<Real_${hop.from}[${JSON.stringify(hop.method)}]>>>`};`).join("\n")}
+${held
+  .map(
+    (hop) =>
+      `type Real_${hop.service} = ${
+        declaresPlainInterface(API, hop.service)
+          ? `Real.${hop.service}`
+          : `NonNullable<Awaited<ReturnType<Real_${hop.from}[${JSON.stringify(hop.method)}]>>>`
+      };`,
+  )
+  .join("\n")}
 ${callbacks.map((name) => `type Real_${name} = Real.${name};`).join("\n")}
 ${reverse.map((check, i) => `export type Reverse${i} = ${check};`).join("\n")}
 
@@ -1134,9 +1480,13 @@ type NoKeys<Keys extends never> = Keys;
 /** A type's method names, less capnweb's brands. */
 type Methods<T> = Exclude<Extract<keyof T, string>, \`__RPC_\${string}\`>;
 type Omitted = ${CREDENTIAL_METHODS.map((name) => JSON.stringify(name)).join(" | ")};
-${[...callers, ...callbacks].map((service) =>
-    `export type Missing_${service} = NoKeys<Exclude<Methods<Real_${service}>, keyof Generated.${service} | Omitted>>;
-export type Extra_${service} = NoKeys<Exclude<Methods<Generated.${service}>, keyof Real_${service}>>;`).join("\n")}
+${[...callers, ...callbacks]
+  .map(
+    (service) =>
+      `export type Missing_${service} = NoKeys<Exclude<Methods<Real_${service}>, keyof Generated.${service} | Omitted>>;
+export type Extra_${service} = NoKeys<Exclude<Methods<Generated.${service}>, keyof Real_${service}>>;`,
+  )
+  .join("\n")}
 
 ${usage}
 `;
@@ -1147,7 +1497,13 @@ ${usage}
       const stubView = join(probeDir, "workshop-api-stub-view.d.ts");
       const file = join(probeDir, "probe.ts");
       writeFileSync(generated, declarations);
-      writeFileSync(stubView, declarations.replace(AWAITABLE_DECLARATION, `export type ${AWAITABLE}<T> = T & Promise<T>;`));
+      writeFileSync(
+        stubView,
+        declarations.replace(
+          AWAITABLE_DECLARATION,
+          `export type ${AWAITABLE}<T> = T & Promise<T>;`,
+        ),
+      );
       writeFileSync(file, probeText(usage));
       return [file, generated, stubView] as const;
     });
@@ -1169,8 +1525,10 @@ ${usage}
       expect(sources.every(Boolean)).toBe(true);
       const diagnostics = [
         ...shared,
-        ...sources.flatMap((source) => [...program.getSyntacticDiagnostics(source),
-          ...program.getSemanticDiagnostics(source)]),
+        ...sources.flatMap((source) => [
+          ...program.getSyntacticDiagnostics(source),
+          ...program.getSemanticDiagnostics(source),
+        ]),
       ];
       // Each message with the probe's line it is on, which names the method checked.
       return diagnostics.map((diagnostic) => {
@@ -1187,21 +1545,30 @@ ${usage}
     expect(probeResults()[holds]).toEqual([]);
   });
 
-  const callback = probe(emitted.full, `declare const overseer: Generated.Overseer;
+  const callback = probe(
+    emitted.full,
+    `declare const overseer: Generated.Overseer;
 void overseer.subscribeToMetadata((metadata) => {
   const title: string = metadata.title;
   void title;
-});`);
+});`,
+  );
   test("a synchronous callback type-checks against the generated declaration", () => {
-    const subscribe = schema.services.Overseer!.methods.find((m) => m.name === "subscribeToMetadata")!;
+    const subscribe = schema.services.Overseer!.methods.find(
+      (m) => m.name === "subscribeToMetadata",
+    )!;
     expect(subscribe.params[0]!.type.kind).toBe("function");
-    expect(emitted.full).toContain("subscribeToMetadata(callback: (metadata: WorkspaceMetadata) => Awaitable<void>)");
+    expect(emitted.full).toContain(
+      "subscribeToMetadata(callback: (metadata: WorkspaceMetadata) => Awaitable<void>)",
+    );
     expect(probeResults()[callback]).toEqual([]);
   });
 
   // A subscriber written to `api.ts`'s interface, its methods synchronous, implements the generated
   // one; and one call's result is passed to the next unawaited, as capnweb resolves it first.
-  const syncSubscriber = probe(emitted.full, `declare const api: Generated.AuthenticatedApi;
+  const syncSubscriber = probe(
+    emitted.full,
+    `declare const api: Generated.AuthenticatedApi;
 class Accounts implements Generated.ConnectedAccountsSubscriber {
   readonly ids = new Set<number>();
   add(id: number) {
@@ -1217,13 +1584,16 @@ export async function rename(id: string, from: number, to: number): Promise<void
   void subscription;
   const overseer = api.openWorkspace(id);
   await overseer.getGadget(to).setTitle(overseer.getGadget(from).getTitle());
-}`);
+}`,
+  );
   test("a synchronous subscriber, and a promised argument, type-check against the generated declaration", () => {
     expect(probeResults()[syncSubscriber]).toEqual([]);
   });
 
   // Disposal is how a caller cancels a subscription, and pipelining sends a chain of calls at once.
-  const disposes = probe(emitted.full, `declare const api: Generated.AuthenticatedApi;
+  const disposes = probe(
+    emitted.full,
+    `declare const api: Generated.AuthenticatedApi;
 export async function use(id: string): Promise<number> {
   const chats = await api.openWorkspace(id).listChats();
   using subscription = await api.openWorkspace(id).subscribeToMetadata(() => {});
@@ -1232,7 +1602,8 @@ export async function use(id: string): Promise<number> {
   handle[Symbol.dispose]();
   api[Symbol.dispose]();
   return chats.length;
-}`);
+}`,
+  );
   test("a returned handle disposes, and a returned capability pipelines, against the generated declaration", () => {
     expect(probeResults()[disposes]).toEqual([]);
   });
@@ -1259,20 +1630,22 @@ export async function use(id: string): Promise<number> {
   }
   /** `GatekeeperUiFrame`, data beside a capability, as a root method returns it. */
   function frame(copy: Schema) {
-    const results = copy.services[ROOT]!.methods.filter((m) => m.name === "startResourceConfigurator")
-      .map((m) => m.returns);
+    const results = copy.services[ROOT]!.methods.filter(
+      (m) => m.name === "startResourceConfigurator",
+    ).map((m) => m.returns);
     expect(results).toEqual([{ kind: "ref", name: "GatekeeperUiFrame" }]);
     const shape = copy.shapes.GatekeeperUiFrame as Extract<ApiShape, { kind: "object" }>;
     expect(shape.properties).toEqual({ iframeHtml: { kind: "string" }, ui: { kind: "stub" } });
     return shape;
   }
   function firstMethod(copy: Schema, service: string, kind: ApiShape["kind"]) {
-    const found = copy.services[service]!.methods.find((m) => m.returns.kind === kind && !CREDENTIAL_METHODS.includes(m.name));
+    const found = copy.services[service]!.methods.find(
+      (m) => m.returns.kind === kind && !CREDENTIAL_METHODS.includes(m.name),
+    );
     expect(found, `a ${kind}-returning method of ${service}`).toBeDefined();
     return found!;
   }
   describe("fails on a corrupted declaration", () => {
-
     const rootResult = corrupt((copy) => {
       const m = firstMethod(copy, ROOT, "boolean");
       m.returns = { kind: "string" };
@@ -1289,8 +1662,9 @@ export async function use(id: string): Promise<number> {
       return m.name;
     });
     test("a result two hops away", () => {
-      expect(schema.services.Overseer!.methods.find((m) => m.name === "getGadget")!.returns)
-        .toEqual({ kind: "stub", service: "GadgetClient" });
+      expect(
+        schema.services.Overseer!.methods.find((m) => m.name === "getGadget")!.returns,
+      ).toEqual({ kind: "stub", service: "GadgetClient" });
       const { target, diagnostics } = twoHops;
       expect(diagnostics.join("\n")).toMatch(new RegExp(`'${target}\\b`));
     });
@@ -1299,7 +1673,9 @@ export async function use(id: string): Promise<number> {
       for (const m of copy.services[ROOT]!.methods) {
         const shape = m.returns.kind === "ref" ? copy.shapes[m.returns.name] : undefined;
         if (shape?.kind !== "object") continue;
-        const property = Object.entries(shape.properties).find(([, value]) => value.kind === "string");
+        const property = Object.entries(shape.properties).find(
+          ([, value]) => value.kind === "string",
+        );
         if (!property) continue;
         shape.properties[property[0]] = { kind: "number" };
         return property[0];
@@ -1311,12 +1687,17 @@ export async function use(id: string): Promise<number> {
       expect(diagnostics.join("\n")).toMatch(new RegExp(`'${target}\\b`));
     });
 
-    const services = [ROOT, ...heldServices(schema, ROOT, CREDENTIAL_METHODS).map(({ service }) => service)];
+    const services = [
+      ROOT,
+      ...heldServices(schema, ROOT, CREDENTIAL_METHODS).map(({ service }) => service),
+    ];
     const deepest = deepestShape(schema, services, CREDENTIAL_METHODS);
     expect(deepest.depth, deepest.name).toBeGreaterThanOrEqual(4);
     const deepestProperty = corrupt((copy) => {
       const shape = copy.shapes[deepest.name] as Extract<ApiShape, { kind: "object" }>;
-      const property = Object.keys(shape.properties).find((key) => shape.properties[key]!.kind === "string")!;
+      const property = Object.keys(shape.properties).find(
+        (key) => shape.properties[key]!.kind === "string",
+      )!;
       shape.properties[property] = { kind: "number" };
       return property;
     });
@@ -1378,7 +1759,10 @@ export async function use(id: string): Promise<number> {
 
     const addedBranch = corrupt((copy) => {
       const m = copy.services[ROOT]!.methods.find((candidate) => candidate.name === "getAdminApi")!;
-      expect(m.returns).toEqual({ kind: "union", branches: [{ kind: "null" }, { kind: "stub", service: "AdminApi" }] });
+      expect(m.returns).toEqual({
+        kind: "union",
+        branches: [{ kind: "null" }, { kind: "stub", service: "AdminApi" }],
+      });
       (m.returns as Extract<ApiShape, { kind: "union" }>).branches.push({ kind: "string" });
       return m.name;
     });
@@ -1388,10 +1772,16 @@ export async function use(id: string): Promise<number> {
     });
 
     const narrowedParameter = corrupt((copy) => {
-      const m = copy.services[ROOT]!.methods.find((candidate) => !CREDENTIAL_METHODS.includes(candidate.name)
-        && candidate.params.some((param) => param.type.kind === "string"))!;
+      const m = copy.services[ROOT]!.methods.find(
+        (candidate) =>
+          !CREDENTIAL_METHODS.includes(candidate.name) &&
+          candidate.params.some((param) => param.type.kind === "string"),
+      )!;
       expect(m, "a root method with a string parameter").toBeDefined();
-      m.params.find((param) => param.type.kind === "string")!.type = { kind: "literal", value: "only-this" };
+      m.params.find((param) => param.type.kind === "string")!.type = {
+        kind: "literal",
+        value: "only-this",
+      };
       return m.name;
     });
     test("a parameter narrowed to a literal", () => {
@@ -1400,8 +1790,11 @@ export async function use(id: string): Promise<number> {
     });
 
     const widenedParameter = corrupt((copy) => {
-      const m = copy.services[ROOT]!.methods.find((candidate) => !CREDENTIAL_METHODS.includes(candidate.name)
-        && candidate.params.some((param) => param.type.kind === "string"))!;
+      const m = copy.services[ROOT]!.methods.find(
+        (candidate) =>
+          !CREDENTIAL_METHODS.includes(candidate.name) &&
+          candidate.params.some((param) => param.type.kind === "string"),
+      )!;
       expect(m, "a root method with a string parameter").toBeDefined();
       m.params.find((param) => param.type.kind === "string")!.type = { kind: "any" };
       return m.name;
@@ -1412,7 +1805,9 @@ export async function use(id: string): Promise<number> {
     });
 
     const droppedRootMethod = corrupt((copy) => {
-      copy.services[ROOT]!.methods = copy.services[ROOT]!.methods.filter((m) => m.name !== "newWorkspace");
+      copy.services[ROOT]!.methods = copy.services[ROOT]!.methods.filter(
+        (m) => m.name !== "newWorkspace",
+      );
       return "newWorkspace";
     });
     test("a method dropped from the root", () => {
@@ -1430,20 +1825,28 @@ export async function use(id: string): Promise<number> {
     });
     test("a method dropped from a subscriber", () => {
       const { target, diagnostics } = droppedSubscriberMethod;
-      expect(diagnostics.join("\n")).toMatch(new RegExp(`"${target}"[\\s\\S]*Missing_ConnectedAccountsSubscriber`));
+      expect(diagnostics.join("\n")).toMatch(
+        new RegExp(`"${target}"[\\s\\S]*Missing_ConnectedAccountsSubscriber`),
+      );
     });
 
     const widenedSubscriberParameter = corrupt((copy) => {
-      const m = copy.services.ConnectedAccountsSubscriber!.methods.find((candidate) => candidate.name === "add")!;
+      const m = copy.services.ConnectedAccountsSubscriber!.methods.find(
+        (candidate) => candidate.name === "add",
+      )!;
       const param = m.params.find((candidate) => candidate.name === "vendorId")!;
       expect(param.type).toEqual({ kind: "string" });
       param.type = { kind: "any" };
       return m.name;
     });
     test("a subscriber's parameter widened to unknown", () => {
-      expect(parameterServices(schema, ROOT, CREDENTIAL_METHODS)).toContain("ConnectedAccountsSubscriber");
+      expect(parameterServices(schema, ROOT, CREDENTIAL_METHODS)).toContain(
+        "ConnectedAccountsSubscriber",
+      );
       const { target, diagnostics } = widenedSubscriberParameter;
-      expect(diagnostics.join("\n")).toMatch(new RegExp(`ConnectedAccountsSubscriber\\["${target}"\\]`));
+      expect(diagnostics.join("\n")).toMatch(
+        new RegExp(`ConnectedAccountsSubscriber\\["${target}"\\]`),
+      );
     });
   });
 });
@@ -1461,10 +1864,13 @@ function isData(schema: Schema, shape: ApiShape, seen = new Set<string>()): bool
     case "map":
       return isData(schema, shape.key, seen) && isData(schema, shape.value, seen);
     case "tuple":
-      return [...shape.elements, ...shape.rest ? [shape.rest] : []].every((s) => isData(schema, s, seen));
+      return [...shape.elements, ...(shape.rest ? [shape.rest] : [])].every((s) =>
+        isData(schema, s, seen),
+      );
     case "object":
-      return [...Object.values(shape.properties), ...shape.index ? [shape.index] : []]
-        .every((s) => isData(schema, s, seen));
+      return [...Object.values(shape.properties), ...(shape.index ? [shape.index] : [])].every(
+        (s) => isData(schema, s, seen),
+      );
     case "union":
       return shape.branches.every((s) => isData(schema, s, seen));
     case "ref":
@@ -1477,8 +1883,16 @@ function isData(schema: Schema, shape: ApiShape, seen = new Set<string>()): bool
 }
 
 /** Shape kinds that are never objects, so `Exclude<T, object>` keeps exactly them. */
-const NOT_OBJECTS = new Set<ApiShape["kind"]>(["string", "number", "boolean", "bigint", "null", "undefined", "void",
-  "literal"]);
+const NOT_OBJECTS = new Set<ApiShape["kind"]>([
+  "string",
+  "number",
+  "boolean",
+  "bigint",
+  "null",
+  "undefined",
+  "void",
+  "literal",
+]);
 
 /**
  * The checks that the data in `ours`, the generated type of `shape`, is assignable to `real`: the
@@ -1487,8 +1901,14 @@ const NOT_OBJECTS = new Set<ApiShape["kind"]>(["string", "number", "boolean", "b
  * that is an object, if any, by itself. Anything else that holds a capability throws, so the probe
  * is extended rather than silently skipping it.
  */
-function dataParts(schema: Schema, shape: ApiShape, real: string, ours: string, where: string,
-  seen = new Set<string>()): string[] {
+function dataParts(
+  schema: Schema,
+  shape: ApiShape,
+  real: string,
+  ours: string,
+  where: string,
+  seen = new Set<string>(),
+): string[] {
   if (isData(schema, shape)) return [`Assignable<${real},\n  ${ours}>`];
   switch (shape.kind) {
     case "stub":
@@ -1497,7 +1917,14 @@ function dataParts(schema: Schema, shape: ApiShape, real: string, ours: string, 
       return [];
     case "ref":
       if (seen.has(shape.name)) return [];
-      return dataParts(schema, schema.shapes[shape.name]!, real, ours, where, new Set([...seen, shape.name]));
+      return dataParts(
+        schema,
+        schema.shapes[shape.name]!,
+        real,
+        ours,
+        where,
+        new Set([...seen, shape.name]),
+      );
     case "array":
       return dataParts(schema, shape.element, `${real}[number]`, `${ours}[number]`, where, seen);
     case "object":
@@ -1506,19 +1933,32 @@ function dataParts(schema: Schema, shape: ApiShape, real: string, ours: string, 
           const key = JSON.stringify(name);
           return dataParts(schema, value, `${real}[${key}]`, `${ours}[${key}]`, where, seen);
         }),
-        ...shape.index ? dataParts(schema, shape.index, `${real}[string]`, `${ours}[string]`, where, seen) : [],
+        ...(shape.index
+          ? dataParts(schema, shape.index, `${real}[string]`, `${ours}[string]`, where, seen)
+          : []),
       ];
     case "union": {
       const objects = shape.branches.filter((branch) => !NOT_OBJECTS.has(branch.kind));
-      if (objects.length > 1) throw new Error(`${where}: a result with more than one object branch and a capability`);
+      if (objects.length > 1)
+        throw new Error(`${where}: a result with more than one object branch and a capability`);
       return [
         `Assignable<${real},\n  Exclude<${ours}, object>>`,
         ...objects.flatMap((branch) =>
-          dataParts(schema, branch, `Extract<${real}, object>`, `Extract<${ours}, object>`, where, seen)),
+          dataParts(
+            schema,
+            branch,
+            `Extract<${real}, object>`,
+            `Extract<${ours}, object>`,
+            where,
+            seen,
+          ),
+        ),
       ];
     }
     default:
-      throw new Error(`${where}: a ${shape.kind} holding a capability, which the probe cannot take apart`);
+      throw new Error(
+        `${where}: a ${shape.kind} holding a capability, which the probe cannot take apart`,
+      );
   }
 }
 
@@ -1527,10 +1967,15 @@ function dataParts(schema: Schema, shape: ApiShape, real: string, ours: string, 
  * given services' methods is deepest, counted in named shapes from the result (1 is the result's
  * own).
  */
-function deepestShape(schema: Schema, services: string[], omit: string[]): { name: string; depth: number } {
+function deepestShape(
+  schema: Schema,
+  services: string[],
+  omit: string[],
+): { name: string; depth: number } {
   const depths = new Map<string, number>();
   let level: ApiShape[] = services.flatMap((service) =>
-    schema.services[service]!.methods.filter((m) => !omit.includes(m.name)).map((m) => m.returns));
+    schema.services[service]!.methods.filter((m) => !omit.includes(m.name)).map((m) => m.returns),
+  );
   for (let depth = 1; level.length; depth++) {
     const next: ApiShape[] = [];
     const visit = (shape: ApiShape): void => {
@@ -1542,9 +1987,12 @@ function deepestShape(schema: Schema, services: string[], omit: string[]): { nam
           visit(shape.key);
           return visit(shape.value);
         case "tuple":
-          return [...shape.elements, ...shape.rest ? [shape.rest] : []].forEach(visit);
+          return [...shape.elements, ...(shape.rest ? [shape.rest] : [])].forEach(visit);
         case "object":
-          return [...Object.values(shape.properties), ...shape.index ? [shape.index] : []].forEach(visit);
+          return [
+            ...Object.values(shape.properties),
+            ...(shape.index ? [shape.index] : []),
+          ].forEach(visit);
         case "union":
           return shape.branches.forEach(visit);
         case "ref":
@@ -1556,10 +2004,15 @@ function deepestShape(schema: Schema, services: string[], omit: string[]): { nam
     level.forEach(visit);
     level = next;
   }
-  const [name, depth] = [...depths].filter(([key]) => {
-    const shape = schema.shapes[key]!;
-    return shape.kind === "object" && Object.values(shape.properties).some((value) => value.kind === "string");
-  }).toSorted(([a, x], [b, y]) => y - x || (a < b ? -1 : 1))[0]!;
+  const [name, depth] = [...depths]
+    .filter(([key]) => {
+      const shape = schema.shapes[key]!;
+      return (
+        shape.kind === "object" &&
+        Object.values(shape.properties).some((value) => value.kind === "string")
+      );
+    })
+    .toSorted(([a, x], [b, y]) => y - x || (a < b ? -1 : 1))[0]!;
   return { name, depth };
 }
 
@@ -1580,10 +2033,13 @@ function parameterServices(schema: Schema, root: string, omit: string[]): string
         visit(shape.key, inParameter);
         return visit(shape.value, inParameter);
       case "tuple":
-        return [...shape.elements, ...shape.rest ? [shape.rest] : []].forEach((s) => visit(s, inParameter));
+        return [...shape.elements, ...(shape.rest ? [shape.rest] : [])].forEach((s) =>
+          visit(s, inParameter),
+        );
       case "object":
-        return [...Object.values(shape.properties), ...shape.index ? [shape.index] : []]
-          .forEach((s) => visit(s, inParameter));
+        return [...Object.values(shape.properties), ...(shape.index ? [shape.index] : [])].forEach(
+          (s) => visit(s, inParameter),
+        );
       case "union":
         return shape.branches.forEach((s) => visit(s, inParameter));
       case "ref":
@@ -1602,7 +2058,9 @@ function parameterServices(schema: Schema, root: string, omit: string[]): string
   const service = (name: string) => {
     if (services.has(name)) return;
     services.add(name);
-    for (const m of schema.services[name]!.methods.filter((candidate) => !omit.includes(candidate.name))) {
+    for (const m of schema.services[name]!.methods.filter(
+      (candidate) => !omit.includes(candidate.name),
+    )) {
       m.params.forEach((param) => visit(param.type, true));
       visit(m.returns, false);
     }
@@ -1613,16 +2071,36 @@ function parameterServices(schema: Schema, root: string, omit: string[]): string
 
 /** Whether `file` declares interface `name`, without type parameters. */
 function declaresPlainInterface(file: string, name: string): boolean {
-  const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, false);
-  return source.statements.some((statement) => ts.isInterfaceDeclaration(statement) && statement.name.text === name
-    && !statement.typeParameters);
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(file, "utf8"),
+    ts.ScriptTarget.Latest,
+    false,
+  );
+  return source.statements.some(
+    (statement) =>
+      ts.isInterfaceDeclaration(statement) &&
+      statement.name.text === name &&
+      !statement.typeParameters,
+  );
 }
 
 /** Whether `file` declares interface `name` with `RpcTarget` in its own `extends` clause. */
 function extendsRpcTargetDirectly(file: string, name: string): boolean {
-  const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, false);
-  return source.statements.some((statement) => ts.isInterfaceDeclaration(statement) && statement.name.text === name
-    && !!statement.heritageClauses?.some((clause) => clause.types.some((type) => type.expression.getText(source) === "RpcTarget")));
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(file, "utf8"),
+    ts.ScriptTarget.Latest,
+    false,
+  );
+  return source.statements.some(
+    (statement) =>
+      ts.isInterfaceDeclaration(statement) &&
+      statement.name.text === name &&
+      !!statement.heritageClauses?.some((clause) =>
+        clause.types.some((type) => type.expression.getText(source) === "RpcTarget"),
+      ),
+  );
 }
 
 /**
@@ -1630,17 +2108,25 @@ function extendsRpcTargetDirectly(file: string, name: string): boolean {
  * union of it with values), each with the service and method of the first path to it, breadth
  * first in method order. Only those with identifiers for names: `RpcStub<{}>` has no methods.
  */
-function heldServices(schema: Schema, root: string, omit: string[]): { service: string; from: string; method: string }[] {
+function heldServices(
+  schema: Schema,
+  root: string,
+  omit: string[],
+): { service: string; from: string; method: string }[] {
   const held: { service: string; from: string; method: string }[] = [];
   const seen = new Set([root]);
   for (let i = -1; i < held.length; i++) {
     const from = i < 0 ? root : held[i]!.service;
-    for (const m of schema.services[from]!.methods.filter((candidate) => !omit.includes(candidate.name))) {
+    for (const m of schema.services[from]!.methods.filter(
+      (candidate) => !omit.includes(candidate.name),
+    )) {
       const branches = m.returns.kind === "union" ? m.returns.branches : [m.returns];
       for (const branch of branches) {
-        if (branch.kind !== "stub" || branch.service === undefined || seen.has(branch.service)) continue;
+        if (branch.kind !== "stub" || branch.service === undefined || seen.has(branch.service))
+          continue;
         seen.add(branch.service);
-        if (/^[A-Za-z_$][\w$]*$/.test(branch.service)) held.push({ service: branch.service, from, method: m.name });
+        if (/^[A-Za-z_$][\w$]*$/.test(branch.service))
+          held.push({ service: branch.service, from, method: m.name });
       }
     }
   }

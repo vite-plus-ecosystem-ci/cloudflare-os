@@ -1,6 +1,6 @@
-import { defineConfig } from 'vitest/config'
-import { cloudflareTest } from '@cloudflare/vitest-plugin'
-import { COMPATIBILITY_DATE } from '@gadgets/scripts/worker-config'
+import { defineConfig } from "vite-plus";
+import { cloudflareTest } from "@cloudflare/vitest-plugin";
+import { COMPATIBILITY_DATE } from "@gadgets/scripts/worker-config";
 
 /**
  * Tests run inside workerd (via `@cloudflare/vitest-plugin`) so they exercise the same runtime APIs as
@@ -12,14 +12,14 @@ export default defineConfig({
     cloudflareTest({
       miniflare: {
         compatibilityDate: COMPATIBILITY_DATE,
-        compatibilityFlags: ['nodejs_compat'],
+        compatibilityFlags: ["nodejs_compat"],
       },
     }),
   ],
   test: {
-    include: ['__tests__/*.test.ts'],
+    include: ["__tests__/*.test.ts"],
     // Nothing here imports `cloudflare:test`, so a pool that failed to start would leave this suite
     // green while running under Node. The guard makes that fail loudly instead.
-    setupFiles: ['@gadgets/scripts/assert-workerd'],
+    setupFiles: ["@gadgets/scripts/assert-workerd"],
   },
-})
+});

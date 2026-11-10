@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { createExecutionContext } from "cloudflare:test";
-import { expect, it } from "vitest";
+import { expect, it } from "vite-plus/test";
 
 it("admits every observer of public search results", async () => {
   const worker = createExecutionContext().exports;
@@ -8,10 +8,16 @@ it("admits every observer of public search results", async () => {
   const owner = await worker.WebSearchAccount({}).getVerifier();
   const collaborator = await worker.WebSearchAccount({}).getVerifier();
 
-  await expect(gatekeeper.verifyObserverAccess([
-    { id: "owner", verifier: owner },
-    { id: "collaborator", verifier: collaborator },
-  ], [])).resolves.toEqual({ allowedObserverIds: ["owner", "collaborator"] });
-  await expect(gatekeeper.verifyObserverAccess([], []))
-    .resolves.toEqual({ allowedObserverIds: [] });
+  await expect(
+    gatekeeper.verifyObserverAccess(
+      [
+        { id: "owner", verifier: owner },
+        { id: "collaborator", verifier: collaborator },
+      ],
+      [],
+    ),
+  ).resolves.toEqual({ allowedObserverIds: ["owner", "collaborator"] });
+  await expect(gatekeeper.verifyObserverAccess([], [])).resolves.toEqual({
+    allowedObserverIds: [],
+  });
 });

@@ -2,7 +2,7 @@
 // returned its data as the subresource `user/<userId>`, and no collaborator may read one, not even a
 // collaborator connected as that same ZoomInfo user. ZoomInfo is faked at `fetch`.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { ALICE, FakeZoomInfo, failure, hooks, seedAccount, unwrap } from "./fake-zoominfo";
 import type { GatekeeperProps, Step } from "./worker";
 
@@ -43,12 +43,17 @@ describe("reads", () => {
     ["getCreditUsage"],
   ];
 
-  it.each(reads)("%s reports the connection's ZoomInfo user, found something or not", async (...step) => {
-    const fake = new FakeZoomInfo().install();
-    const zoominfo = await aliceBinding(fake);
-    unwrap(await zoominfo.run(step));
-    expect((await zoominfo.observations()).map(observation => observation.subresources)).toEqual([[ALICE_ID]]);
-  });
+  it.each(reads)(
+    "%s reports the connection's ZoomInfo user, found something or not",
+    async (...step) => {
+      const fake = new FakeZoomInfo().install();
+      const zoominfo = await aliceBinding(fake);
+      unwrap(await zoominfo.run(step));
+      expect(
+        (await zoominfo.observations()).map((observation) => observation.subresources),
+      ).toEqual([[ALICE_ID]]);
+    },
+  );
 
   it("reports a cache hit as the user it was fetched as, reading nothing from ZoomInfo", async () => {
     const fake = new FakeZoomInfo().install();
@@ -57,19 +62,27 @@ describe("reads", () => {
     const lookups = fake.count(/^GET \/gtm\/data\/v1\/lookup\//);
     expect(unwrap(await zoominfo.run(["lookup", "industries"]))).toEqual(fetched);
     expect(fake.count(/^GET \/gtm\/data\/v1\/lookup\//)).toBe(lookups);
-    expect((await zoominfo.observations()).map(({ description, subresources }) => [description, subresources]))
-      .toEqual([
-        ["Resolved 1 value(s) for the `industries` taxonomy.", [ALICE_ID]],
-        ["Resolved 1 value(s) for the `industries` taxonomy (cached).", [ALICE_ID]],
-      ]);
+    expect(
+      (await zoominfo.observations()).map(({ description, subresources }) => [
+        description,
+        subresources,
+      ]),
+    ).toEqual([
+      ["Resolved 1 value(s) for the `industries` taxonomy.", [ALICE_ID]],
+      ["Resolved 1 value(s) for the `industries` taxonomy (cached).", [ALICE_ID]],
+    ]);
   });
 
   it("returns nothing when its observation is refused", async () => {
     const fake = new FakeZoomInfo().install();
     const zoominfo = await aliceBinding(fake);
     await hooks().refuseObservations(zoominfo.name, true);
-    expect(failure(await zoominfo.run(["searchCompanies", {}]))).toMatch(/refused this observation/);
-    expect((await zoominfo.observations()).map(observation => observation.subresources)).toEqual([[ALICE_ID]]);
+    expect(failure(await zoominfo.run(["searchCompanies", {}]))).toMatch(
+      /refused this observation/,
+    );
+    expect((await zoominfo.observations()).map((observation) => observation.subresources)).toEqual([
+      [ALICE_ID],
+    ]);
   });
 });
 
@@ -79,10 +92,20 @@ describe("verifyObserverAccess", () => {
     const zoominfo = await aliceBinding(fake);
     const observers = [
       { id: "alice-elsewhere", userObjectId: await seedAccount(fake, ALICE) },
-      { id: "colleague", userObjectId: await seedAccount(fake, { sub: "00u3carol", name: "Carol", email: "carol@example.com" }) },
+      {
+        id: "colleague",
+        userObjectId: await seedAccount(fake, {
+          sub: "00u3carol",
+          name: "Carol",
+          email: "carol@example.com",
+        }),
+      },
     ];
-    expect(unwrap(await hooks().verifyObserverAccess(zoominfo.name, zoominfo.props, observers, [ALICE_ID])))
-      .toEqual({ allowedObserverIds: [] });
+    expect(
+      unwrap(
+        await hooks().verifyObserverAccess(zoominfo.name, zoominfo.props, observers, [ALICE_ID]),
+      ),
+    ).toEqual({ allowedObserverIds: [] });
   });
 
   it.each([
@@ -92,12 +115,18 @@ describe("verifyObserverAccess", () => {
     "user/00u1%61lice",
     "user/",
     "",
-  ])("refuses the whole call for %j, which names no ZoomInfo user", async id => {
+  ])("refuses the whole call for %j, which names no ZoomInfo user", async (id) => {
     const fake = new FakeZoomInfo().install();
     const zoominfo = await aliceBinding(fake);
     const observers = [{ id: "alice-elsewhere", userObjectId: await seedAccount(fake, ALICE) }];
-    expect(failure(await hooks().verifyObserverAccess(zoominfo.name, zoominfo.props, observers, [ALICE_ID, id])))
-      .toMatch(/subresource ID/);
+    expect(
+      failure(
+        await hooks().verifyObserverAccess(zoominfo.name, zoominfo.props, observers, [
+          ALICE_ID,
+          id,
+        ]),
+      ),
+    ).toMatch(/subresource ID/);
   });
 });
 
@@ -107,7 +136,10 @@ describe("addObserver", () => {
     const zoominfo = await aliceBinding(fake);
     unwrap(await zoominfo.run(["searchCompanies", {}]));
     const aliceElsewhere = await seedAccount(fake, ALICE);
-    expect(failure(await hooks().addObserver(zoominfo.name, zoominfo.props, "alice-elsewhere", aliceElsewhere)))
-      .toMatch(/may only be observed by its owner/);
+    expect(
+      failure(
+        await hooks().addObserver(zoominfo.name, zoominfo.props, "alice-elsewhere", aliceElsewhere),
+      ),
+    ).toMatch(/may only be observed by its owner/);
   });
 });

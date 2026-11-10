@@ -5,7 +5,7 @@
 
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import { env } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { ActionDescription } from "@gadgets/workshop-shared/gatekeeper";
 import type { GatekeeperProps, GitHubActionData, Outcome } from "./worker";
 
@@ -31,20 +31,32 @@ let nextScenario = 0;
 function gatekeeper(resourceKind: GatekeeperProps["resourceKind"] = "repo") {
   const scenario = `auto-approval-${nextScenario++}`;
   const props: GatekeeperProps = {
-    userObjectId: env.USER_ACCOUNT.newUniqueId().toString(), resourceKind, owner: OWNER, repo: REPO,
+    userObjectId: env.USER_ACCOUNT.newUniqueId().toString(),
+    resourceKind,
+    owner: OWNER,
+    repo: REPO,
     ...(resourceKind === "repo" ? {} : { issueNumber: 7 }),
   };
   const hooks = env.TEST_HOOKS.getByName(scenario);
   return {
-    advertised: async () => (await unwrap(hooks.autoApprovableActions(scenario, props))).map(kind => kind.tag),
+    advertised: async () =>
+      (await unwrap(hooks.autoApprovableActions(scenario, props))).map((kind) => kind.tag),
     /** Submits each action and returns the [kind tag, verdict] the approval queue received. */
     submit: async (actions: GitHubActionData[]) => {
       const queue = new RecordingQueue();
       for (const action of actions) {
-        await unwrap(hooks.submitAction(scenario, props, new RpcStub(queue) as never, action,
-          { title: action.type, description: action.type, implementsRevert: false }));
+        await unwrap(
+          hooks.submitAction(scenario, props, new RpcStub(queue) as never, action, {
+            title: action.type,
+            description: action.type,
+            implementsRevert: false,
+          }),
+        );
       }
-      return queue.submitted.map(({ actionKind, autoApprovable }) => [actionKind?.tag, autoApprovable]);
+      return queue.submitted.map(({ actionKind, autoApprovable }) => [
+        actionKind?.tag,
+        autoApprovable,
+      ]);
     },
   };
 }
@@ -53,11 +65,23 @@ let nextApprovalId = 1;
 const base = () => ({ approvalId: nextApprovalId++, submittedAt: 0, owner: OWNER, repo: REPO });
 const entity = () => ({ ...base(), targetKind: "pull" as const, targetId: "7" });
 const review = (decision: "comment" | "approve" | "requestChanges"): GitHubActionData => ({
-  ...base(), type: "postReview", pullId: "7", provisionalReviewId: `~review${nextApprovalId}`,
-  review: { revision: { baseSha: "a".repeat(40), headSha: "b".repeat(40) }, decision, bodyMarkdown: "Summary" },
+  ...base(),
+  type: "postReview",
+  pullId: "7",
+  provisionalReviewId: `~review${nextApprovalId}`,
+  review: {
+    revision: { baseSha: "a".repeat(40), headSha: "b".repeat(40) },
+    decision,
+    bodyMarkdown: "Summary",
+  },
 });
 const push = (force: boolean, gatedBranch?: boolean): GitHubActionData => ({
-  ...base(), type: "push", branch: "feature", expectedOldSha: "a".repeat(40), newSha: "b".repeat(40), force,
+  ...base(),
+  type: "push",
+  branch: "feature",
+  expectedOldSha: "a".repeat(40),
+  newSha: "b".repeat(40),
+  force,
   ...(gatedBranch === undefined ? {} : { gatedBranch }),
 });
 
@@ -65,18 +89,42 @@ describe("auto-approval", () => {
   it("lets every action but a merge apply once its kind is enabled, closing, reopening and feature-branch force pushes included", async () => {
     const submitted = await gatekeeper().submit([
       { ...base(), type: "createIssue", provisionalId: "~1", options: { title: "Bug" } },
-      { ...base(), type: "createPullRequest", provisionalId: "~2", options: { title: "Fix", head: "feature", base: "main" } },
+      {
+        ...base(),
+        type: "createPullRequest",
+        provisionalId: "~2",
+        options: { title: "Fix", head: "feature", base: "main" },
+      },
       { ...entity(), type: "setTitle", title: "New", previousTitle: "Old" },
       { ...entity(), type: "setBody", bodyMarkdown: "New", previousBodyMarkdown: "Old" },
       { ...entity(), type: "addLabels", labels: ["bug"], previousLabels: [] },
       { ...entity(), type: "removeLabels", labels: ["bug"], previousLabels: ["bug"] },
-      { ...entity(), type: "changeState", state: "closed", reason: "completed", previousState: "open" },
+      {
+        ...entity(),
+        type: "changeState",
+        state: "closed",
+        reason: "completed",
+        previousState: "open",
+      },
       { ...entity(), type: "changeState", state: "open", previousState: "closed" },
       { ...entity(), type: "postComment", bodyMarkdown: "Hi", provisionalCommentId: "~comment1" },
-      { ...base(), type: "replyToDiffComment", pullId: "7", commentId: "9", bodyMarkdown: "Done", provisionalCommentId: "~comment2" },
+      {
+        ...base(),
+        type: "replyToDiffComment",
+        pullId: "7",
+        commentId: "9",
+        bodyMarkdown: "Done",
+        provisionalCommentId: "~comment2",
+      },
       push(false, false),
       push(true, false),
-      { ...base(), type: "mergePullRequest", pullId: "7", expectedHeadSha: "b".repeat(40), headBranch: "feature" },
+      {
+        ...base(),
+        type: "mergePullRequest",
+        pullId: "7",
+        expectedHeadSha: "b".repeat(40),
+        headBranch: "feature",
+      },
     ]);
     expect(submitted).toEqual([
       ["github.createIssue", true],
@@ -112,14 +160,19 @@ describe("auto-approval", () => {
 
   it("keeps an issue assigned to an app manual under the kind that lets other issues be created", async () => {
     const createIssue = (assignees: string[]): GitHubActionData => ({
-      ...base(), type: "createIssue", provisionalId: `~issue${nextApprovalId}`, options: { title: "Bug", assignees },
+      ...base(),
+      type: "createIssue",
+      provisionalId: `~issue${nextApprovalId}`,
+      options: { title: "Bug", assignees },
     });
-    expect(await gatekeeper().submit([
-      createIssue(["octocat"]),
-      createIssue(["octocat", "copilot-swe-agent[bot]"]),
-      createIssue(["Copilot"]),
-      createIssue(["some-agent[BOT]"]),
-    ])).toEqual([
+    expect(
+      await gatekeeper().submit([
+        createIssue(["octocat"]),
+        createIssue(["octocat", "copilot-swe-agent[bot]"]),
+        createIssue(["Copilot"]),
+        createIssue(["some-agent[BOT]"]),
+      ]),
+    ).toEqual([
       ["github.createIssue", true],
       ["github.createIssue", false],
       ["github.createIssue", false],
@@ -128,7 +181,13 @@ describe("auto-approval", () => {
   });
 
   it("keeps an approving review manual under the kind that lets comment and request-changes reviews apply", async () => {
-    expect(await gatekeeper("pull").submit([review("comment"), review("requestChanges"), review("approve")])).toEqual([
+    expect(
+      await gatekeeper("pull").submit([
+        review("comment"),
+        review("requestChanges"),
+        review("approve"),
+      ]),
+    ).toEqual([
       ["github.postReview", true],
       ["github.postReview", true],
       ["github.postReview", false],
@@ -136,12 +195,23 @@ describe("auto-approval", () => {
   });
 
   it("advertises, per binding, exactly the eligible kinds its actions can carry, and never a merge", async () => {
-    const issue = ["setTitle", "setBody", "addLabels", "removeLabels", "changeState", "postComment"]
-      .map(type => `github.${type}`);
+    const issue = [
+      "setTitle",
+      "setBody",
+      "addLabels",
+      "removeLabels",
+      "changeState",
+      "postComment",
+    ].map((type) => `github.${type}`);
     const pull = [...issue, "github.postReview", "github.replyToDiffComment"];
     expect(await gatekeeper("issue").advertised()).toEqual(issue);
     expect(await gatekeeper("pull").advertised()).toEqual(pull);
-    expect(await gatekeeper("repo").advertised()).toEqual(
-      ["github.createIssue", "github.createPullRequest", ...pull, "github.push", "github.forcePush"]);
+    expect(await gatekeeper("repo").advertised()).toEqual([
+      "github.createIssue",
+      "github.createPullRequest",
+      ...pull,
+      "github.push",
+      "github.forcePush",
+    ]);
   });
 });

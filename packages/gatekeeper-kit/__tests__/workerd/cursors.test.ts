@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type {
   GatekeeperUserVerifier,
   GitCache,
@@ -22,7 +22,8 @@ type Issue = { id: number; open: boolean };
 /** Pages a fixed list the way a provider does: a short page means the end. */
 function pagedApi(items: Issue[]) {
   return vi.fn(async (page: number, perPage: number) =>
-    items.slice((page - 1) * perPage, page * perPage));
+    items.slice((page - 1) * perPage, page * perPage),
+  );
 }
 
 /** A real authorizer, so a gate built from its stub is type-checked rather than cast into place. */
@@ -58,14 +59,15 @@ function makeAuthorizer(): { authorizer: RpcStub<ObservationAuthorizer>; seen: s
 /** Serves a scripted sequence of token pages; past the end the provider reports exhaustion. */
 function tokenApi(pages: TokenPage<Issue>[]) {
   let index = 0;
-  return vi.fn(async (_token: string | undefined, _perPage: number) =>
-    pages[index++] ?? { items: [] });
+  return vi.fn(
+    async (_token: string | undefined, _perPage: number) => pages[index++] ?? { items: [] },
+  );
 }
 
 // Cursors must authorize the exact page they return; tests that assert on it pass their own.
 const authorizePage = async () => {};
 
-const ids = (page: Issue[] | null) => page?.map(issue => issue.id);
+const ids = (page: Issue[] | null) => page?.map((issue) => issue.id);
 
 describe("ArrayCursor", () => {
   it("pages a held list, then reports the end", async () => {
@@ -88,29 +90,40 @@ describe("ArrayCursor", () => {
 
 describe("PageNumberCursor", () => {
   it("fetches only the provider pages a page of results needs", async () => {
-    const fetchPage = pagedApi([1, 2, 3, 4, 5].map(id => ({ id, open: true })));
-    const cursor = new PageNumberCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 2, remotePageSize: 2 });
+    const fetchPage = pagedApi([1, 2, 3, 4, 5].map((id) => ({ id, open: true })));
+    const cursor = new PageNumberCursor<Issue>({
+      fetchPage,
+      authorizePage,
+      pageSize: 2,
+      remotePageSize: 2,
+    });
 
-    expect((await cursor.next())?.map(issue => issue.id)).toEqual([1, 2]);
+    expect((await cursor.next())?.map((issue) => issue.id)).toEqual([1, 2]);
     expect(fetchPage).toHaveBeenCalledOnce();
 
-    expect((await cursor.next())?.map(issue => issue.id)).toEqual([3, 4]);
-    expect((await cursor.next())?.map(issue => issue.id)).toEqual([5]);
+    expect((await cursor.next())?.map((issue) => issue.id)).toEqual([3, 4]);
+    expect((await cursor.next())?.map((issue) => issue.id)).toEqual([5]);
     expect(await cursor.next()).toBeNull();
   });
 
   it("serializes concurrent callers instead of duplicating and skipping pages", async () => {
-    const items = [1, 2, 3, 4, 5, 6].map(id => ({ id, open: true }));
+    const items = [1, 2, 3, 4, 5, 6].map((id) => ({ id, open: true }));
     const fetchPage = pagedApi(items);
-    const cursor = new PageNumberCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 2, remotePageSize: 2 });
+    const cursor = new PageNumberCursor<Issue>({
+      fetchPage,
+      authorizePage,
+      pageSize: 2,
+      remotePageSize: 2,
+    });
 
     // A gadget can pipeline these; the provider page counter must not be read twice before it moves.
     const pages = await Promise.all([cursor.next(), cursor.next(), cursor.next()]);
 
-    expect(pages.map(page => page?.map(issue => issue.id)))
-      .toEqual([[1, 2], [3, 4], [5, 6]]);
+    expect(pages.map((page) => page?.map((issue) => issue.id))).toEqual([
+      [1, 2],
+      [3, 4],
+      [5, 6],
+    ]);
     expect(fetchPage.mock.calls.map(([page]) => page)).toEqual([1, 2, 3]);
   });
 
@@ -118,8 +131,12 @@ describe("PageNumberCursor", () => {
     const items = Array.from({ length: 45 }, (_, index) => ({ id: index + 1, open: true }));
     // Answers 20 to a request for 100, as Cloudflare's own /accounts endpoint does.
     const fetchPage = vi.fn(async (page: number) => items.slice((page - 1) * 20, page * 20));
-    const cursor = new PageNumberCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 100, remotePageSize: 100 });
+    const cursor = new PageNumberCursor<Issue>({
+      fetchPage,
+      authorizePage,
+      pageSize: 100,
+      remotePageSize: 100,
+    });
 
     // Stopping at the first short page would have returned only the first 20.
     expect((await cursor.next())?.length).toBe(45);
@@ -130,7 +147,7 @@ describe("PageNumberCursor", () => {
     const pages = [[{ id: 1, open: true }], [{ id: 2, open: true }]];
     let attempt = 0;
     const cursor = new PageNumberCursor<Issue>({
-      fetchPage: async page => {
+      fetchPage: async (page) => {
         if (++attempt === 1) throw new Error("provider 503");
         return pages[page - 1] ?? [];
       },
@@ -151,7 +168,7 @@ describe("PageNumberCursor", () => {
     let attempt = 0;
     const cursor = new PageNumberCursor<Issue>({
       fetchPage,
-      retain: items => {
+      retain: (items) => {
         if (++attempt === 1) throw new Error("authorization unavailable");
         return items;
       },
@@ -168,25 +185,37 @@ describe("PageNumberCursor", () => {
 
   it("exposes no paging method a stub holder could call", () => {
     // capnweb resolves string paths only; reached by name it would skip the queue.
-    const cursor = new PageNumberCursor<Issue>(
-      { fetchPage: async () => [], authorizePage, pageSize: 1 });
+    const cursor = new PageNumberCursor<Issue>({
+      fetchPage: async () => [],
+      authorizePage,
+      pageSize: 1,
+    });
 
     expect((cursor as unknown as Record<string, unknown>).loadMore).toBeUndefined();
   });
 
   it("reports the end rather than an error when the provider is simply empty", async () => {
-    const cursor = new PageNumberCursor<Issue>(
-      { fetchPage: async () => [], authorizePage, pageSize: 2 });
+    const cursor = new PageNumberCursor<Issue>({
+      fetchPage: async () => [],
+      authorizePage,
+      pageSize: 2,
+    });
 
     expect(await cursor.next()).toBeNull();
   });
 
   it("walks past a page holding only rows the caller may not see", async () => {
     // The shape that truncates GitHub's issue list today: page 1 is entirely dropped rows.
-    const pages = [[{ id: 1, open: false }, { id: 2, open: false }], [{ id: 3, open: true }]];
+    const pages = [
+      [
+        { id: 1, open: false },
+        { id: 2, open: false },
+      ],
+      [{ id: 3, open: true }],
+    ];
     const cursor = new PageNumberCursor<Issue>({
-      fetchPage: async page => pages[page - 1] ?? [],
-      retain: items => items.filter(issue => issue.open),
+      fetchPage: async (page) => pages[page - 1] ?? [],
+      retain: (items) => items.filter((issue) => issue.open),
       authorizePage,
       pageSize: 2,
       remotePageSize: 2,
@@ -198,8 +227,13 @@ describe("PageNumberCursor", () => {
 
   it("bounds one call rather than walking a whole history of dropped pages", async () => {
     const fetchPage = vi.fn(async () => [{ id: 1, open: false }]);
-    const cursor = new PageNumberCursor<Issue>(
-      { fetchPage, retain: () => [], authorizePage, pageSize: 2, remotePageSize: 1 });
+    const cursor = new PageNumberCursor<Issue>({
+      fetchPage,
+      retain: () => [],
+      authorizePage,
+      pageSize: 2,
+      remotePageSize: 1,
+    });
 
     // `[]` invites another call, where null would claim the list had ended.
     expect(await cursor.next()).toEqual([]);
@@ -212,27 +246,30 @@ describe("PageNumberCursor", () => {
     const fetchPage = vi.fn(async (page: number) => [{ id: page, open: page % 3 === 0 }]);
     const cursor = new PageNumberCursor<Issue>({
       fetchPage,
-      retain: items => items.filter(issue => issue.open),
+      retain: (items) => items.filter((issue) => issue.open),
       authorizePage,
       pageSize: 100,
       remotePageSize: 1,
     });
 
-    expect((await cursor.next())?.map(issue => issue.id)).toEqual([3, 6, 9]);
+    expect((await cursor.next())?.map((issue) => issue.id)).toEqual([3, 6, 9]);
     expect(fetchPage).toHaveBeenCalledTimes(10);
     // The walk resumes where the window ended rather than starting over or skipping.
-    expect((await cursor.next())?.map(issue => issue.id)).toEqual([12, 15, 18]);
+    expect((await cursor.next())?.map((issue) => issue.id)).toEqual([12, 15, 18]);
   });
 
   it("rejects page sizes that would never terminate", () => {
     const fetchPage = pagedApi([]);
-    expect(() => new PageNumberCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 0 })).toThrow(/positive safe integer/);
-    expect(() => new PageNumberCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 2, remotePageSize: 0 }))
-      .toThrow(/positive safe integer/);
-    expect(() => new PageNumberCursor<Issue>({ fetchPage, authorizePage, pageSize: 2.5 }))
-      .toThrow(/positive safe integer/);
+    expect(() => new PageNumberCursor<Issue>({ fetchPage, authorizePage, pageSize: 0 })).toThrow(
+      /positive safe integer/,
+    );
+    expect(
+      () =>
+        new PageNumberCursor<Issue>({ fetchPage, authorizePage, pageSize: 2, remotePageSize: 0 }),
+    ).toThrow(/positive safe integer/);
+    expect(() => new PageNumberCursor<Issue>({ fetchPage, authorizePage, pageSize: 2.5 })).toThrow(
+      /positive safe integer/,
+    );
   });
 
   it("releases what the caller acquired when it rejects the page size", () => {
@@ -240,9 +277,15 @@ describe("PageNumberCursor", () => {
     // skipped `dispose` would leak the duplicated stub on every rejected call.
     const dispose = vi.fn();
 
-    expect(() => new PageNumberCursor<Issue>(
-      { fetchPage: pagedApi([]), authorizePage, pageSize: 0, dispose }))
-      .toThrow(/positive safe integer/);
+    expect(
+      () =>
+        new PageNumberCursor<Issue>({
+          fetchPage: pagedApi([]),
+          authorizePage,
+          pageSize: 0,
+          dispose,
+        }),
+    ).toThrow(/positive safe integer/);
 
     expect(dispose).toHaveBeenCalledOnce();
   });
@@ -254,8 +297,12 @@ describe("OffsetCursor", () => {
     // Answers 20 to a request for 100, as jira's silent `maxResults` clamp does. Page arithmetic
     // over this shape would request offsets 0, 100, ... and lose rows 20-99 without an error.
     const fetchPage = vi.fn(async (offset: number) => items.slice(offset, offset + 20));
-    const cursor = new OffsetCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 100, remotePageSize: 100 });
+    const cursor = new OffsetCursor<Issue>({
+      fetchPage,
+      authorizePage,
+      pageSize: 100,
+      remotePageSize: 100,
+    });
 
     expect((await cursor.next())?.length).toBe(45);
     expect(await cursor.next()).toBeNull();
@@ -263,12 +310,17 @@ describe("OffsetCursor", () => {
   });
 
   it("advances by the raw page, not what retain kept", async () => {
-    const items = [{ id: 1, open: false }, { id: 2, open: true }, { id: 3, open: true }];
-    const fetchPage =
-      vi.fn(async (offset: number, limit: number) => items.slice(offset, offset + limit));
+    const items = [
+      { id: 1, open: false },
+      { id: 2, open: true },
+      { id: 3, open: true },
+    ];
+    const fetchPage = vi.fn(async (offset: number, limit: number) =>
+      items.slice(offset, offset + limit),
+    );
     const cursor = new OffsetCursor<Issue>({
       fetchPage,
-      retain: page => page.filter(issue => issue.open),
+      retain: (page) => page.filter((issue) => issue.open),
       authorizePage,
       pageSize: 10,
       remotePageSize: 2,
@@ -284,7 +336,7 @@ describe("OffsetCursor", () => {
     const items = [{ id: 1, open: true }];
     let attempt = 0;
     const cursor = new OffsetCursor<Issue>({
-      fetchPage: async offset => {
+      fetchPage: async (offset) => {
         if (++attempt === 1) throw new Error("provider 503");
         return items.slice(offset, offset + 1);
       },
@@ -304,18 +356,31 @@ describe("TokenCursor", () => {
     // Marketo's shape: an empty window mid-walk, and `""` as a real continuation token. Ending on
     // either -- as page-number paging must -- silently truncates the walk.
     const fetchPage = tokenApi([
-      { items: [{ id: 1, open: true }, { id: 2, open: true }], nextToken: "a" },
+      {
+        items: [
+          { id: 1, open: true },
+          { id: 2, open: true },
+        ],
+        nextToken: "a",
+      },
       { items: [], nextToken: "b" },
       { items: [{ id: 3, open: true }], nextToken: "" },
       { items: [{ id: 4, open: true }] },
     ]);
-    const cursor = new TokenCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 10, remotePageSize: 25 });
+    const cursor = new TokenCursor<Issue>({
+      fetchPage,
+      authorizePage,
+      pageSize: 10,
+      remotePageSize: 25,
+    });
 
     expect(ids(await cursor.next())).toEqual([1, 2, 3, 4]);
     expect(await cursor.next()).toBeNull();
     expect(fetchPage.mock.calls).toEqual([
-      [undefined, 25], ["a", 25], ["b", 25], ["", 25],
+      [undefined, 25],
+      ["a", 25],
+      ["b", 25],
+      ["", 25],
     ]);
   });
 
@@ -339,7 +404,7 @@ describe("TokenCursor", () => {
     const asked: (string | undefined)[] = [];
     let attempt = 0;
     const cursor = new TokenCursor<Issue>({
-      fetchPage: async token => {
+      fetchPage: async (token) => {
         asked.push(token);
         if (++attempt === 2) throw new Error("provider 503");
         return { items: [{ id: attempt, open: true }], nextToken: attempt < 3 ? "t2" : undefined };
@@ -358,7 +423,8 @@ describe("TokenCursor", () => {
     const fetchPage = vi.fn(async (token: string | undefined): Promise<TokenPage<Issue>> =>
       token === undefined
         ? { items: [{ id: 1, open: true }], nextToken: "same" }
-        : { items: [{ id: 2, open: true }], nextToken: token });
+        : { items: [{ id: 2, open: true }], nextToken: token },
+    );
     const cursor = new TokenCursor<Issue>({ fetchPage, authorizePage, pageSize: 10 });
 
     await expect(cursor.next()).rejects.toThrow(/same continuation token/);
@@ -368,16 +434,32 @@ describe("TokenCursor", () => {
 
   it("serializes concurrent callers instead of duplicating and skipping pages", async () => {
     const fetchPage = tokenApi([
-      { items: [{ id: 1, open: true }, { id: 2, open: true }], nextToken: "a" },
-      { items: [{ id: 3, open: true }, { id: 4, open: true }], nextToken: "b" },
+      {
+        items: [
+          { id: 1, open: true },
+          { id: 2, open: true },
+        ],
+        nextToken: "a",
+      },
+      {
+        items: [
+          { id: 3, open: true },
+          { id: 4, open: true },
+        ],
+        nextToken: "b",
+      },
       { items: [{ id: 5, open: true }] },
     ]);
-    const cursor = new TokenCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 2, remotePageSize: 2 });
+    const cursor = new TokenCursor<Issue>({
+      fetchPage,
+      authorizePage,
+      pageSize: 2,
+      remotePageSize: 2,
+    });
 
     const pages = await Promise.all([cursor.next(), cursor.next(), cursor.next()]);
 
-    expect(pages.map(page => ids(page))).toEqual([[1, 2], [3, 4], [5]]);
+    expect(pages.map((page) => ids(page))).toEqual([[1, 2], [3, 4], [5]]);
     expect(fetchPage.mock.calls.map(([token]) => token)).toEqual([undefined, "a", "b"]);
   });
 
@@ -399,12 +481,14 @@ describe("TokenCursor", () => {
   });
 
   it("authorizes the exact page it returns, including one served from the buffer", async () => {
-    const fetchPage = tokenApi([
-      { items: [1, 2, 3, 4, 5].map(id => ({ id, open: true })) },
-    ]);
+    const fetchPage = tokenApi([{ items: [1, 2, 3, 4, 5].map((id) => ({ id, open: true })) }]);
     const authorized = vi.fn(async () => {});
-    const cursor = new TokenCursor<Issue>(
-      { fetchPage, authorizePage: authorized, pageSize: 2, remotePageSize: 5 });
+    const cursor = new TokenCursor<Issue>({
+      fetchPage,
+      authorizePage: authorized,
+      pageSize: 2,
+      remotePageSize: 5,
+    });
 
     expect(ids(await cursor.next())).toEqual([1, 2]);
     expect(ids(await cursor.next())).toEqual([3, 4]);
@@ -412,15 +496,25 @@ describe("TokenCursor", () => {
     // The second page came out of the buffer with no provider call, and was still authorized.
     expect(fetchPage).toHaveBeenCalledOnce();
     expect(authorized.mock.calls).toEqual([
-      [[{ id: 1, open: true }, { id: 2, open: true }], { terminal: false }],
-      [[{ id: 3, open: true }, { id: 4, open: true }], { terminal: false }],
+      [
+        [
+          { id: 1, open: true },
+          { id: 2, open: true },
+        ],
+        { terminal: false },
+      ],
+      [
+        [
+          { id: 3, open: true },
+          { id: 4, open: true },
+        ],
+        { terminal: false },
+      ],
     ]);
   });
 
   it("re-offers a refused page rather than dropping it or re-fetching", async () => {
-    const fetchPage = tokenApi([
-      { items: [1, 2, 3, 4, 5].map(id => ({ id, open: true })) },
-    ]);
+    const fetchPage = tokenApi([{ items: [1, 2, 3, 4, 5].map((id) => ({ id, open: true })) }]);
     let call = 0;
     const cursor = new TokenCursor<Issue>({
       fetchPage,
@@ -446,11 +540,11 @@ describe("TokenCursor", () => {
     let call = 0;
     const cursor = new PageNumberCursor<Issue>({
       fetchPage,
-      retain: rows => rows.filter(issue => issue.open),
+      retain: (rows) => rows.filter((issue) => issue.open),
       pageSize: 100,
       remotePageSize: 1,
-      authorizePage: async items => {
-        offered.push(items.map(issue => issue.id));
+      authorizePage: async (items) => {
+        offered.push(items.map((issue) => issue.id));
         if (++call === 1) throw new Error("authorization unavailable");
       },
     });
@@ -458,7 +552,10 @@ describe("TokenCursor", () => {
     await expect(cursor.next()).rejects.toThrow("authorization unavailable");
     expect(ids(await cursor.next())).toEqual([3, 6, 9]);
 
-    expect(offered).toEqual([[3, 6, 9], [3, 6, 9]]);
+    expect(offered).toEqual([
+      [3, 6, 9],
+      [3, 6, 9],
+    ]);
     // The held page is served without asking the provider again.
     expect(fetchPage).toHaveBeenCalledTimes(10);
   });
@@ -467,7 +564,8 @@ describe("TokenCursor", () => {
     const authorized = vi.fn(async () => {});
     const cursor = new TokenCursor<Issue>({
       fetchPage: tokenApi(
-        Array.from({ length: 12 }, (_, index) => ({ items: [], nextToken: `w${index}` }))),
+        Array.from({ length: 12 }, (_, index) => ({ items: [], nextToken: `w${index}` })),
+      ),
       authorizePage: authorized,
       pageSize: 2,
     });
@@ -556,21 +654,22 @@ describe("TokenCursor", () => {
     using gate = new ObservationGate(
       authorizer,
       // A `sets` scope needs the strategy that actually checks them.
-      trackedCollectionObservers({ kv: fakeKv(), hasCollectionAccess: async () => [] }));
+      trackedCollectionObservers({ kv: fakeKv(), hasCollectionAccess: async () => [] }),
+    );
     const cursor = new TokenCursor<Issue>({
-      fetchPage: tokenApi([
-        { items: [], nextToken: "w0" },
-        { items: [{ id: 1, open: true }] },
-      ]),
+      fetchPage: tokenApi([{ items: [], nextToken: "w0" }, { items: [{ id: 1, open: true }] }]),
       pageSize: 2,
       remotePageSize: 1,
-      authorizePage: (issues, { terminal }) => issues.length === 0
-        ? gate.authorize(
-          { title: "Issues", description: terminal ? "None left." : "None visible yet." },
-          { kind: "baseline" })
-        : gate.authorize(
-          { title: "Issues", description: `Read ${issues.length} issues.` },
-          { kind: "collections", ids: issues.map(issue => issue.id.toString()) }),
+      authorizePage: (issues, { terminal }) =>
+        issues.length === 0
+          ? gate.authorize(
+              { title: "Issues", description: terminal ? "None left." : "None visible yet." },
+              { kind: "baseline" },
+            )
+          : gate.authorize(
+              { title: "Issues", description: `Read ${issues.length} issues.` },
+              { kind: "collections", ids: issues.map((issue) => issue.id.toString()) },
+            ),
     });
 
     // A page, then exhaustion. Neither may throw out of the gate.
@@ -585,7 +684,7 @@ describe("TokenCursor", () => {
     const strategy = trackedCollectionObservers<string[]>({
       kv: fakeKv(),
       hasCollectionAccess: async (allowed, collectionIds) =>
-        collectionIds.map(id => allowed.includes(id)),
+        collectionIds.map((id) => allowed.includes(id)),
     });
     using gate = new ObservationGate(authorizer, strategy);
     await strategy.addObserver("limited", ["s1"] as unknown as Fetcher<GatekeeperUserVerifier>);
@@ -593,9 +692,11 @@ describe("TokenCursor", () => {
     using cursor = new TokenCursor<Issue>({
       fetchPage: tokenApi([{ items: [{ id: 1, open: true }] }]),
       pageSize: 1,
-      authorizePage: issues => gate.authorize(
-        { title: "Issues", description: `Read ${issues.length} issues.` },
-        { kind: "collections", ids: ["s2"] }),
+      authorizePage: (issues) =>
+        gate.authorize(
+          { title: "Issues", description: `Read ${issues.length} issues.` },
+          { kind: "collections", ids: ["s2"] },
+        ),
     });
 
     // The collaborator cannot see s2, so the derived exclusion refuses the page before its rows
@@ -610,7 +711,9 @@ describe("TokenCursor", () => {
     // session must not close the handle the walk still holds.
     const { authorizer, seen } = makeAuthorizer();
     const session = new ObservationGate(
-      authorizer, trackedCollectionObservers({ kv: fakeKv(), hasCollectionAccess: async () => [] }));
+      authorizer,
+      trackedCollectionObservers({ kv: fakeKv(), hasCollectionAccess: async () => [] }),
+    );
     const walk = session.lease();
     const cursor = new TokenCursor<Issue>({
       fetchPage: tokenApi([
@@ -620,9 +723,11 @@ describe("TokenCursor", () => {
       pageSize: 1,
       remotePageSize: 1,
       // The cursor takes its own lease and releases it when the walk is dropped.
-      authorizePage: items => walk.authorize(
-        { title: "Issues", description: `Read ${items.length} issues.` },
-        { kind: "collections", ids: items.map(issue => issue.id.toString()) }),
+      authorizePage: (items) =>
+        walk.authorize(
+          { title: "Issues", description: `Read ${items.length} issues.` },
+          { kind: "collections", ids: items.map((issue) => issue.id.toString()) },
+        ),
       dispose: () => walk[Symbol.dispose](),
     });
 
@@ -638,7 +743,9 @@ describe("TokenCursor", () => {
   it("releases a lease without disturbing the session that opened it", async () => {
     const { authorizer, seen } = makeAuthorizer();
     using session = new ObservationGate(
-      authorizer, trackedCollectionObservers({ kv: fakeKv(), hasCollectionAccess: async () => [] }));
+      authorizer,
+      trackedCollectionObservers({ kv: fakeKv(), hasCollectionAccess: async () => [] }),
+    );
 
     session.lease()[Symbol.dispose]();
 
@@ -649,14 +756,21 @@ describe("TokenCursor", () => {
 
   it("rejects page sizes that would never terminate", () => {
     const fetchPage = tokenApi([]);
-    expect(() => new TokenCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 0 })).toThrow(/positive safe integer/);
-    expect(() => new TokenCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 2, remotePageSize: 1.5 }))
-      .toThrow(/positive safe integer/);
-    expect(() => new TokenCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 2, maxProviderPagesPerCall: 0 }))
-      .toThrow(/positive safe integer/);
+    expect(() => new TokenCursor<Issue>({ fetchPage, authorizePage, pageSize: 0 })).toThrow(
+      /positive safe integer/,
+    );
+    expect(
+      () => new TokenCursor<Issue>({ fetchPage, authorizePage, pageSize: 2, remotePageSize: 1.5 }),
+    ).toThrow(/positive safe integer/);
+    expect(
+      () =>
+        new TokenCursor<Issue>({
+          fetchPage,
+          authorizePage,
+          pageSize: 2,
+          maxProviderPagesPerCall: 0,
+        }),
+    ).toThrow(/positive safe integer/);
   });
 
   it("fetches one provider page per call when bounded to one, returning [] for an empty window", async () => {
@@ -666,8 +780,12 @@ describe("TokenCursor", () => {
       { items: [{ id: 1, open: true }], nextToken: "b" },
       { items: [{ id: 2, open: true }] },
     ]);
-    const cursor = new TokenCursor<Issue>(
-      { fetchPage, authorizePage, pageSize: 10, maxProviderPagesPerCall: 1 });
+    const cursor = new TokenCursor<Issue>({
+      fetchPage,
+      authorizePage,
+      pageSize: 10,
+      maxProviderPagesPerCall: 1,
+    });
 
     expect(await cursor.next()).toEqual([]);
     expect(fetchPage).toHaveBeenCalledTimes(1);
@@ -686,18 +804,24 @@ describe("injected rows", () => {
   it("merges by the provider's order, ahead of an equal provider row, outside authorization", async () => {
     const authorized = vi.fn(async () => {});
     const cursor = new TokenCursor<Issue>({
-      fetchPage: tokenApi([
-        { items: [issue(2), issue(4)], nextToken: "a" },
-        { items: [issue(6)] },
-      ]),
-      inject: { items: [issue(1, false), issue(4, false), issue(5, false), issue(7, false)], compare: byId },
+      fetchPage: tokenApi([{ items: [issue(2), issue(4)], nextToken: "a" }, { items: [issue(6)] }]),
+      inject: {
+        items: [issue(1, false), issue(4, false), issue(5, false), issue(7, false)],
+        compare: byId,
+      },
       authorizePage: authorized,
       pageSize: 10,
       remotePageSize: 2,
     });
 
     expect(await cursor.next()).toEqual([
-      issue(1, false), issue(2), issue(4, false), issue(4), issue(5, false), issue(6), issue(7, false),
+      issue(1, false),
+      issue(2),
+      issue(4, false),
+      issue(4),
+      issue(5, false),
+      issue(6),
+      issue(7, false),
     ]);
     expect(await cursor.next()).toBeNull();
     // Injected rows are the agent's own simulation, not something the provider disclosed.
@@ -723,7 +847,11 @@ describe("injected rows", () => {
     const authorized = vi.fn(async () => {});
     const cursor = new TokenCursor<Issue>({
       fetchPage: tokenApi([{ items: [issue(2), issue(4)] }]),
-      inject: { items: [issue(1, false), issue(3, false), issue(5, false)], compare: byId, authorize: true },
+      inject: {
+        items: [issue(1, false), issue(3, false), issue(5, false)],
+        compare: byId,
+        authorize: true,
+      },
       authorizePage: authorized,
       pageSize: 2,
     });
@@ -754,7 +882,11 @@ describe("injected rows", () => {
     await expect(cursor.next()).rejects.toThrow("authorization unavailable");
     expect(await cursor.next()).toEqual([issue(1, false)]);
     expect(await cursor.next()).toEqual([issue(2)]);
-    expect(authorized.mock.calls.map(([rows]) => rows)).toEqual([[issue(1, false)], [issue(1, false)], [issue(2)]]);
+    expect(authorized.mock.calls.map(([rows]) => rows)).toEqual([
+      [issue(1, false)],
+      [issue(1, false)],
+      [issue(2)],
+    ]);
   });
 
   it("still owes the zero-result answer after serving only injected rows", async () => {
@@ -779,7 +911,7 @@ describe("injected rows", () => {
       inject: {
         items: [issue(1, false), issue(3, false)],
         compare: byId,
-        revalidate: row => row.id === 1 ? null : { ...row, open: true },
+        revalidate: (row) => (row.id === 1 ? null : { ...row, open: true }),
       },
       authorizePage,
       pageSize: 1,
@@ -802,7 +934,7 @@ describe("injected rows", () => {
       inject: {
         items: [issue(1, false), issue(9, false)],
         compare: byId,
-        identity: row => String(landed.get(row.id) ?? row.id),
+        identity: (row) => String(landed.get(row.id) ?? row.id),
       },
       authorizePage,
       pageSize: 2,
@@ -822,12 +954,12 @@ describe("injected rows", () => {
     let attempt = 0;
     let call = 0;
     const cursor = new TokenCursor<Issue>({
-      fetchPage: async token => {
+      fetchPage: async (token) => {
         if (token === undefined) return { items: [issue(2)], nextToken: "a" };
         if (++attempt === 1) throw new Error("provider 503");
         return { items: [issue(3)] };
       },
-      inject: { items: [issue(1, false)], compare: byId, identity: row => String(row.id) },
+      inject: { items: [issue(1, false)], compare: byId, identity: (row) => String(row.id) },
       authorizePage: async () => {
         if (++call === 1) throw new Error("authorization unavailable");
       },
@@ -852,8 +984,8 @@ describe("injected rows", () => {
       inject: {
         items: [issue(1, false)],
         compare: byId,
-        revalidate: row => (queued.has(row.id) ? row : null),
-        identity: row => String(row.id),
+        revalidate: (row) => (queued.has(row.id) ? row : null),
+        identity: (row) => String(row.id),
       },
       authorizePage: authorized,
       pageSize: 2,
@@ -879,7 +1011,7 @@ describe("injected rows", () => {
     const authorized = vi.fn(async () => {});
     const cursor = new TokenCursor<Issue>({
       fetchPage,
-      overlay: row => gone.has(row.id) ? [] : [issue(row.id, !closed.has(row.id))],
+      overlay: (row) => (gone.has(row.id) ? [] : [issue(row.id, !closed.has(row.id))]),
       authorizePage: authorized,
       pageSize: 1,
     });
@@ -907,7 +1039,7 @@ describe("injected rows", () => {
       refresh: async () => {
         visible = latest;
       },
-      overlay: row => visible.has(row.id) ? [row] : [],
+      overlay: (row) => (visible.has(row.id) ? [row] : []),
       authorizePage: async () => {},
       pageSize: 1,
     });
@@ -932,7 +1064,7 @@ describe("injected rows", () => {
       refresh: async () => {
         visible = latest;
       },
-      overlay: row => visible.has(row.id) ? [row] : [],
+      overlay: (row) => (visible.has(row.id) ? [row] : []),
       authorizePage: authorized,
       pageSize: 2,
     });
@@ -982,7 +1114,7 @@ describe("injected rows", () => {
     });
     const cursor = new TokenCursor<Issue>({
       fetchPage: tokenApi([{ items: [issue(1), issue(2), issue(3)] }]),
-      overlay: row => hidden.has(row.id) ? [] : [{ ...row }],
+      overlay: (row) => (hidden.has(row.id) ? [] : [{ ...row }]),
       authorizePage: authorized,
       pageSize: 2,
     });
@@ -1002,13 +1134,14 @@ describe("injected rows", () => {
   it("serves the rows a provider row splits into on one page, as the overlay splits it then", async () => {
     // One fetch buffers all three rows; a change staged after the first page splits the third.
     const split = new Set([1]);
-    const pieces = (row: Issue) => split.has(row.id) ? [issue(row.id), issue(row.id, false)] : [row];
+    const pieces = (row: Issue) =>
+      split.has(row.id) ? [issue(row.id), issue(row.id, false)] : [row];
     const authorized = vi.fn(async () => {});
     const cursor = new TokenCursor<Issue>({
       fetchPage: tokenApi([{ items: [issue(1), issue(2), issue(3)] }]),
       overlay: pieces,
       // Pieces share their row's identity, which must not drop one for another.
-      inject: { items: [], compare: byId, identity: row => String(row.id) },
+      inject: { items: [], compare: byId, identity: (row) => String(row.id) },
       authorizePage: authorized,
       pageSize: 2,
     });
@@ -1029,7 +1162,7 @@ describe("injected rows", () => {
   it("serves a row's pieces whole on a page too small for them", async () => {
     const cursor = new TokenCursor<Issue>({
       fetchPage: tokenApi([{ items: [issue(1), issue(2)] }]),
-      overlay: row => [row, issue(row.id, false)],
+      overlay: (row) => [row, issue(row.id, false)],
       authorizePage: async () => {},
       pageSize: 1,
     });
@@ -1048,7 +1181,7 @@ describe("injected rows", () => {
       inject: {
         items: [issue(1, false)],
         compare: byId,
-        identity: row => String(landed.get(row.id) ?? row.id),
+        identity: (row) => String(landed.get(row.id) ?? row.id),
       },
       authorizePage: async () => {
         if (++call === 1) throw new Error("authorization unavailable");
@@ -1070,7 +1203,7 @@ describe("injected rows", () => {
       inject: {
         items: [issue(1, false)],
         compare: byId,
-        identity: row => String(landed.get(row.id) ?? row.id),
+        identity: (row) => String(landed.get(row.id) ?? row.id),
       },
       authorizePage: async () => {
         if (++call === 1) throw new Error("authorization unavailable");
@@ -1094,7 +1227,8 @@ describe("injected rows", () => {
     });
     const cursor = new TokenCursor<Issue>({
       fetchPage: tokenApi([{ items: [issue(1), issue(2)] }]),
-      overlay: row => Array.from({ length: pieces.get(row.id) ?? 1 }, (_, piece) => issue(row.id, piece === 0)),
+      overlay: (row) =>
+        Array.from({ length: pieces.get(row.id) ?? 1 }, (_, piece) => issue(row.id, piece === 0)),
       authorizePage: authorized,
       pageSize: 2,
     });
@@ -1116,7 +1250,8 @@ describe("injected rows", () => {
       },
       refresh: async () => void order.push("refresh"),
       overlay: () => [],
-      authorizePage: async (rows, { terminal }) => void order.push(`${terminal ? "terminal" : "page"}:${rows.length}`),
+      authorizePage: async (rows, { terminal }) =>
+        void order.push(`${terminal ? "terminal" : "page"}:${rows.length}`),
       pageSize: 1,
     });
 
@@ -1132,7 +1267,10 @@ describe("injected rows", () => {
       if (authorized.mock.calls.length === 1) throw new Error("authorization unavailable");
     });
     const cursor = new TokenCursor<Issue>({
-      fetchPage: async () => ({ items: [issue(++fetched), issue(++fetched)], nextToken: String(fetched) }),
+      fetchPage: async () => ({
+        items: [issue(++fetched), issue(++fetched)],
+        nextToken: String(fetched),
+      }),
       overlay,
       authorizePage: authorized,
       pageSize: 1,
@@ -1158,12 +1296,18 @@ describe("injected rows", () => {
 });
 
 describe("PageHookCursor", () => {
-  const issues: Issue[] = [{ id: 1, open: true }, { id: 2, open: false }, { id: 3, open: true }];
+  const issues: Issue[] = [
+    { id: 1, open: true },
+    { id: 2, open: false },
+    { id: 3, open: true },
+  ];
 
   it("runs the hook on each page before returning it, and not at exhaustion", async () => {
     const hooked: number[][] = [];
     const cursor = new PageHookCursor(new ArrayCursor(issues, 2), {
-      beforePage: async items => { hooked.push(items.map(issue => issue.id)); },
+      beforePage: async (items) => {
+        hooked.push(items.map((issue) => issue.id));
+      },
     });
 
     expect(await cursor.next()).toEqual(issues.slice(0, 2));
@@ -1178,9 +1322,9 @@ describe("PageHookCursor", () => {
     let failures = 1;
     const hooked: number[][] = [];
     const cursor = new PageHookCursor(new ArrayCursor(issues, 2), {
-      beforePage: async items => {
+      beforePage: async (items) => {
         if (failures-- > 0) throw new Error("hook failed");
-        hooked.push(items.map(issue => issue.id));
+        hooked.push(items.map((issue) => issue.id));
       },
     });
 
@@ -1193,9 +1337,9 @@ describe("PageHookCursor", () => {
   it("serializes concurrent calls, so each page is hooked and returned once", async () => {
     const hooked: number[][] = [];
     const cursor = new PageHookCursor(new ArrayCursor(issues, 1), {
-      beforePage: async items => {
+      beforePage: async (items) => {
         await Promise.resolve();
-        hooked.push(items.map(issue => issue.id));
+        hooked.push(items.map((issue) => issue.id));
       },
     });
 
@@ -1206,7 +1350,10 @@ describe("PageHookCursor", () => {
 
   it("runs the release hook once, however often it is disposed", () => {
     const dispose = vi.fn();
-    const cursor = new PageHookCursor(new ArrayCursor(issues, 2), { beforePage: async () => {}, dispose });
+    const cursor = new PageHookCursor(new ArrayCursor(issues, 2), {
+      beforePage: async () => {},
+      dispose,
+    });
 
     cursor[Symbol.dispose]();
     cursor[Symbol.dispose]();

@@ -1,30 +1,55 @@
 /* eslint-disable react/react-in-jsx-scope */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
-import { afterEach, expect, it, vi } from "vitest";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from "@tanstack/react-router";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import { UnreadThreads } from "./UnreadThreads";
 import "../../styles.css";
 
-const unread = { state: { unreadChatCount: 1, unreadMessageCount: 1,
-    chats: [{
-    workspaceId: "workspace", chatId: 1, chatTitle: "A long thread title that should truncate before the date",
-    latestSequence: 2, readThroughSequence: 0, unreadMessageCount: 1,
-    latestMessagePreview: "The latest message should stay underneath the thread title.",
-    latestActivityAt: new Date("2026-10-13T12:00:00Z"),
-  }] } };
-vi.mock("./UnreadStateBridge", () => ({useUnreadState: () => unread}));
-const api = {getUnreadThreads: async () => unread.state.chats};
-vi.mock("../../AuthContext", () => ({useAuthenticatedApi: () => ({authenticatedApi: api})}));
+const unread = {
+  state: {
+    unreadChatCount: 1,
+    unreadMessageCount: 1,
+    chats: [
+      {
+        workspaceId: "workspace",
+        chatId: 1,
+        chatTitle: "A long thread title that should truncate before the date",
+        latestSequence: 2,
+        readThroughSequence: 0,
+        unreadMessageCount: 1,
+        latestMessagePreview: "The latest message should stay underneath the thread title.",
+        latestActivityAt: new Date("2026-10-13T12:00:00Z"),
+      },
+    ],
+  },
+};
+vi.mock("./UnreadStateBridge", () => ({ useUnreadState: () => unread }));
+const api = { getUnreadThreads: async () => unread.state.chats };
+vi.mock("../../AuthContext", () => ({ useAuthenticatedApi: () => ({ authenticatedApi: api }) }));
 let host: HTMLDivElement | undefined, root: Root | undefined;
-afterEach(async () => { await act(async () => root?.unmount()); host?.remove(); });
+afterEach(async () => {
+  await act(async () => root?.unmount());
+  host?.remove();
+});
 
 it("right-aligns the date above the unread badge at desktop and narrow widths", async () => {
   const base = createRootRoute({ component: UnreadThreads });
-  const router = createRouter({ routeTree: base, history: createMemoryHistory({ initialEntries: ["/"] }) });
+  const router = createRouter({
+    routeTree: base,
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
   host = document.body.appendChild(document.createElement("div"));
   root = createRoot(host);
-  await act(async () => { await router.load(); root!.render(<RouterProvider router={router} />); });
+  await act(async () => {
+    await router.load();
+    root!.render(<RouterProvider router={router} />);
+  });
   const rect = (element: Element) => element.getBoundingClientRect();
   for (const width of [832, 320]) {
     host.style.width = `${width}px`;
@@ -37,7 +62,9 @@ it("right-aligns the date above the unread badge at desktop and narrow widths", 
     expect(Math.abs(date.top - title.top)).toBeLessThanOrEqual(1);
     expect(badge.top).toBeGreaterThanOrEqual(date.bottom + 4);
     expect(badge.top + badge.height / 2).toBeGreaterThan(rect(row).top + rect(row).height / 2);
-    expect(Math.abs(badge.top + badge.height / 2 - preview.top - preview.height / 2)).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(badge.top + badge.height / 2 - preview.top - preview.height / 2),
+    ).toBeLessThanOrEqual(1);
     expect(title.right).toBeLessThan(date.left);
     expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
   }

@@ -23,11 +23,15 @@
 // decides the action again. Scenarios a seed might miss are pinned as `examples`.
 
 import * as fc from "fast-check";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import type { ApprovalQueue } from "@gadgets/workshop-shared/gatekeeper";
 import { PROPERTY_RUN_OPTIONS } from "@gadgets/scripts/property-runs";
 import {
-  ActionApplyError, ActionJournal, ActionOutcomeUnknownError, defineActions, type ActionSubmitter,
+  ActionApplyError,
+  ActionJournal,
+  ActionOutcomeUnknownError,
+  defineActions,
+  type ActionSubmitter,
   type TaggedAction,
 } from "../src/actions";
 import { fakeKv } from "./fake-kv";
@@ -37,7 +41,11 @@ type Provider = "ok" | "retry" | "refused" | "unknown";
 type Actions = { create: { ref: string; parent?: string }; edit: { target: string } };
 type Action = TaggedAction<Actions>;
 type Host = {
-  provider: Provider; late: boolean; bound: Set<string>; dispatched: number[]; released: number[];
+  provider: Provider;
+  late: boolean;
+  bound: Set<string>;
+  dispatched: number[];
+  released: number[];
 };
 
 // `parent` and `target` pick, modulo the count, among the provisional references the agent holds
@@ -74,19 +82,22 @@ function declare(retainApplied: boolean) {
     reject: async (_payload: unknown, host: Host, { id }: { id: number }) =>
       void host.released.push(id),
   } as const;
-  return defineActions<Host, Actions>({
-    create: {
-      ...common,
-      provides: payload => [payload.ref],
-      dependsOn: payload => (payload.parent === undefined ? [] : [payload.parent]),
-      apply: async (payload, host, { id }) => reach(host, id, payload.ref),
+  return defineActions<Host, Actions>(
+    {
+      create: {
+        ...common,
+        provides: (payload) => [payload.ref],
+        dependsOn: (payload) => (payload.parent === undefined ? [] : [payload.parent]),
+        apply: async (payload, host, { id }) => reach(host, id, payload.ref),
+      },
+      edit: {
+        ...common,
+        dependsOn: (payload) => [payload.target],
+        apply: async (_payload, host, { id }) => reach(host, id),
+      },
     },
-    edit: {
-      ...common,
-      dependsOn: payload => [payload.target],
-      apply: async (_payload, host, { id }) => reach(host, id),
-    },
-  }, { fence: "none", retainApplied, isResolvedReference: (host, ref) => host.bound.has(ref) });
+    { fence: "none", retainApplied, isResolvedReference: (host, ref) => host.bound.has(ref) },
+  );
 }
 
 type Modeled = {
@@ -108,7 +119,7 @@ class ActionModel {
   /** The id an accepted submission gets; undefined for one that is refused. */
   submit(action: Action): number | undefined {
     const ref = needed(action);
-    const creatable = this.actions.some(a => a.status === "pending" && created(a.action) === ref);
+    const creatable = this.actions.some((a) => a.status === "pending" && created(a.action) === ref);
     if (ref !== undefined && !this.bound.has(ref) && !creatable) return undefined;
     return this.actions.push({ action, status: "pending" });
   }
@@ -154,7 +165,8 @@ class ActionModel {
   /** The ids a decision may name: those awaiting one, or every one. */
   decidable(any: boolean): number[] {
     return this.actions.flatMap(({ status }, at) =>
-      (any || status === "pending" || status === "failed" ? [at + 1] : []));
+      any || status === "pending" || status === "failed" ? [at + 1] : [],
+    );
   }
 
   /** How the journal holds each action: its record's state, or how the record went away. */
@@ -167,17 +179,29 @@ class ActionModel {
   }
 }
 
-const succeeds = (call: Promise<unknown>) => call.then(() => true, () => false);
+const succeeds = (call: Promise<unknown>) =>
+  call.then(
+    () => true,
+    () => false,
+  );
 
 function stored(journal: ActionJournal<Action>, id: number): string {
   const record = journal.get(id);
   if (record === undefined) return journal.wasApplied(id) ? "retired" : "gone";
-  return `${record.state}${record.undispatched ? " undispatched" : ""}`
-    + (record.outcome === "unknown" ? " unknown" : "");
+  return (
+    `${record.state}${record.undispatched ? " undispatched" : ""}` +
+    (record.outcome === "unknown" ? " unknown" : "")
+  );
 }
 
 async function replay(retainApplied: boolean, steps: Step[]) {
-  const host: Host = { provider: "ok", late: false, bound: new Set(), dispatched: [], released: [] };
+  const host: Host = {
+    provider: "ok",
+    late: false,
+    bound: new Set(),
+    dispatched: [],
+    released: [],
+  };
   const journal = new ActionJournal<Action>(fakeKv(), { namespace: "pending" });
   const actions = declare(retainApplied).bind(journal, host);
   const model = new ActionModel();
@@ -206,35 +230,45 @@ async function replay(retainApplied: boolean, steps: Step[]) {
     } else if (step.do === "apply") {
       host.provider = step.provider;
       host.late = step.late;
-      expect(await succeeds(actions.apply(id)), `${label}: approving ${id} succeeds`)
-        .toBe(model.apply(id, step.provider, step.late));
+      expect(await succeeds(actions.apply(id)), `${label}: approving ${id} succeeds`).toBe(
+        model.apply(id, step.provider, step.late),
+      );
     } else {
-      expect(await succeeds(actions.reject(id)), `${label}: denying ${id} succeeds`)
-        .toBe(model.reject(id));
+      expect(await succeeds(actions.reject(id)), `${label}: denying ${id} succeeds`).toBe(
+        model.reject(id),
+      );
     }
 
     const ids = model.actions.map((_, at) => at + 1);
-    expect(submitAction.mock.calls.map(([sent]) => sent), `${label}: sent to the overseer`)
-      .toEqual(ids);
-    expect(ids.map(each => stored(journal, each)), `${label}: journal records`)
-      .toEqual(model.stored(retainApplied));
-    expect(journal.listPending(), `${label}: pending projection`).toEqual(model.actions.flatMap(
-      ({ action, status }, at) => (status === "pending" ? [{ id: at + 1, action }] : [])));
+    expect(
+      submitAction.mock.calls.map(([sent]) => sent),
+      `${label}: sent to the overseer`,
+    ).toEqual(ids);
+    expect(
+      ids.map((each) => stored(journal, each)),
+      `${label}: journal records`,
+    ).toEqual(model.stored(retainApplied));
+    expect(journal.listPending(), `${label}: pending projection`).toEqual(
+      model.actions.flatMap(({ action, status }, at) =>
+        status === "pending" ? [{ id: at + 1, action }] : [],
+      ),
+    );
     expect(host.dispatched, `${label}: handler dispatches`).toEqual(model.dispatched);
     expect(host.released, `${label}: release hooks`).toEqual(model.released);
 
     // Read off the journal alone, so it holds even where the model shares a mistake with the kit:
     // a reference can still be bound only by a pending creation or one whose outcome is unknown.
     const bindable = new Set<string | undefined>(host.bound);
-    for (const record of ids.map(each => journal.get(each))) {
+    for (const record of ids.map((each) => journal.get(each))) {
       if (record?.state === "pending" || record?.outcome === "unknown") {
         bindable.add(created(record.action));
       }
     }
     for (const { id: waiting, action } of journal.listPending()) {
       const ref = needed(action);
-      expect(ref === undefined || bindable.has(ref), `${label}: ${waiting} can still apply`)
-        .toBe(true);
+      expect(ref === undefined || bindable.has(ref), `${label}: ${waiting} can still apply`).toBe(
+        true,
+      );
     }
   }
 }
@@ -244,25 +278,38 @@ const choice = fc.nat({ max: 11 });
 const seldom = fc.constantFrom(false, false, false, true);
 // Submissions outweigh decisions, so a decision usually lands on an action others wait on.
 const step: fc.Arbitrary<Step> = fc.oneof(
-  { weight: 4, arbitrary: fc.record({ do: fc.constant("create" as const), parent: fc.option(choice) }) },
+  {
+    weight: 4,
+    arbitrary: fc.record({ do: fc.constant("create" as const), parent: fc.option(choice) }),
+  },
   { weight: 3, arbitrary: fc.record({ do: fc.constant("edit" as const), target: choice }) },
   {
     weight: 4,
     arbitrary: fc.record({
-      do: fc.constant("apply" as const), pick: choice, any: seldom,
+      do: fc.constant("apply" as const),
+      pick: choice,
+      any: seldom,
       provider: fc.constantFrom<Provider>("ok", "ok", "ok", "ok", "retry", "refused", "unknown"),
       late: fc.constantFrom(false, false, true),
     }),
   },
-  { weight: 2, arbitrary: fc.record({ do: fc.constant("reject" as const), pick: choice, any: seldom }) },
+  {
+    weight: 2,
+    arbitrary: fc.record({ do: fc.constant("reject" as const), pick: choice, any: seldom }),
+  },
 );
 
 // Examples name an action by its id, and a reference by its creation's place, from 0, among the
 // creations accepted so far.
 const create = (parent: number | null = null): Step => ({ do: "create", parent });
 const edit = (target: number): Step => ({ do: "edit", target });
-const approve = (id: number, provider: Provider = "ok", late = false): Step =>
-  ({ do: "apply", pick: id - 1, any: true, provider, late });
+const approve = (id: number, provider: Provider = "ok", late = false): Step => ({
+  do: "apply",
+  pick: id - 1,
+  any: true,
+  provider,
+  late,
+});
 const deny = (id: number): Step => ({ do: "reject", pick: id - 1, any: true });
 
 const examples: [boolean, Step[]][] = [
@@ -276,10 +323,21 @@ const examples: [boolean, Step[]][] = [
   // Approved out of order, retried after an outage, then approved and denied again by a user whose
   // approval the overseer never recorded: neither reaches the handler nor undoes the applied
   // folder. The provider then refuses the upload into it, which retires the edit of that upload.
-  [true, [
-    create(), create(0), edit(1), approve(2), approve(1, "retry"), approve(1), approve(1), deny(1),
-    approve(2, "refused"), edit(1),
-  ]],
+  [
+    true,
+    [
+      create(),
+      create(0),
+      edit(1),
+      approve(2),
+      approve(1, "retry"),
+      approve(1),
+      approve(1),
+      deny(1),
+      approve(2, "refused"),
+      edit(1),
+    ],
+  ],
   // An upload the provider created before the call failed stays pending, and denying it leaves the
   // edit of the file that now exists to apply.
   [false, [create(), edit(0), approve(1, "retry", true), deny(1), edit(0), approve(2), approve(3)]],
@@ -291,7 +349,8 @@ it("matches a model of the queue after every submission, approval and denial", a
   try {
     await fc.assert(
       fc.asyncProperty(fc.boolean(), fc.array(step, { maxLength: 40, size: "max" }), replay),
-      { ...PROPERTY_RUN_OPTIONS, numRuns: 1000, examples });
+      { ...PROPERTY_RUN_OPTIONS, numRuns: 1000, examples },
+    );
   } finally {
     logged.mockRestore();
   }

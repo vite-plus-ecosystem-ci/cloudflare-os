@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test:run": "vitest run"
+    "test:run": "vp test run"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
@@ -21,7 +21,6 @@
     "@types/node": "^26.1.0",
     "capnweb": "catalog:",
     "typescript": "catalog:",
-    "typescript6": "catalog:",
-    "vitest": "catalog:"
+    "typescript6": "catalog:"
   }
 }

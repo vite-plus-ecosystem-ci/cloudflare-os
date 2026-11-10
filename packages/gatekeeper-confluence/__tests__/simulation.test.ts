@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   simulateBody,
   simulateTitle,
@@ -30,7 +30,14 @@ describe("simulateTitle", () => {
 
   it("uses a provisional content's create title", () => {
     const records = [
-      rec({ type: "createContent", provisionalId: "~1", kind: "page", parent: { type: "space", spaceKey: "ENG" }, title: "New Page", status: "current" }),
+      rec({
+        type: "createContent",
+        provisionalId: "~1",
+        kind: "page",
+        parent: { type: "space", spaceKey: "ENG" },
+        title: "New Page",
+        status: "current",
+      }),
     ];
     expect(simulateTitle(records, "")).toBe("New Page");
   });
@@ -42,7 +49,9 @@ describe("simulateBody", () => {
   });
 
   it("replaces the body on setContent", () => {
-    const records = [rec({ type: "setContent", contentId: "1", markdown: "replaced", previousMarkdown: "hello" })];
+    const records = [
+      rec({ type: "setContent", contentId: "1", markdown: "replaced", previousMarkdown: "hello" }),
+    ];
     expect(simulateBody("hello", records)).toBe("replaced");
   });
 
@@ -61,7 +70,15 @@ describe("simulateBody", () => {
 
   it("seeds the body from a provisional create", () => {
     const records = [
-      rec({ type: "createContent", provisionalId: "~1", kind: "page", parent: { type: "space", spaceKey: "ENG" }, title: "T", content: "seed", status: "current" }),
+      rec({
+        type: "createContent",
+        provisionalId: "~1",
+        kind: "page",
+        parent: { type: "space", spaceKey: "ENG" },
+        title: "T",
+        content: "seed",
+        status: "current",
+      }),
     ];
     expect(simulateBody(null, records)).toBe("seed");
   });
@@ -96,9 +113,11 @@ describe("simulateTrashed", () => {
 
   it("reflects the latest trash/restore", () => {
     expect(simulateTrashed([rec({ type: "trash", contentId: "1" })])).toBe(true);
-    expect(simulateTrashed([
-      rec({ type: "trash", contentId: "1" }),
-      rec({ type: "restore", contentId: "1" }),
-    ])).toBe(false);
+    expect(
+      simulateTrashed([
+        rec({ type: "trash", contentId: "1" }),
+        rec({ type: "restore", contentId: "1" }),
+      ]),
+    ).toBe(false);
   });
 });

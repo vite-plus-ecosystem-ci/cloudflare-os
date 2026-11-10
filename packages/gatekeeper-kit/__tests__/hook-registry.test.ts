@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { DELIVERED_RETENTION_MS, MAX_DELIVERY_ATTEMPTS } from "../src/hook-delivery-queue";
 import { HookRegistry } from "../src/hook-registry";
 import { fakeKv, type FakeKv } from "./fake-kv";
@@ -10,7 +10,7 @@ function copyOf<Stub extends Disposable>(stub: Stub): Stub {
   let disposed = false;
   return new Proxy(stub, {
     get(target, property) {
-      if (property === Symbol.dispose) return () => (disposed = true, target[Symbol.dispose]());
+      if (property === Symbol.dispose) return () => ((disposed = true), target[Symbol.dispose]());
       if (disposed) throw new Error("A stub was used after it was disposed.");
       return Reflect.get(target, property);
     },
@@ -23,13 +23,16 @@ function kvHoldingStubs(): FakeKv {
   const stubs = new Map<string, Record<string, Disposable>>();
   const read = (key: string) => {
     const held = stubs.get(key);
-    return held && Object.fromEntries(Object.entries(held).map(([name, stub]) => [name, copyOf(stub)]));
+    return (
+      held && Object.fromEntries(Object.entries(held).map(([name, stub]) => [name, copyOf(stub)]))
+    );
   };
   return {
     ...kv,
     get: <T>(key: string) => (read(key) ?? kv.get(key)) as T | undefined,
-    put: (key, value) => key.startsWith("caps:") ? void stubs.set(key, value as never) : kv.put(key, value),
-    delete: key => {
+    put: (key, value) =>
+      key.startsWith("caps:") ? void stubs.set(key, value as never) : kv.put(key, value),
+    delete: (key) => {
       stubs.delete(key);
       kv.delete(key);
     },
@@ -40,13 +43,23 @@ function kvHoldingStubs(): FakeKv {
 function hook() {
   const disposed: string[] = [];
   const disposable = (name: string) => ({ [Symbol.dispose]: () => void disposed.push(name) });
-  const firing = { callback: { name: "callback" }, approvalQueue: { name: "queue" }, ...disposable("firing") };
+  const firing = {
+    callback: { name: "callback" },
+    approvalQueue: { name: "queue" },
+    ...disposable("firing"),
+  };
   const deliver = vi.fn(async (..._args: unknown[]) => {});
   const capabilities = {
     delivery: { deliver, ...disposable("delivery") },
     initiator: { startHook: vi.fn(async () => firing), ...disposable("initiator") },
   };
-  return { capabilities: capabilities as never, startHook: capabilities.initiator.startHook, deliver, firing, disposed };
+  return {
+    capabilities: capabilities as never,
+    startHook: capabilities.initiator.startHook,
+    deliver,
+    firing,
+    disposed,
+  };
 }
 
 const registry = (kv = kvHoldingStubs(), onDrop = () => {}) =>
@@ -69,7 +82,10 @@ describe("HookRegistry", () => {
 
     hooks.set("a", { repo: "three" }, second.capabilities);
 
-    expect(hooks.entries()).toEqual([["a", { repo: "three" }], ["b", { repo: "two" }]]);
+    expect(hooks.entries()).toEqual([
+      ["a", { repo: "three" }],
+      ["b", { repo: "two" }],
+    ]);
     expect(first.disposed).toEqual(["delivery", "initiator"]);
     expect(second.disposed).toEqual([]);
   });
@@ -114,9 +130,16 @@ describe("HookRegistry", () => {
     const kv = kvHoldingStubs();
     const enabled = hook();
     registry(kv).set("a", { repo: "one" }, enabled.capabilities);
-    const full: FakeKv = { ...kv, put: () => { throw new Error("storage is full"); } };
+    const full: FakeKv = {
+      ...kv,
+      put: () => {
+        throw new Error("storage is full");
+      },
+    };
 
-    expect(() => registry(full).set("a", { repo: "two" }, hook().capabilities)).toThrow("storage is full");
+    expect(() => registry(full).set("a", { repo: "two" }, hook().capabilities)).toThrow(
+      "storage is full",
+    );
     expect(enabled.disposed).toEqual(["delivery", "initiator"]);
   });
 
@@ -173,7 +196,8 @@ describe("HookRegistry", () => {
     await hooks.run(Date.now());
     expect(deliver).not.toHaveBeenCalled();
 
-    for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS; attempt++) await hooks.run(hooks.nextDue()!);
+    for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS; attempt++)
+      await hooks.run(hooks.nextDue()!);
     expect(onDrop).toHaveBeenCalledTimes(1);
   });
 

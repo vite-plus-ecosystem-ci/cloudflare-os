@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { fileIcon, formatDate, formatSize, parseRef } from "../src/sharepoint-configurator";
 
-const SITE = "contoso.sharepoint.com,11111111-1111-1111-1111-111111111111,33333333-3333-3333-3333-333333333333";
+const SITE =
+  "contoso.sharepoint.com,11111111-1111-1111-1111-111111111111,33333333-3333-3333-3333-333333333333";
 const GUID = "44444444-4444-4444-4444-444444444444";
 const DRIVE = "b!AAAAAAAAAAAAAAAAAAAA";
 
@@ -20,11 +21,30 @@ describe("parseRef", () => {
   });
 
   it.each([
-    "", "everything", "all:", "site", "site:", "site:x/y", `site:${SITE}/extra`, "folder:../../me", `folder:${DRIVE}`,
-    `folder:${DRIVE}/`, `folder:${DRIVE}/01/02`, `folder:${DRIVE}/..`, `folder:${DRIVE}/a b`, `file:${DRIVE}/01?x=1`,
-    `drive:${DRIVE}/root`, "drive:root", `list:${SITE}`, `list:${SITE}/not-a-guid`, `list:${SITE}/${GUID}/items`,
-    `page:${SITE}/${GUID}/x`, `onedrive:${DRIVE}`, `item:${DRIVE}/01`, `${SITE}`,
-  ])("refuses %j, which would put more than an ID into a Graph path", ref => {
+    "",
+    "everything",
+    "all:",
+    "site",
+    "site:",
+    "site:x/y",
+    `site:${SITE}/extra`,
+    "folder:../../me",
+    `folder:${DRIVE}`,
+    `folder:${DRIVE}/`,
+    `folder:${DRIVE}/01/02`,
+    `folder:${DRIVE}/..`,
+    `folder:${DRIVE}/a b`,
+    `file:${DRIVE}/01?x=1`,
+    `drive:${DRIVE}/root`,
+    "drive:root",
+    `list:${SITE}`,
+    `list:${SITE}/not-a-guid`,
+    `list:${SITE}/${GUID}/items`,
+    `page:${SITE}/${GUID}/x`,
+    `onedrive:${DRIVE}`,
+    `item:${DRIVE}/01`,
+    `${SITE}`,
+  ])("refuses %j, which would put more than an ID into a Graph path", (ref) => {
     expect(() => parseRef(ref)).toThrow("That choice isn't valid. Choose again.");
   });
 });

@@ -1,10 +1,13 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { stageCredentials } from "@gadgets/gatekeeper-kit/credential-stage";
 
 import { McpAuthRequiredError } from "../src/client.js";
 import {
-  McpAccountBase, resolveConnectTarget, type AccountEnv, type ConnectedServer,
+  McpAccountBase,
+  resolveConnectTarget,
+  type AccountEnv,
+  type ConnectedServer,
 } from "../src/account.js";
 
 function fakeContext() {
@@ -14,27 +17,51 @@ function fakeContext() {
     storage: {
       async deleteAlarm() {},
       async setAlarm() {},
-      async deleteAll() { values.clear(); },
+      async deleteAll() {
+        values.clear();
+      },
       kv: {
-        get<T>(key: string) { return values.get(key) as T | undefined; },
-        put<T>(key: string, value: T) { values.set(key, value); },
-        delete(key: string) { values.delete(key); },
+        get<T>(key: string) {
+          return values.get(key) as T | undefined;
+        },
+        put<T>(key: string, value: T) {
+          values.set(key, value);
+        },
+        delete(key: string) {
+          values.delete(key);
+        },
       },
     },
   };
 }
 
-const testLog = { with() { return testLog; }, info() {}, warn() {} };
+const testLog = {
+  with() {
+    return testLog;
+  },
+  info() {},
+  warn() {},
+};
 
 class InterleavingAccount extends McpAccountBase<AccountEnv> {
   #rejectProbe: ((reason: Error) => void) | undefined;
 
-  protected baseUrl(): string { return "https://gatekeeper.example"; }
-  protected log(): never { return testLog as never; }
-  protected mintAccount(): never { throw new Error("not reached"); }
-  protected override staticToken(): string { return "new-portal-token"; }
+  protected baseUrl(): string {
+    return "https://gatekeeper.example";
+  }
+  protected log(): never {
+    return testLog as never;
+  }
+  protected mintAccount(): never {
+    throw new Error("not reached");
+  }
+  protected override staticToken(): string {
+    return "new-portal-token";
+  }
   protected override async probe(): Promise<never> {
-    return await new Promise<never>((_resolve, reject) => { this.#rejectProbe = reject; });
+    return await new Promise<never>((_resolve, reject) => {
+      this.#rejectProbe = reject;
+    });
   }
 
   failProbe(): void {
@@ -52,14 +79,22 @@ class ConfiguredTokenAccount extends McpAccountBase<AccountEnv> {
   configuredEndpoint = "https://old.example/mcp";
   configuredToken = "old-portal-token";
 
-  protected baseUrl(): string { return "https://gatekeeper.example"; }
-  protected log(): never { return testLog as never; }
-  protected mintAccount(): never { throw new Error("not reached"); }
+  protected baseUrl(): string {
+    return "https://gatekeeper.example";
+  }
+  protected log(): never {
+    return testLog as never;
+  }
+  protected mintAccount(): never {
+    throw new Error("not reached");
+  }
   protected override staticToken(server: ConnectedServer): string | null {
     // The real portal's rule: only answer for the endpoint configuration currently names.
     return this.configuredEndpoint === server.endpoint ? this.configuredToken : null;
   }
-  protected override async probe(): Promise<never> { throw new Error("not probed"); }
+  protected override async probe(): Promise<never> {
+    throw new Error("not probed");
+  }
 }
 
 // Exercises the expiry latch. The callback is the Workshop, reached over RPC, so it can fail
@@ -68,10 +103,18 @@ class ExpiringAccount extends McpAccountBase<AccountEnv> {
   notifications = 0;
   failNext = false;
 
-  protected baseUrl(): string { return "https://gatekeeper.example"; }
-  protected log(): never { return testLog as never; }
-  protected mintAccount(): never { throw new Error("not reached"); }
-  protected override async probe(): Promise<never> { throw new Error("not probed"); }
+  protected baseUrl(): string {
+    return "https://gatekeeper.example";
+  }
+  protected log(): never {
+    return testLog as never;
+  }
+  protected mintAccount(): never {
+    throw new Error("not reached");
+  }
+  protected override async probe(): Promise<never> {
+    throw new Error("not probed");
+  }
 
   installCallback(): void {
     this.ctx.storage.kv.put("callback", {
@@ -85,10 +128,18 @@ class ExpiringAccount extends McpAccountBase<AccountEnv> {
 
 // A deployment that named a `"token"` endpoint but configured no token for it.
 class UnconfiguredTokenAccount extends McpAccountBase<AccountEnv> {
-  protected baseUrl(): string { return "https://gatekeeper.example"; }
-  protected log(): never { return testLog as never; }
-  protected mintAccount(): never { throw new Error("not reached"); }
-  protected override staticToken(): string | null { return null; }
+  protected baseUrl(): string {
+    return "https://gatekeeper.example";
+  }
+  protected log(): never {
+    return testLog as never;
+  }
+  protected mintAccount(): never {
+    throw new Error("not reached");
+  }
+  protected override staticToken(): string | null {
+    return null;
+  }
   protected override async probe(): Promise<never> {
     throw new Error("probe must not run without a configured token");
   }
@@ -99,34 +150,54 @@ class UnconfiguredTokenAccount extends McpAccountBase<AccountEnv> {
 }
 
 class AuthChallengeAccount extends McpAccountBase<AccountEnv> {
-  protected baseUrl(): string { return "https://gatekeeper.example"; }
-  protected log(): never { return testLog as never; }
-  protected mintAccount(): never { throw new Error("not reached"); }
+  protected baseUrl(): string {
+    return "https://gatekeeper.example";
+  }
+  protected log(): never {
+    return testLog as never;
+  }
+  protected mintAccount(): never {
+    throw new Error("not reached");
+  }
   protected override async probe(): Promise<never> {
     throw new McpAuthRequiredError("authorization required", null);
   }
 }
 
 class OAuthFlowAccount extends McpAccountBase<AccountEnv> {
-  protected baseUrl(): string { return "https://gatekeeper.example"; }
-  protected log(): never { return testLog as never; }
-  protected mintAccount(): never { return {} as never; }
+  protected baseUrl(): string {
+    return "https://gatekeeper.example";
+  }
+  protected log(): never {
+    return testLog as never;
+  }
+  protected mintAccount(): never {
+    return {} as never;
+  }
   protected override async probe(
-    _server: ConnectedServer, accessToken: string | null,
+    _server: ConnectedServer,
+    accessToken: string | null,
   ): Promise<never> {
     if (!accessToken) throw new McpAuthRequiredError("authorization required", null);
     // The transport session the server opened for these credentials.
     return {
-      info: { serverInfo: { name: "Acme" } }, sessionId: `session-for-${accessToken}`,
+      info: { serverInfo: { name: "Acme" } },
+      sessionId: `session-for-${accessToken}`,
     } as never;
   }
 }
 
 // A server that answers `initialize` with or without a credential.
 class PublicServerAccount extends McpAccountBase<AccountEnv> {
-  protected baseUrl(): string { return "https://gatekeeper.example"; }
-  protected log(): never { return testLog as never; }
-  protected mintAccount(): never { return {} as never; }
+  protected baseUrl(): string {
+    return "https://gatekeeper.example";
+  }
+  protected log(): never {
+    return testLog as never;
+  }
+  protected mintAccount(): never {
+    return {} as never;
+  }
   protected override async probe(): Promise<never> {
     return { info: { serverInfo: { name: "Acme" } }, sessionId: "public-session" } as never;
   }
@@ -201,8 +272,9 @@ describe("connect initiation nonce", () => {
     // The first request reaches a probe that deliberately never settles. Durable Object requests can
     // interleave at that await, so the second request exercises the exact duplicate-completion race.
     const first = account.beginConnect(nonce, server("https://a.example/mcp"));
-    await expect(account.beginConnect(nonce, server("https://a.example/mcp")))
-      .resolves.toEqual({ kind: "invalid" });
+    await expect(account.beginConnect(nonce, server("https://a.example/mcp"))).resolves.toEqual({
+      kind: "invalid",
+    });
 
     account.failProbe();
     await expect(first).rejects.toThrow("stop test probe");
@@ -213,12 +285,14 @@ describe("connect initiation nonce", () => {
   it("does not hand current credentials to a facet for the pre-repoint endpoint", async () => {
     const context = fakeContext();
     context.storage.kv.put("server", {
-      ...server("https://new.example/mcp"), auth: "none",
+      ...server("https://new.example/mcp"),
+      auth: "none",
     });
     const account = new AuthChallengeAccount(context as never, {});
 
-    await expect(account.getConnection("https://old.example/mcp"))
-      .rejects.toThrow(/account is now connected to new\.example/);
+    await expect(account.getConnection("https://old.example/mcp")).rejects.toThrow(
+      /account is now connected to new\.example/,
+    );
   });
 
   it("moves the server record before probing a repointed static-token portal", async () => {
@@ -226,19 +300,25 @@ describe("connect initiation nonce", () => {
     // record during the new probe, this stale facet would pass validation and receive the new token.
     const context = fakeContext();
     context.storage.kv.put("server", {
-      ...server("https://old.example/mcp"), auth: "token", provenance: "deployment",
+      ...server("https://old.example/mcp"),
+      auth: "token",
+      provenance: "deployment",
     });
     const account = new InterleavingAccount(context as never, {});
     const nonce = "c".repeat(64);
     await account.prepareReconnect(nonce);
     const repoint = account.beginConnect(nonce, {
-      ...server("https://new.example/mcp"), auth: "token", provenance: "deployment",
+      ...server("https://new.example/mcp"),
+      auth: "token",
+      provenance: "deployment",
     });
 
-    expect(context.storage.kv.get<ConnectedServer>("server")?.endpoint)
-      .toBe("https://new.example/mcp");
-    await expect(account.getConnection("https://old.example/mcp"))
-      .rejects.toThrow(/account is now connected to new\.example/);
+    expect(context.storage.kv.get<ConnectedServer>("server")?.endpoint).toBe(
+      "https://new.example/mcp",
+    );
+    await expect(account.getConnection("https://old.example/mcp")).rejects.toThrow(
+      /account is now connected to new\.example/,
+    );
 
     account.failProbe();
     await expect(repoint).rejects.toThrow("stop test probe");
@@ -254,10 +334,15 @@ describe("connect initiation nonce", () => {
     const nonce = "d".repeat(64);
     await account.prepareReconnect(nonce);
     const repoint = account.beginConnect(nonce, {
-      ...server("https://new.example/mcp"), provenance: "deployment",
+      ...server("https://new.example/mcp"),
+      provenance: "deployment",
     });
     await account.setMcpSessionId(
-      old.endpoint, connection.generation, connection.sessionId, "old-session");
+      old.endpoint,
+      connection.generation,
+      connection.sessionId,
+      "old-session",
+    );
     expect(context.storage.kv.get("mcpSessionId")).toBeUndefined();
 
     account.failProbe();
@@ -272,12 +357,15 @@ describe("connect initiation nonce", () => {
     const first = await account.getConnection(connected.endpoint);
     const second = await account.getConnection(connected.endpoint);
 
-    await expect(account.setMcpSessionId(
-      connected.endpoint, first.generation, null, "first-session")).resolves.toBe(true);
-    await expect(account.setMcpSessionId(
-      connected.endpoint, second.generation, null, "first-session")).resolves.toBe(true);
-    await expect(account.setMcpSessionId(
-      connected.endpoint, second.generation, null, "second-session")).resolves.toBe(false);
+    await expect(
+      account.setMcpSessionId(connected.endpoint, first.generation, null, "first-session"),
+    ).resolves.toBe(true);
+    await expect(
+      account.setMcpSessionId(connected.endpoint, second.generation, null, "first-session"),
+    ).resolves.toBe(true);
+    await expect(
+      account.setMcpSessionId(connected.endpoint, second.generation, null, "second-session"),
+    ).resolves.toBe(false);
 
     expect(context.storage.kv.get("mcpSessionId")).toBe("first-session");
   });
@@ -302,23 +390,37 @@ describe("connect initiation nonce", () => {
       },
     });
     context.storage.kv.put("oauthClient", {
-      client_id: "old-client", issuer: "https://auth.old.example",
+      client_id: "old-client",
+      issuer: "https://auth.old.example",
     });
     const account = new InterleavingAccount(context as never, {});
 
     let answerRefresh: ((response: Response) => void) | undefined;
-    vi.stubGlobal("fetch", () => new Promise<Response>(resolve => { answerRefresh = resolve; }));
+    vi.stubGlobal(
+      "fetch",
+      () =>
+        new Promise<Response>((resolve) => {
+          answerRefresh = resolve;
+        }),
+    );
     const refreshing = account.getConnection(old.endpoint);
     await vi.waitFor(() => expect(answerRefresh).toBeDefined());
 
     const nonce = "e".repeat(64);
     await account.prepareReconnect(nonce);
     const repoint = account.beginConnect(nonce, {
-      ...server("https://new.example/mcp"), provenance: "deployment",
+      ...server("https://new.example/mcp"),
+      provenance: "deployment",
     });
-    answerRefresh!(new Response(JSON.stringify({
-      access_token: "late-old-access", refresh_token: "late-old-refresh",
-    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    answerRefresh!(
+      new Response(
+        JSON.stringify({
+          access_token: "late-old-access",
+          refresh_token: "late-old-refresh",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
 
     await expect(refreshing).rejects.toThrow(/previous MCP connection|connection changed/);
     expect(context.storage.kv.get("tokens")).toBeUndefined();
@@ -347,21 +449,25 @@ describe("connect initiation nonce", () => {
       },
     });
     context.storage.kv.put("oauthClient", {
-      client_id: "client", issuer: "https://auth.example",
+      client_id: "client",
+      issuer: "https://auth.example",
     });
     const account = new OAuthFlowAccount(context as never, {});
     let refreshes = 0;
     vi.stubGlobal("fetch", async () => {
       refreshes++;
       return new Response(JSON.stringify({ access_token: "fresh", token_type: "Bearer" }), {
-        status: 200, headers: { "Content-Type": "application/json" },
+        status: 200,
+        headers: { "Content-Type": "application/json" },
       });
     });
 
-    await expect(account.getConnection(connected.endpoint))
-      .resolves.toMatchObject({ authorization: "fresh" });
-    await expect(account.getConnection(connected.endpoint))
-      .resolves.toMatchObject({ authorization: "fresh" });
+    await expect(account.getConnection(connected.endpoint)).resolves.toMatchObject({
+      authorization: "fresh",
+    });
+    await expect(account.getConnection(connected.endpoint)).resolves.toMatchObject({
+      authorization: "fresh",
+    });
     expect(refreshes).toBe(1);
   });
 
@@ -372,19 +478,22 @@ describe("connect initiation nonce", () => {
     // this account's storage, so without endpoint scoping it answers with the *new* portal's secret.
     const context = fakeContext();
     context.storage.kv.put("server", {
-      ...server("https://old.example/mcp"), auth: "token", provenance: "deployment",
+      ...server("https://old.example/mcp"),
+      auth: "token",
+      provenance: "deployment",
     });
     const account = new ConfiguredTokenAccount(context as never, {});
 
     // Before the repoint the configured token is served normally.
-    await expect(account.getConnection("https://old.example/mcp"))
-      .resolves.toMatchObject({ authorization: "old-portal-token" });
+    await expect(account.getConnection("https://old.example/mcp")).resolves.toMatchObject({
+      authorization: "old-portal-token",
+    });
 
     // The administrator repoints the gateway and rotates its token. Nobody has reconnected yet.
     account.configuredEndpoint = "https://new.example/mcp";
     account.configuredToken = "new-portal-token";
 
-    const failure = await account.getConnection("https://old.example/mcp").catch(err => err);
+    const failure = await account.getConnection("https://old.example/mcp").catch((err) => err);
     expect(failure).toBeInstanceOf(Error);
     expect(failure.message).not.toContain("new-portal-token");
     expect(failure.message).toMatch(/reconnect the account/i);
@@ -427,9 +536,13 @@ describe("connect initiation nonce", () => {
     const nonce = "f".repeat(64);
     await account.prepareReconnect(nonce);
 
-    await expect(account.beginConnect(nonce, {
-      ...server("https://portal.example/mcp"), auth: "token", provenance: "deployment",
-    })).rejects.toThrow(/No preissued token is configured/);
+    await expect(
+      account.beginConnect(nonce, {
+        ...server("https://portal.example/mcp"),
+        auth: "token",
+        provenance: "deployment",
+      }),
+    ).rejects.toThrow(/No preissued token is configured/);
 
     // Nothing was recorded, and the link still works so an administrator can set the token and retry.
     expect(context.storage.kv.get("server")).toBeUndefined();
@@ -471,12 +584,20 @@ describe("connect initiation nonce", () => {
     const nonce = "b".repeat(64);
     await account.setCallback({} as never, nonce);
 
-    await expect(account.beginConnect(nonce, {
-      ...server("https://portal.example/mcp"), auth: "none", provenance: "deployment",
-    })).rejects.toThrow(/unsafe authorization URL/);
-    await expect(account.beginConnect(nonce, {
-      ...server("https://portal.example/mcp"), auth: "none", provenance: "deployment",
-    })).rejects.toThrow(/unsafe authorization URL/);
+    await expect(
+      account.beginConnect(nonce, {
+        ...server("https://portal.example/mcp"),
+        auth: "none",
+        provenance: "deployment",
+      }),
+    ).rejects.toThrow(/unsafe authorization URL/);
+    await expect(
+      account.beginConnect(nonce, {
+        ...server("https://portal.example/mcp"),
+        auth: "none",
+        provenance: "deployment",
+      }),
+    ).rejects.toThrow(/unsafe authorization URL/);
     expect(context.storage.kv.get<ConnectedServer>("server")?.auth).toBe("oauth");
   });
 
@@ -495,8 +616,9 @@ describe("connect initiation nonce", () => {
 
     const resumed = new OAuthFlowAccount(context as never, {});
     expect(await resumed.acceptAuthCode("authorization-code", oauthNonce)).toEqual(HANDOFF);
-    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token)
-      .toBe("access-token");
+    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token).toBe(
+      "access-token",
+    );
     expect(context.storage.kv.get("mcpSessionId")).toBe("session-for-access-token");
     expect(complete).toHaveBeenCalledOnce();
     expect(await resumed.acceptAuthCode("authorization-code", oauthNonce)).toBeNull();
@@ -511,7 +633,11 @@ describe("connect initiation nonce", () => {
     const complete = vi.fn(async () => HANDOFF);
     context.storage.kv.put("server", server("https://mcp.example/mcp"));
     context.storage.kv.put("callback", { complete, reconnectComplete });
-    context.storage.kv.put("tokens", { access_token: "old-token", token_type: "Bearer", expiresAt: 1 });
+    context.storage.kv.put("tokens", {
+      access_token: "old-token",
+      token_type: "Bearer",
+      expiresAt: 1,
+    });
     context.storage.kv.put("mcpSessionId", "old-session");
     const account = new OAuthFlowAccount(context as never, {});
     const nonce = "7".repeat(64);
@@ -520,13 +646,15 @@ describe("connect initiation nonce", () => {
     const outcome = await account.beginConnect(nonce, null);
     expect(outcome.kind).toBe("redirect");
     const state = new URL((outcome as { url: string }).url).searchParams.get("state")!;
-    expect(await account.acceptAuthCode("code", state.slice(state.indexOf(":") + 1)))
-      .toEqual(HANDOFF);
+    expect(await account.acceptAuthCode("code", state.slice(state.indexOf(":") + 1))).toEqual(
+      HANDOFF,
+    );
 
     expect(reconnectComplete).toHaveBeenCalledOnce();
     expect(complete).not.toHaveBeenCalled();
-    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token)
-      .toBe("old-token");
+    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token).toBe(
+      "old-token",
+    );
     // The session the probe opened with the new tokens is staged with them: bound facets still
     // read the old tokens, and a session opened under other credentials is not theirs to use.
     expect(context.storage.kv.get("mcpSessionId")).toBe("old-session");
@@ -534,14 +662,18 @@ describe("connect initiation nonce", () => {
     // The Workshop was told which stage this completion produced, and only that id commits it.
     const stageId = reconnectComplete.mock.calls[0][0];
     expect(stageId).toMatch(/^[0-9a-f]{64}$/);
-    await expect(account.commitReconnect("0".repeat(64))).rejects.toThrow(/No reconnect is awaiting/);
-    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token)
-      .toBe("old-token");
+    await expect(account.commitReconnect("0".repeat(64))).rejects.toThrow(
+      /No reconnect is awaiting/,
+    );
+    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token).toBe(
+      "old-token",
+    );
     expect(context.storage.kv.get("stagedCredentials")).toBeDefined();
 
     await account.commitReconnect(stageId);
-    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token)
-      .toBe("access-token");
+    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token).toBe(
+      "access-token",
+    );
     expect(context.storage.kv.get("mcpSessionId")).toBe("session-for-access-token");
     expect(context.storage.kv.get("stagedCredentials")).toBeUndefined();
     await expect(account.commitReconnect(stageId)).rejects.toThrow(/No reconnect is awaiting/);
@@ -552,7 +684,8 @@ describe("connect initiation nonce", () => {
     // this the grant the exchange parked would sit unused and unrevoked until the next reconnect.
     class ProbeFailsAccount extends OAuthFlowAccount {
       protected override async probe(
-        server: ConnectedServer, accessToken: string | null,
+        server: ConnectedServer,
+        accessToken: string | null,
       ): Promise<never> {
         if (accessToken) throw new Error("server rejected the new credentials");
         return await super.probe(server, accessToken);
@@ -563,7 +696,11 @@ describe("connect initiation nonce", () => {
     const reconnectComplete = vi.fn(async (_stageId: string) => HANDOFF);
     context.storage.kv.put("server", server("https://mcp.example/mcp"));
     context.storage.kv.put("callback", { reconnectComplete });
-    context.storage.kv.put("tokens", { access_token: "old-token", token_type: "Bearer", expiresAt: 1 });
+    context.storage.kv.put("tokens", {
+      access_token: "old-token",
+      token_type: "Bearer",
+      expiresAt: 1,
+    });
     const account = new ProbeFailsAccount(context as never, {});
     const nonce = "7".repeat(64);
     await account.prepareReconnect(nonce);
@@ -571,16 +708,18 @@ describe("connect initiation nonce", () => {
     const outcome = await account.beginConnect(nonce, null);
     expect(outcome.kind).toBe("redirect");
     const state = new URL((outcome as { url: string }).url).searchParams.get("state")!;
-    await expect(account.acceptAuthCode("code", state.slice(state.indexOf(":") + 1)))
-      .rejects.toThrow("server rejected the new credentials");
+    await expect(
+      account.acceptAuthCode("code", state.slice(state.indexOf(":") + 1)),
+    ).rejects.toThrow("server rejected the new credentials");
 
     expect(reconnectComplete).not.toHaveBeenCalled();
     expect(context.storage.kv.get("reconnectTokens")).toBeUndefined();
     expect(context.storage.kv.get("reconnectOauthClient")).toBeUndefined();
     expect(context.storage.kv.get("reconnectOauthDiscovery")).toBeUndefined();
     expect(context.storage.kv.get("stagedCredentials")).toBeUndefined();
-    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token)
-      .toBe("old-token");
+    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token).toBe(
+      "old-token",
+    );
     expect(revoked).toEqual([
       "token=access-token&token_type_hint=access_token&client_id=client-id",
       "token=refresh-token&token_type_hint=refresh_token&client_id=client-id",
@@ -598,15 +737,21 @@ describe("connect initiation nonce", () => {
       if (String(input) !== "https://auth.example/token") return upstream(input, init);
       issued++;
       return Response.json({
-        access_token: `token-${issued}`, refresh_token: `refresh-${issued}`,
-        token_type: "Bearer", expires_in: 3600,
+        access_token: `token-${issued}`,
+        refresh_token: `refresh-${issued}`,
+        token_type: "Bearer",
+        expires_in: 3600,
       });
     });
     const reconnectComplete = vi.fn(async (_stageId: string) => HANDOFF);
     const complete = vi.fn(async () => HANDOFF);
     context.storage.kv.put("server", server("https://mcp.example/mcp"));
     context.storage.kv.put("callback", { complete, reconnectComplete });
-    context.storage.kv.put("tokens", { access_token: "old-token", token_type: "Bearer", expiresAt: 1 });
+    context.storage.kv.put("tokens", {
+      access_token: "old-token",
+      token_type: "Bearer",
+      expiresAt: 1,
+    });
     const account = new OAuthFlowAccount(context as never, {});
     const liveToken = () =>
       context.storage.kv.get<{ access_token: string }>("tokens")?.access_token;
@@ -647,11 +792,15 @@ describe("connect initiation nonce", () => {
       return upstream(input, init);
     });
     const live = {
-      access_token: "old-token", refresh_token: "old-refresh", token_type: "Bearer", expiresAt: 1,
+      access_token: "old-token",
+      refresh_token: "old-refresh",
+      token_type: "Bearer",
+      expiresAt: 1,
     };
     context.storage.kv.put("server", server("https://mcp.example/mcp"));
     context.storage.kv.put("callback", {
-      complete: vi.fn(async () => HANDOFF), reconnectComplete: vi.fn(async () => HANDOFF),
+      complete: vi.fn(async () => HANDOFF),
+      reconnectComplete: vi.fn(async () => HANDOFF),
     });
     context.storage.kv.put("tokens", live);
     const account = new OAuthFlowAccount(context as never, {});
@@ -661,7 +810,7 @@ describe("connect initiation nonce", () => {
     const outcome = await account.beginConnect(nonce, null);
 
     expect(outcome.kind).toBe("redirect");
-    expect(tokenRequests.filter(body => body.includes("refresh_token"))).toEqual([]);
+    expect(tokenRequests.filter((body) => body.includes("refresh_token"))).toEqual([]);
     expect(context.storage.kv.get("tokens")).toEqual(live);
     expect(context.storage.kv.get("stagedCredentials")).toBeUndefined();
   });
@@ -680,7 +829,11 @@ describe("connect initiation nonce", () => {
     const liveDiscovery = { authorizationServerUrl: "https://auth.example" };
     context.storage.kv.put("server", liveServer);
     context.storage.kv.put("callback", { complete: vi.fn(async () => HANDOFF), reconnectComplete });
-    context.storage.kv.put("tokens", { access_token: "old-token", token_type: "Bearer", expiresAt: 1 });
+    context.storage.kv.put("tokens", {
+      access_token: "old-token",
+      token_type: "Bearer",
+      expiresAt: 1,
+    });
     context.storage.kv.put("oauthClient", liveClient);
     context.storage.kv.put("oauthDiscovery", liveDiscovery);
     const account = new OAuthFlowAccount(context as never, {});
@@ -690,8 +843,9 @@ describe("connect initiation nonce", () => {
     const outcome = await account.beginConnect(nonce, null);
     expect(outcome.kind).toBe("redirect");
     const state = new URL((outcome as { url: string }).url).searchParams.get("state")!;
-    expect(await account.acceptAuthCode("code", state.slice(state.indexOf(":") + 1)))
-      .toEqual(HANDOFF);
+    expect(await account.acceptAuthCode("code", state.slice(state.indexOf(":") + 1))).toEqual(
+      HANDOFF,
+    );
 
     expect(reconnectComplete).toHaveBeenCalledOnce();
     expect(context.storage.kv.get("server")).toEqual(liveServer);
@@ -702,12 +856,16 @@ describe("connect initiation nonce", () => {
 
     await account.commitReconnect(reconnectComplete.mock.calls[0][0]);
     expect(context.storage.kv.get("server")).toEqual({ ...liveServer, serverName: "Acme" });
-    expect(context.storage.kv.get<{ client_id: string }>("oauthClient")?.client_id)
-      .toBe("client-id");
-    expect(context.storage.kv.get<{ authorizationServerMetadata?: unknown }>("oauthDiscovery")
-      ?.authorizationServerMetadata).toBeDefined();
-    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token)
-      .toBe("access-token");
+    expect(context.storage.kv.get<{ client_id: string }>("oauthClient")?.client_id).toBe(
+      "client-id",
+    );
+    expect(
+      context.storage.kv.get<{ authorizationServerMetadata?: unknown }>("oauthDiscovery")
+        ?.authorizationServerMetadata,
+    ).toBeDefined();
+    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token).toBe(
+      "access-token",
+    );
   });
 
   it("rediscovers the authorization server on reconnect", async () => {
@@ -727,9 +885,14 @@ describe("connect initiation nonce", () => {
     };
     context.storage.kv.put("server", server("https://mcp.example/mcp"));
     context.storage.kv.put("callback", {
-      complete: vi.fn(async () => HANDOFF), reconnectComplete: vi.fn(async () => HANDOFF),
+      complete: vi.fn(async () => HANDOFF),
+      reconnectComplete: vi.fn(async () => HANDOFF),
     });
-    context.storage.kv.put("tokens", { access_token: "old-token", token_type: "Bearer", expiresAt: 1 });
+    context.storage.kv.put("tokens", {
+      access_token: "old-token",
+      token_type: "Bearer",
+      expiresAt: 1,
+    });
     context.storage.kv.put("oauthDiscovery", staleDiscovery);
     const account = new OAuthFlowAccount(context as never, {});
     const nonce = "d".repeat(64);
@@ -738,8 +901,10 @@ describe("connect initiation nonce", () => {
     const outcome = await account.beginConnect(nonce, null);
     expect(outcome.kind).toBe("redirect");
     expect((outcome as { url: string }).url).toMatch(/^https:\/\/auth\.example\/authorize\?/);
-    expect(context.storage.kv.get<{ authorizationServerUrl: string }>("reconnectOauthDiscovery")
-      ?.authorizationServerUrl).toBe("https://auth.example");
+    expect(
+      context.storage.kv.get<{ authorizationServerUrl: string }>("reconnectOauthDiscovery")
+        ?.authorizationServerUrl,
+    ).toBe("https://auth.example");
     expect(context.storage.kv.get("oauthDiscovery")).toEqual(staleDiscovery);
   });
 
@@ -751,12 +916,20 @@ describe("connect initiation nonce", () => {
     const oldServer = { ...server("https://old.example/mcp"), provenance: "deployment" as const };
     const newServer = { ...server("https://new.example/mcp"), provenance: "deployment" as const };
     context.storage.kv.put("server", oldServer);
-    context.storage.kv.put("tokens", { access_token: "live-token", token_type: "Bearer", expiresAt: 1 });
-    const stageIdA = stageCredentials(context.storage.kv, {
-      tokens: { access_token: "staged-token", token_type: "Bearer", expiresAt: 1 },
-      sessionId: "a",
-      server: oldServer,
-    }, Date.now());
+    context.storage.kv.put("tokens", {
+      access_token: "live-token",
+      token_type: "Bearer",
+      expiresAt: 1,
+    });
+    const stageIdA = stageCredentials(
+      context.storage.kv,
+      {
+        tokens: { access_token: "staged-token", token_type: "Bearer", expiresAt: 1 },
+        sessionId: "a",
+        server: oldServer,
+      },
+      Date.now(),
+    );
     const account = new InterleavingAccount(context as never, {});
     const nonce = "e".repeat(64);
     await account.prepareReconnect(nonce);
@@ -779,9 +952,14 @@ describe("connect initiation nonce", () => {
     stubOAuthServer();
     context.storage.kv.put("server", server("https://mcp.example/mcp"));
     context.storage.kv.put("callback", {
-      complete: vi.fn(async () => HANDOFF), reconnectComplete: vi.fn(async () => HANDOFF),
+      complete: vi.fn(async () => HANDOFF),
+      reconnectComplete: vi.fn(async () => HANDOFF),
     });
-    context.storage.kv.put("tokens", { access_token: "old-token", token_type: "Bearer", expiresAt: 1 });
+    context.storage.kv.put("tokens", {
+      access_token: "old-token",
+      token_type: "Bearer",
+      expiresAt: 1,
+    });
     const account = new OAuthFlowAccount(context as never, {});
     const nonce = "a".repeat(64);
     await account.prepareReconnect(nonce);
@@ -790,8 +968,9 @@ describe("connect initiation nonce", () => {
 
     expect(context.storage.kv.get("oauthClient")).toBeUndefined();
     expect(context.storage.kv.get("oauthDiscovery")).toBeUndefined();
-    expect(context.storage.kv.get<{ client_id: string }>("reconnectOauthClient")?.client_id)
-      .toBe("client-id");
+    expect(context.storage.kv.get<{ client_id: string }>("reconnectOauthClient")?.client_id).toBe(
+      "client-id",
+    );
     expect(context.storage.kv.get("reconnectOauthDiscovery")).toBeDefined();
   });
 
@@ -808,9 +987,14 @@ describe("connect initiation nonce", () => {
     const liveClient = { client_id: "old-client", issuer: "https://auth.example" };
     context.storage.kv.put("server", server("https://mcp.example/mcp"));
     context.storage.kv.put("callback", {
-      complete: vi.fn(async () => HANDOFF), reconnectComplete: vi.fn(async () => HANDOFF),
+      complete: vi.fn(async () => HANDOFF),
+      reconnectComplete: vi.fn(async () => HANDOFF),
     });
-    context.storage.kv.put("tokens", { access_token: "old-token", token_type: "Bearer", expiresAt: 1 });
+    context.storage.kv.put("tokens", {
+      access_token: "old-token",
+      token_type: "Bearer",
+      expiresAt: 1,
+    });
     context.storage.kv.put("oauthClient", liveClient);
     const account = new OAuthFlowAccount(context as never, {});
     const nonce = "b".repeat(64);
@@ -819,12 +1003,14 @@ describe("connect initiation nonce", () => {
     const outcome = await account.beginConnect(nonce, null);
     expect(outcome.kind).toBe("redirect");
     const state = new URL((outcome as { url: string }).url).searchParams.get("state")!;
-    await expect(account.acceptAuthCode("code", state.slice(state.indexOf(":") + 1)))
-      .rejects.toThrow();
+    await expect(
+      account.acceptAuthCode("code", state.slice(state.indexOf(":") + 1)),
+    ).rejects.toThrow();
 
     expect(context.storage.kv.get("oauthClient")).toEqual(liveClient);
-    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token)
-      .toBe("old-token");
+    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token).toBe(
+      "old-token",
+    );
   });
 
   it("stages an observed auth-mode change rather than flipping the live record", async () => {
@@ -835,7 +1021,11 @@ describe("connect initiation nonce", () => {
     const reconnectComplete = vi.fn(async (_stageId: string) => HANDOFF);
     context.storage.kv.put("server", server("https://mcp.example/mcp"));
     context.storage.kv.put("callback", { complete: vi.fn(async () => HANDOFF), reconnectComplete });
-    context.storage.kv.put("tokens", { access_token: "old-token", token_type: "Bearer", expiresAt: 1 });
+    context.storage.kv.put("tokens", {
+      access_token: "old-token",
+      token_type: "Bearer",
+      expiresAt: 1,
+    });
     const account = new PublicServerAccount(context as never, {});
     const nonce = "d".repeat(64);
     await account.prepareReconnect(nonce);
@@ -859,7 +1049,10 @@ describe("connect initiation nonce", () => {
     context.storage.kv.put("server", server("https://mcp.example/mcp"));
     context.storage.kv.put("callback", { reconnectComplete });
     context.storage.kv.put("tokens", {
-      access_token: "old-token", refresh_token: "old-refresh", token_type: "Bearer", expiresAt: 1,
+      access_token: "old-token",
+      refresh_token: "old-refresh",
+      token_type: "Bearer",
+      expiresAt: 1,
     });
     context.storage.kv.put("oauthClient", { client_id: "client-id" });
     context.storage.kv.put("oauthDiscovery", {
@@ -871,7 +1064,9 @@ describe("connect initiation nonce", () => {
     expect((await account.beginConnect(nonce, null)).kind).toBe("done");
     // Nothing is revoked until the Workshop confirms the reconnect: the old grant still serves.
     expect(revoked).toEqual([]);
-    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token).toBe("old-token");
+    expect(context.storage.kv.get<{ access_token: string }>("tokens")?.access_token).toBe(
+      "old-token",
+    );
 
     await account.commitReconnect(reconnectComplete.mock.calls[0][0]);
     expect(context.storage.kv.get<ConnectedServer>("server")?.auth).toBe("none");
@@ -892,11 +1087,17 @@ describe("connect initiation nonce", () => {
     stubOAuthServer();
     const reconnectComplete = vi.fn(async (_stageId: string) => HANDOFF);
     const portal = (serverName: string): ConnectedServer => ({
-      ...server("https://mcp.example/mcp"), provenance: "deployment", serverName,
+      ...server("https://mcp.example/mcp"),
+      provenance: "deployment",
+      serverName,
     });
     context.storage.kv.put("server", portal("Old name"));
     context.storage.kv.put("callback", { reconnectComplete });
-    context.storage.kv.put("tokens", { access_token: "old-token", token_type: "Bearer", expiresAt: 1 });
+    context.storage.kv.put("tokens", {
+      access_token: "old-token",
+      token_type: "Bearer",
+      expiresAt: 1,
+    });
     const account = new OAuthFlowAccount(context as never, {});
     const nonce = "9".repeat(64);
     await account.prepareReconnect(nonce);
@@ -905,13 +1106,16 @@ describe("connect initiation nonce", () => {
     expect(outcome.kind).toBe("redirect");
     expect(context.storage.kv.get<ConnectedServer>("server")?.serverName).toBe("Old name");
     const state = new URL((outcome as { url: string }).url).searchParams.get("state")!;
-    expect(await account.acceptAuthCode("code", state.slice(state.indexOf(":") + 1)))
-      .toEqual(HANDOFF);
+    expect(await account.acceptAuthCode("code", state.slice(state.indexOf(":") + 1))).toEqual(
+      HANDOFF,
+    );
     expect(context.storage.kv.get<ConnectedServer>("server")?.serverName).toBe("Old name");
 
     await account.commitReconnect(reconnectComplete.mock.calls[0][0]);
     expect(context.storage.kv.get<ConnectedServer>("server")).toMatchObject({
-      serverName: "New name", provenance: "deployment", auth: "oauth",
+      serverName: "New name",
+      provenance: "deployment",
+      auth: "oauth",
     });
   });
 
@@ -922,18 +1126,24 @@ describe("connect initiation nonce", () => {
     stubOAuthServer();
     const base = globalThis.fetch;
     let releaseRevocation!: () => void;
-    const revocationStarted = new Promise<void>(started => {
+    const revocationStarted = new Promise<void>((started) => {
       vi.stubGlobal("fetch", async (input: string, init?: RequestInit) => {
         if (String(input) !== "https://auth.example/revoke") return await base(input, init);
         started();
-        await new Promise<void>(release => { releaseRevocation = release; });
+        await new Promise<void>((release) => {
+          releaseRevocation = release;
+        });
         return new Response(null, { status: 200 });
       });
     });
     const reconnectComplete = vi.fn(async (_stageId: string) => HANDOFF);
     context.storage.kv.put("server", server("https://mcp.example/mcp"));
     context.storage.kv.put("callback", { reconnectComplete });
-    context.storage.kv.put("tokens", { access_token: "old-token", token_type: "Bearer", expiresAt: 1 });
+    context.storage.kv.put("tokens", {
+      access_token: "old-token",
+      token_type: "Bearer",
+      expiresAt: 1,
+    });
     context.storage.kv.put("oauthClient", { client_id: "client-id" });
     context.storage.kv.put("oauthDiscovery", {
       authorizationServerMetadata: { revocation_endpoint: "https://auth.example/revoke" },
@@ -962,8 +1172,9 @@ describe("connect initiation nonce", () => {
 
 describe("resolveConnectTarget", () => {
   it("accepts the first endpoint offered", () => {
-    expect(resolveConnectTarget(undefined, server("https://a.example/mcp")))
-      .toEqual(server("https://a.example/mcp"));
+    expect(resolveConnectTarget(undefined, server("https://a.example/mcp"))).toEqual(
+      server("https://a.example/mcp"),
+    );
   });
 
   it("refuses a reconnect that names a different endpoint", () => {
@@ -971,8 +1182,9 @@ describe("resolveConnectTarget", () => {
     // even for an account that already had a server. Re-pointing left every existing binding holding
     // the old endpoint in its props while the account minted credentials for the new one -- so the
     // next tool call would send the new server's bearer token to the old server.
-    expect(resolveConnectTarget(server("https://a.example/mcp"), server("https://evil.example/mcp")))
-      .toBeNull();
+    expect(
+      resolveConnectTarget(server("https://a.example/mcp"), server("https://evil.example/mcp")),
+    ).toBeNull();
   });
 
   it("adopts the caller's record when the endpoint is unchanged", () => {
@@ -981,18 +1193,23 @@ describe("resolveConnectTarget", () => {
     // could not pick up a renamed portal or a rotated preissued token: it would report success and
     // go on using exactly the configuration it was asked to replace.
     const stored: ConnectedServer = {
-      ...server("https://a.example/mcp"), serverName: "Old name", auth: "token",
+      ...server("https://a.example/mcp"),
+      serverName: "Old name",
+      auth: "token",
     };
     const configured: ConnectedServer = {
-      ...server("https://a.example/mcp"), serverName: "New name", auth: "oauth",
+      ...server("https://a.example/mcp"),
+      serverName: "New name",
+      auth: "oauth",
     };
     expect(resolveConnectTarget(stored, configured)).toEqual(configured);
   });
 
   it("falls back to the stored record when the caller names no target", () => {
     // A user-supplied reconnect has nothing to restate, so the account keeps what it has.
-    expect(resolveConnectTarget(server("https://a.example/mcp"), null))
-      .toEqual(server("https://a.example/mcp"));
+    expect(resolveConnectTarget(server("https://a.example/mcp"), null)).toEqual(
+      server("https://a.example/mcp"),
+    );
   });
 
   it("has nothing to connect to when neither side names an endpoint", () => {
@@ -1002,7 +1219,10 @@ describe("resolveConnectTarget", () => {
 
 describe("resolveConnectTarget and a repointed deployment", () => {
   const deployment = (endpoint: string): ConnectedServer => ({
-    ...server(endpoint), provenance: "deployment", serverId: "portal", serverName: "Portal",
+    ...server(endpoint),
+    provenance: "deployment",
+    serverId: "portal",
+    serverName: "Portal",
   });
 
   it("lets a deployment repoint its own gateway", () => {
@@ -1016,13 +1236,18 @@ describe("resolveConnectTarget and a repointed deployment", () => {
 
   it("still refuses a user-supplied reconnect that names a different endpoint", () => {
     // Unchanged, and the reason is different: this target is whatever was typed into the form.
-    expect(resolveConnectTarget(
-      server("https://a.example/mcp"), server("https://evil.example/mcp"))).toBeNull();
+    expect(
+      resolveConnectTarget(server("https://a.example/mcp"), server("https://evil.example/mcp")),
+    ).toBeNull();
   });
 
   it("refuses a user-supplied target trying to move a deployment's account", () => {
     // Provenance is the discriminator, so it has to be the incoming target's, not the stored one's.
-    expect(resolveConnectTarget(
-      deployment("https://old.example/mcp"), server("https://evil.example/mcp"))).toBeNull();
+    expect(
+      resolveConnectTarget(
+        deployment("https://old.example/mcp"),
+        server("https://evil.example/mcp"),
+      ),
+    ).toBeNull();
   });
 });

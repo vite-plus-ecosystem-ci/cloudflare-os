@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-plugin";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 import deployed from "./cloudflare.config.ts";
 
 const { compatibilityDate, compatibilityFlags } = deployed.worker;
@@ -18,23 +18,28 @@ export default defineConfig({
         compatibilityDate,
         compatibilityFlags,
         bindings: {
-          CLIENT_ID: "test-client", CLIENT_SECRET: "test-secret",
-          PUBSUB_CHAT_TOPIC: "projects/test/topics/chat", PUBSUB_GMAIL_TOPIC: "projects/test/topics/gmail",
+          CLIENT_ID: "test-client",
+          CLIENT_SECRET: "test-secret",
+          PUBSUB_CHAT_TOPIC: "projects/test/topics/chat",
+          PUBSUB_GMAIL_TOPIC: "projects/test/topics/gmail",
           PUBSUB_PUSH_SERVICE_ACCOUNT: "push@test.iam.gserviceaccount.com",
         },
         durableObjects: {
-          BigQueryGatekeeperImpl: {className: "BigQueryGatekeeperImpl", useSQLite: true},
-          ChatHookDriver: {className: "ChatHookDriver", useSQLite: true},
-          GmailGatekeeperImpl: {className: "GmailGatekeeperImpl", useSQLite: true},
-          GmailHookDriver: {className: "GmailHookDriver", useSQLite: true},
-          GoogleCalendarGatekeeperImpl: {className: "GoogleCalendarGatekeeperImpl", useSQLite: true},
-          GoogleChatGatekeeperImpl: {className: "GoogleChatGatekeeperImpl", useSQLite: true},
-          GoogleDocGatekeeperImpl: {className: "GoogleDocGatekeeperImpl", useSQLite: true},
-          GoogleDriveGatekeeperImpl: {className: "GoogleDriveGatekeeperImpl", useSQLite: true},
-          GoogleSheetsGatekeeperImpl: {className: "GoogleSheetsGatekeeperImpl", useSQLite: true},
-          GoogleSlidesGatekeeperImpl: {className: "GoogleSlidesGatekeeperImpl", useSQLite: true},
-          TestHooks: {className: "TestHooks", useSQLite: true},
-          UserAccount: {className: "UserAccount", useSQLite: true},
+          BigQueryGatekeeperImpl: { className: "BigQueryGatekeeperImpl", useSQLite: true },
+          ChatHookDriver: { className: "ChatHookDriver", useSQLite: true },
+          GmailGatekeeperImpl: { className: "GmailGatekeeperImpl", useSQLite: true },
+          GmailHookDriver: { className: "GmailHookDriver", useSQLite: true },
+          GoogleCalendarGatekeeperImpl: {
+            className: "GoogleCalendarGatekeeperImpl",
+            useSQLite: true,
+          },
+          GoogleChatGatekeeperImpl: { className: "GoogleChatGatekeeperImpl", useSQLite: true },
+          GoogleDocGatekeeperImpl: { className: "GoogleDocGatekeeperImpl", useSQLite: true },
+          GoogleDriveGatekeeperImpl: { className: "GoogleDriveGatekeeperImpl", useSQLite: true },
+          GoogleSheetsGatekeeperImpl: { className: "GoogleSheetsGatekeeperImpl", useSQLite: true },
+          GoogleSlidesGatekeeperImpl: { className: "GoogleSlidesGatekeeperImpl", useSQLite: true },
+          TestHooks: { className: "TestHooks", useSQLite: true },
+          UserAccount: { className: "UserAccount", useSQLite: true },
         },
       },
     }),

@@ -3,14 +3,18 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { BrowserPushBridge } from "./BrowserPushBridge";
 
 const { router, syncBrowserPush } = vi.hoisted(() => ({
   router: { navigate: vi.fn<(options: object) => Promise<void>>() },
   syncBrowserPush: vi.fn<(api: object, userId: string, publicKey: string) => Promise<void>>(),
 }));
-let auth: { authenticatedApi: object; currentUser: { id: string } | null; isCurrentUserConfirmed: boolean };
+let auth: {
+  authenticatedApi: object;
+  currentUser: { id: string } | null;
+  isCurrentUserConfirmed: boolean;
+};
 let webPushPublicKey: string;
 
 vi.mock("@tanstack/react-router", () => ({ useRouter: () => router }));
@@ -23,10 +27,11 @@ describe("BrowserPushBridge", () => {
   let root: Root;
   let serviceWorker: EventTarget;
 
-  const render = (next: typeof auth) => act(async () => {
-    auth = next;
-    root.render(<BrowserPushBridge />);
-  });
+  const render = (next: typeof auth) =>
+    act(async () => {
+      auth = next;
+      root.render(<BrowserPushBridge />);
+    });
 
   beforeEach(() => {
     router.navigate.mockReset();
@@ -65,7 +70,10 @@ describe("BrowserPushBridge", () => {
 
     await render({ authenticatedApi: first, currentUser: alice, isCurrentUserConfirmed: true });
     await render({ authenticatedApi: second, currentUser: alice, isCurrentUserConfirmed: true });
-    expect(syncBrowserPush.mock.calls).toEqual([[first, "alice", "BKey"], [second, "alice", "BKey"]]);
+    expect(syncBrowserPush.mock.calls).toEqual([
+      [first, "alice", "BKey"],
+      [second, "alice", "BKey"],
+    ]);
   });
 
   it("syncs again when a reconnect brings a new key", async () => {
@@ -74,15 +82,19 @@ describe("BrowserPushBridge", () => {
     await render({ authenticatedApi: first, currentUser: alice, isCurrentUserConfirmed: true });
     webPushPublicKey = "BNew";
     await render({ authenticatedApi: second, currentUser: alice, isCurrentUserConfirmed: true });
-    expect(syncBrowserPush.mock.calls).toEqual([[first, "alice", "BKey"], [second, "alice", "BNew"]]);
+    expect(syncBrowserPush.mock.calls).toEqual([
+      [first, "alice", "BKey"],
+      [second, "alice", "BNew"],
+    ]);
   });
 
   it("opens the chat a clicked notification names", async () => {
     await render({ authenticatedApi: {}, currentUser: null, isCurrentUserConfirmed: false });
 
     let path = "/workspace/w1?chat=3&showChat=true";
-    serviceWorker.dispatchEvent(new MessageEvent("message",
-      { data: { type: "cloudflare-os:open-notification", path } }));
+    serviceWorker.dispatchEvent(
+      new MessageEvent("message", { data: { type: "cloudflare-os:open-notification", path } }),
+    );
 
     expect(router.navigate).toHaveBeenCalledWith({ href: path });
   });

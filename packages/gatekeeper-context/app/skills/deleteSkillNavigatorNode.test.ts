@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { ContextApi } from "../../src/context-types";
 import { deleteSkillNavigatorNode } from "./deleteSkillNavigatorNode";
 
@@ -23,10 +23,7 @@ describe("deleteSkillNavigatorNode", () => {
       path: "teams/review/SKILL.md",
     });
 
-    expect(context.deleteContextSkill).toHaveBeenCalledWith(
-      "collection",
-      "teams/review/SKILL.md",
-    );
+    expect(context.deleteContextSkill).toHaveBeenCalledWith("collection", "teams/review/SKILL.md");
   });
 
   it("deletes a complete directory subtree", async () => {

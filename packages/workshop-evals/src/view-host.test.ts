@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vite-plus/test";
 import { closeViewBrowser, RenderedView } from "./view-host.js";
 
 afterAll(() => closeViewBrowser());
@@ -30,11 +30,17 @@ describe("RenderedView", { timeout: 60_000 }, () => {
         new WebSocket("wss://example.com/socket");
         Promise.reject(new Error("rejected"));
       </script>`);
-    await expect.poll(() => view.requests.toSorted()).toEqual([
-      "https://example.com/api", "https://example.com/app.js", "https://example.com/chart.png",
-      "https://example.com/embed", "https://example.com/style.css", "https://example.com/tile.png",
-      "wss://example.com/socket",
-    ]);
+    await expect
+      .poll(() => view.requests.toSorted())
+      .toEqual([
+        "https://example.com/api",
+        "https://example.com/app.js",
+        "https://example.com/chart.png",
+        "https://example.com/embed",
+        "https://example.com/style.css",
+        "https://example.com/tile.png",
+        "wss://example.com/socket",
+      ]);
     await expect.poll(() => view.errors).toEqual(["rejected"]);
   });
 
@@ -53,7 +59,9 @@ describe("RenderedView", { timeout: 60_000 }, () => {
         const results = await Promise.all(tries.map(async run => { try { await run(); return "ran"; } catch { return "refused"; } }));
         document.getElementById("out").textContent = results.join(" ");
       </script>`);
-    expect((await view.waitForText(text => text.includes("ran"))).text).toContain("refused refused refused ran ran");
+    expect((await view.waitForText((text) => text.includes("ran"))).text).toContain(
+      "refused refused refused ran ran",
+    );
     await view.click("Ask", []);
     expect(view.messages).toEqual(["Clicked"]);
   });
@@ -103,8 +111,10 @@ describe("RenderedView", { timeout: 60_000 }, () => {
         people.addEventListener("change", show);
         show();
       </script>`);
-    expect(await input.setValue("4", "5", text => text.includes("Each 20.00")))
-      .toMatchObject({ pass: true, how: "changed the control and pressed Enter" });
+    expect(await input.setValue("4", "5", (text) => text.includes("Each 20.00"))).toMatchObject({
+      pass: true,
+      how: "changed the control and pressed Enter",
+    });
 
     await using stepper = await RenderedView.open(`
       <span id="people">4</span><button aria-label="Add a person">+</button>
@@ -118,12 +128,15 @@ describe("RenderedView", { timeout: 60_000 }, () => {
         document.querySelector("button").onclick = () => { people++; show(); };
         show();
       </script>`);
-    expect(await stepper.setValue("4", "5", text => text.includes("Each 20.00")))
-      .toMatchObject({ pass: true, how: "clicked its stepper 1 times" });
+    expect(await stepper.setValue("4", "5", (text) => text.includes("Each 20.00"))).toMatchObject({
+      pass: true,
+      how: "clicked its stepper 1 times",
+    });
   });
 
   it("clicks a control only where nothing covers it", async () => {
-    const view = (style: string) => RenderedView.open(`
+    const view = (style: string) =>
+      RenderedView.open(`
       <div style="position:relative">
         <button id="pick" style="width:200px;height:40px">Pick</button>
         <div style="position:absolute;top:0;left:0;${style};height:40px;background:#eee">Streamer</div>
@@ -132,7 +145,9 @@ describe("RenderedView", { timeout: 60_000 }, () => {
         document.getElementById("pick").addEventListener("click", () => agent.send("Pick Streamer"));
       </script>`);
     await using covered = await view("width:200px");
-    expect(await covered.click("Streamer", [])).toContain('found nothing to click on button#pick "pick"');
+    expect(await covered.click("Streamer", [])).toContain(
+      'found nothing to click on button#pick "pick"',
+    );
     expect(covered.messages).toEqual([]);
     await using half = await view("width:120px");
     await half.click("Streamer", []);
@@ -148,7 +163,8 @@ describe("RenderedView", { timeout: 60_000 }, () => {
   });
 
   it("edits only a control the user can see and change, within its limits", async () => {
-    const view = (attributes: string) => RenderedView.open(`
+    const view = (attributes: string) =>
+      RenderedView.open(`
       <input id="people" value="4" ${attributes}> <p id="each"></p>
       <script type="module">
         const people = document.getElementById("people");
@@ -156,13 +172,20 @@ describe("RenderedView", { timeout: 60_000 }, () => {
         people.addEventListener("input", show);
         show();
       </script>`);
-    for (const attributes of ["readonly", "disabled", 'style="opacity:0"', 'style="position:absolute;left:-9999px"']) {
+    for (const attributes of [
+      "readonly",
+      "disabled",
+      'style="opacity:0"',
+      'style="position:absolute;left:-9999px"',
+    ]) {
       await using refused = await view(attributes);
-      expect(await refused.setValue("4", "5", text => text.includes("People 5")), attributes)
-        .toMatchObject({ pass: false, how: "found no control holding 4" });
+      expect(
+        await refused.setValue("4", "5", (text) => text.includes("People 5")),
+        attributes,
+      ).toMatchObject({ pass: false, how: "found no control holding 4" });
     }
     await using limited = await view('maxlength="1"');
-    const limitedEdit = await limited.setValue("4", "12", text => text.includes("People 1"));
+    const limitedEdit = await limited.setValue("4", "12", (text) => text.includes("People 1"));
     expect(limitedEdit.pass).toBe(true);
     expect(limitedEdit.text).not.toContain("12");
 
@@ -172,11 +195,14 @@ describe("RenderedView", { timeout: 60_000 }, () => {
         const people = document.getElementById("people");
         people.addEventListener("change", () => { document.getElementById("each").textContent = "People " + people.value; });
       </script>`);
-    expect(await select.setValue("4", "5", text => text.includes("People 5"))).toMatchObject({ pass: true });
+    expect(await select.setValue("4", "5", (text) => text.includes("People 5"))).toMatchObject({
+      pass: true,
+    });
   });
 
   it("reads the space between inline elements, and none where they touch", async () => {
-    await using view = await RenderedView.open(`<div><span>Jan</span> <span>410</span></div><div><b>Feb</b>\n  <i>380</i></div>
+    await using view =
+      await RenderedView.open(`<div><span>Jan</span> <span>410</span></div><div><b>Feb</b>\n  <i>380</i></div>
       <p><span style="display:inline-block">$54</span><span style="display:inline-block">.46</span></p><pre>Mar\n340</pre>`);
     expect(await view.text()).toBe("Jan 410\nFeb 380\n$54.46\nMar\n340");
   });
@@ -185,12 +211,20 @@ describe("RenderedView", { timeout: 60_000 }, () => {
     await using view = await RenderedView.open(`
       <p>Each pays <span>$<b>4</b><small>.50</small></span> <button aria-label="Add a person">+</button></p>
       <p><b>Stream</b>er $45 · <b>Basic</b> $15</p>`);
-    expect((await view.shownTexts()).map(({ text }) => text).toSorted())
-      .toEqual(["$4.50", "+", "Basic", "Each pays $4.50 +", "Streamer $45 · Basic $15"]);
+    expect((await view.shownTexts()).map(({ text }) => text).toSorted()).toEqual([
+      "$4.50",
+      "+",
+      "Basic",
+      "Each pays $4.50 +",
+      "Streamer $45 · Basic $15",
+    ]);
     const { series } = await view.waitForSeries(["Streamer", "Basic"], () => true);
     expect(series.beside).toEqual([expect.stringContaining("$45"), expect.stringContaining("$15")]);
     expect(series.beside[0]).not.toContain("$15");
-    expect(await view.setValue("4", "5", text => text.includes("$5"))).toMatchObject({ pass: false, how: "found no control holding 4" });
+    expect(await view.setValue("4", "5", (text) => text.includes("$5"))).toMatchObject({
+      pass: false,
+      how: "found no control holding 4",
+    });
   });
 
   it("reads the values a person sees in form controls", async () => {
@@ -212,7 +246,9 @@ describe("RenderedView", { timeout: 60_000 }, () => {
         <rect width="50" height="20" opacity="0" aria-label="Unseen bar" /></svg>`);
     expect((await view.text()).split("\n")).toEqual(["Shown", "Bar", "Tooltip"]);
 
-    await using blank = await RenderedView.open(`<style>body { display: none; }</style><p>Jan 410</p><svg width="100" height="40"></svg>`);
+    await using blank = await RenderedView.open(
+      `<style>body { display: none; }</style><p>Jan 410</p><svg width="100" height="40"></svg>`,
+    );
     expect(await blank.text()).toBe("");
     expect(await blank.visible()).toBe(false);
   });
@@ -225,10 +261,15 @@ describe("RenderedView", { timeout: 60_000 }, () => {
         <rect x="60" y="60" width="30" height="40" /><text x="75" y="115" text-anchor="middle">Feb</text>
       </svg>`);
     const { series } = await view.waitForSeries(["Food", "Travel", "Jan", "Feb"], () => true);
-    expect(series.beside.slice(0, 2)).toEqual([expect.stringContaining("$420"), expect.stringContaining("$185")]);
+    expect(series.beside.slice(0, 2)).toEqual([
+      expect.stringContaining("$420"),
+      expect.stringContaining("$185"),
+    ]);
     expect(series.beside[0]).not.toContain("$185");
-    expect(series.marks.filter(mark => mark.key === "rect 0"))
-      .toEqual([{ label: 2, key: "rect 0", axis: "y", at: expect.any(Number) }, { label: 3, key: "rect 0", axis: "y", at: expect.any(Number) }]);
+    expect(series.marks.filter((mark) => mark.key === "rect 0")).toEqual([
+      { label: 2, key: "rect 0", axis: "y", at: expect.any(Number) },
+      { label: 3, key: "rect 0", axis: "y", at: expect.any(Number) },
+    ]);
   });
 
   it("finds each label where it is drawn, in a box of its own beside another", async () => {
@@ -239,7 +280,13 @@ describe("RenderedView", { timeout: 60_000 }, () => {
         </div>
         <div><span style="display:inline-block;width:90px">Jan</span>${gap}<span style="display:inline-block;width:90px">Feb</span></div>`);
       const { series } = await view.waitForSeries(["Jan", "Feb"], () => true);
-      expect(series.marks.map(({ label, axis }) => [label, axis]), JSON.stringify(gap)).toEqual([[0, "y"], [1, "y"]]);
+      expect(
+        series.marks.map(({ label, axis }) => [label, axis]),
+        JSON.stringify(gap),
+      ).toEqual([
+        [0, "y"],
+        [1, "y"],
+      ]);
     }
   });
 });

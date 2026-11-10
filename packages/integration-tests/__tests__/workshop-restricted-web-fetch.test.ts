@@ -1,9 +1,18 @@
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type { AdminApi } from "@gadgets/workshop-shared/api";
 import { openAgentSession } from "../src/agent-session.js";
-import { ADMIN_USERNAME, startTestGatekeeperHarness, TEST_VENDOR_ID, type Harness } from "../src/harness.js";
-import { SCRIPTED_MODEL_ID, scriptedModelRouter, type RoutedScriptedModel } from "../src/mock-model.js";
+import {
+  ADMIN_USERNAME,
+  startTestGatekeeperHarness,
+  TEST_VENDOR_ID,
+  type Harness,
+} from "../src/harness.js";
+import {
+  SCRIPTED_MODEL_ID,
+  scriptedModelRouter,
+  type RoutedScriptedModel,
+} from "../src/mock-model.js";
 import { NetworkInterceptor, type Handler } from "../src/network-interceptor.js";
 import { connect, signUp } from "../src/rpc-client.js";
 
@@ -18,7 +27,7 @@ const TARGET = `https://${TRUSTED_HOST}/restricted-web-fetch`;
 const OTHER_HOST = "other.example";
 const PAGE = "The trusted page.";
 const webRequests: string[] = [];
-const web: Handler = url => {
+const web: Handler = (url) => {
   if (url.host !== TRUSTED_HOST && url.host !== OTHER_HOST) return null;
   webRequests.push(url.href);
   return new Response(PAGE, { headers: { "content-type": "text/plain" } });
@@ -44,22 +53,37 @@ afterAll(async () => {
   }
 });
 
-const READ_RESTRICTED = { toolCall: { id: "read-restricted", name: "executeCode", arguments: {
-  code: "export default async function(self, env) { console.log(await env.TEST_AMBIENT.readValue(true)); }",
-} } };
+const READ_RESTRICTED = {
+  toolCall: {
+    id: "read-restricted",
+    name: "executeCode",
+    arguments: {
+      code: "export default async function(self, env) { console.log(await env.TEST_AMBIENT.readValue(true)); }",
+    },
+  },
+};
 
-const fetchStep = (id: string, url: string) => ({ toolCall: { id, name: "webFetch", arguments: { url } } });
-
-const toolResult = (id: string, content: string) => ({ messages: expect.arrayContaining([
-  expect.objectContaining({ role: "tool", tool_call_id: id, content: expect.stringContaining(content) }),
-]) });
-
-const openSession = (model: RoutedScriptedModel) => openAgentSession(harness.url, {
-  modelId: SCRIPTED_MODEL_ID,
-  userModel: model.userModel,
-  ambientVendorIds: [TEST_VENDOR_ID],
-  usernamePrefix: "restrictedfetch",
+const fetchStep = (id: string, url: string) => ({
+  toolCall: { id, name: "webFetch", arguments: { url } },
 });
+
+const toolResult = (id: string, content: string) => ({
+  messages: expect.arrayContaining([
+    expect.objectContaining({
+      role: "tool",
+      tool_call_id: id,
+      content: expect.stringContaining(content),
+    }),
+  ]),
+});
+
+const openSession = (model: RoutedScriptedModel) =>
+  openAgentSession(harness.url, {
+    modelId: SCRIPTED_MODEL_ID,
+    userModel: model.userModel,
+    ambientVendorIds: [TEST_VENDOR_ID],
+    usernamePrefix: "restrictedfetch",
+  });
 
 it("refuses a web fetch once the workspace has read restricted data, with no trusted hosts", async () => {
   const model = models.script([
@@ -72,9 +96,13 @@ it("refuses a web fetch once the workspace has read restricted data, with no tru
 
   expect(turn.outcome).toEqual({ status: "completed" });
   expect(model.requests).toHaveLength(3);
-  expect(model.requests[2]).toMatchObject(toolResult("fetch-page",
+  expect(model.requests[2]).toMatchObject(
+    toolResult(
+      "fetch-page",
       "This workspace has observed sensitive data. To prevent leaks, the workspace is " +
-      "prohibited from fetching from public web sites."));
+        "prohibited from fetching from public web sites.",
+    ),
+  );
   expect(webRequests).toEqual([]);
 });
 
@@ -93,7 +121,9 @@ it("fetches only from trusted hosts once the workspace has read restricted data"
     expect(turn.outcome).toEqual({ status: "completed" });
     expect(model.requests).toHaveLength(4);
     expect(model.requests[2]).toMatchObject(toolResult("fetch-trusted", PAGE));
-    expect(model.requests[3]).toMatchObject(toolResult("fetch-other", `may only fetch from ${TRUSTED_HOST}`));
+    expect(model.requests[3]).toMatchObject(
+      toolResult("fetch-other", `may only fetch from ${TRUSTED_HOST}`),
+    );
     expect(webRequests).toEqual([TARGET]);
   } finally {
     await admin.setRestrictedWebFetchHosts([]);
@@ -117,7 +147,7 @@ it("fetches a URL the trusted hosts refuse once the user approves it, if the adm
 
     expect(asked.outcome).toEqual({ status: "completed" });
     expect(model.requests).toHaveLength(2);
-    const requests = asked.history.filter(msg => msg.type === "webFetchRequest");
+    const requests = asked.history.filter((msg) => msg.type === "webFetchRequest");
     expect(requests).toEqual([expect.objectContaining({ url: approved, state: "pending" })]);
     expect(webRequests).not.toContain(approved);
 
@@ -127,8 +157,9 @@ it("fetches a URL the trusted hosts refuse once the user approves it, if the adm
     expect(model.requests).toHaveLength(4);
     expect(model.requests[3]).toMatchObject(toolResult("fetch-approved", PAGE));
     expect(webRequests).toContain(approved);
-    const pending = resumed.history.filter(msg => msg.type === "webFetchRequest")
-        .filter(msg => msg.state === "pending");
+    const pending = resumed.history
+      .filter((msg) => msg.type === "webFetchRequest")
+      .filter((msg) => msg.state === "pending");
     expect(pending).toEqual([expect.objectContaining({ url: denied })]);
 
     // A denial leaves the turn ended, and an approval ends with the turn it was given in.
@@ -137,12 +168,18 @@ it("fetches a URL the trusted hosts refuse once the user approves it, if the adm
 
     expect(next.outcome).toEqual({ status: "completed" });
     expect(model.requests).toHaveLength(5);
-    expect(model.requests[4]).toMatchObject({ messages: expect.arrayContaining([
-      expect.objectContaining({ role: "user", content: expect.stringContaining(`The user denied fetching ${denied}`) }),
-    ]) });
-    expect(next.history.filter(msg => msg.type === "webFetchRequest").at(-1))
-      .toEqual(expect.objectContaining({ url: approved, state: "pending" }));
-    expect(webRequests.filter(url => url === approved)).toHaveLength(1);
+    expect(model.requests[4]).toMatchObject({
+      messages: expect.arrayContaining([
+        expect.objectContaining({
+          role: "user",
+          content: expect.stringContaining(`The user denied fetching ${denied}`),
+        }),
+      ]),
+    });
+    expect(next.history.filter((msg) => msg.type === "webFetchRequest").at(-1)).toEqual(
+      expect.objectContaining({ url: approved, state: "pending" }),
+    );
+    expect(webRequests.filter((url) => url === approved)).toHaveLength(1);
     expect(webRequests).not.toContain(denied);
   } finally {
     await admin.setRestrictedWebFetchApprovals(false);

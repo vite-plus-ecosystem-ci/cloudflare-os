@@ -3,10 +3,12 @@
 
 import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type {
-  AuthenticatedApi, NotificationSubscriber, UserNotification,
+  AuthenticatedApi,
+  NotificationSubscriber,
+  UserNotification,
 } from "@gadgets/workshop-shared/api";
 import { NotificationBridge } from "./NotificationBridge";
 import { disconnectNativeNotificationEnrollment } from "./nativeNotificationEnrollment";
@@ -27,7 +29,10 @@ const notification: UserNotification = {
 };
 
 const setVisibility = (visibilityState: DocumentVisibilityState) => {
-  Object.defineProperty(document, "visibilityState", { configurable: true, value: visibilityState });
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value: visibilityState,
+  });
   document.dispatchEvent(new Event("visibilitychange"));
 };
 
@@ -45,13 +50,17 @@ describe("NotificationBridge", () => {
     subscribeToNotifications: Mock<Subscribe>;
   };
 
-  const render = () => act(async () => root.render(
-    <NotificationBridge
-      authenticatedApi={authenticatedApi as unknown as RpcStub<AuthenticatedApi>} />,
-  ));
+  const render = () =>
+    act(async () =>
+      root.render(
+        <NotificationBridge
+          authenticatedApi={authenticatedApi as unknown as RpcStub<AuthenticatedApi>}
+        />,
+      ),
+    );
   // What capnweb does once the server drops its last reference to a subscriber.
-  const release = (index: number) => act(async () =>
-    (subscribers[index] as unknown as Disposable)[Symbol.dispose]());
+  const release = (index: number) =>
+    act(async () => (subscribers[index] as unknown as Disposable)[Symbol.dispose]());
 
   beforeEach(() => {
     addToast.mockClear();
@@ -61,9 +70,11 @@ describe("NotificationBridge", () => {
     dispose = vi.fn<() => void>();
     authenticatedApi = {
       authorizeNotificationDevice: vi.fn<() => Promise<string>>().mockResolvedValue("a".repeat(64)),
-      registerAuthorizedNotificationDevice: vi.fn<(id: string) => Promise<void>>().mockResolvedValue(),
+      registerAuthorizedNotificationDevice: vi
+        .fn<(id: string) => Promise<void>>()
+        .mockResolvedValue(),
       registerNotificationDevice: vi.fn<(id: string) => Promise<void>>().mockResolvedValue(),
-      subscribeToNotifications: vi.fn<Subscribe>(subscriber => {
+      subscribeToNotifications: vi.fn<Subscribe>((subscriber) => {
         subscribers.push(subscriber);
         return Object.assign(Promise.resolve(), { [Symbol.dispose]: dispose });
       }),
@@ -83,40 +94,65 @@ describe("NotificationBridge", () => {
   it("obtains a CFOS-authorized grant before asking new native apps to enroll", async () => {
     const request = vi.fn<(authorization?: string) => void>();
     const finished = vi.fn<(outcome: "ready" | "failed") => void>();
-    Object.assign(window, { cloudflareOSNative: { version: 1, isAvailable: () => true,
-      loginReady: () => {}, returnToInstalls: () => {}, notifications: {
-        authorizationRequired: true, currentDeviceRegistration: () => undefined,
-        requestDeviceRegistration: request, registrationFinished: finished,
-      } } });
+    Object.assign(window, {
+      cloudflareOSNative: {
+        version: 1,
+        isAvailable: () => true,
+        loginReady: () => {},
+        returnToInstalls: () => {},
+        notifications: {
+          authorizationRequired: true,
+          currentDeviceRegistration: () => undefined,
+          requestDeviceRegistration: request,
+          registrationFinished: finished,
+        },
+      },
+    });
     await render();
     expect(request).toHaveBeenCalledExactlyOnceWith("a".repeat(64));
-    await act(async () => window.dispatchEvent(new CustomEvent(
-      "cloudflare-os:notification-device-registration",
-      { detail: { deviceRegistrationId: "native-handle" } },
-    )));
-    expect(authenticatedApi.registerAuthorizedNotificationDevice)
-        .toHaveBeenCalledExactlyOnceWith("native-handle");
+    await act(async () =>
+      window.dispatchEvent(
+        new CustomEvent("cloudflare-os:notification-device-registration", {
+          detail: { deviceRegistrationId: "native-handle" },
+        }),
+      ),
+    );
+    expect(authenticatedApi.registerAuthorizedNotificationDevice).toHaveBeenCalledExactlyOnceWith(
+      "native-handle",
+    );
     expect(authenticatedApi.registerNotificationDevice).not.toHaveBeenCalled();
     expect(finished).toHaveBeenCalledWith("ready");
     authenticatedApi = { ...authenticatedApi };
     await render();
     expect(authenticatedApi.authorizeNotificationDevice).toHaveBeenCalledOnce();
-    await act(async () => window.dispatchEvent(
-      new Event("cloudflare-os:notification-authorization-request")));
+    await act(async () =>
+      window.dispatchEvent(new Event("cloudflare-os:notification-authorization-request")),
+    );
     expect(authenticatedApi.authorizeNotificationDevice).toHaveBeenCalledTimes(2);
   });
 
   it("does not hand a late grant to native after the authenticated view unmounts", async () => {
     let resolve!: (grant: string) => void;
     authenticatedApi.authorizeNotificationDevice.mockReturnValue(
-        new Promise(done => { resolve = done; }));
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
     const request = vi.fn<(authorization?: string) => void>();
-    Object.assign(window, { cloudflareOSNative: { version: 1, isAvailable: () => true,
-      loginReady: () => {}, returnToInstalls: () => {}, notifications: {
-        authorizationRequired: true, currentDeviceRegistration: () => undefined,
-        requestDeviceRegistration: request,
-        registrationFinished: vi.fn<(outcome: "ready" | "failed") => void>(),
-      } } });
+    Object.assign(window, {
+      cloudflareOSNative: {
+        version: 1,
+        isAvailable: () => true,
+        loginReady: () => {},
+        returnToInstalls: () => {},
+        notifications: {
+          authorizationRequired: true,
+          currentDeviceRegistration: () => undefined,
+          requestDeviceRegistration: request,
+          registrationFinished: vi.fn<(outcome: "ready" | "failed") => void>(),
+        },
+      },
+    });
     await render();
     await act(async () => root.unmount());
     root = createRoot(container);
@@ -129,14 +165,21 @@ describe("NotificationBridge", () => {
     authenticatedApi.registerAuthorizedNotificationDevice.mockReturnValue(registration.promise);
     const finished = vi.fn<(outcome: "ready" | "failed") => void>();
     const disconnect = vi.fn<() => void>();
-    Object.assign(window, { cloudflareOSNative: { version: 1, isAvailable: () => true,
-      loginReady: () => {}, returnToInstalls: () => {}, notifications: {
-        authorizationRequired: true,
-        currentDeviceRegistration: () => "pending-handle",
-        requestDeviceRegistration: vi.fn<(authorization?: string) => void>(),
-        registrationFinished: finished,
-        disconnect,
-      } } });
+    Object.assign(window, {
+      cloudflareOSNative: {
+        version: 1,
+        isAvailable: () => true,
+        loginReady: () => {},
+        returnToInstalls: () => {},
+        notifications: {
+          authorizationRequired: true,
+          currentDeviceRegistration: () => "pending-handle",
+          requestDeviceRegistration: vi.fn<(authorization?: string) => void>(),
+          registrationFinished: finished,
+          disconnect,
+        },
+      },
+    });
     await render();
     await act(async () => root.unmount());
     root = createRoot(container);
@@ -150,14 +193,21 @@ describe("NotificationBridge", () => {
     authenticatedApi.registerAuthorizedNotificationDevice.mockReturnValue(new Promise(() => {}));
     const finished = vi.fn<(outcome: "ready" | "failed") => void>();
     const disconnect = vi.fn<() => void>();
-    Object.assign(window, { cloudflareOSNative: { version: 1, isAvailable: () => true,
-      loginReady: () => {}, returnToInstalls: () => {}, notifications: {
-        authorizationRequired: true,
-        currentDeviceRegistration: () => "pending-handle",
-        requestDeviceRegistration: vi.fn<(authorization?: string) => void>(),
-        registrationFinished: finished,
-        disconnect,
-      } } });
+    Object.assign(window, {
+      cloudflareOSNative: {
+        version: 1,
+        isAvailable: () => true,
+        loginReady: () => {},
+        returnToInstalls: () => {},
+        notifications: {
+          authorizationRequired: true,
+          currentDeviceRegistration: () => "pending-handle",
+          requestDeviceRegistration: vi.fn<(authorization?: string) => void>(),
+          registrationFinished: finished,
+          disconnect,
+        },
+      },
+    });
     await render();
     act(() => disconnectNativeNotificationEnrollment());
     expect(finished).toHaveBeenCalledExactlyOnceWith("failed");
@@ -171,13 +221,20 @@ describe("NotificationBridge", () => {
     );
     const request = vi.fn<(authorization?: string) => void>();
     const finished = vi.fn<(outcome: "ready" | "failed") => void>();
-    Object.assign(window, { cloudflareOSNative: { version: 1, isAvailable: () => true,
-      loginReady: () => {}, returnToInstalls: () => {}, notifications: {
-        authorizationRequired: true,
-        currentDeviceRegistration: () => "stale-handle",
-        requestDeviceRegistration: request,
-        registrationFinished: finished,
-      } } });
+    Object.assign(window, {
+      cloudflareOSNative: {
+        version: 1,
+        isAvailable: () => true,
+        loginReady: () => {},
+        returnToInstalls: () => {},
+        notifications: {
+          authorizationRequired: true,
+          currentDeviceRegistration: () => "stale-handle",
+          requestDeviceRegistration: request,
+          registrationFinished: finished,
+        },
+      },
+    });
     await render();
     expect(finished).toHaveBeenCalledExactlyOnceWith("failed");
     expect(authenticatedApi.authorizeNotificationDevice).toHaveBeenCalledOnce();
@@ -187,20 +244,34 @@ describe("NotificationBridge", () => {
   it("hands a pending grant to the active Strict Mode effect", async () => {
     let resolve!: (grant: string) => void;
     authenticatedApi.authorizeNotificationDevice.mockReturnValue(
-        new Promise(done => { resolve = done; }));
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
     const request = vi.fn<(authorization?: string) => void>();
-    Object.assign(window, { cloudflareOSNative: { version: 1, isAvailable: () => true,
-      loginReady: () => {}, returnToInstalls: () => {}, notifications: {
-        authorizationRequired: true, currentDeviceRegistration: () => undefined,
-        requestDeviceRegistration: request,
-        registrationFinished: vi.fn<(outcome: "ready" | "failed") => void>(),
-      } } });
-    await act(async () => root.render(
-      <StrictMode>
-        <NotificationBridge
-          authenticatedApi={authenticatedApi as unknown as RpcStub<AuthenticatedApi>} />
-      </StrictMode>,
-    ));
+    Object.assign(window, {
+      cloudflareOSNative: {
+        version: 1,
+        isAvailable: () => true,
+        loginReady: () => {},
+        returnToInstalls: () => {},
+        notifications: {
+          authorizationRequired: true,
+          currentDeviceRegistration: () => undefined,
+          requestDeviceRegistration: request,
+          registrationFinished: vi.fn<(outcome: "ready" | "failed") => void>(),
+        },
+      },
+    });
+    await act(async () =>
+      root.render(
+        <StrictMode>
+          <NotificationBridge
+            authenticatedApi={authenticatedApi as unknown as RpcStub<AuthenticatedApi>}
+          />
+        </StrictMode>,
+      ),
+    );
     expect(authenticatedApi.authorizeNotificationDevice).toHaveBeenCalledOnce();
     await act(async () => resolve("a".repeat(64)));
     expect(request).toHaveBeenCalledExactlyOnceWith("a".repeat(64));
@@ -209,25 +280,38 @@ describe("NotificationBridge", () => {
   it("reports an injected registration from the active Strict Mode effect", async () => {
     let resolveRegistration!: () => void;
     authenticatedApi.registerAuthorizedNotificationDevice.mockReturnValue(
-      new Promise(done => { resolveRegistration = done; }),
+      new Promise((done) => {
+        resolveRegistration = done;
+      }),
     );
     const request = vi.fn<(authorization?: string) => void>();
     const finished = vi.fn<(outcome: "ready" | "failed") => void>();
-    Object.assign(window, { cloudflareOSNative: { version: 1, isAvailable: () => true,
-      loginReady: () => {}, returnToInstalls: () => {}, notifications: {
-        authorizationRequired: true,
-        currentDeviceRegistration: () => "strict-mode-handle",
-        requestDeviceRegistration: request,
-        registrationFinished: finished,
-      } } });
-    await act(async () => root.render(
-      <StrictMode>
-        <NotificationBridge
-          authenticatedApi={authenticatedApi as unknown as RpcStub<AuthenticatedApi>} />
-      </StrictMode>,
-    ));
-    expect(authenticatedApi.registerAuthorizedNotificationDevice)
-        .toHaveBeenCalledExactlyOnceWith("strict-mode-handle");
+    Object.assign(window, {
+      cloudflareOSNative: {
+        version: 1,
+        isAvailable: () => true,
+        loginReady: () => {},
+        returnToInstalls: () => {},
+        notifications: {
+          authorizationRequired: true,
+          currentDeviceRegistration: () => "strict-mode-handle",
+          requestDeviceRegistration: request,
+          registrationFinished: finished,
+        },
+      },
+    });
+    await act(async () =>
+      root.render(
+        <StrictMode>
+          <NotificationBridge
+            authenticatedApi={authenticatedApi as unknown as RpcStub<AuthenticatedApi>}
+          />
+        </StrictMode>,
+      ),
+    );
+    expect(authenticatedApi.registerAuthorizedNotificationDevice).toHaveBeenCalledExactlyOnceWith(
+      "strict-mode-handle",
+    );
     await act(async () => resolveRegistration());
     expect(finished).toHaveBeenCalledExactlyOnceWith("ready");
     expect(request).not.toHaveBeenCalled();
@@ -236,21 +320,27 @@ describe("NotificationBridge", () => {
   it("reports a legacy-global registration through Strict Mode effect replay", async () => {
     let resolveRegistration!: () => void;
     authenticatedApi.registerNotificationDevice.mockReturnValue(
-      new Promise(done => { resolveRegistration = done; }),
+      new Promise((done) => {
+        resolveRegistration = done;
+      }),
     );
     const finished = vi.fn<(message: { type: "ready" | "failed" }) => void>();
     Object.assign(window, {
       __CLOUDFLARE_OS_NOTIFICATION_DEVICE_REGISTRATION__: "legacy-handle",
       webkit: { messageHandlers: { cloudflareOSNotificationReady: { postMessage: finished } } },
     });
-    await act(async () => root.render(
-      <StrictMode>
-        <NotificationBridge
-          authenticatedApi={authenticatedApi as unknown as RpcStub<AuthenticatedApi>} />
-      </StrictMode>,
-    ));
-    expect(authenticatedApi.registerNotificationDevice)
-        .toHaveBeenCalledExactlyOnceWith("legacy-handle");
+    await act(async () =>
+      root.render(
+        <StrictMode>
+          <NotificationBridge
+            authenticatedApi={authenticatedApi as unknown as RpcStub<AuthenticatedApi>}
+          />
+        </StrictMode>,
+      ),
+    );
+    expect(authenticatedApi.registerNotificationDevice).toHaveBeenCalledExactlyOnceWith(
+      "legacy-handle",
+    );
     await act(async () => resolveRegistration());
     expect(finished).toHaveBeenCalledExactlyOnceWith({ type: "ready" });
     Reflect.deleteProperty(window, "webkit");
@@ -269,8 +359,7 @@ describe("NotificationBridge", () => {
     expect(addToast).not.toHaveBeenCalled();
   });
 
-  it("subscribes again when the server drops a live subscription, not after unsubscribing",
-      async () => {
+  it("subscribes again when the server drops a live subscription, not after unsubscribing", async () => {
     await render();
     // A User DO reset releases the subscriber while the session lives on.
     await release(0);
@@ -302,7 +391,7 @@ describe("NotificationBridge", () => {
 
   it("releases the old session on replacement and unmount", async () => {
     await render();
-    authenticatedApi = {...authenticatedApi};
+    authenticatedApi = { ...authenticatedApi };
     await render();
     expect(dispose).toHaveBeenCalledOnce();
     await act(async () => root.unmount());
@@ -312,9 +401,9 @@ describe("NotificationBridge", () => {
 
   it("recovers when the subscriber is released before a successful setup ACK", async () => {
     const ack = Promise.withResolvers<void>();
-    authenticatedApi.subscribeToNotifications.mockImplementationOnce(subscriber => {
+    authenticatedApi.subscribeToNotifications.mockImplementationOnce((subscriber) => {
       subscribers.push(subscriber);
-      return Object.assign(ack.promise, {[Symbol.dispose]: dispose});
+      return Object.assign(ack.promise, { [Symbol.dispose]: dispose });
     });
     await render();
     await release(0);
@@ -329,7 +418,7 @@ describe("NotificationBridge", () => {
 
   it("does not immediately retry when a failed subscription releases its arguments", async () => {
     using _ = vi.spyOn(console, "error").mockImplementation(() => {});
-    authenticatedApi.subscribeToNotifications.mockImplementationOnce(subscriber => {
+    authenticatedApi.subscribeToNotifications.mockImplementationOnce((subscriber) => {
       subscribers.push(subscriber);
       return Object.assign(Promise.reject(new Error("unavailable")), { [Symbol.dispose]: dispose });
     });
@@ -343,10 +432,12 @@ describe("NotificationBridge", () => {
     vi.useFakeTimers();
     using _ = vi.spyOn(console, "error").mockImplementation(() => {});
     let unavailable = true;
-    authenticatedApi.subscribeToNotifications.mockImplementation(subscriber => {
+    authenticatedApi.subscribeToNotifications.mockImplementation((subscriber) => {
       subscribers.push(subscriber);
-      return Object.assign(unavailable ? Promise.reject(new Error("unavailable")) : Promise.resolve(),
-        {[Symbol.dispose]: dispose});
+      return Object.assign(
+        unavailable ? Promise.reject(new Error("unavailable")) : Promise.resolve(),
+        { [Symbol.dispose]: dispose },
+      );
     });
     try {
       await render();
@@ -367,36 +458,45 @@ describe("NotificationBridge", () => {
     }
   });
 
-  it.each(["unmount", "reconnect"])("cancels pending notification recovery on %s", async reason => {
-    vi.useFakeTimers();
-    using _ = vi.spyOn(console, "error").mockImplementation(() => {});
-    authenticatedApi.subscribeToNotifications.mockImplementationOnce(subscriber => {
-      subscribers.push(subscriber);
-      return Object.assign(Promise.reject(new Error("unavailable")), {[Symbol.dispose]: dispose});
-    });
-    try {
-      await render();
-      if (reason === "unmount") {
-        await act(async () => root.unmount());
-        root = createRoot(container);
-      } else {
-        authenticatedApi = {...authenticatedApi};
+  it.each(["unmount", "reconnect"])(
+    "cancels pending notification recovery on %s",
+    async (reason) => {
+      vi.useFakeTimers();
+      using _ = vi.spyOn(console, "error").mockImplementation(() => {});
+      authenticatedApi.subscribeToNotifications.mockImplementationOnce((subscriber) => {
+        subscribers.push(subscriber);
+        return Object.assign(Promise.reject(new Error("unavailable")), {
+          [Symbol.dispose]: dispose,
+        });
+      });
+      try {
         await render();
+        if (reason === "unmount") {
+          await act(async () => root.unmount());
+          root = createRoot(container);
+        } else {
+          authenticatedApi = { ...authenticatedApi };
+          await render();
+        }
+        await release(0);
+        await act(async () => vi.advanceTimersByTime(60_000));
+        expect(authenticatedApi.subscribeToNotifications).toHaveBeenCalledTimes(
+          reason === "unmount" ? 1 : 2,
+        );
+      } finally {
+        vi.useRealTimers();
       }
-      await release(0);
-      await act(async () => vi.advanceTimersByTime(60_000));
-      expect(authenticatedApi.subscribeToNotifications).toHaveBeenCalledTimes(reason === "unmount" ? 1 : 2);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
+    },
+  );
 
   it("opens a notified task in the app", async () => {
     await render();
     await act(() => subscribers[0].notify(notification));
     addToast.mock.calls[0][0].actions[0].onClick();
     expect(router.navigate).toHaveBeenCalledWith({
-      to: "/workspace/$id", params: { id: "workspace-1" }, search: { chat: 1, showChat: true },
+      to: "/workspace/$id",
+      params: { id: "workspace-1" },
+      search: { chat: 1, showChat: true },
     });
   });
 
@@ -417,10 +517,13 @@ describe("NotificationBridge", () => {
       webkit: { messageHandlers: { cloudflareOSNotificationReady: { postMessage } } },
     });
     await render();
-    await act(async () => window.dispatchEvent(new CustomEvent(
-      "cloudflare-os:notification-device-registration",
-      { detail: { deviceRegistrationId: "registration-1" } },
-    )));
+    await act(async () =>
+      window.dispatchEvent(
+        new CustomEvent("cloudflare-os:notification-device-registration", {
+          detail: { deviceRegistrationId: "registration-1" },
+        }),
+      ),
+    );
     expect(authenticatedApi.registerNotificationDevice).toHaveBeenCalledWith("registration-1");
     expect(postMessage).toHaveBeenCalledWith({ type: "ready" });
     Reflect.deleteProperty(window, "webkit");
@@ -452,7 +555,9 @@ describe("NotificationBridge", () => {
   it("does not redeem a versioned one-use registration again during an RPC reconnect", async () => {
     using _ = vi.spyOn(console, "error").mockImplementation(() => {});
     let failRegistration!: (reason: Error) => void;
-    const pending = new Promise<void>((_resolve, reject) => { failRegistration = reject; });
+    const pending = new Promise<void>((_resolve, reject) => {
+      failRegistration = reject;
+    });
     authenticatedApi.registerNotificationDevice.mockReturnValue(pending);
     const finished = vi.fn<(outcome: "ready" | "failed") => void>();
     Object.assign(window, {

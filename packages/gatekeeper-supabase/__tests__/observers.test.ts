@@ -5,7 +5,7 @@
 // lists, reusing allowed answers longer than denials, within the credentials that learned them.
 // The Management API is faked at `fetch`.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { stageCredentials } from "@gadgets/gatekeeper-kit/credential-stage";
 
 vi.mock("capnweb-validate", () => ({
@@ -25,7 +25,9 @@ function memoryKv() {
   return {
     map,
     get: <T>(key: string) => map.get(key) as T | undefined,
-    put: (key: string, value: unknown) => { map.set(key, value); },
+    put: (key: string, value: unknown) => {
+      map.set(key, value);
+    },
     delete: (key: string) => map.delete(key),
     *list<T>({ prefix }: { prefix: string }): Iterable<[string, T]> {
       for (const key of [...map.keys()].toSorted()) {
@@ -36,13 +38,21 @@ function memoryKv() {
 }
 
 function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 function project(ref: string, organizationSlug: string) {
   return {
-    ref, name: ref, organization_slug: organizationSlug, region: "us-east-1", status: "ACTIVE_HEALTHY",
-    created_at: "2026-01-01T00:00:00Z", database: { host: `db.${ref}.supabase.co`, version: "15" },
+    ref,
+    name: ref,
+    organization_slug: organizationSlug,
+    region: "us-east-1",
+    status: "ACTIVE_HEALTHY",
+    created_at: "2026-01-01T00:00:00Z",
+    database: { host: `db.${ref}.supabase.co`, version: "15" },
   };
 }
 
@@ -52,16 +62,19 @@ function project(ref: string, organizationSlug: string) {
  */
 function serve(routes: Record<string, unknown>) {
   const requests: { request: string; token: string | null }[] = [];
-  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
-    const { pathname } = new URL(url);
-    requests.push({
-      request: `${init?.method ?? "GET"} ${pathname}`,
-      token: new Headers(init?.headers).get("Authorization"),
-    });
-    const route = routes[pathname];
-    if (route === undefined) return json({ message: "not found" }, 404);
-    return typeof route === "function" ? route() as Response : json(route);
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: RequestInit) => {
+      const { pathname } = new URL(url);
+      requests.push({
+        request: `${init?.method ?? "GET"} ${pathname}`,
+        token: new Headers(init?.headers).get("Authorization"),
+      });
+      const route = routes[pathname];
+      if (route === undefined) return json({ message: "not found" }, 404);
+      return typeof route === "function" ? (route() as Response) : json(route);
+    }),
+  );
   return requests;
 }
 
@@ -71,13 +84,19 @@ function recordingQueue() {
   const observations: Observation[] = [];
   return {
     observations,
-    dup() { return this; },
-    authorizeObservation(description: Observation) { observations.push(description); },
+    dup() {
+      return this;
+    },
+    authorizeObservation(description: Observation) {
+      observations.push(description);
+    },
   };
 }
 
 /** A gatekeeper facet as `getGatekeeperClassFor` mints it, reading with a live owner token. */
-function gatekeeper(props: { resourceKind: "project"; ref: string } | { resourceKind: "organization"; slug: string }) {
+function gatekeeper(
+  props: { resourceKind: "project"; ref: string } | { resourceKind: "organization"; slug: string },
+) {
   const kv = memoryKv();
   const owner = {
     getAccessToken: async () => ({ token: "owner-token", expiresAt: Date.now() + 3_600_000 }),
@@ -108,7 +127,10 @@ function connectedAccount() {
     id: { toString: () => "account" },
     exports: {},
   };
-  const account = new UserAccount(ctx as never, { CLIENT_ID: "client", CLIENT_SECRET: "secret" } as never);
+  const account = new UserAccount(
+    ctx as never,
+    { CLIENT_ID: "client", CLIENT_SECRET: "secret" } as never,
+  );
   return { account, kv };
 }
 
@@ -128,7 +150,7 @@ describe("organization binding observations", () => {
     });
     const { gatekeeper: facet, kv } = gatekeeper({ resourceKind: "organization", slug: "acme" });
     const queue = recordingQueue();
-    const organization = await facet.startSession(queue as never) as SupabaseOrganization;
+    const organization = (await facet.startSession(queue as never)) as SupabaseOrganization;
 
     await organization.getInfo();
     // Served from the session cache, and still reported.
@@ -147,7 +169,9 @@ describe("organization binding observations", () => {
       ["Run read-only SQL on Supabase", ["organization/acme", PROJECT_ID]],
     ]);
     // Reads no longer feed the legacy tracker or exclude observers by it.
-    expect(queue.observations.every(observation => observation.excludeObservers === undefined)).toBe(true);
+    expect(
+      queue.observations.every((observation) => observation.excludeObservers === undefined),
+    ).toBe(true);
     expect([...kv.list({ prefix: "observedProject:" })]).toEqual([]);
   });
 });
@@ -161,14 +185,20 @@ describe("project binding observations", () => {
     });
     const { gatekeeper: facet } = gatekeeper({ resourceKind: "project", ref: REF });
     const queue = recordingQueue();
-    const session = await facet.startSession(queue as never) as SupabaseProject;
+    const session = (await facet.startSession(queue as never)) as SupabaseProject;
 
     expect(await session.listStorageBuckets()).toEqual([]);
     await session.getInfo();
-    expect(await (await session.getDatabase()).query("select 1")).toEqual({ rows: [], rowCount: 0 });
+    expect(await (await session.getDatabase()).query("select 1")).toEqual({
+      rows: [],
+      rowCount: 0,
+    });
 
-    expect(queue.observations.map(({ subresources }) => subresources))
-      .toEqual([[PROJECT_ID], [PROJECT_ID], [PROJECT_ID]]);
+    expect(queue.observations.map(({ subresources }) => subresources)).toEqual([
+      [PROJECT_ID],
+      [PROJECT_ID],
+      [PROJECT_ID],
+    ]);
     expect(requests.filter(({ request }) => request === `GET /v1/projects/${REF}`)).toHaveLength(1);
   });
 
@@ -179,7 +209,7 @@ describe("project binding observations", () => {
     });
     const { gatekeeper: facet } = gatekeeper({ resourceKind: "project", ref: REF });
     const queue = recordingQueue();
-    const session = await facet.startSession(queue as never) as SupabaseProject;
+    const session = (await facet.startSession(queue as never)) as SupabaseProject;
 
     await expect(session.listStorageBuckets()).rejects.toThrow(/which organization owns/);
     expect(queue.observations).toEqual([]);
@@ -190,10 +220,11 @@ describe("verifyObserverAccess", () => {
   it("allows, on an organization binding, the observers whose accounts can read every ID", async () => {
     const { gatekeeper: facet } = gatekeeper({ resourceKind: "organization", slug: "acme" });
     const member = observer("member", () => true);
-    const outsider = observer("outsider", subresource => subresource === "organization/acme");
+    const outsider = observer("outsider", (subresource) => subresource === "organization/acme");
 
-    await expect(facet.verifyObserverAccess([member, outsider], ["organization/acme", PROJECT_ID]))
-      .resolves.toEqual({ allowedObserverIds: ["member"] });
+    await expect(
+      facet.verifyObserverAccess([member, outsider], ["organization/acme", PROJECT_ID]),
+    ).resolves.toEqual({ allowedObserverIds: ["member"] });
     expect(member.checkSubresourceAccess).toHaveBeenCalledWith(["organization/acme", PROJECT_ID]);
   });
 
@@ -212,8 +243,10 @@ describe("verifyObserverAccess", () => {
       "organization",
       "",
     ]) {
-      await expect(facet.verifyObserverAccess([member], ["organization/acme", id]), id)
-        .rejects.toThrow(/subresource/i);
+      await expect(
+        facet.verifyObserverAccess([member], ["organization/acme", id]),
+        id,
+      ).rejects.toThrow(/subresource/i);
     }
     expect(member.checkSubresourceAccess).not.toHaveBeenCalled();
   });
@@ -223,11 +256,13 @@ describe("verifyObserverAccess", () => {
     const member = observer("member", () => true);
 
     // The project may have moved to another organization since a read reported it.
-    await expect(facet.verifyObserverAccess([member], [PROJECT_ID, `organization/elsewhere/project/${REF}`]))
-      .resolves.toEqual({ allowedObserverIds: ["member"] });
+    await expect(
+      facet.verifyObserverAccess([member], [PROJECT_ID, `organization/elsewhere/project/${REF}`]),
+    ).resolves.toEqual({ allowedObserverIds: ["member"] });
     for (const id of ["organization/acme", `organization/acme/project/${OTHER_REF}`]) {
-      await expect(facet.verifyObserverAccess([member], [PROJECT_ID, id]), id)
-        .rejects.toThrow(/subresource/i);
+      await expect(facet.verifyObserverAccess([member], [PROJECT_ID, id]), id).rejects.toThrow(
+        /subresource/i,
+      );
     }
   });
 
@@ -235,11 +270,16 @@ describe("verifyObserverAccess", () => {
     const { gatekeeper: facet } = gatekeeper({ resourceKind: "project", ref: REF });
     const unreachable = {
       id: "unreachable",
-      verifier: { checkSubresourceAccess: async () => { throw new Error("credentials expired"); } } as never,
+      verifier: {
+        checkSubresourceAccess: async () => {
+          throw new Error("credentials expired");
+        },
+      } as never,
     };
 
-    await expect(facet.verifyObserverAccess([observer("member", () => true), unreachable], [PROJECT_ID]))
-      .rejects.toThrow("credentials expired");
+    await expect(
+      facet.verifyObserverAccess([observer("member", () => true), unreachable], [PROJECT_ID]),
+    ).rejects.toThrow("credentials expired");
   });
 });
 
@@ -253,13 +293,15 @@ describe("getHistoricalSubresources", () => {
 
     const exported = await facet.getHistoricalSubresources();
     expect(exported.toSorted()).toEqual(
-      ["organization/acme", PROJECT_ID, `organization/acme/project/${OTHER_REF}`].toSorted());
+      ["organization/acme", PROJECT_ID, `organization/acme/project/${OTHER_REF}`].toSorted(),
+    );
     expect(await facet.getHistoricalSubresources()).toEqual(exported);
     expect([...kv.map]).toEqual(before);
     expect(requests).toEqual([]);
     const member = observer("member", () => true);
-    await expect(facet.verifyObserverAccess([member], exported))
-      .resolves.toEqual({ allowedObserverIds: ["member"] });
+    await expect(facet.verifyObserverAccess([member], exported)).resolves.toEqual({
+      allowedObserverIds: ["member"],
+    });
   });
 
   it("exports a project binding's project under the organization its metadata recorded, even stale", async () => {
@@ -274,8 +316,9 @@ describe("getHistoricalSubresources", () => {
     expect(exported).toEqual([PROJECT_ID]);
     expect(requests).toEqual([]);
     const member = observer("member", () => true);
-    await expect(facet.verifyObserverAccess([member], exported))
-      .resolves.toEqual({ allowedObserverIds: ["member"] });
+    await expect(facet.verifyObserverAccess([member], exported)).resolves.toEqual({
+      allowedObserverIds: ["member"],
+    });
   });
 
   it("exports nothing for a project binding that never recorded its organization", async () => {
@@ -296,9 +339,13 @@ describe("UserAccount.checkSubresourceAccess", () => {
     const requests = serve({ "/v1/projects": [project(REF, "moved")] });
     const { account } = connectedAccount();
 
-    await expect(account.checkSubresourceAccess([
-      PROJECT_ID, `organization/acme/project/${OTHER_REF}`, `organization/elsewhere/project/${REF}`,
-    ])).resolves.toEqual([true, false, true]);
+    await expect(
+      account.checkSubresourceAccess([
+        PROJECT_ID,
+        `organization/acme/project/${OTHER_REF}`,
+        `organization/elsewhere/project/${REF}`,
+      ]),
+    ).resolves.toEqual([true, false, true]);
     expect(requests.map(({ request }) => request)).toEqual(["GET /v1/projects"]);
   });
 
@@ -306,8 +353,9 @@ describe("UserAccount.checkSubresourceAccess", () => {
     const requests = serve({ "/v1/organizations": [{ slug: "acme", name: "Acme" }] });
     const { account } = connectedAccount();
 
-    await expect(account.checkSubresourceAccess(["organization/acme", "organization/other"]))
-      .resolves.toEqual([true, false]);
+    await expect(
+      account.checkSubresourceAccess(["organization/acme", "organization/other"]),
+    ).resolves.toEqual([true, false]);
     expect(requests.map(({ request }) => request)).toEqual(["GET /v1/organizations"]);
   });
 
@@ -317,19 +365,31 @@ describe("UserAccount.checkSubresourceAccess", () => {
     const { account } = connectedAccount();
     const otherId = `organization/acme/project/${OTHER_REF}`;
 
-    await expect(account.checkSubresourceAccess([PROJECT_ID, otherId])).resolves.toEqual([true, false]);
+    await expect(account.checkSubresourceAccess([PROJECT_ID, otherId])).resolves.toEqual([
+      true,
+      false,
+    ]);
     reachable = [project(OTHER_REF, "acme")];
 
     vi.setSystemTime(Date.now() + 10_000);
-    await expect(account.checkSubresourceAccess([PROJECT_ID, otherId])).resolves.toEqual([true, false]);
+    await expect(account.checkSubresourceAccess([PROJECT_ID, otherId])).resolves.toEqual([
+      true,
+      false,
+    ]);
     expect(requests).toHaveLength(1);
 
     vi.setSystemTime(Date.now() + 6_000);
-    await expect(account.checkSubresourceAccess([PROJECT_ID, otherId])).resolves.toEqual([true, true]);
+    await expect(account.checkSubresourceAccess([PROJECT_ID, otherId])).resolves.toEqual([
+      true,
+      true,
+    ]);
     expect(requests).toHaveLength(2);
 
     vi.setSystemTime(Date.now() + 15 * 60_000 - 15_000);
-    await expect(account.checkSubresourceAccess([PROJECT_ID, otherId])).resolves.toEqual([false, true]);
+    await expect(account.checkSubresourceAccess([PROJECT_ID, otherId])).resolves.toEqual([
+      false,
+      true,
+    ]);
     expect(requests).toHaveLength(3);
   });
 
@@ -340,9 +400,15 @@ describe("UserAccount.checkSubresourceAccess", () => {
 
     await expect(account.checkSubresourceAccess([PROJECT_ID])).resolves.toEqual([true]);
     reachable = [];
-    const stageId = stageCredentials(kv, {
-      accessToken: "token-2", refreshToken: "refresh-2", accessTokenExpiresAt: Date.now() + 3_600_000,
-    }, Date.now());
+    const stageId = stageCredentials(
+      kv,
+      {
+        accessToken: "token-2",
+        refreshToken: "refresh-2",
+        accessTokenExpiresAt: Date.now() + 3_600_000,
+      },
+      Date.now(),
+    );
     await account.commitReconnect(stageId);
 
     await expect(account.checkSubresourceAccess([PROJECT_ID])).resolves.toEqual([false]);
@@ -369,10 +435,20 @@ describe("UserAccount.checkSubresourceAccess", () => {
     const checking = account.checkSubresourceAccess([PROJECT_ID, otherId]);
     await started.promise;
     reachable = [project(OTHER_REF, "acme")];
-    await account.commitReconnect(stageCredentials(kv, {
-      accessToken: "token-2", refreshToken: "refresh-2", accessTokenExpiresAt: Date.now() + 3_600_000,
-    }, Date.now()));
-    refreshed.resolve(json({ access_token: "token-1b", refresh_token: "refresh-1b", expires_in: 3600 }));
+    await account.commitReconnect(
+      stageCredentials(
+        kv,
+        {
+          accessToken: "token-2",
+          refreshToken: "refresh-2",
+          accessTokenExpiresAt: Date.now() + 3_600_000,
+        },
+        Date.now(),
+      ),
+    );
+    refreshed.resolve(
+      json({ access_token: "token-1b", refresh_token: "refresh-1b", expires_in: 3600 }),
+    );
 
     await expect(checking).rejects.toThrow(/changed while their access was being checked/);
   });
@@ -380,19 +456,31 @@ describe("UserAccount.checkSubresourceAccess", () => {
   it("keeps a reconnected grant when a refresh of the replaced one finishes after it", async () => {
     const started = Promise.withResolvers<void>();
     const refreshed = Promise.withResolvers<Response>();
-    serve({ "/v1/oauth/token": () => {
-      started.resolve();
-      return refreshed.promise;
-    } });
+    serve({
+      "/v1/oauth/token": () => {
+        started.resolve();
+        return refreshed.promise;
+      },
+    });
     const { account, kv } = connectedAccount();
     kv.put("accessTokenExpiresAt", Date.now());
 
     const token = account.getAccessToken();
     await started.promise;
-    await account.commitReconnect(stageCredentials(kv, {
-      accessToken: "token-2", refreshToken: "refresh-2", accessTokenExpiresAt: Date.now() + 3_600_000,
-    }, Date.now()));
-    refreshed.resolve(json({ access_token: "token-1b", refresh_token: "refresh-1b", expires_in: 3600 }));
+    await account.commitReconnect(
+      stageCredentials(
+        kv,
+        {
+          accessToken: "token-2",
+          refreshToken: "refresh-2",
+          accessTokenExpiresAt: Date.now() + 3_600_000,
+        },
+        Date.now(),
+      ),
+    );
+    refreshed.resolve(
+      json({ access_token: "token-1b", refresh_token: "refresh-1b", expires_in: 3600 }),
+    );
 
     await expect(token).resolves.toMatchObject({ token: "token-2" });
     expect([kv.get("accessToken"), kv.get("refreshToken")]).toEqual(["token-2", "refresh-2"]);
@@ -403,7 +491,9 @@ describe("UserAccount.checkSubresourceAccess", () => {
     const requests = serve({ "/v1/projects": () => response() });
     const { account } = connectedAccount();
 
-    await expect(account.checkSubresourceAccess([PROJECT_ID])).rejects.toThrow(/expired or been revoked/);
+    await expect(account.checkSubresourceAccess([PROJECT_ID])).rejects.toThrow(
+      /expired or been revoked/,
+    );
     response = () => json({ message: "slow down" }, 429);
     await expect(account.checkSubresourceAccess([PROJECT_ID])).rejects.toThrow();
     response = () => json({ message: "unavailable" }, 503);
@@ -417,9 +507,13 @@ describe("UserAccount.checkSubresourceAccess", () => {
     const requests = serve({ "/v1/projects": [project(REF, "acme")] });
     const { account, kv } = connectedAccount();
 
-    await expect(account.checkSubresourceAccess([PROJECT_ID, "repo/1"])).rejects.toThrow(/subresource/i);
+    await expect(account.checkSubresourceAccess([PROJECT_ID, "repo/1"])).rejects.toThrow(
+      /subresource/i,
+    );
     kv.delete("refreshToken");
-    await expect(account.checkSubresourceAccess([PROJECT_ID])).rejects.toThrow(/not been configured/);
+    await expect(account.checkSubresourceAccess([PROJECT_ID])).rejects.toThrow(
+      /not been configured/,
+    );
     expect(requests).toEqual([]);
   });
 });

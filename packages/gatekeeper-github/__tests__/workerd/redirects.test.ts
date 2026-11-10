@@ -4,7 +4,7 @@
 // repository's content.
 
 import { env, runInDurableObject } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { GatekeeperProps } from "./worker";
 
 const SHA = "a".repeat(40);
@@ -20,9 +20,10 @@ describe("getGatekeeperClassFor", () => {
     ["https://github.com/octo/repo/issues/new"],
     ["https://github.com/octo/repo/issues"],
     ["https://github.com/octo/repo/pull/12abc"],
-  ])("refuses the malformed issue or PR URL %s", async url => {
-    expect(await hooks().resourcePatternFor(url))
-      .toEqual({ error: `Unsupported GitHub URL: ${url}` });
+  ])("refuses the malformed issue or PR URL %s", async (url) => {
+    expect(await hooks().resourcePatternFor(url)).toEqual({
+      error: `Unsupported GitHub URL: ${url}`,
+    });
   });
 
   it.each([
@@ -62,7 +63,10 @@ async function repoGatekeeper() {
     state.storage.kv.put("accessToken", "test-token");
   });
   const props: GatekeeperProps = {
-    userObjectId: accountId.toString(), resourceKind: "repo", owner: "octo", repo: "repo",
+    userObjectId: accountId.toString(),
+    resourceKind: "repo",
+    owner: "octo",
+    repo: "repo",
   };
   const hooks = env.TEST_HOOKS.getByName(scenario);
   return { resolveRef: (ref: string) => hooks.resolveRef(scenario, props, ref) };
@@ -83,7 +87,9 @@ describe("GitHubGatekeeperImpl redirects", () => {
     expect(JSON.stringify(refused)).not.toContain("43");
     // The id is probed once by name, and the other repository is never requested.
     expect(requested).toEqual([
-      "/repos/octo/repo", "/repositories/42/commits/main", "/repositories/42/commits/other",
+      "/repos/octo/repo",
+      "/repositories/42/commits/main",
+      "/repositories/42/commits/other",
     ]);
   });
 
@@ -96,7 +102,11 @@ describe("GitHubGatekeeperImpl redirects", () => {
     const gk = await repoGatekeeper();
 
     expect(await gk.resolveRef("main")).toEqual({ ok: { id: SHA, fromCache: false } });
-    expect(requested).toEqual(["/repos/octo/repo", "/repositories/42", "/repositories/42/commits/main"]);
+    expect(requested).toEqual([
+      "/repos/octo/repo",
+      "/repositories/42",
+      "/repositories/42/commits/main",
+    ]);
   });
 
   it("reads nothing when the root's redirect names no repository id", async () => {
@@ -105,10 +115,12 @@ describe("GitHubGatekeeperImpl redirects", () => {
     });
     const gk = await repoGatekeeper();
 
-    expect(await gk.resolveRef("main"))
-      .toEqual({ error: expect.stringContaining("out of the bound repository") });
-    expect(await gk.resolveRef("main"))
-      .toEqual({ error: expect.stringContaining("out of the bound repository") });
+    expect(await gk.resolveRef("main")).toEqual({
+      error: expect.stringContaining("out of the bound repository"),
+    });
+    expect(await gk.resolveRef("main")).toEqual({
+      error: expect.stringContaining("out of the bound repository"),
+    });
     // Nothing is read by name in its place, and the failed probe is not repeated.
     expect(requested).toEqual(["/repos/octo/repo"]);
   });

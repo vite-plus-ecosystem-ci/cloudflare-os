@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  IDENTITY, inverse, matrixFor, multiply, placementOf, roundedPlacement, type Box, type Placement,
+  IDENTITY,
+  inverse,
+  matrixFor,
+  multiply,
+  placementOf,
+  roundedPlacement,
+  type Box,
+  type Placement,
 } from "../src/slides-geometry";
 
 function placed(m: Parameters<typeof placementOf>[0], box: Box): Placement | undefined {
@@ -45,7 +52,13 @@ describe("Slides geometry", () => {
   it("inverts a matrix", () => {
     let m = { a: 0.8, b: 0.6, c: -1.2, d: 1.6, tx: 1000, ty: -500 };
     let near = (value: number) => expect.closeTo(value, 9);
-    expect(multiply(m, inverse(m))).toEqual(
-      { a: near(1), b: near(0), c: near(0), d: near(1), tx: near(0), ty: near(0) });
+    expect(multiply(m, inverse(m))).toEqual({
+      a: near(1),
+      b: near(0),
+      c: near(0),
+      d: near(1),
+      tx: near(0),
+      ty: near(0),
+    });
   });
 });

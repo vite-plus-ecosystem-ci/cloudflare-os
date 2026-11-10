@@ -1,11 +1,16 @@
-import { describe, it, expect } from 'vitest';
-import * as fc from 'fast-check';
-import { PROPERTY_RUN_OPTIONS } from '@gadgets/scripts/property-runs';
-import { StreamingToolInputParser } from '../src/streaming-json-parser.js';
+import { describe, it, expect } from "vite-plus/test";
+import * as fc from "fast-check";
+import { PROPERTY_RUN_OPTIONS } from "@gadgets/scripts/property-runs";
+import { StreamingToolInputParser } from "../src/streaming-json-parser.js";
 import {
-  cutDeltas, decodableValue, deltaSizes, previewedToolCall, serialize, STREAMED_FIELD,
+  cutDeltas,
+  decodableValue,
+  deltaSizes,
+  previewedToolCall,
+  serialize,
+  STREAMED_FIELD,
   type PreviewedToolCall,
-} from './tool-input-streams.js';
+} from "./tool-input-streams.js";
 
 // Helper: feed a complete JSON string in one shot.
 function parseAll(streamingField: string, json: string) {
@@ -40,9 +45,10 @@ function parseRandomChunks(streamingField: string, json: string, seed: number = 
 
 // Run a test case with all three feeding strategies.
 function testAllStrategies(
-    streamingField: string,
-    json: string,
-    check: (p: StreamingToolInputParser) => void) {
+  streamingField: string,
+  json: string,
+  check: (p: StreamingToolInputParser) => void,
+) {
   check(parseAll(streamingField, json));
   check(parseCharByChar(streamingField, json));
   check(parseRandomChunks(streamingField, json));
@@ -52,12 +58,12 @@ function testAllStrategies(
 // Basic functionality
 // ===========================================================================
 
-describe('StreamingToolInputParser', () => {
-  describe('basic writeFile-style input', () => {
+describe("StreamingToolInputParser", () => {
+  describe("basic writeFile-style input", () => {
     let json = '{"filename": "foo.ts", "content": "hello world"}';
 
-    it('parses prefix fields and streaming value', () => {
-      testAllStrategies("content", json, p => {
+    it("parses prefix fields and streaming value", () => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ filename: "foo.ts" });
         expect(p.streamingValue).toBe("hello world");
@@ -66,11 +72,11 @@ describe('StreamingToolInputParser', () => {
     });
   });
 
-  describe('editFile-style input with three fields', () => {
+  describe("editFile-style input with three fields", () => {
     let json = '{"filename": "app.js", "textToReplace": "old code", "replacement": "new code"}';
 
-    it('parses two prefix fields and streams the third', () => {
-      testAllStrategies("replacement", json, p => {
+    it("parses two prefix fields and streams the third", () => {
+      testAllStrategies("replacement", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({
           filename: "app.js",
@@ -82,11 +88,11 @@ describe('StreamingToolInputParser', () => {
     });
   });
 
-  describe('executeCode-style input with only the streaming field', () => {
+  describe("executeCode-style input with only the streaming field", () => {
     let json = '{"code": "console.log(42)"}';
 
-    it('parses empty prefix and streams the value', () => {
-      testAllStrategies("code", json, p => {
+    it("parses empty prefix and streams the value", () => {
+      testAllStrategies("code", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({});
         expect(p.streamingValue).toBe("console.log(42)");
@@ -99,40 +105,40 @@ describe('StreamingToolInputParser', () => {
   // Escape handling in the streaming field
   // ===========================================================================
 
-  describe('escape sequences in streaming value', () => {
-    it('handles simple escapes', () => {
+  describe("escape sequences in streaming value", () => {
+    it("handles simple escapes", () => {
       let json = '{"content": "line1\\nline2\\ttab\\\\\\"end"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.streamingValue).toBe('line1\nline2\ttab\\"end');
         expect(p.streamComplete).toBe(true);
       });
     });
 
-    it('handles unicode escapes', () => {
+    it("handles unicode escapes", () => {
       let json = '{"content": "caf\\u00e9 \\u0041"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.streamingValue).toBe("caf\u00e9 A");
         expect(p.streamComplete).toBe(true);
       });
     });
 
-    it('handles escape at exact chunk boundary', () => {
+    it("handles escape at exact chunk boundary", () => {
       // Split right before the backslash
       let p = new StreamingToolInputParser("content");
       p.append('{"content": "abc');
       expect(p.streamingValue).toBe("abc");
-      p.append('\\');
+      p.append("\\");
       expect(p.streamingValue).toBe("abc"); // backslash waiting for next char
-      p.append('n');
+      p.append("n");
       expect(p.streamingValue).toBe("abc\n");
       p.append('def"}');
       expect(p.streamingValue).toBe("abc\ndef");
       expect(p.streamComplete).toBe(true);
     });
 
-    it('handles \\uXXXX split across chunks', () => {
+    it("handles \\uXXXX split across chunks", () => {
       let p = new StreamingToolInputParser("content");
       p.append('{"content": "x\\u00');
       expect(p.streamingValue).toBe("x"); // incomplete \uXXXX
@@ -146,65 +152,65 @@ describe('StreamingToolInputParser', () => {
   // Non-string prefix values (numbers, booleans, null, objects, arrays)
   // ===========================================================================
 
-  describe('non-string prefix values', () => {
-    it('skips numeric prefix values', () => {
+  describe("non-string prefix values", () => {
+    it("skips numeric prefix values", () => {
       let json = '{"line": 42, "content": "hello"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ line: 42 });
         expect(p.streamingValue).toBe("hello");
       });
     });
 
-    it('skips boolean prefix values', () => {
+    it("skips boolean prefix values", () => {
       let json = '{"verbose": true, "content": "data"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ verbose: true });
         expect(p.streamingValue).toBe("data");
       });
     });
 
-    it('skips null prefix values', () => {
+    it("skips null prefix values", () => {
       let json = '{"prev": null, "content": "data"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ prev: null });
         expect(p.streamingValue).toBe("data");
       });
     });
 
-    it('skips nested object prefix values', () => {
+    it("skips nested object prefix values", () => {
       let json = '{"meta": {"a": 1, "b": "two"}, "content": "data"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ meta: { a: 1, b: "two" } });
         expect(p.streamingValue).toBe("data");
       });
     });
 
-    it('skips nested array prefix values', () => {
+    it("skips nested array prefix values", () => {
       let json = '{"tags": ["a", "b", "c"], "content": "data"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ tags: ["a", "b", "c"] });
         expect(p.streamingValue).toBe("data");
       });
     });
 
-    it('skips deeply nested prefix values', () => {
+    it("skips deeply nested prefix values", () => {
       let json = '{"meta": {"nested": {"deep": [1, {"x": "y"}]}}, "content": "ok"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ meta: { nested: { deep: [1, { x: "y" }] } } });
         expect(p.streamingValue).toBe("ok");
       });
     });
 
-    it('handles strings with escapes inside nested objects', () => {
+    it("handles strings with escapes inside nested objects", () => {
       // The string inside the nested object contains a quote escape and braces.
       let json = '{"meta": {"desc": "has \\"quotes\\" and {braces}"}, "content": "ok"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ meta: { desc: 'has "quotes" and {braces}' } });
         expect(p.streamingValue).toBe("ok");
@@ -216,21 +222,21 @@ describe('StreamingToolInputParser', () => {
   // Escape handling in keys
   // ===========================================================================
 
-  describe('escape sequences in keys', () => {
-    it('handles simple escapes in non-streaming keys', () => {
+  describe("escape sequences in keys", () => {
+    it("handles simple escapes in non-streaming keys", () => {
       let json = '{"file\\nname": "foo.ts", "content": "data"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ "file\nname": "foo.ts" });
         expect(p.streamingValue).toBe("data");
       });
     });
 
-    it('handles unicode escapes in keys', () => {
+    it("handles unicode escapes in keys", () => {
       let json = '{"\\u0066ile": "foo.ts", "content": "data"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
-        expect(p.prefixFields).toEqual({ "file": "foo.ts" });
+        expect(p.prefixFields).toEqual({ file: "foo.ts" });
         expect(p.streamingValue).toBe("data");
       });
     });
@@ -240,8 +246,8 @@ describe('StreamingToolInputParser', () => {
   // Incremental streaming behavior
   // ===========================================================================
 
-  describe('incremental streaming', () => {
-    it('grows streamingValue as tokens arrive', () => {
+  describe("incremental streaming", () => {
+    it("grows streamingValue as tokens arrive", () => {
       let p = new StreamingToolInputParser("content");
 
       p.append('{"filen');
@@ -256,7 +262,7 @@ describe('StreamingToolInputParser', () => {
       expect(p.streamingValue).toBe("hel");
       expect(p.streamComplete).toBe(false);
 
-      p.append('lo wor');
+      p.append("lo wor");
       expect(p.streamingValue).toBe("hello wor");
 
       p.append('ld"}');
@@ -264,7 +270,7 @@ describe('StreamingToolInputParser', () => {
       expect(p.streamComplete).toBe(true);
     });
 
-    it('never regresses streamingValue length', () => {
+    it("never regresses streamingValue length", () => {
       let json = '{"content": "abcdefghijklmnopqrstuvwxyz"}';
       let p = new StreamingToolInputParser("content");
       let prevLen = 0;
@@ -281,10 +287,10 @@ describe('StreamingToolInputParser', () => {
   // Whitespace handling
   // ===========================================================================
 
-  describe('whitespace handling', () => {
-    it('handles extra whitespace around structure', () => {
+  describe("whitespace handling", () => {
+    it("handles extra whitespace around structure", () => {
       let json = '  { "filename" :  "f.ts" ,  "content" :  "data"  }  ';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ filename: "f.ts" });
         expect(p.streamingValue).toBe("data");
@@ -297,10 +303,10 @@ describe('StreamingToolInputParser', () => {
   // Edge cases
   // ===========================================================================
 
-  describe('edge cases', () => {
-    it('handles empty streaming value', () => {
+  describe("edge cases", () => {
+    it("handles empty streaming value", () => {
       let json = '{"filename": "f.ts", "content": ""}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ filename: "f.ts" });
         expect(p.streamingValue).toBe("");
@@ -308,22 +314,22 @@ describe('StreamingToolInputParser', () => {
       });
     });
 
-    it('handles empty object without the streaming field', () => {
-      let json = '{}';
+    it("handles empty object without the streaming field", () => {
+      let json = "{}";
       let p = parseAll("content", json);
       expect(p.hasError).toBe(false);
       expect(p.prefixFields).toBeNull(); // streaming field never found
       expect(p.streamingValue).toBe("");
     });
 
-    it('handles incomplete input (partial prefix key)', () => {
+    it("handles incomplete input (partial prefix key)", () => {
       let p = new StreamingToolInputParser("content");
       p.append('{"file');
       expect(p.hasError).toBe(false);
       expect(p.prefixFields).toBeNull();
     });
 
-    it('handles incomplete input (partial streaming value)', () => {
+    it("handles incomplete input (partial streaming value)", () => {
       let p = new StreamingToolInputParser("content");
       p.append('{"content": "partial');
       expect(p.hasError).toBe(false);
@@ -332,20 +338,20 @@ describe('StreamingToolInputParser', () => {
       expect(p.streamComplete).toBe(false);
     });
 
-    it('handles prefix field whose string value contains the streaming key name', () => {
+    it("handles prefix field whose string value contains the streaming key name", () => {
       // The value of "description" contains "content" — should not confuse the parser.
       let json = '{"description": "the content field", "content": "real data"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.prefixFields).toEqual({ description: "the content field" });
         expect(p.streamingValue).toBe("real data");
       });
     });
 
-    it('handles streaming value with embedded JSON', () => {
+    it("handles streaming value with embedded JSON", () => {
       // The streaming value itself contains JSON-like text with quotes and braces.
       let json = '{"content": "fn() { return {\\"key\\": \\"val\\"}; }"}';
-      testAllStrategies("content", json, p => {
+      testAllStrategies("content", json, (p) => {
         expect(p.hasError).toBe(false);
         expect(p.streamingValue).toBe('fn() { return {"key": "val"}; }');
         expect(p.streamComplete).toBe(true);
@@ -357,33 +363,33 @@ describe('StreamingToolInputParser', () => {
   // Error cases
   // ===========================================================================
 
-  describe('error cases', () => {
-    it('reports error for non-object input', () => {
+  describe("error cases", () => {
+    it("reports error for non-object input", () => {
       let p = parseAll("content", '"not an object"');
       expect(p.hasError).toBe(true);
     });
 
-    it('reports error for non-string streaming field value', () => {
+    it("reports error for non-string streaming field value", () => {
       let p = parseAll("content", '{"content": 42}');
       expect(p.hasError).toBe(true);
     });
 
-    it('reports error for invalid escape in streaming value', () => {
+    it("reports error for invalid escape in streaming value", () => {
       let p = parseAll("content", '{"content": "bad\\qescape"}');
       expect(p.hasError).toBe(true);
     });
 
-    it('reports error for invalid unicode escape in streaming value', () => {
+    it("reports error for invalid unicode escape in streaming value", () => {
       let p = parseAll("content", '{"content": "bad\\uXXXXescape"}');
       expect(p.hasError).toBe(true);
     });
 
-    it('reports error for invalid escape in key', () => {
+    it("reports error for invalid escape in key", () => {
       let p = parseAll("content", '{"bad\\qkey": "val", "content": "data"}');
       expect(p.hasError).toBe(true);
     });
 
-    it('reports error for missing colon', () => {
+    it("reports error for missing colon", () => {
       let p = parseAll("content", '{"content" "oops"}');
       expect(p.hasError).toBe(true);
     });
@@ -402,42 +408,46 @@ describe('StreamingToolInputParser', () => {
 // what that much input determines: no prefix fields until the streamed value opens, then all of
 // them; the streamed value decoded up to any escape still cut off, so it only grows and never
 // lags; and, at the end, the same input JSON.parse reads.
-describe('StreamingToolInputParser property', () => {
-  it('tracks the decodable prefix of a streamed tool input after every delta', () => {
+describe("StreamingToolInputParser property", () => {
+  it("tracks the decodable prefix of a streamed tool input after every delta", () => {
     let surrogateCall: PreviewedToolCall = {
       toolName: "writeFile",
-      input: {filename: "app.ts", content: "label: '😀',\n\\\"end\\\""},
+      input: { filename: "app.ts", content: "label: '😀',\n\\\"end\\\"" },
       asciiOnly: true,
       spaced: true,
     };
-    fc.assert(fc.property(previewedToolCall, deltaSizes, (call, sizes) => {
-      let field = STREAMED_FIELD[call.toolName];
-      let {json, valueStart} = serialize(call);
-      let {[field]: value, ...prefix} = JSON.parse(json);
-      let parser = new StreamingToolInputParser(field);
-      let received = 0;
-      for (let delta of cutDeltas(json, sizes)) {
-        parser.append(delta);
-        received += delta.length;
-        let at = `after ${received} of ${json.length} chars of ${json}`;
-        expect(parser.hasError, at).toBe(false);
-        expect(parser.prefixFields, at).toEqual(received >= valueStart ? prefix : null);
-        // Compared JSON-encoded: the value may end in a lone high surrogate, which in a failure
-        // message is invalid UTF-8 to the vitest pool's WebSocket, which then drops the report.
-        expect(JSON.stringify(parser.streamingValue), at)
-            .toBe(JSON.stringify(decodableValue(json, valueStart, received)));
-        expect(parser.streamComplete, at).toBe(received >= json.length - 1);
-      }
-      expect(parser.prefixFields).toEqual(prefix);
-      expect(parser.streamingValue).toBe(value);
-    }), {
-      ...PROPERTY_RUN_OPTIONS,
-      numRuns: 200,
-      examples: [
-        // One UTF-16 code unit per delta: every escape and `\ud83d\ude00` pair split everywhere.
-        [surrogateCall, [1]],
-        [{...surrogateCall, asciiOnly: false}, [1]],
-      ],
-    });
+    fc.assert(
+      fc.property(previewedToolCall, deltaSizes, (call, sizes) => {
+        let field = STREAMED_FIELD[call.toolName];
+        let { json, valueStart } = serialize(call);
+        let { [field]: value, ...prefix } = JSON.parse(json);
+        let parser = new StreamingToolInputParser(field);
+        let received = 0;
+        for (let delta of cutDeltas(json, sizes)) {
+          parser.append(delta);
+          received += delta.length;
+          let at = `after ${received} of ${json.length} chars of ${json}`;
+          expect(parser.hasError, at).toBe(false);
+          expect(parser.prefixFields, at).toEqual(received >= valueStart ? prefix : null);
+          // Compared JSON-encoded: the value may end in a lone high surrogate, which in a failure
+          // message is invalid UTF-8 to the vitest pool's WebSocket, which then drops the report.
+          expect(JSON.stringify(parser.streamingValue), at).toBe(
+            JSON.stringify(decodableValue(json, valueStart, received)),
+          );
+          expect(parser.streamComplete, at).toBe(received >= json.length - 1);
+        }
+        expect(parser.prefixFields).toEqual(prefix);
+        expect(parser.streamingValue).toBe(value);
+      }),
+      {
+        ...PROPERTY_RUN_OPTIONS,
+        numRuns: 200,
+        examples: [
+          // One UTF-16 code unit per delta: every escape and `\ud83d\ude00` pair split everywhere.
+          [surrogateCall, [1]],
+          [{ ...surrogateCall, asciiOnly: false }, [1]],
+        ],
+      },
+    );
   });
 });

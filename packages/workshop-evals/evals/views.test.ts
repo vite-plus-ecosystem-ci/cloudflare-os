@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import type { SeriesMark } from "../src/view-host.js";
 import { countAmount, plotsValues, showsAmount } from "./views.js";
 
@@ -11,7 +11,8 @@ describe("showsAmount", () => {
   });
 
   it("does not read an amount inside a longer number", () => {
-    for (const text of ["4200", "0.420", "1420", "420.5"]) expect(showsAmount(text, 420), text).toBe(false);
+    for (const text of ["4200", "0.420", "1420", "420.5"])
+      expect(showsAmount(text, 420), text).toBe(false);
   });
 
   it("keeps the sign of an amount below zero", () => {
@@ -44,21 +45,41 @@ const column = (at: readonly number[], key = "rect 0"): SeriesMark[] =>
 
 describe("plotsValues", () => {
   it("passes marks drawn to a straight scale, whatever the scale's origin", () => {
-    expect(plotsValues(column(VALUES.map(value => 200 - value / 4)), VALUES)).toBe(true);
-    expect(plotsValues(column(VALUES.map(value => 200 - (value - 250) / 2)), VALUES)).toBe(true);
-    const rows = VALUES.map((value, label): SeriesMark => ({ label, key: "div 0", axis: "x", at: 40 + value / 3 }));
+    expect(plotsValues(column(VALUES.map((value) => 200 - value / 4)), VALUES)).toBe(true);
+    expect(plotsValues(column(VALUES.map((value) => 200 - (value - 250) / 2)), VALUES)).toBe(true);
+    const rows = VALUES.map((value, label): SeriesMark => ({
+      label,
+      key: "div 0",
+      axis: "x",
+      at: 40 + value / 3,
+    }));
     expect(plotsValues(rows, VALUES)).toBe(true);
   });
 
   it("finds the series among other marks", () => {
     const grid = column([20, 20, 20, 20], "line 0");
-    expect(plotsValues([...grid, ...column(VALUES.map(value => 200 - value / 4), "rect 1")], VALUES)).toBe(true);
+    expect(
+      plotsValues(
+        [
+          ...grid,
+          ...column(
+            VALUES.map((value) => 200 - value / 4),
+            "rect 1",
+          ),
+        ],
+        VALUES,
+      ),
+    ).toBe(true);
   });
 
   it("fails marks out of order, upside down, flat or missing a label", () => {
-    expect(plotsValues(column([410, 610, 380, 290].map(value => 200 - value / 4)), VALUES)).toBe(false);
-    expect(plotsValues(column(VALUES.map(value => value / 4)), VALUES)).toBe(false);
-    expect(plotsValues(column(VALUES.map(value => 200 - value / 100)), VALUES)).toBe(false);
-    expect(plotsValues(column(VALUES.map(value => 200 - value / 4)).slice(1), VALUES)).toBe(false);
+    expect(plotsValues(column([410, 610, 380, 290].map((value) => 200 - value / 4)), VALUES)).toBe(
+      false,
+    );
+    expect(plotsValues(column(VALUES.map((value) => value / 4)), VALUES)).toBe(false);
+    expect(plotsValues(column(VALUES.map((value) => 200 - value / 100)), VALUES)).toBe(false);
+    expect(plotsValues(column(VALUES.map((value) => 200 - value / 4)).slice(1), VALUES)).toBe(
+      false,
+    );
   });
 });

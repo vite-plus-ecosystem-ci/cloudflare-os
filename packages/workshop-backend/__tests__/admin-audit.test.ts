@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { runInDurableObject } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { type AdminAuditRecord, type AdminSettingRecord } from "@gadgets/workshop-shared/api";
 import type { AdminAuditDurableObject } from "../src/admin-audit.js";
 import { utcDayKey } from "../src/ai-gateway-billing/limits/config.js";
@@ -28,8 +28,13 @@ function daysAgo(days: number): Date {
 
 function setting(overrides: Partial<AdminSettingRecord> = {}): AdminSettingRecord {
   return {
-    kind: "setting", at: new Date(), admin: "ada", sessionId: "session-1", via: "cli",
-    method: "setSiteName", changes: [{ setting: "siteName", before: "Old", after: "New" }],
+    kind: "setting",
+    at: new Date(),
+    admin: "ada",
+    sessionId: "session-1",
+    via: "cli",
+    method: "setSiteName",
+    changes: [{ setting: "siteName", before: "Old", after: "New" }],
     ...overrides,
   };
 }
@@ -39,45 +44,77 @@ function setting(overrides: Partial<AdminSettingRecord> = {}): AdminSettingRecor
 async function expectRejection(call: Promise<unknown>, message: string): Promise<void> {
   let caught: unknown;
   let rejected = false;
-  try { await call; } catch (err) { rejected = true; caught = err; }
+  try {
+    await call;
+  } catch (err) {
+    rejected = true;
+    caught = err;
+  }
   expect(rejected).toBe(true);
   expect(String(caught)).toContain(message);
 }
 
 type Stub = ReturnType<typeof auditLog>;
 
-function sql<T extends Record<string, SqlStorageValue>>(stub: Stub, query: string,
-    ...params: SqlStorageValue[]): Promise<T[]> {
+function sql<T extends Record<string, SqlStorageValue>>(
+  stub: Stub,
+  query: string,
+  ...params: SqlStorageValue[]
+): Promise<T[]> {
   return runInDurableObject(stub, (_instance, state) =>
-      state.storage.sql.exec<T>(query, ...params).toArray());
+    state.storage.sql.exec<T>(query, ...params).toArray(),
+  );
 }
 
 // A workspace access row written as of now, as the stacked inspection change appends them, so that
 // a kind filter has another kind to leave out.
 function insertAccessRow(stub: Stub, admin: string): Promise<unknown[]> {
-  return sql(stub, `INSERT INTO admin_audit
+  return sql(
+    stub,
+    `INSERT INTO admin_audit
       (at, kind, admin, workspace_id, workspace_title, exposed, record)
-      VALUES (?, 'workspace', ?, 'w1', 'Plans', 'metadata', '{}')`, Date.now(), admin);
+      VALUES (?, 'workspace', ?, 'w1', 'Plans', 'metadata', '{}')`,
+    Date.now(),
+    admin,
+  );
 }
 
 // A raw row, past append()'s shaping, to test the table's own CHECKs.
-function insertRow(stub: Stub, kind: string, workspaceId: string | null, title: string | null,
-    exposed: string | null): Promise<unknown[]> {
-  return sql(stub, `INSERT INTO admin_audit
+function insertRow(
+  stub: Stub,
+  kind: string,
+  workspaceId: string | null,
+  title: string | null,
+  exposed: string | null,
+): Promise<unknown[]> {
+  return sql(
+    stub,
+    `INSERT INTO admin_audit
       (at, kind, admin, workspace_id, workspace_title, exposed, record)
-      VALUES (0, ?, 'ada', ?, ?, ?, '{}')`, kind, workspaceId, title, exposed);
+      VALUES (0, ?, 'ada', ?, ?, ?, '{}')`,
+    kind,
+    workspaceId,
+    title,
+    exposed,
+  );
 }
 
 describe("AdminAuditDurableObject.list", () => {
   it("lists newest first, and returns each record as appended", async () => {
     let log = auditLog();
     let first = setting({ at: daysAgo(2) });
-    let second = setting({ at: daysAgo(1), method: "setSignupsEnabled",
-      changes: [{ setting: "signupsEnabled", before: "true", after: "false" }] });
-    let third = setting({ method: "setBanner", changes: [
-      { setting: "banner", key: "message", after: "Maintenance tonight" },
-      { setting: "banner", key: "color", before: "blue", after: "red" },
-    ] });
+    let second = setting({
+      at: daysAgo(1),
+      method: "setSignupsEnabled",
+      changes: [{ setting: "signupsEnabled", before: "true", after: "false" }],
+    });
+    let third = setting({
+      method: "setBanner",
+      changes: [
+        { setting: "banner", key: "message", after: "Maintenance tonight" },
+        { setting: "banner", key: "color", before: "blue", after: "red" },
+      ],
+    });
     let fourth = setting({ via: "api", sessionId: "session-2" });
     for (let record of [first, second, third, fourth]) await log.append(record, RETENTION);
 
@@ -89,11 +126,15 @@ describe("AdminAuditDurableObject.list", () => {
   it("stores each field once", async () => {
     let log = auditLog();
     await log.append(setting(), RETENTION);
-    let rows = await sql<
-        { kind: string; workspace_id: string | null; exposed: string | null; record: string }>(log,
-        "SELECT kind, workspace_id, exposed, record FROM admin_audit ORDER BY seq");
-    expect(rows.map(row => [row.kind, row.workspace_id, row.exposed]))
-        .toEqual([["setting", null, null]]);
+    let rows = await sql<{
+      kind: string;
+      workspace_id: string | null;
+      exposed: string | null;
+      record: string;
+    }>(log, "SELECT kind, workspace_id, exposed, record FROM admin_audit ORDER BY seq");
+    expect(rows.map((row) => [row.kind, row.workspace_id, row.exposed])).toEqual([
+      ["setting", null, null],
+    ]);
     let json = JSON.parse(rows[0].record);
     for (let field of ["kind", "at", "admin"]) expect(json, field).not.toHaveProperty(field);
   });
@@ -108,18 +149,21 @@ describe("AdminAuditDurableObject.list", () => {
     for (let record of records) await log.append(record, RETENTION);
 
     let list = async (query: object) =>
-        (await log.list({ limit: 50, ...query }, RETENTION)).records;
+      (await log.list({ limit: 50, ...query }, RETENTION)).records;
     await insertAccessRow(log, "ada");
     expect(await list({ kind: "setting", admin: "ada" })).toEqual([records[2], records[0]]);
-    expect((await list({ admin: "ada", since: daysAgo(2) })).map(record => record.kind))
-        .toEqual(["workspace", "setting"]);
+    expect((await list({ admin: "ada", since: daysAgo(2) })).map((record) => record.kind)).toEqual([
+      "workspace",
+      "setting",
+    ]);
     expect(await list({ admin: "linus" })).toEqual([]);
   });
 
   it("pages with a cursor, and rejects a malformed cursor or an over-long filter", async () => {
     let log = auditLog();
-    let records = Array.from({ length: 5 },
-        (_, i) => setting({ changes: [{ setting: "siteName", after: `Site ${i}` }] }));
+    let records = Array.from({ length: 5 }, (_, i) =>
+      setting({ changes: [{ setting: "siteName", after: `Site ${i}` }] }),
+    );
     for (let record of records) await log.append(record, RETENTION);
 
     let first = await log.list({ limit: 2 }, RETENTION);
@@ -133,15 +177,19 @@ describe("AdminAuditDurableObject.list", () => {
     for (let cursor of ["abc", "-1", "1.5", "99999999999999999999"]) {
       await expectRejection(log.list({ limit: 2, cursor }, RETENTION), "Invalid cursor.");
     }
-    await expectRejection(log.list({ limit: 2, admin: "a".repeat(1001) }, RETENTION),
-        "Audit filters must be at most 1000 characters.");
+    await expectRejection(
+      log.list({ limit: 2, admin: "a".repeat(1001) }, RETENTION),
+      "Audit filters must be at most 1000 characters.",
+    );
   });
 
   it("filters by method through its index, paging within the filter", async () => {
     let log = auditLog();
     let names = Array.from({ length: 3 }, (_, i) => setting({ admin: i === 1 ? "grace" : "ada" }));
-    let signups = setting({ method: "setSignupsEnabled",
-      changes: [{ setting: "signupsEnabled", before: "true", after: "false" }] });
+    let signups = setting({
+      method: "setSignupsEnabled",
+      changes: [{ setting: "signupsEnabled", before: "true", after: "false" }],
+    });
     for (let record of [names[0], signups, names[1], names[2]]) {
       await log.append(record, RETENTION);
     }
@@ -149,17 +197,24 @@ describe("AdminAuditDurableObject.list", () => {
     let first = await log.list({ limit: 2, method: "setSiteName" }, RETENTION);
     expect(first.records).toEqual([names[2], names[1]]);
     let second = await log.list(
-        { limit: 2, method: "setSiteName", cursor: first.nextCursor }, RETENTION);
+      { limit: 2, method: "setSiteName", cursor: first.nextCursor },
+      RETENTION,
+    );
     expect(second.records).toEqual([names[0]]);
     expect(second.nextCursor).toBeUndefined();
-    expect((await log.list({ limit: 50, method: "setSignupsEnabled" }, RETENTION)).records)
-        .toEqual([signups]);
-    expect((await log.list({ limit: 50, method: "setSiteName", admin: "grace" }, RETENTION))
-        .records).toEqual([names[1]]);
+    expect((await log.list({ limit: 50, method: "setSignupsEnabled" }, RETENTION)).records).toEqual(
+      [signups],
+    );
+    expect(
+      (await log.list({ limit: 50, method: "setSiteName", admin: "grace" }, RETENTION)).records,
+    ).toEqual([names[1]]);
 
-    let plan = await sql<{ detail: string }>(log, `EXPLAIN QUERY PLAN SELECT seq FROM admin_audit
-        WHERE json_extract(record, '$.method') = 'setSiteName' ORDER BY seq DESC`);
-    expect(plan.map(step => step.detail).join("\n")).toContain("admin_audit_method");
+    let plan = await sql<{ detail: string }>(
+      log,
+      `EXPLAIN QUERY PLAN SELECT seq FROM admin_audit
+        WHERE json_extract(record, '$.method') = 'setSiteName' ORDER BY seq DESC`,
+    );
+    expect(plan.map((step) => step.detail).join("\n")).toContain("admin_audit_method");
   });
 });
 
@@ -203,14 +258,19 @@ describe("AdminAuditDurableObject schema", () => {
   it("ties the workspace columns to access records", async () => {
     let log = auditLog();
     // Each row carries the `exposed` its kind needs, so that it breaks only the CHECK it targets.
-    await expectRejection(insertRow(log, "workspace", null, "t", "metadata"),
-        "CHECK constraint failed");
-    await expectRejection(insertRow(log, "workspace", "w1", null, "metadata"),
-        "CHECK constraint failed");
+    await expectRejection(
+      insertRow(log, "workspace", null, "t", "metadata"),
+      "CHECK constraint failed",
+    );
+    await expectRejection(
+      insertRow(log, "workspace", "w1", null, "metadata"),
+      "CHECK constraint failed",
+    );
     await expectRejection(insertRow(log, "setting", "w1", "t", null), "CHECK constraint failed");
     await expectRejection(
-        sql(log, `INSERT INTO admin_audit (at, kind, admin, record) VALUES (0, 'setting', 'a', '{')`),
-        "CHECK constraint failed");
+      sql(log, `INSERT INTO admin_audit (at, kind, admin, record) VALUES (0, 'setting', 'a', '{')`),
+      "CHECK constraint failed",
+    );
     await insertRow(log, "workspace", "w1", "t", "metadata");
     await insertRow(log, "setting", null, null, null);
     expect(await sql(log, "SELECT seq FROM admin_audit")).toHaveLength(2);
@@ -219,13 +279,16 @@ describe("AdminAuditDurableObject schema", () => {
   it("ties exposed to access records", async () => {
     let log = auditLog();
     await expectRejection(insertRow(log, "workspace", "w1", "t", null), "CHECK constraint failed");
-    await expectRejection(insertRow(log, "setting", null, null, "metadata"),
-        "CHECK constraint failed");
-    await expectRejection(insertRow(log, "workspace", "w1", "t", "bogus"),
-        "CHECK constraint failed");
+    await expectRejection(
+      insertRow(log, "setting", null, null, "metadata"),
+      "CHECK constraint failed",
+    );
+    await expectRejection(
+      insertRow(log, "workspace", "w1", "t", "bogus"),
+      "CHECK constraint failed",
+    );
     expect(await sql(log, "SELECT seq FROM admin_audit")).toHaveLength(0);
   });
-
 });
 
 describe("AdminAuditDurableObject.stats", () => {
@@ -246,7 +309,7 @@ describe("AdminAuditDurableObject.stats", () => {
     for (let at of recent) expected.set(utcDayKey(at), (expected.get(utcDayKey(at)) ?? 0) + 1);
     for (let { day, count } of stats.byDay) expect(count, day).toBe(expected.get(day) ?? 0);
     expect(stats.totalEvents).toBe(3);
-    expect(stats.byDay.filter(d => d.count === 0).length).toBeGreaterThanOrEqual(4);
+    expect(stats.byDay.filter((d) => d.count === 0).length).toBeGreaterThanOrEqual(4);
 
     expect((await log.stats({ days: 30 }, RETENTION)).totalEvents).toBe(4);
   });
@@ -265,7 +328,9 @@ describe("AdminAuditDurableObject.stats", () => {
     let stats = await log.stats({ days: 7 }, RETENTION);
     expect(stats.totalEvents).toBe(5);
     expect(stats.topAdmins).toEqual([
-      { admin: "ada", count: 2 }, { admin: "grace", count: 2 }, { admin: "linus", count: 1 },
+      { admin: "ada", count: 2 },
+      { admin: "grace", count: 2 },
+      { admin: "linus", count: 1 },
     ]);
   });
 
@@ -290,5 +355,4 @@ describe("AdminAuditDurableObject.stats", () => {
     expect(stats.totalEvents).toBe(2);
     expect(stats.byDay).toHaveLength(366);
   });
-
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   connectHandoffPageHtml,
   connectMutationError,
@@ -12,8 +12,9 @@ const HANDOFF = { targetOrigin: "https://workshop.example", ticket: "a".repeat(6
 
 describe("connect pages", () => {
   it("escapes every character that could break out of markup", () => {
-    expect(escapeHtml(`<img src="x" onerror='alert(1)'>&`))
-      .toBe("&lt;img src=&quot;x&quot; onerror=&#39;alert(1)&#39;&gt;&amp;");
+    expect(escapeHtml(`<img src="x" onerror='alert(1)'>&`)).toBe(
+      "&lt;img src=&quot;x&quot; onerror=&#39;alert(1)&#39;&gt;&amp;",
+    );
   });
 
   it("escapes vendor-supplied error text into the page", () => {
@@ -26,7 +27,9 @@ describe("connect pages", () => {
 
   it("declares a language and viewport on every page it serves", () => {
     for (const html of [
-      connectHandoffPageHtml(HANDOFF), INVALID_LINK_HTML, errorPageHtml("Failed", "Retry"),
+      connectHandoffPageHtml(HANDOFF),
+      INVALID_LINK_HTML,
+      errorPageHtml("Failed", "Retry"),
     ]) {
       expect(html).toContain(`<html lang="en">`);
       expect(html).toContain(`name="viewport"`);
@@ -65,11 +68,15 @@ describe("connectHandoffPageHtml", () => {
     expect(target).toBe("https://workshop.example");
     // The path is pinned here and in workshop-frontend's route: the kit must not depend on it.
     expect(html).toContain(
-      `window.location.replace(target + "/connect/handoff#" + encodeURIComponent(ticket))`);
+      `window.location.replace(target + "/connect/handoff#" + encodeURIComponent(ticket))`,
+    );
   });
 
   it("cannot be broken out of by the ticket or origin it embeds", () => {
-    const hostile = { targetOrigin: "https://workshop.example", ticket: `</script><img src=x onerror=alert(1)>&'"` };
+    const hostile = {
+      targetOrigin: "https://workshop.example",
+      ticket: `</script><img src=x onerror=alert(1)>&'"`,
+    };
     const html = connectHandoffPageHtml(hostile);
 
     expect(html).not.toContain("</script><img");
@@ -82,26 +89,38 @@ describe("connectHandoffPageHtml", () => {
     // A trailing slash or path would produce a malformed redirect; an unparsable value or an opaque
     // origin would send the ticket somewhere else.
     for (const targetOrigin of [
-      "https://workshop.example/", "https://workshop.example/app", "*", "null", "workshop.example",
-      "", "javascript:alert(1)",
+      "https://workshop.example/",
+      "https://workshop.example/app",
+      "*",
+      "null",
+      "workshop.example",
+      "",
+      "javascript:alert(1)",
     ]) {
-      expect(() => connectHandoffPageHtml({ ...HANDOFF, targetOrigin }))
-        .toThrow("targetOrigin is not an origin");
+      expect(() => connectHandoffPageHtml({ ...HANDOFF, targetOrigin })).toThrow(
+        "targetOrigin is not an origin",
+      );
     }
-    expect(() => connectHandoffPageHtml({ ...HANDOFF, targetOrigin: "http://localhost:3000" }))
-      .not.toThrow();
+    expect(() =>
+      connectHandoffPageHtml({ ...HANDOFF, targetOrigin: "http://localhost:3000" }),
+    ).not.toThrow();
   });
 
   it("keeps the referrer policy that hides the path from cross-origin requests", () => {
-    expect(connectHandoffPageHtml(HANDOFF))
-      .toContain(`<meta name="referrer" content="strict-origin-when-cross-origin">`);
+    expect(connectHandoffPageHtml(HANDOFF)).toContain(
+      `<meta name="referrer" content="strict-origin-when-cross-origin">`,
+    );
   });
 
   it("carries no channel, opener or message transport", () => {
     const html = connectHandoffPageHtml(HANDOFF);
 
     for (const transport of [
-      "BroadcastChannel", "opener", "postMessage", "setTimeout", "setInterval",
+      "BroadcastChannel",
+      "opener",
+      "postMessage",
+      "setTimeout",
+      "setInterval",
     ]) {
       expect(html).not.toContain(transport);
     }
@@ -115,26 +134,32 @@ describe("connectMutationError", () => {
     new Request(`${origin}/connect/capability`, { method: "POST", headers });
 
   it("accepts a same-origin mutation carrying the required content type", () => {
-    expect(connectMutationError(
-      mutation({ Origin: origin, "Content-Type": "application/json" }), json,
-    )).toBeUndefined();
+    expect(
+      connectMutationError(mutation({ Origin: origin, "Content-Type": "application/json" }), json),
+    ).toBeUndefined();
   });
 
   it("refuses a mutation whose Origin is absent or foreign", () => {
     // Browsers send Origin on every POST, so an absent one is a non-browser caller that has no
     // business on a browser capability URL.
-    expect(connectMutationError(mutation({ "Content-Type": "application/json" }), json))
-      .toBe("cross-origin");
-    expect(connectMutationError(
-      mutation({ Origin: "https://attacker.example", "Content-Type": "application/json" }), json,
-    )).toBe("cross-origin");
+    expect(connectMutationError(mutation({ "Content-Type": "application/json" }), json)).toBe(
+      "cross-origin",
+    );
+    expect(
+      connectMutationError(
+        mutation({ Origin: "https://attacker.example", "Content-Type": "application/json" }),
+        json,
+      ),
+    ).toBe("cross-origin");
   });
 
   it("refuses a mutation whose content type is absent or wrong", () => {
-    expect(connectMutationError(mutation({ Origin: origin }), json))
-      .toBe("unsupported-content-type");
-    expect(connectMutationError(mutation({ Origin: origin, "Content-Type": "text/plain" }), json))
-      .toBe("unsupported-content-type");
+    expect(connectMutationError(mutation({ Origin: origin }), json)).toBe(
+      "unsupported-content-type",
+    );
+    expect(
+      connectMutationError(mutation({ Origin: origin, "Content-Type": "text/plain" }), json),
+    ).toBe("unsupported-content-type");
   });
 
   it("compares against the configured origin, not the request URL", () => {
@@ -144,25 +169,30 @@ describe("connectMutationError", () => {
       headers: { Origin: origin, "Content-Type": "application/json" },
     });
     expect(connectMutationError(rewritten, json)).toBeUndefined();
-    expect(connectMutationError(rewritten, { ...json, origin: "https://other.example" }))
-      .toBe("cross-origin");
+    expect(connectMutationError(rewritten, { ...json, origin: "https://other.example" })).toBe(
+      "cross-origin",
+    );
   });
 
   it("accepts a full base URL as the expected origin", () => {
-    expect(connectMutationError(
-      mutation({ Origin: origin, "Content-Type": "application/json" }),
-      { origin: `${origin}/gatekeeper/acme`, contentType: "application/json" },
-    )).toBeUndefined();
+    expect(
+      connectMutationError(mutation({ Origin: origin, "Content-Type": "application/json" }), {
+        origin: `${origin}/gatekeeper/acme`,
+        contentType: "application/json",
+      }),
+    ).toBeUndefined();
   });
 
   it("matches the content type case-insensitively and past its parameters", () => {
-    expect(connectMutationError(
-      mutation({ Origin: origin, "Content-Type": "APPLICATION/JSON" }), json,
-    )).toBeUndefined();
-    expect(connectMutationError(
-      mutation({ Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }),
-      { origin, contentType: "multipart/form-data" },
-    )).toBeUndefined();
+    expect(
+      connectMutationError(mutation({ Origin: origin, "Content-Type": "APPLICATION/JSON" }), json),
+    ).toBeUndefined();
+    expect(
+      connectMutationError(
+        mutation({ Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }),
+        { origin, contentType: "multipart/form-data" },
+      ),
+    ).toBeUndefined();
   });
 
   it("compares the media type exactly, so no neighbour or parameter can smuggle it", () => {
@@ -172,8 +202,9 @@ describe("connectMutationError", () => {
       "text/plain; x=application/json",
       "application/json-patch+json",
     ]) {
-      expect(connectMutationError(mutation({ Origin: origin, "Content-Type": contentType }), json))
-        .toBe("unsupported-content-type");
+      expect(
+        connectMutationError(mutation({ Origin: origin, "Content-Type": contentType }), json),
+      ).toBe("unsupported-content-type");
     }
   });
 });

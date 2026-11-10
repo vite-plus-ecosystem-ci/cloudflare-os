@@ -1,10 +1,15 @@
 // An auto-approved action can be applied while submitActionForApproval is still awaiting the
 // overseer's reply. These drive the real gatekeeper class with an approval queue that applies
 // before it returns, as the overseer's auto-approval drain may.
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("cloudflare:workers", () => ({
-  DurableObject: class { constructor(public ctx: unknown, public env: unknown) {} },
+  DurableObject: class {
+    constructor(
+      public ctx: unknown,
+      public env: unknown,
+    ) {}
+  },
   RpcTarget: class {},
   WorkerEntrypoint: class {},
 }));
@@ -23,7 +28,12 @@ function gatekeeper() {
   const kv = new Map<string, unknown>();
   const ctx = {
     props: { userObjectId: "user", resourceKind: "account" },
-    exports: { UserAccount: { idFromString: (id: string) => id, get: () => ({ getAccessToken: async () => "token" }) } },
+    exports: {
+      UserAccount: {
+        idFromString: (id: string) => id,
+        get: () => ({ getAccessToken: async () => "token" }),
+      },
+    },
     storage: {
       kv: {
         get: (key: string) => structuredClone(kv.get(key)),
@@ -53,7 +63,10 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("submitActionForApproval when the action is applied before the reply", () => {
   it("leaves an applied action retired instead of reviving it as pending", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 204 })),
+    );
     const { gk, kv } = gatekeeper();
     const action = pause(gk);
     await gk.submitActionForApproval(applyingQueue(gk, "ok"), action, presentation);
@@ -62,7 +75,10 @@ describe("submitActionForApproval when the action is applied before the reply", 
   });
 
   it("keeps an apply failure as failed, not pending", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 503 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("down", { status: 503 })),
+    );
     const { gk, kv } = gatekeeper();
     const action = pause(gk);
     await gk.submitActionForApproval(applyingQueue(gk, "ok"), action, presentation);
@@ -70,10 +86,15 @@ describe("submitActionForApproval when the action is applied before the reply", 
   });
 
   it("reports success when the reply is lost after the action applied", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 204 })),
+    );
     const { gk, kv } = gatekeeper();
     const action = pause(gk);
-    await expect(gk.submitActionForApproval(applyingQueue(gk, "lost"), action, presentation)).resolves.toBeUndefined();
+    await expect(
+      gk.submitActionForApproval(applyingQueue(gk, "lost"), action, presentation),
+    ).resolves.toBeUndefined();
     expect(kv.get(`retiredAction:${action.approvalId}`)).toMatchObject({ state: "approved" });
   });
 
@@ -89,26 +110,36 @@ describe("submitActionForApproval when the action is applied before the reply", 
   });
 
   it("keeps a failed apply for a retry when the reply is lost", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 503 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("down", { status: 503 })),
+    );
     const { gk, kv } = gatekeeper();
     const action = pause(gk);
-    await expect(gk.submitActionForApproval(applyingQueue(gk, "lost"), action, presentation)).resolves.toBeUndefined();
+    await expect(
+      gk.submitActionForApproval(applyingQueue(gk, "lost"), action, presentation),
+    ).resolves.toBeUndefined();
     expect(kv.get(`action:${action.approvalId}`)).toMatchObject({ state: "failed" });
   });
 
   it("keeps an action whose apply is still under way when the reply is lost", async () => {
     let release: (() => void) | undefined;
-    const fetch = vi.fn(() => new Promise<Response>(resolve => {
-      release = () => resolve(new Response(null, { status: 204 }));
-    }));
+    const fetch = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(new Response(null, { status: 204 }));
+        }),
+    );
     vi.stubGlobal("fetch", fetch);
     const { gk, kv } = gatekeeper();
     const action = pause(gk);
     let applying: Promise<void> | undefined;
-    const queue = { submitAction: async (id: number) => {
-      applying = gk.applyAction(id);
-      throw new Error("Network connection lost.");
-    } } as never;
+    const queue = {
+      submitAction: async (id: number) => {
+        applying = gk.applyAction(id);
+        throw new Error("Network connection lost.");
+      },
+    } as never;
     await expect(gk.submitActionForApproval(queue, action, presentation)).resolves.toBeUndefined();
     expect(kv.get(`action:${action.approvalId}`)).toMatchObject({ state: "pending" });
     await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
@@ -120,8 +151,14 @@ describe("submitActionForApproval when the action is applied before the reply", 
   it("still drops the record and fails when the submit fails without applying", async () => {
     const { gk, kv } = gatekeeper();
     const action = pause(gk);
-    const queue = { submitAction: async () => { throw new Error("queue gone"); } } as never;
-    await expect(gk.submitActionForApproval(queue, action, presentation)).rejects.toThrow("queue gone");
+    const queue = {
+      submitAction: async () => {
+        throw new Error("queue gone");
+      },
+    } as never;
+    await expect(gk.submitActionForApproval(queue, action, presentation)).rejects.toThrow(
+      "queue gone",
+    );
     expect(kv.has(`action:${action.approvalId}`)).toBe(false);
   });
 });

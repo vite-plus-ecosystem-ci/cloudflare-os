@@ -1,11 +1,15 @@
 // An alert's details as the agent reads them: PagerDuty sends a monitoring tool's details as a
 // JSON object or as plain text, and both reach the agent.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { toAlert, type WireAlert } from "../src/pagerduty-normalize";
 
-const alert = (details: unknown): WireAlert =>
-  ({ id: "PALRT01", status: "triggered", created_at: "2026-11-06T00:00:00Z", body: { details } });
+const alert = (details: unknown): WireAlert => ({
+  id: "PALRT01",
+  status: "triggered",
+  created_at: "2026-11-06T00:00:00Z",
+  body: { details },
+});
 
 describe("an alert's details", () => {
   it.each([

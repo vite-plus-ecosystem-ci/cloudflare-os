@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vite-plus/test";
 import { listAccounts } from "../src/cloudflare-api";
 
 const TOKEN = "test-token";
@@ -11,7 +11,7 @@ afterEach(() => {
 function page(names: string[], perPage: number, totalCount?: number): Response {
   return Response.json({
     success: true,
-    result: names.map(name => ({ id: `${name}-id`, name })),
+    result: names.map((name) => ({ id: `${name}-id`, name })),
     result_info: { page: 1, per_page: perPage, count: names.length, total_count: totalCount },
   });
 }
@@ -24,10 +24,13 @@ it("walks every page rather than stopping at the provider's default page size", 
   // `/accounts` defaults to 20 per page, so an unpaginated GET silently hides the rest: the accounts
   // beyond the first page could not be selected, and searching for one found nothing.
   const urls: string[] = [];
-  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-    urls.push(String(input));
-    return urls.length === 1 ? page(names(50), 50, 62) : page(names(12, 50), 50, 62);
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      urls.push(String(input));
+      return urls.length === 1 ? page(names(50), 50, 62) : page(names(12, 50), 50, 62);
+    }),
+  );
 
   const accounts = await listAccounts(TOKEN);
 
@@ -73,10 +76,13 @@ it("honours a page size the provider lowered below the request", async () => {
 
 it("keeps the accounts gathered before a mid-walk failure", async () => {
   let call = 0;
-  vi.stubGlobal("fetch", vi.fn(async () => {
-    call++;
-    return call === 1 ? page(names(50), 50, 99) : new Response("nope", { status: 500 });
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      call++;
+      return call === 1 ? page(names(50), 50, 99) : new Response("nope", { status: 500 });
+    }),
+  );
 
   // A partial list is more useful than none, and the caller cannot tell a truncated list from a
   // complete one -- so this is deliberately not an error.
@@ -94,7 +100,10 @@ it("caps the walk so a misbehaving provider cannot loop forever", async () => {
 });
 
 it("returns no accounts when the first page fails", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("denied", { status: 403 })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("denied", { status: 403 })),
+  );
 
   expect(await listAccounts(TOKEN)).toEqual([]);
 });

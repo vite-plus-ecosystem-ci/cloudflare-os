@@ -2,14 +2,16 @@
 // subresources for the Workshop to check, how verifyObserverAccess() answers for them, and what
 // addObserver() still enforces itself.
 
-import {env} from "cloudflare:workers";
-import {runInDurableObject} from "cloudflare:test";
-import {afterEach, describe, expect, it, vi} from "vitest";
-import {stageCredentials} from "@gadgets/gatekeeper-kit/credential-stage";
+import { env } from "cloudflare:workers";
+import { runInDurableObject } from "cloudflare:test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { stageCredentials } from "@gadgets/gatekeeper-kit/credential-stage";
 import type {
-  GoogleCalendarGatekeeperImpl, GoogleCalendarGatekeeperImplProps, UserAccount,
+  GoogleCalendarGatekeeperImpl,
+  GoogleCalendarGatekeeperImplProps,
+  UserAccount,
 } from "../../src/google";
-import type {TestHooks} from "./worker";
+import type { TestHooks } from "./worker";
 
 const testEnv = env as unknown as {
   GoogleCalendarGatekeeperImpl: DurableObjectNamespace<GoogleCalendarGatekeeperImpl>;
@@ -18,7 +20,7 @@ const testEnv = env as unknown as {
 };
 
 const json = (value: unknown, status = 200) =>
-  new Response(JSON.stringify(value), {status, headers: {"Content-Type": "application/json"}});
+  new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
 
 const BOUND = "team@group.calendar.google.com";
 const ALICE = "alice@example.com";
@@ -47,33 +49,53 @@ type CalendarBackend = {
   /** HTTP status a token's calendar lookups fail with. */
   roleStatus: Record<string, number>;
   /** The events Google lists on the bound calendar. */
-  events: Array<{id: string; summary: string; start: {dateTime: string}; end: {dateTime: string}}>;
+  events: Array<{
+    id: string;
+    summary: string;
+    start: { dateTime: string };
+    end: { dateTime: string };
+  }>;
   /** The calendars each free/busy query named. */
-  queries: Array<{token: string; calendarIds: string[]}>;
+  queries: Array<{ token: string; calendarIds: string[] }>;
   /** The calendars each token looked up its role on. */
-  lookups: Array<{token: string; calendarId: string}>;
+  lookups: Array<{ token: string; calendarId: string }>;
 };
 
 /** Seeds an account holding `token`, once: later calls reuse whatever it holds by then. */
 async function connectAccount(name: string, token: string): Promise<string> {
   const id = testEnv.UserAccount.idFromName(name);
-  await runInDurableObject(testEnv.UserAccount.get(id), (_instance: unknown, state: DurableObjectState) => {
-    if (state.storage.kv.get("refreshToken")) return;
-    state.storage.kv.put("refreshToken", `${token}-refresh`);
-    state.storage.kv.put("accessToken", {token, expires: new Date(Date.now() + 3_600_000)});
-  });
+  await runInDurableObject(
+    testEnv.UserAccount.get(id),
+    (_instance: unknown, state: DurableObjectState) => {
+      if (state.storage.kv.get("refreshToken")) return;
+      state.storage.kv.put("refreshToken", `${token}-refresh`);
+      state.storage.kv.put("accessToken", { token, expires: new Date(Date.now() + 3_600_000) });
+    },
+  );
   return id.toString();
 }
 
-function calendarHarness(availabilityMode: GoogleCalendarGatekeeperImplProps["availabilityMode"] = "allVisible") {
+function calendarHarness(
+  availabilityMode: GoogleCalendarGatekeeperImplProps["availabilityMode"] = "allVisible",
+) {
   const backend: CalendarBackend = {
-    freeBusy: {owner: id => [BOUND, ALICE, HOLIDAYS].includes(id)},
+    freeBusy: { owner: (id) => [BOUND, ALICE, HOLIDAYS].includes(id) },
     freeBusyStatus: {},
-    roles: {owner: "owner"},
+    roles: { owner: "owner" },
     roleStatus: {},
     events: [
-      {id: "standup", summary: "Standup", start: {dateTime: "2026-11-03T09:00:00Z"}, end: {dateTime: "2026-11-03T09:15:00Z"}},
-      {id: "retro", summary: "Retro", start: {dateTime: "2026-11-03T16:00:00Z"}, end: {dateTime: "2026-11-03T17:00:00Z"}},
+      {
+        id: "standup",
+        summary: "Standup",
+        start: { dateTime: "2026-11-03T09:00:00Z" },
+        end: { dateTime: "2026-11-03T09:15:00Z" },
+      },
+      {
+        id: "retro",
+        summary: "Retro",
+        start: { dateTime: "2026-11-03T16:00:00Z" },
+        end: { dateTime: "2026-11-03T17:00:00Z" },
+      },
     ],
     queries: [],
     lookups: [],
@@ -83,34 +105,44 @@ function calendarHarness(availabilityMode: GoogleCalendarGatekeeperImplProps["av
     const token = new Headers(init.headers).get("Authorization")?.replace(/^Bearer /, "") ?? "";
     if (url.pathname === "/calendar/v3/freeBusy" && init.method === "POST") {
       // Shaped by the gatekeeper's own freeBusy(), the only caller of this endpoint.
-      const request: {items: {id: string}[]} = JSON.parse(String(init.body));
-      const calendarIds = request.items.map(item => item.id);
-      backend.queries.push({token, calendarIds});
+      const request: { items: { id: string }[] } = JSON.parse(String(init.body));
+      const calendarIds = request.items.map((item) => item.id);
+      backend.queries.push({ token, calendarIds });
       const status = backend.freeBusyStatus[token];
-      if (status) return json({error: {code: status}}, status);
+      if (status) return json({ error: { code: status } }, status);
       const sees = backend.freeBusy[token] ?? (() => false);
-      return json({calendars: Object.fromEntries(calendarIds.map(id => {
-        const answer = sees(id);
-        return [id, answer === true
-          ? {busy: [{start: timeMin.toISOString(), end: timeMax.toISOString()}]}
-          : {busy: [], errors: [{domain: "global", reason: answer === false ? "notFound" : answer}]}];
-      }))});
+      return json({
+        calendars: Object.fromEntries(
+          calendarIds.map((id) => {
+            const answer = sees(id);
+            return [
+              id,
+              answer === true
+                ? { busy: [{ start: timeMin.toISOString(), end: timeMax.toISOString() }] }
+                : {
+                    busy: [],
+                    errors: [{ domain: "global", reason: answer === false ? "notFound" : answer }],
+                  },
+            ];
+          }),
+        ),
+      });
     }
     const listed = url.pathname.match(/^\/calendar\/v3\/users\/me\/calendarList\/([^/]+)$/);
     if (listed) {
       const calendarId = decodeURIComponent(listed[1]);
-      backend.lookups.push({token, calendarId});
+      backend.lookups.push({ token, calendarId });
       const status = backend.roleStatus[token];
-      if (status) return json({error: {code: status}}, status);
+      if (status) return json({ error: { code: status } }, status);
       const role = backend.roles[token];
       return role
-        ? json({id: calendarId, summary: "Team", accessRole: role})
-        : json({error: {code: 404}}, 404);
+        ? json({ id: calendarId, summary: "Team", accessRole: role })
+        : json({ error: { code: 404 } }, 404);
     }
     if (url.pathname === `/calendar/v3/calendars/${encodeURIComponent(BOUND)}/events`) {
-      return json({items: backend.events});
+      return json({ items: backend.events });
     }
-    return json({error: {code: 404}}, 404);
+    return json({ error: { code: 404 } }, 404);
   });
 
   const name = `calendar-test-${crypto.randomUUID()}`;
@@ -118,8 +150,12 @@ function calendarHarness(availabilityMode: GoogleCalendarGatekeeperImplProps["av
   const id = testEnv.GoogleCalendarGatekeeperImpl.idFromName(name).toString();
   const facetName = `calendar-${name}`;
   const queueId = `queue-${crypto.randomUUID()}`;
-  const ready = connectAccount(name, "owner").then(async userObjectId => {
-    const props: GoogleCalendarGatekeeperImplProps = {userObjectId, calendarId: BOUND, availabilityMode};
+  const ready = connectAccount(name, "owner").then(async (userObjectId) => {
+    const props: GoogleCalendarGatekeeperImplProps = {
+      userObjectId,
+      calendarId: BOUND,
+      availabilityMode,
+    };
     await hook.calendarStartSession(facetName, id, props, queueId);
     return props;
   });
@@ -130,40 +166,62 @@ function calendarHarness(availabilityMode: GoogleCalendarGatekeeperImplProps["av
     observations: async () => {
       await ready;
       // Read in the object: what the queue recorded is `unknown` to the stub's types.
-      const {observations} = await runInDurableObject(hook, (instance: TestHooks) => instance.readQueue(queueId));
+      const { observations } = await runInDurableObject(hook, (instance: TestHooks) =>
+        instance.readQueue(queueId),
+      );
       return observations as Array<Record<string, unknown>>;
     },
     /** Admits an observer whose account holds `token`. */
     addObserver: async (observerId: string, token: string) =>
-      hook.calendarAddObserver(facetName, id, await ready, observerId,
-        await connectAccount(`${name}-${token}`, token)),
+      hook.calendarAddObserver(
+        facetName,
+        id,
+        await ready,
+        observerId,
+        await connectAccount(`${name}-${token}`, token),
+      ),
     /** verifyObserverAccess() for observers named by id, each holding the given token. */
     verify: async (observers: Record<string, string>, subresources: string[]) => {
       const props = await ready;
-      const withAccounts = await Promise.all(Object.entries(observers).map(
-        async ([observerId, token]) => ({
-          id: observerId, userObjectId: await connectAccount(`${name}-${token}`, token),
-        })));
+      const withAccounts = await Promise.all(
+        Object.entries(observers).map(async ([observerId, token]) => ({
+          id: observerId,
+          userObjectId: await connectAccount(`${name}-${token}`, token),
+        })),
+      );
       return hook.calendarVerifyObserverAccess(facetName, id, props, withAccounts, subresources);
     },
     /** Reconnects the account holding `token` to hold `newToken` instead. */
     reconnect: async (token: string, newToken: string) => {
-      const accountId = testEnv.UserAccount.idFromString(await connectAccount(`${name}-${token}`, token));
-      await runInDurableObject(testEnv.UserAccount.get(accountId),
+      const accountId = testEnv.UserAccount.idFromString(
+        await connectAccount(`${name}-${token}`, token),
+      );
+      await runInDurableObject(
+        testEnv.UserAccount.get(accountId),
         async (instance: UserAccount, state: DurableObjectState) => {
-          const stageId = stageCredentials(state.storage.kv, {
-            refreshToken: `${newToken}-refresh`,
-            accessToken: {token: newToken, expires: new Date(Date.now() + 3_600_000)},
-            grantedScopes: [], requestedResources: [],
-          }, Date.now());
+          const stageId = stageCredentials(
+            state.storage.kv,
+            {
+              refreshToken: `${newToken}-refresh`,
+              accessToken: { token: newToken, expires: new Date(Date.now() + 3_600_000) },
+              grantedScopes: [],
+              requestedResources: [],
+            },
+            Date.now(),
+          );
           await instance.commitReconnect(stageId);
-        });
+        },
+      );
     },
     /** What a version that tracked availability itself recorded for a calendar it read. */
     recordLegacyCalendar: async (calendarId: string) =>
-      hook.calendarApplyStorage(facetName, id, await ready, [{
-        kind: "put", key: `observedAvailabilityCalendar:${encodeURIComponent(calendarId)}`, value: "observed",
-      }]),
+      hook.calendarApplyStorage(facetName, id, await ready, [
+        {
+          kind: "put",
+          key: `observedAvailabilityCalendar:${encodeURIComponent(calendarId)}`,
+          value: "observed",
+        },
+      ]),
   };
 }
 
@@ -182,14 +240,23 @@ describe("Google Calendar subresources", () => {
     using session = await calendar.session();
 
     const availability = await session.checkAvailability({
-      people: [BOUND, ALICE, HOLIDAYS, BOB, ` ${ALICE} `], timeMin, timeMax,
+      people: [BOUND, ALICE, HOLIDAYS, BOB, ` ${ALICE} `],
+      timeMin,
+      timeMax,
     });
 
-    expect(availability.map(person => [person.email, person.error])).toEqual([
-      [BOUND, undefined], [ALICE, undefined], [HOLIDAYS, undefined], [BOB, "notFound"],
+    expect(availability.map((person) => [person.email, person.error])).toEqual([
+      [BOUND, undefined],
+      [ALICE, undefined],
+      [HOLIDAYS, undefined],
+      [BOB, "notFound"],
     ]);
     const [observation] = await calendar.observations();
-    expect(observation.subresources).toEqual([BOUND_FREE_BUSY, ALICE_FREE_BUSY, HOLIDAYS_FREE_BUSY]);
+    expect(observation.subresources).toEqual([
+      BOUND_FREE_BUSY,
+      ALICE_FREE_BUSY,
+      HOLIDAYS_FREE_BUSY,
+    ]);
     expect(observation).not.toHaveProperty("excludeObservers");
     // The Workshop checks those calendars now, so admission no longer does.
     await calendar.addObserver("late", "writer");
@@ -200,10 +267,12 @@ describe("Google Calendar subresources", () => {
     using session = await calendar.session();
 
     await session.getCalendar();
-    await session.listEvents({timeMin, timeMax});
+    await session.listEvents({ timeMin, timeMax });
 
-    expect((await calendar.observations()).map(observation => observation.subresources))
-      .toEqual([[BOUND_CALENDAR], [BOUND_CALENDAR]]);
+    expect((await calendar.observations()).map((observation) => observation.subresources)).toEqual([
+      [BOUND_CALENDAR],
+      [BOUND_CALENDAR],
+    ]);
   });
 
   it("reports the calendar for a listing with no events, and nothing for a failed lookup", async () => {
@@ -211,29 +280,33 @@ describe("Google Calendar subresources", () => {
     calendar.backend.events = [];
     using session = await calendar.session();
 
-    await session.listEvents({timeMin, timeMax});
-    await session.checkAvailability({people: [BOB], timeMin, timeMax});
+    await session.listEvents({ timeMin, timeMax });
+    await session.checkAvailability({ people: [BOB], timeMin, timeMax });
 
-    expect((await calendar.observations()).map(observation => observation.subresources))
-      .toEqual([[BOUND_CALENDAR], []]);
+    expect((await calendar.observations()).map((observation) => observation.subresources)).toEqual([
+      [BOUND_CALENDAR],
+      [],
+    ]);
   });
 
   it("reports the bound calendar's free/busy on a binding limited to it", async () => {
     const calendar = calendarHarness("thisCalendar");
     using session = await calendar.session();
 
-    await session.checkAvailability({people: [BOUND], timeMin, timeMax});
+    await session.checkAvailability({ people: [BOUND], timeMin, timeMax });
 
-    expect((await calendar.observations()).map(observation => observation.subresources))
-      .toEqual([[BOUND_FREE_BUSY]]);
+    expect((await calendar.observations()).map((observation) => observation.subresources)).toEqual([
+      [BOUND_FREE_BUSY],
+    ]);
   });
 
   it("refuses another calendar's availability on a binding limited to its own, asking Google nothing", async () => {
     const calendar = calendarHarness("thisCalendar");
     using session = await calendar.session();
 
-    await expect(Promise.resolve(session.checkAvailability({people: [BOUND, ALICE], timeMin, timeMax})))
-      .rejects.toThrow(/only allows availability for the bound calendar/);
+    await expect(
+      Promise.resolve(session.checkAvailability({ people: [BOUND, ALICE], timeMin, timeMax })),
+    ).rejects.toThrow(/only allows availability for the bound calendar/);
     expect(calendar.backend.queries).toEqual([]);
     expect(await calendar.observations()).toEqual([]);
   });
@@ -242,28 +315,33 @@ describe("Google Calendar subresources", () => {
 describe("Google Calendar verifyObserverAccess", () => {
   it("allows only observers whose own account sees the free/busy of every calendar", async () => {
     const calendar = calendarHarness();
-    calendar.backend.freeBusy.both = id => id === ALICE || id === HOLIDAYS;
-    calendar.backend.freeBusy.alice = id => id === ALICE;
-    const observers = {both: "both", alice: "alice", nobody: "nobody"};
+    calendar.backend.freeBusy.both = (id) => id === ALICE || id === HOLIDAYS;
+    calendar.backend.freeBusy.alice = (id) => id === ALICE;
+    const observers = { both: "both", alice: "alice", nobody: "nobody" };
 
-    await expect(calendar.verify(observers, [ALICE_FREE_BUSY, HOLIDAYS_FREE_BUSY]))
-      .resolves.toEqual({allowedObserverIds: ["both"]});
-    await expect(calendar.verify(observers, [ALICE_FREE_BUSY]))
-      .resolves.toEqual({allowedObserverIds: ["both", "alice"]});
+    await expect(
+      calendar.verify(observers, [ALICE_FREE_BUSY, HOLIDAYS_FREE_BUSY]),
+    ).resolves.toEqual({ allowedObserverIds: ["both"] });
+    await expect(calendar.verify(observers, [ALICE_FREE_BUSY])).resolves.toEqual({
+      allowedObserverIds: ["both", "alice"],
+    });
   });
 
   it("checks every calendar of a large requirement, at most 50 to a Google query", async () => {
     const calendar = calendarHarness();
-    const people = Array.from({length: 120}, (_, index) => `person${index}@example.com`);
+    const people = Array.from({ length: 120 }, (_, index) => `person${index}@example.com`);
     calendar.backend.freeBusy.all = () => true;
-    calendar.backend.freeBusy.most = id => id !== people.at(-1);
+    calendar.backend.freeBusy.most = (id) => id !== people.at(-1);
 
-    await expect(calendar.verify(
-      {all: "all", most: "most"}, people.map(id => `calendar/freeBusy/${encodeURIComponent(id)}`),
-    )).resolves.toEqual({allowedObserverIds: ["all"]});
-    const asked = calendar.backend.queries.filter(query => query.token === "most");
-    expect(asked.every(query => query.calendarIds.length <= 50)).toBe(true);
-    expect(asked.flatMap(query => query.calendarIds).toSorted()).toEqual(people.toSorted());
+    await expect(
+      calendar.verify(
+        { all: "all", most: "most" },
+        people.map((id) => `calendar/freeBusy/${encodeURIComponent(id)}`),
+      ),
+    ).resolves.toEqual({ allowedObserverIds: ["all"] });
+    const asked = calendar.backend.queries.filter((query) => query.token === "most");
+    expect(asked.every((query) => query.calendarIds.length <= 50)).toBe(true);
+    expect(asked.flatMap((query) => query.calendarIds).toSorted()).toEqual(people.toSorted());
   });
 
   it("checks each calendar by the observer's role on it, which must see private event details", async () => {
@@ -271,28 +349,35 @@ describe("Google Calendar verifyObserverAccess", () => {
     calendar.backend.roles.writer = "writer";
     calendar.backend.roles.limited = "writerWithoutPrivateAccess";
     calendar.backend.roles.reader = "reader";
-    const observers = {writer: "writer", limited: "limited", reader: "reader", absent: "absent"};
+    const observers = { writer: "writer", limited: "limited", reader: "reader", absent: "absent" };
 
-    await expect(calendar.verify(observers, [BOUND_CALENDAR, ALICE_CALENDAR]))
-      .resolves.toEqual({allowedObserverIds: ["writer"]});
-    expect(calendar.backend.lookups.filter(lookup => lookup.token === "writer")
-      .map(lookup => lookup.calendarId)).toEqual([BOUND, ALICE]);
+    await expect(calendar.verify(observers, [BOUND_CALENDAR, ALICE_CALENDAR])).resolves.toEqual({
+      allowedObserverIds: ["writer"],
+    });
+    expect(
+      calendar.backend.lookups
+        .filter((lookup) => lookup.token === "writer")
+        .map((lookup) => lookup.calendarId),
+    ).toEqual([BOUND, ALICE]);
     expect(calendar.backend.queries).toEqual([]);
   });
 
   it("caches each answer of a mixed verification under its own subresource", async () => {
     const calendar = calendarHarness();
     calendar.backend.roles.alice = "reader";
-    calendar.backend.freeBusy.alice = id => id === ALICE;
+    calendar.backend.freeBusy.alice = (id) => id === ALICE;
 
     // Alice sees Alice's free/busy, but not the event details on the bound calendar.
-    await expect(calendar.verify({alice: "alice"}, [BOUND_CALENDAR, ALICE_FREE_BUSY]))
-      .resolves.toEqual({allowedObserverIds: []});
+    await expect(
+      calendar.verify({ alice: "alice" }, [BOUND_CALENDAR, ALICE_FREE_BUSY]),
+    ).resolves.toEqual({ allowedObserverIds: [] });
     // Both answers are reused, each for the subresource it answered.
-    await expect(calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY]))
-      .resolves.toEqual({allowedObserverIds: ["alice"]});
-    await expect(calendar.verify({alice: "alice"}, [BOUND_CALENDAR]))
-      .resolves.toEqual({allowedObserverIds: []});
+    await expect(calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY])).resolves.toEqual({
+      allowedObserverIds: ["alice"],
+    });
+    await expect(calendar.verify({ alice: "alice" }, [BOUND_CALENDAR])).resolves.toEqual({
+      allowedObserverIds: [],
+    });
     expect(calendar.backend.queries).toHaveLength(1);
     expect(calendar.backend.lookups).toHaveLength(1);
   });
@@ -303,10 +388,11 @@ describe("Google Calendar verifyObserverAccess", () => {
     // A refused lookup (a rate limit, a missing scope) is no answer about the writer's role.
     calendar.backend.roleStatus.writer = 403;
 
-    await expect(calendar.verify({writer: "writer"}, [BOUND_CALENDAR])).rejects.toThrow(/403/);
+    await expect(calendar.verify({ writer: "writer" }, [BOUND_CALENDAR])).rejects.toThrow(/403/);
     delete calendar.backend.roleStatus.writer;
-    await expect(calendar.verify({writer: "writer"}, [BOUND_CALENDAR]))
-      .resolves.toEqual({allowedObserverIds: ["writer"]});
+    await expect(calendar.verify({ writer: "writer" }, [BOUND_CALENDAR])).resolves.toEqual({
+      allowedObserverIds: ["writer"],
+    });
   });
 
   it.each([
@@ -322,8 +408,9 @@ describe("Google Calendar verifyObserverAccess", () => {
     const calendar = calendarHarness();
     calendar.backend.freeBusy.both = () => true;
 
-    await expect(calendar.verify({both: "both"}, [ALICE_FREE_BUSY, subresource]))
-      .rejects.toThrow(/subresource/);
+    await expect(calendar.verify({ both: "both" }, [ALICE_FREE_BUSY, subresource])).rejects.toThrow(
+      /subresource/,
+    );
   });
 
   it("throws rather than denying when an observer's access can't be determined", async () => {
@@ -331,34 +418,38 @@ describe("Google Calendar verifyObserverAccess", () => {
     calendar.backend.freeBusy.both = () => true;
     calendar.backend.freeBusy.backend = () => "backendError";
 
-    await expect(calendar.verify({both: "both", backend: "backend"}, [ALICE_FREE_BUSY]))
-      .rejects.toThrow(/backendError/);
+    await expect(
+      calendar.verify({ both: "both", backend: "backend" }, [ALICE_FREE_BUSY]),
+    ).rejects.toThrow(/backendError/);
   });
 
   it("throws when Google refuses an observer's query, and asks again next time", async () => {
     const calendar = calendarHarness();
-    calendar.backend.freeBusy.alice = id => id === ALICE;
+    calendar.backend.freeBusy.alice = (id) => id === ALICE;
     calendar.backend.freeBusyStatus.alice = 403;
 
     // A refused query (a missing scope, a rate limit) is no answer about Alice's access.
-    await expect(calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY])).rejects.toThrow(/403/);
+    await expect(calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY])).rejects.toThrow(/403/);
     delete calendar.backend.freeBusyStatus.alice;
-    await expect(calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY]))
-      .resolves.toEqual({allowedObserverIds: ["alice"]});
+    await expect(calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY])).resolves.toEqual({
+      allowedObserverIds: ["alice"],
+    });
   });
 
   it("keeps what Google answered before a later request failed", async () => {
     const calendar = calendarHarness();
-    calendar.backend.freeBusy.alice = id => id === ALICE;
+    calendar.backend.freeBusy.alice = (id) => id === ALICE;
     calendar.backend.roles.alice = "writer";
     // Neither a refusal of access nor a status the client retries.
     calendar.backend.roleStatus.alice = 400;
 
-    await expect(calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY, BOUND_CALENDAR]))
-      .rejects.toThrow(/400/);
+    await expect(
+      calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY, BOUND_CALENDAR]),
+    ).rejects.toThrow(/400/);
     delete calendar.backend.roleStatus.alice;
-    await expect(calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY, BOUND_CALENDAR]))
-      .resolves.toEqual({allowedObserverIds: ["alice"]});
+    await expect(
+      calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY, BOUND_CALENDAR]),
+    ).resolves.toEqual({ allowedObserverIds: ["alice"] });
     // The free/busy answer outlived the failed lookup, so only the lookup reached Google again.
     expect(calendar.backend.queries).toHaveLength(1);
     expect(calendar.backend.lookups).toHaveLength(2);
@@ -366,46 +457,57 @@ describe("Google Calendar verifyObserverAccess", () => {
 
   it("reuses an account's recent answers, asking Google only about calendars it hasn't", async () => {
     const calendar = calendarHarness();
-    calendar.backend.freeBusy.alice = id => id === ALICE;
-    await expect(calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY]))
-      .resolves.toEqual({allowedObserverIds: ["alice"]});
+    calendar.backend.freeBusy.alice = (id) => id === ALICE;
+    await expect(calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY])).resolves.toEqual({
+      allowedObserverIds: ["alice"],
+    });
 
     // Alice's answer is still recent, so only the calendar not yet asked about reaches Google.
-    await expect(calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY, HOLIDAYS_FREE_BUSY]))
-      .resolves.toEqual({allowedObserverIds: []});
-    expect(calendar.backend.queries.map(query => query.calendarIds)).toEqual([[ALICE], [HOLIDAYS]]);
+    await expect(
+      calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY, HOLIDAYS_FREE_BUSY]),
+    ).resolves.toEqual({ allowedObserverIds: [] });
+    expect(calendar.backend.queries.map((query) => query.calendarIds)).toEqual([
+      [ALICE],
+      [HOLIDAYS],
+    ]);
   });
 
   it("asks Google again about a denial after 15 seconds, and about an allowed answer after 15 minutes", async () => {
     const calendar = calendarHarness();
-    calendar.backend.freeBusy.alice = id => id === ALICE;
-    vi.useFakeTimers({toFake: ["Date"]});
+    calendar.backend.freeBusy.alice = (id) => id === ALICE;
+    vi.useFakeTimers({ toFake: ["Date"] });
     const start = Date.now();
-    await expect(calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY, HOLIDAYS_FREE_BUSY]))
-      .resolves.toEqual({allowedObserverIds: []});
+    await expect(
+      calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY, HOLIDAYS_FREE_BUSY]),
+    ).resolves.toEqual({ allowedObserverIds: [] });
 
     vi.setSystemTime(start + 14_999);
-    await calendar.verify({alice: "alice"}, [HOLIDAYS_FREE_BUSY]);
+    await calendar.verify({ alice: "alice" }, [HOLIDAYS_FREE_BUSY]);
     vi.setSystemTime(start + 15_000);
-    await calendar.verify({alice: "alice"}, [HOLIDAYS_FREE_BUSY]);
+    await calendar.verify({ alice: "alice" }, [HOLIDAYS_FREE_BUSY]);
     vi.setSystemTime(start + 15 * 60_000 - 1);
-    await calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY]);
+    await calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY]);
     vi.setSystemTime(start + 15 * 60_000);
-    await calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY]);
-    expect(calendar.backend.queries.map(query => query.calendarIds))
-      .toEqual([[ALICE, HOLIDAYS], [HOLIDAYS], [ALICE]]);
+    await calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY]);
+    expect(calendar.backend.queries.map((query) => query.calendarIds)).toEqual([
+      [ALICE, HOLIDAYS],
+      [HOLIDAYS],
+      [ALICE],
+    ]);
   });
 
   it("asks Google again after a reconnect, which may sign in as someone else", async () => {
     const calendar = calendarHarness();
-    calendar.backend.freeBusy.alice = id => id === ALICE;
-    await expect(calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY]))
-      .resolves.toEqual({allowedObserverIds: ["alice"]});
+    calendar.backend.freeBusy.alice = (id) => id === ALICE;
+    await expect(calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY])).resolves.toEqual({
+      allowedObserverIds: ["alice"],
+    });
 
     await calendar.reconnect("alice", "bob");
-    await expect(calendar.verify({alice: "alice"}, [ALICE_FREE_BUSY]))
-      .resolves.toEqual({allowedObserverIds: []});
-    expect(calendar.backend.queries.map(query => query.token)).toEqual(["alice", "bob"]);
+    await expect(calendar.verify({ alice: "alice" }, [ALICE_FREE_BUSY])).resolves.toEqual({
+      allowedObserverIds: [],
+    });
+    expect(calendar.backend.queries.map((query) => query.token)).toEqual(["alice", "bob"]);
   });
 });
 
@@ -424,11 +526,12 @@ describe("Google Calendar addObserver", () => {
     const calendar = calendarHarness();
     calendar.backend.roles.writer = "writer";
     calendar.backend.roles.alice = "writer";
-    calendar.backend.freeBusy.alice = id => id === ALICE;
+    calendar.backend.freeBusy.alice = (id) => id === ALICE;
     await calendar.recordLegacyCalendar(ALICE);
 
-    await expect(calendar.addObserver("writer", "writer"))
-      .rejects.toThrow(/cannot see free\/busy availability for alice@example\.com/);
+    await expect(calendar.addObserver("writer", "writer")).rejects.toThrow(
+      /cannot see free\/busy availability for alice@example\.com/,
+    );
     await calendar.addObserver("alice", "alice");
   });
 });

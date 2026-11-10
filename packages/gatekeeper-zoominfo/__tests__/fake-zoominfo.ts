@@ -5,7 +5,7 @@
 // the user; the data API answers with JSON:API documents. Anything else fails the test.
 
 import { env, runInDurableObject } from "cloudflare:test";
-import { vi } from "vitest";
+import { vi } from "vite-plus/test";
 import { generateNonce } from "@gadgets/gatekeeper-kit/connect-nonce";
 import { CredentialCoordinator } from "@gadgets/gatekeeper-kit/credentials";
 
@@ -20,7 +20,10 @@ export const BOB: FakeUser = { sub: "00u2bob", name: "Bob", email: "bob@example.
 export type FakeRequest = { method: string; path: string; token?: string };
 
 function json(value: unknown, status = 200): Response {
-  return new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(value), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 function base64UrlJson(value: unknown): string {
@@ -37,8 +40,12 @@ const GRANTED_SCOPES = ["api:data:company", "api:data:contact"];
 export class FakeZoomInfo {
   readonly requests: FakeRequest[] = [];
   /** The claims of the ID token a grant for `user` carries; `null` sends none. */
-  idToken: (user: FakeUser) => Record<string, unknown> | null =
-    user => ({ sub: user.sub, aud: CLIENT_ID, name: user.name, email: user.email });
+  idToken: (user: FakeUser) => Record<string, unknown> | null = (user) => ({
+    sub: user.sub,
+    aud: CLIENT_ID,
+    name: user.name,
+    email: user.email,
+  });
   /** Enrichments fail as an outage would. */
   failEnrichment = false;
   /** How long the token endpoint takes to answer, so requests to it can overlap. */
@@ -56,14 +63,19 @@ export class FakeZoomInfo {
   #issued = 0;
 
   install(): this {
-    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => this.#handle(new Request(input, init)));
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) =>
+      this.#handle(new Request(input, init)),
+    );
     return this;
   }
 
   /** A new access and refresh token for `user`. */
   grant(user: FakeUser): { accessToken: string; refreshToken: string } {
     const n = ++this.#issued;
-    const grant = { accessToken: `access-${user.sub}-${n}`, refreshToken: `refresh-${user.sub}-${n}` };
+    const grant = {
+      accessToken: `access-${user.sub}-${n}`,
+      refreshToken: `refresh-${user.sub}-${n}`,
+    };
     this.#owners.set(grant.accessToken, user).set(grant.refreshToken, user);
     return grant;
   }
@@ -77,7 +89,8 @@ export class FakeZoomInfo {
 
   /** How many requests matched `pattern`, tested against `METHOD /path`. */
   count(pattern: RegExp): number {
-    return this.requests.filter(request => pattern.test(`${request.method} ${request.path}`)).length;
+    return this.requests.filter((request) => pattern.test(`${request.method} ${request.path}`))
+      .length;
   }
 
   async #handle(request: Request): Promise<Response> {
@@ -90,7 +103,8 @@ export class FakeZoomInfo {
       if (this.tokenLatencyMs > 0) await scheduler.wait(this.tokenLatencyMs);
       if (form.get("grant_type") === "refresh_token") {
         await this.holdRefreshes;
-        if (this.refuseRefreshes) return json({ error: this.refuseRefreshes.error }, this.refuseRefreshes.status);
+        if (this.refuseRefreshes)
+          return json({ error: this.refuseRefreshes.error }, this.refuseRefreshes.status);
       }
       return this.#token(form);
     }
@@ -99,20 +113,39 @@ export class FakeZoomInfo {
     if (!user) return json({ errors: [{ detail: "Invalid token" }] }, 401);
     switch (`${request.method} ${url.pathname}`) {
       case "POST /gtm/data/v1/companies/search":
-        return json({ data: [{ type: "Company", id: "7", attributes: { name: "Acme" } }], meta: { totalResults: 1 } });
+        return json({
+          data: [{ type: "Company", id: "7", attributes: { name: "Acme" } }],
+          meta: { totalResults: 1 },
+        });
       case "POST /gtm/data/v1/companies/enrich":
         if (this.failEnrichment) return json({ errors: [{ detail: "Service unavailable" }] }, 503);
-        return json({ data: [{
-          type: "Company", id: "7", attributes: { name: "Acme", enrichedFor: user.name },
-          meta: { matchStatus: "FULL_MATCH" },
-        }] });
+        return json({
+          data: [
+            {
+              type: "Company",
+              id: "7",
+              attributes: { name: "Acme", enrichedFor: user.name },
+              meta: { matchStatus: "FULL_MATCH" },
+            },
+          ],
+        });
       case "GET /gtm/data/v1/users/usage":
-        return json({ data: [{ type: "UserUsage", id: "usage", attributes: { usage: [{ limitType: "record", currentUsage: 3 }] } }] });
+        return json({
+          data: [
+            {
+              type: "UserUsage",
+              id: "usage",
+              attributes: { usage: [{ limitType: "record", currentUsage: 3 }] },
+            },
+          ],
+        });
     }
     // A lookup names its user, so a test can tell whose entitlements shaped a cached value.
     if (url.pathname.startsWith("/gtm/data/v1/lookup/")) {
       await this.holdLookups;
-      return json({ data: [{ type: "Value", id: "1", attributes: { name: `${user.name}'s value` } }] });
+      return json({
+        data: [{ type: "Value", id: "1", attributes: { name: `${user.name}'s value` } }],
+      });
     }
     // Every other read finds nothing.
     if (/^\/gtm\/(data|copilot)\/v1\//.test(url.pathname)) return json({ data: [] });
@@ -120,14 +153,21 @@ export class FakeZoomInfo {
   }
 
   #token(form: URLSearchParams): Response {
-    const redeemed = form.get("grant_type") === "authorization_code" ? form.get("code") : form.get("refresh_token");
+    const redeemed =
+      form.get("grant_type") === "authorization_code"
+        ? form.get("code")
+        : form.get("refresh_token");
     const user = redeemed === null ? undefined : this.#owners.get(redeemed);
     if (!user || redeemed === null) return json({ error: "invalid_grant" }, 400);
-    const scopes = form.get("grant_type") === "refresh_token"
-      ? (form.get("scope")?.split(" ") ?? this.refreshScopeDefaults)
-      : GRANTED_SCOPES;
-    if (scopes.some(scope => !GRANTED_SCOPES.includes(scope))) {
-      return json({ error: "access_denied", error_description: "Requested scopes exceed the original grant" }, 400);
+    const scopes =
+      form.get("grant_type") === "refresh_token"
+        ? (form.get("scope")?.split(" ") ?? this.refreshScopeDefaults)
+        : GRANTED_SCOPES;
+    if (scopes.some((scope) => !GRANTED_SCOPES.includes(scope))) {
+      return json(
+        { error: "access_denied", error_description: "Requested scopes exceed the original grant" },
+        400,
+      );
     }
     this.#owners.delete(redeemed);
     const grant = this.grant(user);
@@ -156,9 +196,15 @@ export function accountStub(userObjectId: string) {
  * one, with a Workshop callback. `legacy` stores it as a version from before the gatekeeper kept the
  * user's ID did. Returns the account id.
  */
-export async function seedAccount(fake: FakeZoomInfo, user: FakeUser, options: {
-  legacy?: boolean; expiresInMs?: number; scopes?: string[];
-} = {}): Promise<string> {
+export async function seedAccount(
+  fake: FakeZoomInfo,
+  user: FakeUser,
+  options: {
+    legacy?: boolean;
+    expiresInMs?: number;
+    scopes?: string[];
+  } = {},
+): Promise<string> {
   const grant = fake.grant(user);
   const id = env.USER_ACCOUNT.newUniqueId();
   await runInDurableObject(env.USER_ACCOUNT.get(id), (_instance, state) => {
@@ -181,15 +227,22 @@ export async function seedAccount(fake: FakeZoomInfo, user: FakeUser, options: {
 }
 
 /** The account's stored grant, read as the kit's CredentialCoordinator holds it. */
-export async function storedGrant(userObjectId: string): Promise<Record<string, unknown> | undefined> {
-  return await runInDurableObject(accountStub(userObjectId),
-    (_instance, state) => new CredentialCoordinator<Record<string, unknown>>(state.storage.kv).stored());
+export async function storedGrant(
+  userObjectId: string,
+): Promise<Record<string, unknown> | undefined> {
+  return await runInDurableObject(accountStub(userObjectId), (_instance, state) =>
+    new CredentialCoordinator<Record<string, unknown>>(state.storage.kv).stored(),
+  );
 }
 
 /** Runs a reconnect in which `user` signs in to ZoomInfo, through the Workshop's commit. */
-export async function reconnectAs(fake: FakeZoomInfo, userObjectId: string, user: FakeUser): Promise<void> {
+export async function reconnectAs(
+  fake: FakeZoomInfo,
+  userObjectId: string,
+  user: FakeUser,
+): Promise<void> {
   const initiation = generateNonce();
-  await runInDurableObject(accountStub(userObjectId), async instance => {
+  await runInDurableObject(accountStub(userObjectId), async (instance) => {
     await instance.prepareReconnect(initiation);
     const flow = await instance.beginOAuthFlow(initiation);
     if (!flow) throw new Error("the reconnect did not start");
@@ -207,6 +260,7 @@ export function unwrap<T>(outcome: { ok: T } | { error: string }): T {
 
 /** A forwarded call's failure message, failing the test when it succeeded. */
 export function failure(outcome: { ok: unknown } | { error: string }): string {
-  if (!("error" in outcome)) throw new Error(`expected a failure, got ${JSON.stringify(outcome.ok)}`);
+  if (!("error" in outcome))
+    throw new Error(`expected a failure, got ${JSON.stringify(outcome.ok)}`);
   return outcome.error;
 }

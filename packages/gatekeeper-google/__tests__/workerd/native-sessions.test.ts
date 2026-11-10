@@ -1,9 +1,13 @@
 import { RpcStub, RpcTarget } from "cloudflare:workers";
 import type {
-  ActionDescription, ApprovalQueue, GitCache, HookController, HookDescription,
+  ActionDescription,
+  ApprovalQueue,
+  GitCache,
+  HookController,
+  HookDescription,
   ObservationDescription,
 } from "@gadgets/workshop-shared/gatekeeper";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { GoogleDocsApi } from "../../src/docs-api";
 import { DriveApi } from "../../src/drive-api";
 import { FILE_READ_IDLE_MS } from "../../src/drive-file-read";
@@ -35,11 +39,13 @@ const NOT_AUTHORIZED_TO_FILE = {
   error: {
     code: 403,
     message: "The user has not granted the app 123456789 read access to the file pdf-1.",
-    errors: [{
-      message: "The user has not granted the app 123456789 read access to the file pdf-1.",
-      reason: "appNotAuthorizedToFile",
-      location: "Authorization",
-    }],
+    errors: [
+      {
+        message: "The user has not granted the app 123456789 read access to the file pdf-1.",
+        reason: "appNotAuthorizedToFile",
+        location: "Authorization",
+      },
+    ],
   },
 };
 
@@ -50,16 +56,21 @@ const NOT_AUTHORIZED_TO_FILE = {
 function fakeConverter(onConvert?: () => void) {
   const converted: Uint8Array[] = [];
   const state = { cancelled: 0 };
-  const convert: PdfConverter = async pdf => {
+  const convert: PdfConverter = async (pdf) => {
     converted.push(new Uint8Array(await new Response(pdf).arrayBuffer()));
     onConvert?.();
-    const stream = new ReadableStream<Uint8Array>({
-      pull(controller) {
-        controller.enqueue(new TextEncoder().encode(PDF_MARKDOWN));
-        controller.close();
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          controller.enqueue(new TextEncoder().encode(PDF_MARKDOWN));
+          controller.close();
+        },
+        cancel() {
+          state.cancelled++;
+        },
       },
-      cancel() { state.cancelled++; },
-    }, { highWaterMark: 0 });
+      { highWaterMark: 0 },
+    );
     return { text: stream, hasText: true };
   };
   return { converted, convert, state };
@@ -88,7 +99,7 @@ const DECK = presentation([
 function slidesResponse(url: URL): Response {
   const pageId = url.pathname.match(/\/pages\/([^/]+)$/)?.[1];
   if (pageId === undefined) return Response.json(DECK);
-  const page = DECK.slides!.find(s => s.objectId === pageId);
+  const page = DECK.slides!.find((s) => s.objectId === pageId);
   return page ? Response.json(page) : new Response(null, { status: 404 });
 }
 
@@ -126,7 +137,8 @@ class TestApprovalQueue extends RpcTarget implements ApprovalQueue {
   }
 
   async bindHook<Hook extends RpcTarget>(
-    _controller: Fetcher<HookController<Hook>>, _callback: RpcStub<Hook>,
+    _controller: Fetcher<HookController<Hook>>,
+    _callback: RpcStub<Hook>,
     _description: HookDescription,
   ): Promise<void> {
     throw new Error("Unexpected hook binding");
@@ -151,18 +163,24 @@ function docTab(tabId: string, title: string, text: string, childTabs: unknown[]
       body: {
         content: [
           { startIndex: 0, endIndex: 1, sectionBreak: {} },
-          ...text ? [{
-            startIndex: 1,
-            endIndex: paragraph.length + 1,
-            paragraph: {
-              elements: [{
-                startIndex: 1,
-                endIndex: paragraph.length + 1,
-                textRun: { content: paragraph, textStyle: {} },
-              }],
-              paragraphStyle: { namedStyleType: "NORMAL_TEXT" },
-            },
-          }] : [],
+          ...(text
+            ? [
+                {
+                  startIndex: 1,
+                  endIndex: paragraph.length + 1,
+                  paragraph: {
+                    elements: [
+                      {
+                        startIndex: 1,
+                        endIndex: paragraph.length + 1,
+                        textRun: { content: paragraph, textStyle: {} },
+                      },
+                    ],
+                    paragraphStyle: { namedStyleType: "NORMAL_TEXT" },
+                  },
+                },
+              ]
+            : []),
         ],
       },
       lists: {},
@@ -175,7 +193,12 @@ function docTab(tabId: string, title: string, text: string, childTabs: unknown[]
 function tableDocTab() {
   let tab = buildTab([
     { runs: ["Before\n"] },
-    { table: [["Owner\n", "Status\n"], ["Alice\n", "Ready\n"]] },
+    {
+      table: [
+        ["Owner\n", "Status\n"],
+        ["Alice\n", "Ready\n"],
+      ],
+    },
     { runs: ["After\n"] },
   ]);
   return {
@@ -188,9 +211,7 @@ function tableDocTab() {
 /** Two roots, a child and a grandchild — the shape `listTabs()` must flatten in preorder. */
 const NESTED_TABS = [
   docTab("overview", "Overview", "Overview body", [
-    docTab("details", "Details", "Details body", [
-      docTab("metrics", "Metrics", "Metrics body"),
-    ]),
+    docTab("details", "Details", "Details body", [docTab("metrics", "Metrics", "Metrics body")]),
   ]),
   docTab("appendix", "Appendix", "Appendix body"),
 ];
@@ -199,62 +220,72 @@ function installProvider(tabs: unknown[] = [docTab("solo", "Solo", "")]) {
   const urls: string[] = [];
   providerTabs = tabs;
   providerRevision = "revision-1";
-  providerDownload = () => new Response(PDF_BYTES, {
-    headers: { "Content-Type": PDF_MIME, "Content-Length": String(PDF_BYTES.byteLength) },
-  });
-  vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
-    const url = new URL(input instanceof Request ? input.url : input.toString());
-    urls.push(url.toString());
-    if (url.hostname === "www.googleapis.com" && url.pathname.endsWith("/drive/v3/files")) {
-      return Response.json({ files: [providerFile("doc-1", DOC_MIME)] });
-    }
-    if (url.hostname === "www.googleapis.com" && isDownload(url.toString())) {
-      return providerDownload();
-    }
-    if (url.hostname === "www.googleapis.com" && url.pathname.includes("/drive/v3/files/")) {
-      const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
-      const mimeType = id === "doc-1" ? DOC_MIME : id === "deck-1" ? SLIDES_MIME
-        : id === "pdf-1" ? PDF_MIME : SHEET_MIME;
-      return Response.json(providerFile(id, mimeType));
-    }
-    if (url.hostname === "docs.googleapis.com") {
-      return Response.json({
-        documentId: "doc-1",
-        title: "Quarterly plan",
-        ...providerRevision === undefined ? {} : { revisionId: providerRevision },
-        tabs: providerTabs,
-      });
-    }
-    if (url.hostname === "slides.googleapis.com") return slidesResponse(url);
-    throw new Error(`Unexpected provider request: ${url.origin}${url.pathname}`);
-  }));
+  providerDownload = () =>
+    new Response(PDF_BYTES, {
+      headers: { "Content-Type": PDF_MIME, "Content-Length": String(PDF_BYTES.byteLength) },
+    });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString());
+      urls.push(url.toString());
+      if (url.hostname === "www.googleapis.com" && url.pathname.endsWith("/drive/v3/files")) {
+        return Response.json({ files: [providerFile("doc-1", DOC_MIME)] });
+      }
+      if (url.hostname === "www.googleapis.com" && isDownload(url.toString())) {
+        return providerDownload();
+      }
+      if (url.hostname === "www.googleapis.com" && url.pathname.includes("/drive/v3/files/")) {
+        const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
+        const mimeType =
+          id === "doc-1"
+            ? DOC_MIME
+            : id === "deck-1"
+              ? SLIDES_MIME
+              : id === "pdf-1"
+                ? PDF_MIME
+                : SHEET_MIME;
+        return Response.json(providerFile(id, mimeType));
+      }
+      if (url.hostname === "docs.googleapis.com") {
+        return Response.json({
+          documentId: "doc-1",
+          title: "Quarterly plan",
+          ...(providerRevision === undefined ? {} : { revisionId: providerRevision }),
+          tabs: providerTabs,
+        });
+      }
+      if (url.hostname === "slides.googleapis.com") return slidesResponse(url);
+      throw new Error(`Unexpected provider request: ${url.origin}${url.pathname}`);
+    }),
+  );
   return urls;
 }
 
 /** Full `documents.get` calls, excluding the lightweight revision check. */
 function docFetches(): number {
-  return providerUrls.filter(url => {
+  return providerUrls.filter((url) => {
     const { hostname, searchParams } = new URL(url);
     return hostname === "docs.googleapis.com" && !searchParams.has("fields");
   }).length;
 }
 
-function newSession(
-  convertPdf?: PdfConverter, scope: DriveBindingScope = { kind: "account" },
-) {
+function newSession(convertPdf?: PdfConverter, scope: DriveBindingScope = { kind: "account" }) {
   const queue = new TestApprovalQueue();
   const queueStub: RpcStub<ApprovalQueue> = new RpcStub(queue);
   return {
     queue,
-    session: new RpcStub(new GoogleDriveSessionImpl(
-      new DriveApi(getAccessToken),
-      new GoogleDocsApi(getAccessToken),
-      new GoogleSheetsApi(getAccessToken),
-      new GoogleSlidesApi(getAccessToken),
-      convertPdf,
-      scope,
-      queueStub,
-    )),
+    session: new RpcStub(
+      new GoogleDriveSessionImpl(
+        new DriveApi(getAccessToken),
+        new GoogleDocsApi(getAccessToken),
+        new GoogleSheetsApi(getAccessToken),
+        new GoogleSlidesApi(getAccessToken),
+        convertPdf,
+        scope,
+        queueStub,
+      ),
+    ),
   };
 }
 
@@ -295,14 +326,18 @@ describe("Drive nested native sessions", () => {
     using session = newSession().session;
     using sheet = await session.openGoogleSheet("sheet-1");
 
-    await expect(Promise.resolve(sheet.readRange("A:A")))
-      .rejects.toThrow(/Invalid or unbounded A1 range/);
-    await expect(Promise.resolve(sheet.readFormats("A:A")))
-      .rejects.toThrow(/Invalid or unbounded A1 range/);
-    await expect(Promise.resolve(sheet.readFormats("A1:CV101")))
-      .rejects.toThrow("readFormats may request at most 10,000 cells.");
-    expect(providerUrls.some(url => new URL(url).hostname === "sheets.googleapis.com"))
-      .toBe(false);
+    await expect(Promise.resolve(sheet.readRange("A:A"))).rejects.toThrow(
+      /Invalid or unbounded A1 range/,
+    );
+    await expect(Promise.resolve(sheet.readFormats("A:A"))).rejects.toThrow(
+      /Invalid or unbounded A1 range/,
+    );
+    await expect(Promise.resolve(sheet.readFormats("A1:CV101"))).rejects.toThrow(
+      "readFormats may request at most 10,000 cells.",
+    );
+    expect(providerUrls.some((url) => new URL(url).hostname === "sheets.googleapis.com")).toBe(
+      false,
+    );
   });
 
   it("opens a native presentation with reads only", async () => {
@@ -311,7 +346,7 @@ describe("Drive nested native sessions", () => {
     using deck = await owned.openGoogleSlides("deck-1");
 
     const info = await deck.getPresentation();
-    expect(info.slides.map(s => s.id)).toEqual(["s1", "s2"]);
+    expect(info.slides.map((s) => s.id)).toEqual(["s1", "s2"]);
     expect(info.masters).toEqual([
       { id: "master-1", name: "Simple Light", background: "LIGHT1", themeColors: SIMPLE_LIGHT },
     ]);
@@ -320,7 +355,7 @@ describe("Drive nested native sessions", () => {
       { id: "layout-title-body", name: "Title and body", master: "master-1" },
     ]);
     expect((await deck.getSlides(["s2"]))[0].speakerNotes).toBe("Say hello");
-    expect(queue.observations.map(o => [o.title, o.subresources])).toEqual([
+    expect(queue.observations.map((o) => [o.title, o.subresources])).toEqual([
       ["Open Google Slides presentation from Google Drive", ["drive/file/deck-1"]],
       ["Read Google Slides presentation outline", ["slides/presentation/deck-1"]],
       ["Read one Google Slides slide", ["slides/presentation/deck-1"]],
@@ -328,21 +363,28 @@ describe("Drive nested native sessions", () => {
 
     // The capability itself has no write method, whatever a caller sends it.
     const writable = deck as unknown as GooglePresentationSession;
-    await expect(Promise.resolve(writable.deleteSlide("s1")))
-      .rejects.toThrow('The RPC receiver does not implement the method "deleteSlide".');
-    await expect(Promise.resolve(writable.updateSlides([
-      { op: "editText", slideId: "s1", elementId: "t1", replace: "Changed" },
-    ]))).rejects.toThrow('The RPC receiver does not implement the method "updateSlides".');
+    await expect(Promise.resolve(writable.deleteSlide("s1"))).rejects.toThrow(
+      'The RPC receiver does not implement the method "deleteSlide".',
+    );
+    await expect(
+      Promise.resolve(
+        writable.updateSlides([
+          { op: "editText", slideId: "s1", elementId: "t1", replace: "Changed" },
+        ]),
+      ),
+    ).rejects.toThrow('The RPC receiver does not implement the method "updateSlides".');
     expect(queue.observations).toHaveLength(3);
   });
 
   it("refuses to open a file that is not a presentation as one", async () => {
     using session = newSession().session;
 
-    await expect(Promise.resolve(session.openGoogleSlides("sheet-1")))
-      .rejects.toThrow("The requested Drive file is not a Google Slides presentation.");
-    expect(providerUrls.some(url => new URL(url).hostname === "slides.googleapis.com"))
-      .toBe(false);
+    await expect(Promise.resolve(session.openGoogleSlides("sheet-1"))).rejects.toThrow(
+      "The requested Drive file is not a Google Slides presentation.",
+    );
+    expect(providerUrls.some((url) => new URL(url).hostname === "slides.googleapis.com")).toBe(
+      false,
+    );
   });
 
   it("gives each child an independently disposable approval-queue stub", async () => {
@@ -351,9 +393,11 @@ describe("Drive nested native sessions", () => {
     using doc = await session.openGoogleDoc("doc-1");
 
     session[Symbol.dispose]();
-    await expect(doc.getMetadata()).resolves.toEqual(expect.objectContaining({
-      title: "Quarterly plan",
-    }));
+    await expect(doc.getMetadata()).resolves.toEqual(
+      expect.objectContaining({
+        title: "Quarterly plan",
+      }),
+    );
     expect(resources.queue.observations).toHaveLength(2);
 
     doc[Symbol.dispose]();
@@ -375,7 +419,7 @@ describe("Drive PDF reads", () => {
   it("returns the converted text after authorizing its read", async () => {
     let authorizedAtConversion: string[] = [];
     const converter = fakeConverter(() => {
-      authorizedAtConversion = queue.observations.map(o => o.title);
+      authorizedAtConversion = queue.observations.map((o) => o.title);
     });
     const { queue, session } = newSession(converter.convert);
     using owned = session;
@@ -390,8 +434,13 @@ describe("Drive PDF reads", () => {
     expect(download.pathname).toBe("/drive/v3/files/pdf-1");
     expect(download.searchParams.get("supportsAllDrives")).toBe("true");
     // The text is converted before its read is authorized, and authorized before it is returned.
-    expect(queue.observations.map(({ title, description, subresources }) =>
-      ({ title, description, subresources }))).toEqual([
+    expect(
+      queue.observations.map(({ title, description, subresources }) => ({
+        title,
+        description,
+        subresources,
+      })),
+    ).toEqual([
       {
         title: "Open PDF from Google Drive",
         description: "Check current metadata for Drive file pdf-1 and open it as a PDF.",
@@ -422,9 +471,10 @@ describe("Drive PDF reads", () => {
     const { queue, session } = newSession(converter.convert);
     using owned = session;
 
-    await expect(Promise.resolve(owned.readPdf("doc-1")))
-      .rejects.toThrow("The requested Drive file is not a PDF.");
-    expect(queue.observations.map(o => o.title)).toEqual(["Open PDF from Google Drive"]);
+    await expect(Promise.resolve(owned.readPdf("doc-1"))).rejects.toThrow(
+      "The requested Drive file is not a PDF.",
+    );
+    expect(queue.observations.map((o) => o.title)).toEqual(["Open PDF from Google Drive"]);
     expect(providerUrls.some(isDownload)).toBe(false);
     expect(converter.converted).toEqual([]);
   });
@@ -434,8 +484,9 @@ describe("Drive PDF reads", () => {
     const { queue, session } = newSession(converter.convert, { kind: "file", fileId: "pdf-1" });
     using owned = session;
 
-    await expect(Promise.resolve(owned.readPdf("pdf-2")))
-      .rejects.toThrow("The requested file is outside this Drive binding.");
+    await expect(Promise.resolve(owned.readPdf("pdf-2"))).rejects.toThrow(
+      "The requested file is outside this Drive binding.",
+    );
     expect(providerUrls).toEqual([]);
     expect(queue.observations).toEqual([]);
   });
@@ -448,45 +499,63 @@ describe("Drive PDF reads", () => {
 
     await expect(Promise.resolve(owned.readPdf("pdf-1"))).rejects.toThrow(PDF_ACCESS_MISSING);
     expect(converter.converted).toEqual([]);
-    expect(queue.observations.map(o => o.title)).toEqual(["Open PDF from Google Drive"]);
+    expect(queue.observations.map((o) => o.title)).toEqual(["Open PDF from Google Drive"]);
   });
 
   it("passes other download failures through", async () => {
-    providerDownload = () => Response.json(
-      { error: { code: 403, errors: [{ reason: "cannotDownloadFile" }] } }, { status: 403 });
+    providerDownload = () =>
+      Response.json(
+        { error: { code: 403, errors: [{ reason: "cannotDownloadFile" }] } },
+        { status: 403 },
+      );
     using session = newSession(fakeConverter().convert).session;
 
-    await expect(Promise.resolve(session.readPdf("pdf-1")))
-      .rejects.toThrow("Google Drive API request failed: 403 (the connected account is not " +
-        "allowed to download this file; its owner or administrator has restricted downloading it)");
+    await expect(Promise.resolve(session.readPdf("pdf-1"))).rejects.toThrow(
+      "Google Drive API request failed: 403 (the connected account is not " +
+        "allowed to download this file; its owner or administrator has restricted downloading it)",
+    );
   });
 
   it("says PDF reading is unavailable without a converter, without downloading", async () => {
     const { queue, session } = newSession();
     using owned = session;
 
-    await expect(Promise.resolve(owned.readPdf("pdf-1")))
-      .rejects.toThrow("PDF reading is not available on this deployment.");
+    await expect(Promise.resolve(owned.readPdf("pdf-1"))).rejects.toThrow(
+      "PDF reading is not available on this deployment.",
+    );
     expect(providerUrls.some(isDownload)).toBe(false);
-    expect(queue.observations.map(o => o.title)).toEqual(["Open PDF from Google Drive"]);
+    expect(queue.observations.map((o) => o.title)).toEqual(["Open PDF from Google Drive"]);
   });
 
   it("refuses text converted before the download ended, releasing both", async () => {
     const download = { cancelled: false };
-    providerDownload = () => new Response(new ReadableStream({
-      start(controller) { controller.enqueue(PDF_BYTES); },
-      cancel() { download.cancelled = true; },
-    }));
+    providerDownload = () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(PDF_BYTES);
+          },
+          cancel() {
+            download.cancelled = true;
+          },
+        }),
+      );
     const converted = { cancelled: false };
     const convert: PdfConverter = async () => ({
-      text: new ReadableStream({ cancel() { converted.cancelled = true; } }), hasText: true,
+      text: new ReadableStream({
+        cancel() {
+          converted.cancelled = true;
+        },
+      }),
+      hasText: true,
     });
     const { queue, session } = newSession(convert);
     using owned = session;
 
-    await expect(Promise.resolve(owned.readPdf("pdf-1")))
-      .rejects.toThrow("Google Drive's file could not be converted from PDF.");
-    expect(queue.observations.map(o => o.title)).toEqual(["Open PDF from Google Drive"]);
+    await expect(Promise.resolve(owned.readPdf("pdf-1"))).rejects.toThrow(
+      "Google Drive's file could not be converted from PDF.",
+    );
+    expect(queue.observations.map((o) => o.title)).toEqual(["Open PDF from Google Drive"]);
     expect(converted.cancelled).toBe(true);
     expect(download.cancelled).toBe(true);
   });
@@ -500,7 +569,12 @@ describe("Drive file reads", () => {
 
   /** The size of a file too large to be worth holding, served only as a stream a test supplies. */
   const BIG = 64 * 1024 * 1024;
-  type ProviderFile = { mimeType: string; content?: Uint8Array; size?: number; canDownload?: boolean };
+  type ProviderFile = {
+    mimeType: string;
+    content?: Uint8Array;
+    size?: number;
+    canDownload?: boolean;
+  };
   const FILES: Record<string, ProviderFile> = {
     "csv-1": { mimeType: "text/csv", content: CSV_BYTES },
     "empty-1": { mimeType: "text/plain", content: new Uint8Array() },
@@ -525,37 +599,46 @@ describe("Drive file reads", () => {
     const urls: string[] = [];
     downloads = [];
     answerDownload = undefined;
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : input.toString());
-      urls.push(url.toString());
-      if (url.hostname !== "www.googleapis.com" || !url.pathname.startsWith("/drive/v3/files/")) {
-        throw new Error(`Unexpected provider request: ${url.origin}${url.pathname}`);
-      }
-      const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
-      const file = FILES[id];
-      if (!file) return Response.json({ error: { code: 404, errors: [{ reason: "notFound" }] } }, { status: 404 });
-      if (isDownload(url.toString())) {
-        const range = new Headers(init?.headers).get("Range");
-        downloads.push(range);
-        if (answerDownload) return answerDownload();
-        const [, start, end] = range!.match(/^bytes=(\d+)-(\d+)$/)!.map(Number);
-        const content = file.content!;
-        const last = Math.min(end, content.byteLength - 1);
-        return new Response(content.slice(start, last + 1), {
-          status: 206,
-          headers: { "Content-Range": `bytes ${start}-${last}/${content.byteLength}` },
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(input instanceof Request ? input.url : input.toString());
+        urls.push(url.toString());
+        if (url.hostname !== "www.googleapis.com" || !url.pathname.startsWith("/drive/v3/files/")) {
+          throw new Error(`Unexpected provider request: ${url.origin}${url.pathname}`);
+        }
+        const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
+        const file = FILES[id];
+        if (!file)
+          return Response.json(
+            { error: { code: 404, errors: [{ reason: "notFound" }] } },
+            { status: 404 },
+          );
+        if (isDownload(url.toString())) {
+          const range = new Headers(init?.headers).get("Range");
+          downloads.push(range);
+          if (answerDownload) return answerDownload();
+          const [, start, end] = range!.match(/^bytes=(\d+)-(\d+)$/)!.map(Number);
+          const content = file.content!;
+          const last = Math.min(end, content.byteLength - 1);
+          return new Response(content.slice(start, last + 1), {
+            status: 206,
+            headers: { "Content-Range": `bytes ${start}-${last}/${content.byteLength}` },
+          });
+        }
+        return Response.json({
+          id,
+          name: id,
+          mimeType: file.mimeType,
+          modifiedTime: "2026-08-20T12:00:00Z",
+          ...(file.content ? { size: String(file.content.byteLength) } : {}),
+          ...(file.size === undefined ? {} : { size: String(file.size) }),
+          ...(file.canDownload === undefined
+            ? {}
+            : { capabilities: { canDownload: file.canDownload } }),
         });
-      }
-      return Response.json({
-        id,
-        name: id,
-        mimeType: file.mimeType,
-        modifiedTime: "2026-08-20T12:00:00Z",
-        ...file.content ? { size: String(file.content.byteLength) } : {},
-        ...file.size === undefined ? {} : { size: String(file.size) },
-        ...file.canDownload === undefined ? {} : { capabilities: { canDownload: file.canDownload } },
-      });
-    }));
+      }),
+    );
     return urls;
   }
 
@@ -579,8 +662,13 @@ describe("Drive file reads", () => {
     });
     expect(await new Response(read.content).text()).toBe("region,amount\nEMEA,120\nAPAC,95\n");
     expect(downloads).toEqual([`bytes=0-${CSV_BYTES.byteLength - 1}`]);
-    expect(queue.observations.map(({ title, description, subresources }) =>
-      ({ title, description, subresources }))).toEqual([
+    expect(
+      queue.observations.map(({ title, description, subresources }) => ({
+        title,
+        description,
+        subresources,
+      })),
+    ).toEqual([
       {
         title: "Open file from Google Drive",
         description: "Check current metadata for Drive file csv-1 and open it as a file.",
@@ -625,9 +713,12 @@ describe("Drive file reads", () => {
   it("refuses an offset past the end of the file without downloading", async () => {
     using session = newSession().session;
 
-    await expect(Promise.resolve(session.readFile("csv-1", { offset: CSV_BYTES.byteLength + 1 })))
-      .rejects.toThrow(`offset ${CSV_BYTES.byteLength + 1} is past the end of the Drive file, ` +
-        `which is ${CSV_BYTES.byteLength} bytes long.`);
+    await expect(
+      Promise.resolve(session.readFile("csv-1", { offset: CSV_BYTES.byteLength + 1 })),
+    ).rejects.toThrow(
+      `offset ${CSV_BYTES.byteLength + 1} is past the end of the Drive file, ` +
+        `which is ${CSV_BYTES.byteLength} bytes long.`,
+    );
     expect(downloads).toEqual([]);
   });
 
@@ -659,17 +750,25 @@ describe("Drive file reads", () => {
   function chunkedAnswer(chunks: number) {
     const state = { pulls: 0, cancelled: false };
     const chunk = new Uint8Array(65_536);
-    const answer = () => new Response(new ReadableStream<Uint8Array>({
-      pull(controller) {
-        if (state.pulls++ < chunks) controller.enqueue(chunk);
-        else controller.close();
-      },
-      cancel() {
-        state.cancelled = true;
-      },
-    }, { highWaterMark: 0 }), {
-      status: 206, headers: { "Content-Range": `bytes 0-${BIG - 1}/${BIG}` },
-    });
+    const answer = () =>
+      new Response(
+        new ReadableStream<Uint8Array>(
+          {
+            pull(controller) {
+              if (state.pulls++ < chunks) controller.enqueue(chunk);
+              else controller.close();
+            },
+            cancel() {
+              state.cancelled = true;
+            },
+          },
+          { highWaterMark: 0 },
+        ),
+        {
+          status: 206,
+          headers: { "Content-Range": `bytes 0-${BIG - 1}/${BIG}` },
+        },
+      );
     return { state, answer };
   }
 
@@ -694,17 +793,26 @@ describe("Drive file reads", () => {
   it.each([
     ["doc-1", "The requested Drive file is a Google Doc; open it with openGoogleDoc()."],
     ["sheet-1", "The requested Drive file is a Google Sheet; open it with openGoogleSheet()."],
-    ["deck-1", "The requested Drive file is a Google Slides presentation; open it with openGoogleSlides()."],
+    [
+      "deck-1",
+      "The requested Drive file is a Google Slides presentation; open it with openGoogleSlides().",
+    ],
     ["folder-1", "The requested Drive item is a folder, which has no content to read."],
-    ["shortcut-1", "The requested Drive item is a shortcut, which is not followed; read its target instead."],
-    ["form-1", "The requested Drive file is a Google-native file (application/vnd.google-apps.form) " +
-      "with no content to download."],
+    [
+      "shortcut-1",
+      "The requested Drive item is a shortcut, which is not followed; read its target instead.",
+    ],
+    [
+      "form-1",
+      "The requested Drive file is a Google-native file (application/vnd.google-apps.form) " +
+        "with no content to download.",
+    ],
   ])("refuses %s after observing it, without downloading", async (fileId, message) => {
     const { queue, session } = newSession();
     using owned = session;
 
     await expect(Promise.resolve(owned.readFile(fileId))).rejects.toThrow(message);
-    expect(queue.observations.map(o => o.title)).toEqual(["Open file from Google Drive"]);
+    expect(queue.observations.map((o) => o.title)).toEqual(["Open file from Google Drive"]);
     expect(downloads).toEqual([]);
   });
 
@@ -713,17 +821,22 @@ describe("Drive file reads", () => {
 
     await expect(Promise.resolve(session.readFile("locked-1"))).rejects.toThrow(
       "Google Drive does not let the connected account download this file; its owner or " +
-      "administrator has restricted downloading it.");
+        "administrator has restricted downloading it.",
+    );
     expect(downloads).toEqual([]);
   });
 
   it("explains a download Drive refuses as malware", async () => {
-    answerDownload = () => Response.json(
-      { error: { code: 403, errors: [{ reason: "cannotDownloadAbusiveFile" }] } }, { status: 403 });
+    answerDownload = () =>
+      Response.json(
+        { error: { code: 403, errors: [{ reason: "cannotDownloadAbusiveFile" }] } },
+        { status: 403 },
+      );
     using session = newSession().session;
 
     await expect(Promise.resolve(session.readFile("csv-1"))).rejects.toThrow(
-      "Google identified this file as malware or spam, so only its owner can download it");
+      "Google identified this file as malware or spam, so only its owner can download it",
+    );
   });
 
   it("asks an account connected before content access to reconnect", async () => {
@@ -732,16 +845,20 @@ describe("Drive file reads", () => {
     using owned = session;
 
     await expect(Promise.resolve(owned.readFile("csv-1"))).rejects.toThrow(FILE_ACCESS_MISSING);
-    expect(queue.observations.map(o => o.title)).toEqual(["Open file from Google Drive"]);
+    expect(queue.observations.map((o) => o.title)).toEqual(["Open file from Google Drive"]);
   });
 
   it("says the file changed when it shrank past the requested range", async () => {
-    answerDownload = () => Response.json(
-      { error: { code: 416, errors: [{ reason: "requestedRangeNotSatisfiable" }] } }, { status: 416 });
+    answerDownload = () =>
+      Response.json(
+        { error: { code: 416, errors: [{ reason: "requestedRangeNotSatisfiable" }] } },
+        { status: 416 },
+      );
     using session = newSession().session;
 
     await expect(Promise.resolve(session.readFile("csv-1", { offset: 4 }))).rejects.toThrow(
-      "The Drive file changed while it was being read; read it again.");
+      "The Drive file changed while it was being read; read it again.",
+    );
   });
 
   // Its old size and time would make the new bytes look like the whole of the old file, so a
@@ -750,37 +867,63 @@ describe("Drive file reads", () => {
   const shrunk = CSV_BYTES.slice(0, -1);
   const n = CSV_BYTES.byteLength;
   it.each([
-    ["grew, by a range's total", () => new Response(grown.slice(0, n), {
-      status: 206, headers: { "Content-Range": `bytes 0-${n - 1}/${grown.byteLength}` },
-    })],
-    ["grew, by a whole-file answer's length", () => new Response(grown, {
-      headers: { "Content-Length": String(grown.byteLength) },
-    })],
-    ["shrank, by a whole-file answer's length", () => new Response(shrunk, {
-      headers: { "Content-Length": String(shrunk.byteLength) },
-    })],
-    ["shrank, by a range of unknown total that ends early", () => new Response(shrunk, {
-      status: 206, headers: { "Content-Range": `bytes 0-${n - 2}/*` },
-    })],
-    ["is unchanged, of a range that ends early all the same", () => new Response(shrunk, {
-      status: 206, headers: { "Content-Range": `bytes 0-${n - 2}/${n}` },
-    })],
+    [
+      "grew, by a range's total",
+      () =>
+        new Response(grown.slice(0, n), {
+          status: 206,
+          headers: { "Content-Range": `bytes 0-${n - 1}/${grown.byteLength}` },
+        }),
+    ],
+    [
+      "grew, by a whole-file answer's length",
+      () =>
+        new Response(grown, {
+          headers: { "Content-Length": String(grown.byteLength) },
+        }),
+    ],
+    [
+      "shrank, by a whole-file answer's length",
+      () =>
+        new Response(shrunk, {
+          headers: { "Content-Length": String(shrunk.byteLength) },
+        }),
+    ],
+    [
+      "shrank, by a range of unknown total that ends early",
+      () =>
+        new Response(shrunk, {
+          status: 206,
+          headers: { "Content-Range": `bytes 0-${n - 2}/*` },
+        }),
+    ],
+    [
+      "is unchanged, of a range that ends early all the same",
+      () =>
+        new Response(shrunk, {
+          status: 206,
+          headers: { "Content-Range": `bytes 0-${n - 2}/${n}` },
+        }),
+    ],
   ])("withholds every byte when Drive says the file %s", async (_name, answer) => {
     answerDownload = answer;
     const { queue, session } = newSession();
     using owned = session;
 
     await expect(Promise.resolve(owned.readFile("csv-1"))).rejects.toThrow(
-      "The Drive file changed while it was being read; read it again.");
-    expect(queue.observations.map(o => o.title)).toEqual(["Open file from Google Drive"]);
+      "The Drive file changed while it was being read; read it again.",
+    );
+    expect(queue.observations.map((o) => o.title)).toEqual(["Open file from Google Drive"]);
   });
 
   // Its headers promise the whole range, so only the stream can say otherwise: it fails in place
   // of ending short. Over RPC the failure arrives as a broken stream, without the refusal's words.
   it("fails the stream, after the bytes it had, when the answer ends inside its range", async () => {
-    answerDownload = () => new Response(shrunk, {
-      status: 206, headers: { "Content-Range": `bytes 0-${n - 1}/${n}` },
-    });
+    answerDownload = () =>
+      new Response(shrunk, {
+        status: 206,
+        headers: { "Content-Range": `bytes 0-${n - 1}/${n}` },
+      });
     using session = newSession().session;
 
     const read = await session.readFile("csv-1");
@@ -806,7 +949,9 @@ describe("Drive file reads", () => {
     using owned = session;
     queue.refuse.add("Read file from Google Drive");
 
-    await expect(Promise.resolve(owned.readFile("stream-1"))).rejects.toThrow("Observation refused");
+    await expect(Promise.resolve(owned.readFile("stream-1"))).rejects.toThrow(
+      "Observation refused",
+    );
     expect(downloads).toHaveLength(1);
     expect(state.cancelled).toBe(true);
   });
@@ -868,8 +1013,9 @@ describe("Drive file reads", () => {
     const { queue, session } = newSession(undefined, { kind: "file", fileId: "csv-1" });
     using owned = session;
 
-    await expect(Promise.resolve(owned.readFile("locked-1")))
-      .rejects.toThrow("The requested file is outside this Drive binding.");
+    await expect(Promise.resolve(owned.readFile("locked-1"))).rejects.toThrow(
+      "The requested file is outside this Drive binding.",
+    );
     expect(providerUrls).toEqual([]);
     expect(queue.observations).toEqual([]);
   });
@@ -903,8 +1049,10 @@ describe("Drive Doc tab selection", () => {
 
     expect(docFetches()).toBe(1);
     expect(queue.observations.map(({ title }) => title)).toEqual([
-      "Open Google Doc from Google Drive", "List Google Doc tabs",
-      "Read Google Doc content", "Read Google Doc content",
+      "Open Google Doc from Google Drive",
+      "List Google Doc tabs",
+      "Read Google Doc content",
+      "Read Google Doc content",
     ]);
     expect(queue.observations.at(-1)?.description).toContain('tab "Appendix" (appendix)');
   });
@@ -950,8 +1098,9 @@ describe("Drive Doc tab selection", () => {
 
     expect(await doc.getContent("metrics")).toBe("Metrics body\n");
     expect(docFetches()).toBe(1);
-    expect(providerUrls.some(url => new URL(url).searchParams.get("fields") === "revisionId"))
-      .toBe(true);
+    expect(
+      providerUrls.some((url) => new URL(url).searchParams.get("fields") === "revisionId"),
+    ).toBe(true);
   });
 
   // Google omits revisionId unless the caller can edit, which is the normal case for a Doc
@@ -969,8 +1118,9 @@ describe("Drive Doc tab selection", () => {
     expect(await doc.listTabs()).toHaveLength(5);
     expect(docFetches()).toBe(2);
     // Nothing to compare, so the revision probe is not worth a request.
-    expect(providerUrls.some(url => new URL(url).searchParams.get("fields") === "revisionId"))
-      .toBe(false);
+    expect(
+      providerUrls.some((url) => new URL(url).searchParams.get("fields") === "revisionId"),
+    ).toBe(false);
   });
 
   it("pipelines a tab read before its session stub resolves", async () => {
@@ -986,10 +1136,16 @@ describe("Drive Doc tab selection", () => {
   });
 
   it.each([
-    [undefined, "getContent: tabId is required for documents with multiple tabs. " +
-      "Call listTabs() to choose a tab."],
-    ["ghost", 'getContent: no tab with ID "ghost" exists in this document. ' +
-      "Call listTabs() to refresh the tab list."],
+    [
+      undefined,
+      "getContent: tabId is required for documents with multiple tabs. " +
+        "Call listTabs() to choose a tab.",
+    ],
+    [
+      "ghost",
+      'getContent: no tab with ID "ghost" exists in this document. ' +
+        "Call listTabs() to refresh the tab list.",
+    ],
   ] as const)("fails closed on selector %s", async (tabId, message) => {
     const { queue, session } = newSession();
     using owned = session;
@@ -1025,8 +1181,16 @@ describe("folder-scoped native sessions", () => {
   /** The subtree the provider answers from. Tests move files by rewriting `parents` here. */
   function subtree(): Map<string, Node> {
     return new Map<string, Node>([
-      [ROOT, { id: ROOT, mimeType: FOLDER_MIME, parents: ["above"], trashed: false,
-        capabilities: { canListChildren: true } }],
+      [
+        ROOT,
+        {
+          id: ROOT,
+          mimeType: FOLDER_MIME,
+          parents: ["above"],
+          trashed: false,
+          capabilities: { canListChildren: true },
+        },
+      ],
       ["doc-1", { id: "doc-1", mimeType: DOC_MIME, parents: [ROOT], trashed: false }],
       ["sheet-1", { id: "sheet-1", mimeType: SHEET_MIME, parents: [ROOT], trashed: false }],
     ]);
@@ -1035,8 +1199,9 @@ describe("folder-scoped native sessions", () => {
   /** One multipart `files.get` batch response, echoing each requested ID by Content-ID position. */
   function batchResponse(body: string, nodes: Map<string, Node>): Response {
     const boundary = "folder_batch";
-    const ids = [...body.matchAll(/GET \/drive\/v3\/files\/([^?]+)\?/g)]
-      .map(match => decodeURIComponent(match[1]));
+    const ids = [...body.matchAll(/GET \/drive\/v3\/files\/([^?]+)\?/g)].map((match) =>
+      decodeURIComponent(match[1]),
+    );
     const parts = ids.map((id, index) => {
       const node = nodes.get(id);
       return [
@@ -1062,76 +1227,97 @@ describe("folder-scoped native sessions", () => {
    * is still being read.
    */
   function installFolderProvider(
-    nodes: Map<string, Node>, onNativeRead?: () => void, onLastChunk?: () => void,
+    nodes: Map<string, Node>,
+    onNativeRead?: () => void,
+    onLastChunk?: () => void,
   ) {
     const nativeCalls: string[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : input.toString());
-      if (isDownload(url.toString())) {
-        nativeCalls.push("download");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(input instanceof Request ? input.url : input.toString());
+        if (isDownload(url.toString())) {
+          nativeCalls.push("download");
+          onNativeRead?.();
+          const half = PDF_BYTES.byteLength >> 1;
+          let sent = 0;
+          return new Response(
+            new ReadableStream<Uint8Array>(
+              {
+                pull(controller) {
+                  if (sent++ === 0) return controller.enqueue(PDF_BYTES.slice(0, half));
+                  onLastChunk?.();
+                  controller.enqueue(PDF_BYTES.slice(half));
+                  controller.close();
+                },
+                cancel() {
+                  nativeCalls.push("download cancelled");
+                },
+              },
+              { highWaterMark: 0 },
+            ),
+            { headers: { "Content-Type": PDF_MIME } },
+          );
+        }
+        if (url.pathname === "/batch/drive/v3") {
+          return batchResponse(String(init?.body ?? ""), nodes);
+        }
+        if (url.pathname === "/drive/v3/files") {
+          const parents = [
+            ...(url.searchParams.get("q") ?? "").matchAll(/'([^']+)' in parents/g),
+          ].map((match) => match[1]);
+          const files = [...nodes.values()].filter(
+            (node) => node.mimeType !== FOLDER_MIME && parents.includes(node.parents?.[0] ?? ""),
+          );
+          return Response.json({
+            files: files.map((node) => ({
+              ...node,
+              name: node.id,
+              modifiedTime: "2026-08-20T12:00:00Z",
+            })),
+          });
+        }
+        if (url.pathname.includes("/drive/v3/files/")) {
+          const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
+          const node = nodes.get(id);
+          if (!node) return Response.json({}, { status: 404 });
+          return Response.json({ name: id, modifiedTime: "2026-08-20T12:00:00Z", ...node });
+        }
+        nativeCalls.push(url.hostname);
         onNativeRead?.();
-        const half = PDF_BYTES.byteLength >> 1;
-        let sent = 0;
-        return new Response(new ReadableStream<Uint8Array>({
-          pull(controller) {
-            if (sent++ === 0) return controller.enqueue(PDF_BYTES.slice(0, half));
-            onLastChunk?.();
-            controller.enqueue(PDF_BYTES.slice(half));
-            controller.close();
-          },
-          cancel() {
-            nativeCalls.push("download cancelled");
-          },
-        }, { highWaterMark: 0 }), { headers: { "Content-Type": PDF_MIME } });
-      }
-      if (url.pathname === "/batch/drive/v3") {
-        return batchResponse(String(init?.body ?? ""), nodes);
-      }
-      if (url.pathname === "/drive/v3/files") {
-        const parents = [...(url.searchParams.get("q") ?? "").matchAll(/'([^']+)' in parents/g)]
-          .map(match => match[1]);
-        const files = [...nodes.values()].filter(
-          node => node.mimeType !== FOLDER_MIME && parents.includes(node.parents?.[0] ?? ""));
+        if (url.hostname === "docs.googleapis.com") {
+          return Response.json({
+            documentId: decodeURIComponent(url.pathname.split("/").at(-1)!),
+            title: "Quarterly plan",
+            revisionId: "revision-1",
+            tabs: [docTab("solo", "Solo", "")],
+          });
+        }
+        if (url.pathname.endsWith("/values:batchGet")) {
+          return Response.json({
+            valueRanges: url.searchParams
+              .getAll("ranges")
+              .map((range) => ({ range, values: [["x"]] })),
+          });
+        }
+        // A format read: the one bold cell A1.
+        if (url.hostname === "sheets.googleapis.com" && url.searchParams.has("ranges")) {
+          return Response.json({
+            sheets: [
+              formatSheet({ sheetId: 0, title: "Sheet1" }, [
+                { startRow: 0, startColumn: 0, formats: [[{ textFormat: { bold: true } }]] },
+              ]),
+            ],
+          });
+        }
+        if (url.hostname === "slides.googleapis.com") return slidesResponse(url);
         return Response.json({
-          files: files.map(node => ({ ...node, name: node.id, modifiedTime: "2026-08-20T12:00:00Z" })),
+          spreadsheetId: "sheet-1",
+          properties: { title: "Forecast" },
+          sheets: [{ properties: { sheetId: 0, title: "Sheet1", index: 0 } }],
         });
-      }
-      if (url.pathname.includes("/drive/v3/files/")) {
-        const id = decodeURIComponent(url.pathname.split("/").at(-1)!);
-        const node = nodes.get(id);
-        if (!node) return Response.json({}, { status: 404 });
-        return Response.json({ name: id, modifiedTime: "2026-08-20T12:00:00Z", ...node });
-      }
-      nativeCalls.push(url.hostname);
-      onNativeRead?.();
-      if (url.hostname === "docs.googleapis.com") {
-        return Response.json({
-          documentId: decodeURIComponent(url.pathname.split("/").at(-1)!),
-          title: "Quarterly plan",
-          revisionId: "revision-1",
-          tabs: [docTab("solo", "Solo", "")],
-        });
-      }
-      if (url.pathname.endsWith("/values:batchGet")) {
-        return Response.json({
-          valueRanges: url.searchParams.getAll("ranges").map(range => ({ range, values: [["x"]] })),
-        });
-      }
-      // A format read: the one bold cell A1.
-      if (url.hostname === "sheets.googleapis.com" && url.searchParams.has("ranges")) {
-        return Response.json({
-          sheets: [formatSheet({ sheetId: 0, title: "Sheet1" }, [
-            { startRow: 0, startColumn: 0, formats: [[{ textFormat: { bold: true } }]] },
-          ])],
-        });
-      }
-      if (url.hostname === "slides.googleapis.com") return slidesResponse(url);
-      return Response.json({
-        spreadsheetId: "sheet-1",
-        properties: { title: "Forecast" },
-        sheets: [{ properties: { sheetId: 0, title: "Sheet1", index: 0 } }],
-      });
-    }));
+      }),
+    );
     return nativeCalls;
   }
 
@@ -1139,15 +1325,17 @@ describe("folder-scoped native sessions", () => {
     const queue = new TestApprovalQueue();
     return {
       queue,
-      session: new RpcStub(new GoogleDriveSessionImpl(
-        new DriveApi(getAccessToken),
-        new GoogleDocsApi(getAccessToken),
-        new GoogleSheetsApi(getAccessToken),
-        new GoogleSlidesApi(getAccessToken),
-        convertPdf,
-        { kind: "folder", folderId: ROOT },
-        new RpcStub(queue),
-      )),
+      session: new RpcStub(
+        new GoogleDriveSessionImpl(
+          new DriveApi(getAccessToken),
+          new GoogleDocsApi(getAccessToken),
+          new GoogleSheetsApi(getAccessToken),
+          new GoogleSlidesApi(getAccessToken),
+          convertPdf,
+          { kind: "folder", folderId: ROOT },
+          new RpcStub(queue),
+        ),
+      ),
     };
   }
 
@@ -1162,7 +1350,7 @@ describe("folder-scoped native sessions", () => {
     using doc = await session.openGoogleDoc("doc-1");
     expect((await doc.getMetadata()).title).toBe("doc-1");
     expect(await doc.getContent()).toBe("");
-    expect(queue.observations.slice(-2).map(o => o.subresources)).toEqual([
+    expect(queue.observations.slice(-2).map((o) => o.subresources)).toEqual([
       [`drive/folder/${ROOT}`, "drive/file/doc-1", "docs/document/doc-1"],
       [`drive/folder/${ROOT}`, "drive/file/doc-1", "docs/document/doc-1"],
     ]);
@@ -1170,31 +1358,47 @@ describe("folder-scoped native sessions", () => {
     using sheet = await session.openGoogleSheet("sheet-1");
     expect((await sheet.getSpreadsheet()).title).toBe("Forecast");
     expect((await sheet.readRange("A1:A1")).values).toEqual([["x"]]);
-    expect((await sheet.readRanges(["A1:A1", "B1:B1"])).map(r => r.range))
-      .toEqual(["A1:A1", "B1:B1"]);
+    expect((await sheet.readRanges(["A1:A1", "B1:B1"])).map((r) => r.range)).toEqual([
+      "A1:A1",
+      "B1:B1",
+    ]);
 
     // Formats are read with `spreadsheets.get` and an A1 range, which the read-only grant allows,
     // and a mask that asks for no cell's value.
     const fetched = vi.mocked(fetch);
     const before = fetched.mock.calls.length;
-    expect(await sheet.readFormats("A1:B1"))
-      .toEqual({ range: "Sheet1!A1:B1", formats: [[{ bold: true }, null]] });
-    const formatUrls = fetched.mock.calls.slice(before)
+    expect(await sheet.readFormats("A1:B1")).toEqual({
+      range: "Sheet1!A1:B1",
+      formats: [[{ bold: true }, null]],
+    });
+    const formatUrls = fetched.mock.calls
+      .slice(before)
       .map(([input]) => new URL(input instanceof Request ? input.url : input.toString()))
-      .filter(url => url.hostname === "sheets.googleapis.com");
-    expect(formatUrls.map(url => [url.pathname, url.searchParams.getAll("ranges")]))
-      .toEqual([["/v4/spreadsheets/sheet-1", ["A1:B1"]]]);
+      .filter((url) => url.hostname === "sheets.googleapis.com");
+    expect(formatUrls.map((url) => [url.pathname, url.searchParams.getAll("ranges")])).toEqual([
+      ["/v4/spreadsheets/sheet-1", ["A1:B1"]],
+    ]);
     let mask = formatUrls[0].searchParams.get("fields") ?? "";
     expect(mask).toContain("userEnteredFormat(");
-    for (let field of ["formattedValue", "effectiveValue", "userEnteredValue", "hyperlink", "note"]) {
+    for (let field of [
+      "formattedValue",
+      "effectiveValue",
+      "userEnteredValue",
+      "hyperlink",
+      "note",
+    ]) {
       expect(mask).not.toContain(field);
     }
 
     // The capability itself has no write method, whatever a caller sends it.
     const writable = sheet as unknown as GoogleSpreadsheetSession;
-    await expect(Promise.resolve(writable.updateSpreadsheet([
-      { op: "writeCells", range: "Sheet1!A1", values: [["changed"]] },
-    ]))).rejects.toThrow('The RPC receiver does not implement the method "updateSpreadsheet".');
+    await expect(
+      Promise.resolve(
+        writable.updateSpreadsheet([
+          { op: "writeCells", range: "Sheet1!A1", values: [["changed"]] },
+        ]),
+      ),
+    ).rejects.toThrow('The RPC receiver does not implement the method "updateSpreadsheet".');
   });
 
   // The capability was minted while the file was inside; the move is what revokes it, and it has to
@@ -1240,8 +1444,12 @@ describe("folder-scoped native sessions", () => {
     using deck = await session.openGoogleSlides("deck-1");
     expect((await deck.getPresentation()).title).toBe("Quarterly review");
 
-    nodes.set("deck-1",
-      { id: "deck-1", mimeType: SLIDES_MIME, parents: ["elsewhere"], trashed: false });
+    nodes.set("deck-1", {
+      id: "deck-1",
+      mimeType: SLIDES_MIME,
+      parents: ["elsewhere"],
+      trashed: false,
+    });
     nativeCalls.length = 0;
 
     await expect(Promise.resolve(deck.getPresentation())).rejects.toThrow(OUTSIDE);
@@ -1255,7 +1463,12 @@ describe("folder-scoped native sessions", () => {
   it("discards content when the move lands during the provider read", async () => {
     const nodes = subtree();
     installFolderProvider(nodes, () => {
-      nodes.set("doc-1", { id: "doc-1", mimeType: DOC_MIME, parents: ["elsewhere"], trashed: false });
+      nodes.set("doc-1", {
+        id: "doc-1",
+        mimeType: DOC_MIME,
+        parents: ["elsewhere"],
+        trashed: false,
+      });
     });
     const { queue, session } = folderSession(nodes);
     using scoped = session;
@@ -1271,17 +1484,27 @@ describe("folder-scoped native sessions", () => {
   // wire and that a malformed one is refused there rather than deep in a query builder.
   it("searches named child folders across the RPC boundary", async () => {
     const nodes = subtree();
-    nodes.set("sub-a", { id: "sub-a", mimeType: FOLDER_MIME, parents: [ROOT], trashed: false,
-      capabilities: { canListChildren: true } });
-    nodes.set("sub-b", { id: "sub-b", mimeType: FOLDER_MIME, parents: [ROOT], trashed: false,
-      capabilities: { canListChildren: true } });
+    nodes.set("sub-a", {
+      id: "sub-a",
+      mimeType: FOLDER_MIME,
+      parents: [ROOT],
+      trashed: false,
+      capabilities: { canListChildren: true },
+    });
+    nodes.set("sub-b", {
+      id: "sub-b",
+      mimeType: FOLDER_MIME,
+      parents: [ROOT],
+      trashed: false,
+      capabilities: { canListChildren: true },
+    });
     nodes.set("doc-a", { id: "doc-a", mimeType: DOC_MIME, parents: ["sub-a"], trashed: false });
     nodes.set("doc-b", { id: "doc-b", mimeType: DOC_MIME, parents: ["sub-b"], trashed: false });
     installFolderProvider(nodes);
     using session = folderSession(nodes).session;
 
     using cursor = await session.search({ namePrefix: "doc", childFolderIds: ["sub-a", "sub-b"] });
-    expect((await cursor.next())?.map(entry => entry.id)).toEqual(["doc-a", "doc-b"]);
+    expect((await cursor.next())?.map((entry) => entry.id)).toEqual(["doc-a", "doc-b"]);
   });
 
   it("refuses a malformed child folder set at the RPC boundary", async () => {
@@ -1289,9 +1512,14 @@ describe("folder-scoped native sessions", () => {
     installFolderProvider(nodes);
     using session = folderSession(nodes).session;
 
-    await expect(Promise.resolve(session.search(
-      { namePrefix: "doc", childFolderIds: [7] } as unknown as DriveSessionSearchQuery,
-    ))).rejects.toThrow(/childFolderIds/);
+    await expect(
+      Promise.resolve(
+        session.search({
+          namePrefix: "doc",
+          childFolderIds: [7],
+        } as unknown as DriveSessionSearchQuery),
+      ),
+    ).rejects.toThrow(/childFolderIds/);
   });
 
   // That refused read captured a revision while the document sat outside the subtree. Serving it
@@ -1303,8 +1531,12 @@ describe("folder-scoped native sessions", () => {
     const nativeCalls = installFolderProvider(nodes, () => {
       if (!pendingMoveOut) return;
       pendingMoveOut = false;
-      nodes.set("doc-1",
-        { id: "doc-1", mimeType: DOC_MIME, parents: ["elsewhere"], trashed: false });
+      nodes.set("doc-1", {
+        id: "doc-1",
+        mimeType: DOC_MIME,
+        parents: ["elsewhere"],
+        trashed: false,
+      });
     });
     using session = folderSession(nodes).session;
     using doc = await session.openGoogleDoc("doc-1");
@@ -1325,15 +1557,21 @@ describe("folder-scoped native sessions", () => {
     const nativeCalls = installFolderProvider(nodes, () => {
       if (!pendingMoveOut) return;
       pendingMoveOut = false;
-      nodes.set("doc-1",
-        { id: "doc-1", mimeType: DOC_MIME, parents: ["elsewhere"], trashed: false });
+      nodes.set("doc-1", {
+        id: "doc-1",
+        mimeType: DOC_MIME,
+        parents: ["elsewhere"],
+        trashed: false,
+      });
     });
     using session = folderSession(nodes).session;
     using doc = await session.openGoogleDoc("doc-1");
 
-    const settled = await Promise.allSettled(
-      [Promise.resolve(doc.listTabs()), Promise.resolve(doc.getContent())]);
-    expect(settled.map(result => result.status)).toEqual(["rejected", "rejected"]);
+    const settled = await Promise.allSettled([
+      Promise.resolve(doc.listTabs()),
+      Promise.resolve(doc.getContent()),
+    ]);
+    expect(settled.map((result) => result.status)).toEqual(["rejected", "rejected"]);
 
     nodes.set("doc-1", { id: "doc-1", mimeType: DOC_MIME, parents: [ROOT], trashed: false });
     nativeCalls.length = 0;
@@ -1345,11 +1583,17 @@ describe("folder-scoped native sessions", () => {
   it("keeps child-folder and native capabilities alive after their parents are disposed", async () => {
     const nodes = subtree();
     nodes.set("nested", {
-      id: "nested", mimeType: FOLDER_MIME, parents: [ROOT], trashed: false,
+      id: "nested",
+      mimeType: FOLDER_MIME,
+      parents: [ROOT],
+      trashed: false,
       capabilities: { canListChildren: true },
     });
     nodes.set("nested-doc", {
-      id: "nested-doc", mimeType: DOC_MIME, parents: ["nested"], trashed: false,
+      id: "nested-doc",
+      mimeType: DOC_MIME,
+      parents: ["nested"],
+      trashed: false,
     });
     installFolderProvider(nodes);
     const parent = folderSession(nodes).session;
@@ -1370,13 +1614,17 @@ describe("folder-scoped native sessions", () => {
     const { queue, session } = folderSession(nodes, converter.convert);
     using owned = session;
 
-    expect(await readText(await owned.readPdf("pdf-1")))
-      .toEqual({ text: PDF_MARKDOWN, hasText: true });
+    expect(await readText(await owned.readPdf("pdf-1"))).toEqual({
+      text: PDF_MARKDOWN,
+      hasText: true,
+    });
     expect(nativeCalls).toEqual(["download"]);
-    expect(queue.observations.map(o => [o.title, o.subresources])).toEqual([
+    expect(queue.observations.map((o) => [o.title, o.subresources])).toEqual([
       ["Open PDF from Google Drive", [`drive/folder/${ROOT}`, "drive/file/pdf-1"]],
-      ["Read PDF from Google Drive",
-        [`drive/folder/${ROOT}`, "drive/file/pdf-1", "drive/content/pdf-1"]],
+      [
+        "Read PDF from Google Drive",
+        [`drive/folder/${ROOT}`, "drive/file/pdf-1", "drive/content/pdf-1"],
+      ],
     ]);
   });
 
@@ -1384,14 +1632,19 @@ describe("folder-scoped native sessions", () => {
     const nodes = subtree();
     nodes.set("pdf-1", { id: "pdf-1", mimeType: PDF_MIME, parents: [ROOT], trashed: false });
     installFolderProvider(nodes, () => {
-      nodes.set("pdf-1", { id: "pdf-1", mimeType: PDF_MIME, parents: ["elsewhere"], trashed: false });
+      nodes.set("pdf-1", {
+        id: "pdf-1",
+        mimeType: PDF_MIME,
+        parents: ["elsewhere"],
+        trashed: false,
+      });
     });
     const converter = fakeConverter();
     const { queue, session } = folderSession(nodes, converter.convert);
     using owned = session;
 
     await expect(Promise.resolve(owned.readPdf("pdf-1"))).rejects.toThrow(OUTSIDE);
-    expect(queue.observations.map(o => o.title)).toEqual(["Open PDF from Google Drive"]);
+    expect(queue.observations.map((o) => o.title)).toEqual(["Open PDF from Google Drive"]);
     expect(converter.converted).toEqual([PDF_BYTES]);
     expect(converter.state.cancelled).toBe(1);
   });
@@ -1411,16 +1664,26 @@ describe("folder-scoped native sessions", () => {
   it("reads PDFs from an opened child folder", async () => {
     const nodes = subtree();
     nodes.set("nested", {
-      id: "nested", mimeType: FOLDER_MIME, parents: [ROOT], trashed: false,
+      id: "nested",
+      mimeType: FOLDER_MIME,
+      parents: [ROOT],
+      trashed: false,
       capabilities: { canListChildren: true },
     });
-    nodes.set("nested-pdf", { id: "nested-pdf", mimeType: PDF_MIME, parents: ["nested"], trashed: false });
+    nodes.set("nested-pdf", {
+      id: "nested-pdf",
+      mimeType: PDF_MIME,
+      parents: ["nested"],
+      trashed: false,
+    });
     installFolderProvider(nodes);
     using session = folderSession(nodes, fakeConverter().convert).session;
     using child = await session.openFolder("nested");
 
-    expect(await readText(await child.readPdf("nested-pdf")))
-      .toEqual({ text: PDF_MARKDOWN, hasText: true });
+    expect(await readText(await child.readPdf("nested-pdf"))).toEqual({
+      text: PDF_MARKDOWN,
+      hasText: true,
+    });
   });
 
   it("refuses to open a native file that is already outside the subtree", async () => {
@@ -1429,15 +1692,17 @@ describe("folder-scoped native sessions", () => {
     installFolderProvider(nodes);
     using session = folderSession(nodes).session;
 
-    await expect(Promise.resolve(session.openGoogleDoc("doc-1")))
-      .rejects.toThrow(OUTSIDE);
+    await expect(Promise.resolve(session.openGoogleDoc("doc-1"))).rejects.toThrow(OUTSIDE);
   });
 
   // The folder provider answers every download with PDF_BYTES whole, as Drive may for a range that
   // starts at the beginning, so these read whole files.
   function dataNode(parent: string) {
     return {
-      id: "data-1", mimeType: "application/octet-stream", parents: [parent], trashed: false,
+      id: "data-1",
+      mimeType: "application/octet-stream",
+      parents: [parent],
+      trashed: false,
       size: String(PDF_BYTES.byteLength),
     };
   }
@@ -1451,10 +1716,12 @@ describe("folder-scoped native sessions", () => {
 
     expect(await bytesOf(await owned.readFile("data-1"))).toEqual(PDF_BYTES);
     expect(nativeCalls).toEqual(["download"]);
-    expect(queue.observations.map(o => [o.title, o.subresources])).toEqual([
+    expect(queue.observations.map((o) => [o.title, o.subresources])).toEqual([
       ["Open file from Google Drive", [`drive/folder/${ROOT}`, "drive/file/data-1"]],
-      ["Read file from Google Drive",
-        [`drive/folder/${ROOT}`, "drive/file/data-1", "drive/content/data-1"]],
+      [
+        "Read file from Google Drive",
+        [`drive/folder/${ROOT}`, "drive/file/data-1", "drive/content/data-1"],
+      ],
     ]);
   });
 
@@ -1463,13 +1730,14 @@ describe("folder-scoped native sessions", () => {
   it("refuses bytes from a file moved out of the folder before Drive answered", async () => {
     const nodes = subtree();
     nodes.set("data-1", dataNode(ROOT));
-    const nativeCalls = installFolderProvider(
-      nodes, () => nodes.set("data-1", dataNode("elsewhere")));
+    const nativeCalls = installFolderProvider(nodes, () =>
+      nodes.set("data-1", dataNode("elsewhere")),
+    );
     const { queue, session } = folderSession(nodes);
     using owned = session;
 
     await expect(Promise.resolve(owned.readFile("data-1"))).rejects.toThrow(OUTSIDE);
-    expect(queue.observations.map(o => o.title)).toEqual(["Open file from Google Drive"]);
+    expect(queue.observations.map((o) => o.title)).toEqual(["Open file from Google Drive"]);
     // The answer Drive had begun is let go unread.
     expect(nativeCalls).toEqual(["download", "download cancelled"]);
   });
@@ -1479,13 +1747,15 @@ describe("folder-scoped native sessions", () => {
     const nodes = subtree();
     nodes.set("data-1", dataNode(ROOT));
     const nativeCalls = installFolderProvider(nodes, () =>
-      nodes.set("data-1", { ...dataNode(ROOT), modifiedTime: "2026-08-21T09:00:00Z" }));
+      nodes.set("data-1", { ...dataNode(ROOT), modifiedTime: "2026-08-21T09:00:00Z" }),
+    );
     const { queue, session } = folderSession(nodes);
     using owned = session;
 
     await expect(Promise.resolve(owned.readFile("data-1"))).rejects.toThrow(
-      "The Drive file changed while it was being read; read it again.");
-    expect(queue.observations.map(o => o.title)).toEqual(["Open file from Google Drive"]);
+      "The Drive file changed while it was being read; read it again.",
+    );
+    expect(queue.observations.map((o) => o.title)).toEqual(["Open file from Google Drive"]);
     expect(nativeCalls).toEqual(["download", "download cancelled"]);
   });
 
@@ -1514,7 +1784,10 @@ describe("folder-scoped native sessions", () => {
   it("reads files from an opened child folder", async () => {
     const nodes = subtree();
     nodes.set("nested", {
-      id: "nested", mimeType: FOLDER_MIME, parents: [ROOT], trashed: false,
+      id: "nested",
+      mimeType: FOLDER_MIME,
+      parents: [ROOT],
+      trashed: false,
       capabilities: { canListChildren: true },
     });
     nodes.set("data-1", dataNode("nested"));

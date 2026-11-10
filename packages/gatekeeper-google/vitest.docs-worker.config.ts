@@ -1,6 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-plugin";
 import capnwebValidate from "capnweb-validate/vite";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 import deployed from "./cloudflare.config.ts";
 
 const { compatibilityDate, compatibilityFlags } = deployed.worker;
@@ -20,7 +20,10 @@ export default defineConfig({
         // Facets and loopback namespaces need test-only registrations in this test pool.
         durableObjects: {
           CALENDAR_TEST_HOOKS: { className: "CalendarTestHooks", useSQLite: true },
-          GOOGLE_CALENDAR_GATEKEEPER: { className: "GoogleCalendarGatekeeperImpl", useSQLite: true },
+          GOOGLE_CALENDAR_GATEKEEPER: {
+            className: "GoogleCalendarGatekeeperImpl",
+            useSQLite: true,
+          },
           GOOGLE_DOC_GATEKEEPER: { className: "GoogleDocGatekeeperImpl", useSQLite: true },
           GOOGLE_SHEETS_GATEKEEPER: { className: "GoogleSheetsGatekeeperImpl", useSQLite: true },
           GOOGLE_SLIDES_GATEKEEPER: { className: "GoogleSlidesGatekeeperImpl", useSQLite: true },

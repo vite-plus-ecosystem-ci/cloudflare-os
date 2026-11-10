@@ -1,7 +1,7 @@
 // Pure-logic coverage for git-objects.ts: commit-id validation, the advertising helpers and
 // page hook, and raw commit-object parsing.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
   advertiseCommits,
   advertisePages,
@@ -35,8 +35,11 @@ class RecordingAdvertiser {
 
 describe("commitIdsOfSummary", () => {
   it("returns the commit id plus its parents", () => {
-    expect(commitIdsOfSummary({ id: oid(1), parents: [oid(2), oid(3)] }))
-      .toEqual([oid(1), oid(2), oid(3)]);
+    expect(commitIdsOfSummary({ id: oid(1), parents: [oid(2), oid(3)] })).toEqual([
+      oid(1),
+      oid(2),
+      oid(3),
+    ]);
     expect(commitIdsOfSummary({ id: oid(1), parents: [] })).toEqual([oid(1)]);
   });
 });
@@ -62,7 +65,7 @@ describe("advertiseCommits", () => {
 
   it("skips the ids `withhold` names", async () => {
     const advertiser = new RecordingAdvertiser();
-    await advertiseCommits(advertiser, [oid(1), oid(2)], { withhold: id => id === oid(1) });
+    await advertiseCommits(advertiser, [oid(1), oid(2)], { withhold: (id) => id === oid(1) });
     expect(advertiser.calls).toEqual([oid(2)]);
   });
 });
@@ -103,7 +106,9 @@ describe("advertisePages", () => {
   it("skips values that are not full commit ids, and ids `withhold` names", async () => {
     const advertiser = new RecordingAdvertiser();
     const withheld = new Set([oid(2)]);
-    const beforePage = advertisePages<Item>(advertiser, extract, { withhold: id => withheld.has(id) });
+    const beforePage = advertisePages<Item>(advertiser, extract, {
+      withhold: (id) => withheld.has(id),
+    });
 
     await beforePage([{ id: oid(1), parents: ["", oid(2)] }]);
     expect(advertiser.calls).toEqual([oid(1)]);
@@ -132,17 +137,20 @@ describe("parseGitCommitPayload", () => {
   }
 
   it("parses tree, parents, identities, and the message", () => {
-    const parsed = parseGitCommitPayload(payload([
-      `tree ${oid(9)}`,
-      `parent ${oid(1)}`,
-      `parent ${oid(2)}`,
-      "author Ada Lovelace <ada@example.com> 1700000000 +0130",
-      "committer Charles Babbage <charles@example.com> 1700000100 -0500",
-      "",
-      "Add the engine",
-      "",
-      "With details.",
-    ]), oid(7));
+    const parsed = parseGitCommitPayload(
+      payload([
+        `tree ${oid(9)}`,
+        `parent ${oid(1)}`,
+        `parent ${oid(2)}`,
+        "author Ada Lovelace <ada@example.com> 1700000000 +0130",
+        "committer Charles Babbage <charles@example.com> 1700000100 -0500",
+        "",
+        "Add the engine",
+        "",
+        "With details.",
+      ]),
+      oid(7),
+    );
     expect(parsed.tree).toBe(oid(9));
     expect(parsed.parents).toEqual([oid(1), oid(2)]);
     expect(parsed.author).toEqual({
@@ -155,55 +163,63 @@ describe("parseGitCommitPayload", () => {
   });
 
   it("tolerates unknown and multi-line headers (gpgsig continuation lines)", () => {
-    const parsed = parseGitCommitPayload(payload([
-      `tree ${oid(9)}`,
-      "author A <a@example.com> 1700000000 +0000",
-      "committer A <a@example.com> 1700000000 +0000",
-      "gpgsig -----BEGIN PGP SIGNATURE-----",
-      " lineone",
-      " -----END PGP SIGNATURE-----",
-      "",
-      "signed commit",
-    ]), oid(7));
+    const parsed = parseGitCommitPayload(
+      payload([
+        `tree ${oid(9)}`,
+        "author A <a@example.com> 1700000000 +0000",
+        "committer A <a@example.com> 1700000000 +0000",
+        "gpgsig -----BEGIN PGP SIGNATURE-----",
+        " lineone",
+        " -----END PGP SIGNATURE-----",
+        "",
+        "signed commit",
+      ]),
+      oid(7),
+    );
     expect(parsed.parents).toEqual([]);
     expect(parsed.message).toBe("signed commit");
   });
 
   it("is best-effort on partial or malformed identities rather than failing the read", () => {
-    const parsed = parseGitCommitPayload(payload([
-      `tree ${oid(9)}`,
-      "author <ada@example.com>",
-      "committer garbage",
-      "",
-      "m",
-    ]), oid(7));
+    const parsed = parseGitCommitPayload(
+      payload([`tree ${oid(9)}`, "author <ada@example.com>", "committer garbage", "", "m"]),
+      oid(7),
+    );
     expect(parsed.author).toEqual({ email: "ada@example.com" });
     expect(parsed.committer).toEqual({});
   });
 
   it("rejects payloads that are not well-formed commits", () => {
-    expect(() => parseGitCommitPayload(payload(["not a commit"]), oid(7)))
-      .toThrow(/not a well-formed commit/);
-    expect(() => parseGitCommitPayload(payload([`parent ${oid(1)}`, "", "no tree"]), oid(7)))
-      .toThrow(/not a well-formed commit/);
-    expect(() => parseGitCommitPayload(payload([`tree ${oid(9)}`, "parent nope", "", "m"]), oid(7)))
-      .toThrow(/not a well-formed commit/);
+    expect(() => parseGitCommitPayload(payload(["not a commit"]), oid(7))).toThrow(
+      /not a well-formed commit/,
+    );
+    expect(() =>
+      parseGitCommitPayload(payload([`parent ${oid(1)}`, "", "no tree"]), oid(7)),
+    ).toThrow(/not a well-formed commit/);
+    expect(() =>
+      parseGitCommitPayload(payload([`tree ${oid(9)}`, "parent nope", "", "m"]), oid(7)),
+    ).toThrow(/not a well-formed commit/);
   });
 });
 
 describe("commitDetailsFromGitObject", () => {
   it("synthesizes the provider-neutral details shape from exact bytes", () => {
-    const bytes = new TextEncoder().encode([
-      `tree ${oid(9)}`,
-      `parent ${oid(1)}`,
-      "author Ada Lovelace <ada@example.com> 1700000000 +0000",
-      "committer Ada Lovelace <ada@example.com> 1700000100 +0000",
-      "",
-      "feat: pending work",
-      "",
-    ].join("\n"));
+    const bytes = new TextEncoder().encode(
+      [
+        `tree ${oid(9)}`,
+        `parent ${oid(1)}`,
+        "author Ada Lovelace <ada@example.com> 1700000000 +0000",
+        "committer Ada Lovelace <ada@example.com> 1700000100 +0000",
+        "",
+        "feat: pending work",
+        "",
+      ].join("\n"),
+    );
     const details = commitDetailsFromGitObject(
-      oid(7), bytes, id => `https://gitlab.example.com/acme/widgets/-/commit/${id}`);
+      oid(7),
+      bytes,
+      (id) => `https://gitlab.example.com/acme/widgets/-/commit/${id}`,
+    );
     expect(details).toEqual({
       id: oid(7),
       message: "feat: pending work",
@@ -217,9 +233,10 @@ describe("commitDetailsFromGitObject", () => {
 
 function streamOf(pieces: Uint8Array[], onCancel?: () => void): ReadableStream<Uint8Array> {
   return new ReadableStream({
-    pull: controller => {
+    pull: (controller) => {
       const piece = pieces.shift();
-      if (piece === undefined) controller.close(); else controller.enqueue(piece);
+      if (piece === undefined) controller.close();
+      else controller.enqueue(piece);
     },
     cancel: onCancel,
   });
@@ -236,7 +253,9 @@ describe("GitCache.get() content", () => {
 
   it("cancels a streamed object of another type than expected", async () => {
     let cancelled = false;
-    const content = streamOf([new Uint8Array(8)], () => { cancelled = true; });
+    const content = streamOf([new Uint8Array(8)], () => {
+      cancelled = true;
+    });
     // A large blob's oid where a commit was expected.
     expect(await gitObjectBytes({ type: "blob", content }, "commit")).toBeNull();
     await Promise.resolve();
@@ -249,7 +268,10 @@ describe("GitCache.get() content", () => {
     expect(bufferedGitObject({ type: "tree", content: buffered }, "blob")).toBeNull();
     expect(bufferedGitObject(null, "blob")).toBeNull();
     let cancels = 0;
-    const stream = () => streamOf([new Uint8Array(8)], () => { cancels++; });
+    const stream = () =>
+      streamOf([new Uint8Array(8)], () => {
+        cancels++;
+      });
     expect(bufferedGitObject({ type: "blob", content: stream() }, "blob")).toBe("streamed");
     expect(bufferedGitObject({ type: "tree", content: stream() }, "blob")).toBeNull();
     await Promise.resolve();

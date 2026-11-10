@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { MAX_TOOL_RESULT_CHARS } from "../src/agent";
 import { BlobReader, BlobWriter, CHUNK_MAX_SIZE, type ChunkStore } from "../src/git-chunked-blob";
 import { encodeLooseObject } from "../src/git-codec";
@@ -13,12 +13,17 @@ const MAX = MAX_TOOL_RESULT_CHARS;
 function blob(content: string | Uint8Array): LineSource & { kind: "blob" } {
   let bytes = typeof content === "string" ? new TextEncoder().encode(content) : content;
   let rows = new Map<string, GitObjectRecord>();
-  let store: ChunkStore = { get: oid => rows.get(oid), put: record => rows.set(record.oid, record) };
+  let store: ChunkStore = {
+    get: (oid) => rows.get(oid),
+    put: (record) => rows.set(record.oid, record),
+  };
   let writer = new BlobWriter(store, bytes.length);
   writer.write(bytes);
   let pending = writer.finish();
-  let record: GitObjectRecord = pending.record ??
-      { oid: pending.oid, data: encodeLooseObject("blob", pending.payload) };
+  let record: GitObjectRecord = pending.record ?? {
+    oid: pending.oid,
+    data: encodeLooseObject("blob", pending.payload),
+  };
   rows.set(record.oid, record);
   return { kind: "blob", reader: BlobReader.open(store, record) };
 }
@@ -36,12 +41,16 @@ function legacyReadFileWindow(content: string, { startLine, lineCount }: ReadFil
   if (lines.at(-1) === "") lines.pop();
   let first = startLine ?? 1;
   if (first > lines.length) {
-    throw new Error(`startLine ${first} is past the end of the file, which has ` +
-        `${lines.length} line${lines.length === 1 ? "" : "s"}.`);
+    throw new Error(
+      `startLine ${first} is past the end of the file, which has ` +
+        `${lines.length} line${lines.length === 1 ? "" : "s"}.`,
+    );
   }
-  let note = (last: number) => `[lines ${first}-${last} of ${lines.length}` +
-      (last < lines.length ? `; next startLine: ${last + 1}]` : "]");
-  let limit = lineCount === undefined ? lines.length : Math.min(lines.length, first - 1 + lineCount);
+  let note = (last: number) =>
+    `[lines ${first}-${last} of ${lines.length}` +
+    (last < lines.length ? `; next startLine: ${last + 1}]` : "]");
+  let limit =
+    lineCount === undefined ? lines.length : Math.min(lines.length, first - 1 + lineCount);
   let budget = MAX - note(lines.length - 1).length - 2;
   let last = first;
   let chars = lines[first - 1].length;
@@ -82,8 +91,11 @@ function randomText(random: () => number, approxBytes: number): string {
   let bytes = 0;
   while (bytes < approxBytes) {
     let r = random();
-    let length = r < 0.05 ? Math.floor(random() * 40_000) : r < 0.2 ? 0 : Math.floor(random() * 120);
-    let line = Array.from({ length }, () => alphabet[Math.floor(random() * alphabet.length)]).join("");
+    let length =
+      r < 0.05 ? Math.floor(random() * 40_000) : r < 0.2 ? 0 : Math.floor(random() * 120);
+    let line = Array.from({ length }, () => alphabet[Math.floor(random() * alphabet.length)]).join(
+      "",
+    );
     parts.push(line);
     bytes += new TextEncoder().encode(line).length + 1;
   }
@@ -98,7 +110,10 @@ describe("readFile windows", () => {
   let big = Array.from({ length: bigLines }, () => bigLine).join("\n");
 
   // Every rule shared by both sources is checked against both.
-  for (let [name, source] of [["text", text], ["blob", blob]] as const) {
+  for (let [name, source] of [
+    ["text", text],
+    ["blob", blob],
+  ] as const) {
     describe(`from ${name}`, () => {
       it("returns a small unwindowed file verbatim", () => {
         expect(render(source(file), {})).toBe(file);
@@ -106,31 +121,36 @@ describe("readFile windows", () => {
       });
 
       it("returns the requested lines with the range and where to continue", () => {
-        expect(render(source(file), { startLine: 3, lineCount: 2 }))
-            .toBe("line 3\nline 4\n\n[lines 3-4 of 10; next startLine: 5]");
-        expect(render(source(file), { startLine: 9 }))
-            .toBe("line 9\nline 10\n\n[lines 9-10 of 10]");
-        expect(render(source(file), { lineCount: 1 }))
-            .toBe("line 1\n\n[lines 1-1 of 10; next startLine: 2]");
+        expect(render(source(file), { startLine: 3, lineCount: 2 })).toBe(
+          "line 3\nline 4\n\n[lines 3-4 of 10; next startLine: 5]",
+        );
+        expect(render(source(file), { startLine: 9 })).toBe(
+          "line 9\nline 10\n\n[lines 9-10 of 10]",
+        );
+        expect(render(source(file), { lineCount: 1 })).toBe(
+          "line 1\n\n[lines 1-1 of 10; next startLine: 2]",
+        );
       });
 
       it("counts a final line with or without its newline, and no line in an empty file", () => {
         expect(render(source("a\nb"), { startLine: 2 })).toBe("b\n\n[lines 2-2 of 2]");
         expect(render(source("a\nb\n"), { startLine: 2 })).toBe("b\n\n[lines 2-2 of 2]");
         expect(render(source("a\n\n"), { startLine: 2 })).toBe("\n\n[lines 2-2 of 2]");
-        expect(() => render(source(""), { startLine: 1 }))
-            .toThrow("startLine 1 is past the end of the file, which has 0 lines.");
+        expect(() => render(source(""), { startLine: 1 })).toThrow(
+          "startLine 1 is past the end of the file, which has 0 lines.",
+        );
       });
 
       it("rejects a start past the end", () => {
-        expect(() => render(source(file), { startLine: 11 }))
-            .toThrow("startLine 11 is past the end of the file, which has 10 lines.");
-        expect(() => render(source("one"), { startLine: 2 }))
-            .toThrow("startLine 2 is past the end of the file, which has 1 line.");
+        expect(() => render(source(file), { startLine: 11 })).toThrow(
+          "startLine 11 is past the end of the file, which has 10 lines.",
+        );
+        expect(() => render(source("one"), { startLine: 2 })).toThrow(
+          "startLine 2 is past the end of the file, which has 1 line.",
+        );
       });
 
-      it("turns an unwindowed read of a large file into a window of whole lines under the cap",
-          () => {
+      it("turns an unwindowed read of a large file into a window of whole lines under the cap", () => {
         let shown = render(source(big), {});
         expect(shown.length).toBeLessThanOrEqual(MAX);
         let note = windowNote(shown);
@@ -140,8 +160,7 @@ describe("readFile windows", () => {
         expect(shown.length + bigLine.length + 1).toBeGreaterThan(MAX);
       });
 
-      it("treats lineCount as an upper bound, so an oversized request still says where to continue",
-          () => {
+      it("treats lineCount as an upper bound, so an oversized request still says where to continue", () => {
         let shown = render(source(big), { startLine: 5, lineCount: bigLines });
         expect(shown.length).toBeLessThanOrEqual(MAX);
         let note = windowNote(shown);
@@ -161,8 +180,9 @@ describe("readFile windows", () => {
       let windows: ReadFileWindow[] = [{}, { startLine: 1 }, { startLine: lines - 1 }];
       for (let i = 0; i < 40; i++) {
         let startLine = 1 + Math.floor(random() * (lines - 1));
-        windows.push(random() < 0.5 ? { startLine }
-            : { startLine, lineCount: 1 + Math.floor(random() * 200) });
+        windows.push(
+          random() < 0.5 ? { startLine } : { startLine, lineCount: 1 + Math.floor(random() * 200) },
+        );
       }
       for (let window of windows) {
         let expected: string;
@@ -211,15 +231,19 @@ describe("readFile windows", () => {
 
   it("errors on binary data in the window, naming its lines, but not just outside it", () => {
     let content = "one\ntwo\nthr\0ee\nfour\nfive\n";
-    expect(() => render(blob(content), { startLine: 2, lineCount: 2 }))
-        .toThrow(new UnreadableContentError(
-            "f.txt contains binary data in lines 2-3, which readFile cannot show as text."));
-    expect(() => render(blob(content), { startLine: 3, lineCount: 1 }))
-        .toThrow("f.txt contains binary data in line 3,");
+    expect(() => render(blob(content), { startLine: 2, lineCount: 2 })).toThrow(
+      new UnreadableContentError(
+        "f.txt contains binary data in lines 2-3, which readFile cannot show as text.",
+      ),
+    );
+    expect(() => render(blob(content), { startLine: 3, lineCount: 1 })).toThrow(
+      "f.txt contains binary data in line 3,",
+    );
     expect(() => render(blob(content), {})).toThrow("binary data in lines 1-5");
     expect(render(blob(content), { startLine: 4 })).toBe("four\nfive\n\n[lines 4-5 of 5]");
-    expect(render(blob(content), { startLine: 1, lineCount: 2 }))
-        .toBe("one\ntwo\n\n[lines 1-2 of 5; next startLine: 3]");
+    expect(render(blob(content), { startLine: 1, lineCount: 2 })).toBe(
+      "one\ntwo\n\n[lines 1-2 of 5; next startLine: 3]",
+    );
     // Session text is shown as it is, as it always was.
     expect(render(text(content), {})).toBe(content);
   });
@@ -235,12 +259,16 @@ describe("readFile windows", () => {
     let content = `short\n${long}\nafter\n`;
     let shown = render(blob(content), { startLine: 2 });
     expect(shown.length).toBeLessThanOrEqual(MAX);
-    let match = /^(y*)\n\n\[line 2 of 3 is (\d+) bytes; showing the first (\d+) characters\. For a worktree file, readBytes\(\) reads byte ranges\.\]$/
-        .exec(shown);
+    let match =
+      /^(y*)\n\n\[line 2 of 3 is (\d+) bytes; showing the first (\d+) characters\. For a worktree file, readBytes\(\) reads byte ranges\.\]$/.exec(
+        shown,
+      );
     expect(match).not.toBeNull();
     expect(Number(match![2])).toBe(long.length);
     expect(Number(match![3])).toBe(match![1].length);
-    expect(render(text(content), { startLine: 2 })).toBe(`${long}\n\n[lines 2-2 of 3; next startLine: 3]`);
+    expect(render(text(content), { startLine: 2 })).toBe(
+      `${long}\n\n[lines 2-2 of 3; next startLine: 3]`,
+    );
 
     // A whole file with no newline, read unwindowed, is cut the same way; a surrogate pair is
     // never split.

@@ -6,7 +6,7 @@ import { createExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { newWebSocketRpcSession, type RpcStub } from "capnweb";
 import type { PublicApi } from "@gadgets/workshop-shared/api";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { AdminSettingActor } from "../src/admin-access.js";
 import type { UserDurableObject } from "../src/user.js";
 import server from "../src/server.js";
@@ -39,34 +39,52 @@ function unique(prefix: string): string {
 }
 
 /** The deployment's env, with `admins` as ADMINS, and `environment` as WORKSHOP_ENVIRONMENT. */
-function deployment(admins: string[], options: { environment?: string; access?: boolean } = {}): Cloudflare.Env {
+function deployment(
+  admins: string[],
+  options: { environment?: string; access?: boolean } = {},
+): Cloudflare.Env {
   return {
     ...env,
     BLUEPRINTS,
     ADMINS: admins,
     ...(options.environment === undefined ? {} : { WORKSHOP_ENVIRONMENT: options.environment }),
-    ...(options.access ? { CF_ACCESS_AUD: "aud", CF_ACCESS_ISS: "https://team.cloudflareaccess.com" } : {}),
+    ...(options.access
+      ? { CF_ACCESS_AUD: "aud", CF_ACCESS_ISS: "https://team.cloudflareaccess.com" }
+      : {}),
   } as Cloudflare.Env;
 }
 
 /** A PublicApi session on `deploymentEnv`, opened with `userAgent` (and an Access identity, `as`). */
-async function connect(deploymentEnv: Cloudflare.Env, userAgent: string | undefined, as?: string)
-    : Promise<RpcStub<PublicApi>> {
+async function connect(
+  deploymentEnv: Cloudflare.Env,
+  userAgent: string | undefined,
+  as?: string,
+): Promise<RpcStub<PublicApi>> {
   const headers: Record<string, string> = { Upgrade: "websocket", Origin: ORIGIN };
   if (userAgent !== undefined) headers["User-Agent"] = userAgent;
   if (as !== undefined) headers["cf-access-jwt-assertion"] = as;
   // The first /api request installs the bundled blueprints, which needs storage these tests lack.
   // Admin config changes land in `configChanges`.
   const ctx = createExecutionContext();
-  Object.defineProperty(ctx, "exports", { value: Object.create(ctx.exports, {
-    AdminSettings: { value: { getByName: () => ({
-      ensureBundledBlueprintsInstalled: async () => true,
-      updateAdminConfig: async (patch: object, actor: AdminSettingActor) => {
-        configChanges.push({ patch, actor });
+  Object.defineProperty(ctx, "exports", {
+    value: Object.create(ctx.exports, {
+      AdminSettings: {
+        value: {
+          getByName: () => ({
+            ensureBundledBlueprintsInstalled: async () => true,
+            updateAdminConfig: async (patch: object, actor: AdminSettingActor) => {
+              configChanges.push({ patch, actor });
+            },
+          }),
+        },
       },
-    }) } },
-  }) });
-  const response = await server.fetch(new Request(`${ORIGIN}/api`, { headers }), deploymentEnv, ctx);
+    }),
+  });
+  const response = await server.fetch(
+    new Request(`${ORIGIN}/api`, { headers }),
+    deploymentEnv,
+    ctx,
+  );
   expect(response.status).toBe(101);
   const socket = response.webSocket;
   if (!socket) throw new TypeError("Expected a WebSocket response.");
@@ -76,8 +94,11 @@ async function connect(deploymentEnv: Cloudflare.Env, userAgent: string | undefi
 
 /** A password account's session token, made directly in its user DO. */
 async function account(username: string): Promise<string> {
-  const secret = await env.TEST_USER.getByName(username)
-      .createAccount(username, username, new Uint8Array([1, 2, 3]));
+  const secret = await env.TEST_USER.getByName(username).createAccount(
+    username,
+    username,
+    new Uint8Array([1, 2, 3]),
+  );
   if (secret === null) throw new Error(`${username} exists already.`);
   return `${username}:${secret}`;
 }
@@ -124,14 +145,21 @@ describe("cf-os api on a deployment", () => {
   it("refuses every call that signs no one in: createAccount and the public commands", async () => {
     using api = await connect(deployment([]), CLI);
     const username = unique("newcomer");
-    await expect(api.createAccount(username, username, new Uint8Array([1]))).rejects.toThrow(REFUSED);
+    await expect(api.createAccount(username, username, new Uint8Array([1]))).rejects.toThrow(
+      REFUSED,
+    );
     await expect(api.getServerConfig()).rejects.toThrow(REFUSED);
     await expect(api.ping()).rejects.toThrow(REFUSED);
     await expect(api.getBlueprint("format.document")).rejects.toThrow(REFUSED);
     await expect(api.downloadBlueprint("format.document")).rejects.toThrow(REFUSED);
     // Refused before anything was made: the name is still free.
-    expect(await env.TEST_USER.getByName(username).createAccount(username, username, new Uint8Array([1])))
-        .not.toBeNull();
+    expect(
+      await env.TEST_USER.getByName(username).createAccount(
+        username,
+        username,
+        new Uint8Array([1]),
+      ),
+    ).not.toBeNull();
   });
 
   it("signs in through Cloudflare Access as an admin only, creating no account for anyone else", async () => {
@@ -146,8 +174,14 @@ describe("cf-os api on a deployment", () => {
     using otherApi = await connect(access, CLI, other);
     await expect(otherApi.authenticateFromCfAccess().amIAdmin()).rejects.toThrow(REFUSED);
     // Refused before the account was made on first sign-in.
-    expect(await env.TEST_USER.getByName(other).authenticateFromCfAccess(other, false)
-        .then(() => "exists", (error: Error) => error.message)).toMatch(/sign-ups are currently disabled/);
+    expect(
+      await env.TEST_USER.getByName(other)
+        .authenticateFromCfAccess(other, false)
+        .then(
+          () => "exists",
+          (error: Error) => error.message,
+        ),
+    ).toMatch(/sign-ups are currently disabled/);
   });
 });
 
@@ -185,10 +219,12 @@ describe("the label on an admin's changes", () => {
       using adminApi = await session.getAdminApi();
       if (adminApi === null) throw new Error("The admin was refused the admin API.");
       await adminApi.setSiteName("Acme");
-      expect(configChanges.filter(change => change.actor.admin === admin)).toStrictEqual([{
-        patch: { siteName: "Acme" },
-        actor: { admin, sessionId: expect.any(String), via, method: "setSiteName" },
-      }]);
+      expect(configChanges.filter((change) => change.actor.admin === admin)).toStrictEqual([
+        {
+          patch: { siteName: "Acme" },
+          actor: { admin, sessionId: expect.any(String), via, method: "setSiteName" },
+        },
+      ]);
     });
   }
 });

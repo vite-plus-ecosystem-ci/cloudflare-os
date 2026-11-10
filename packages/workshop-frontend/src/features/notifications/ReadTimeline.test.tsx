@@ -2,7 +2,7 @@
 /* eslint-disable react/react-in-jsx-scope */
 import { act, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { RpcStub } from "capnweb";
 import type {
   AuthenticatedApi,
@@ -16,14 +16,15 @@ import { TimelineReadItem } from "./TimelineReadItem";
 import { reportVisibleChat } from "./visibleChat";
 import { TimelineContext } from "./readTimelineContext";
 
-vi.mock("@cloudflare/kumo", async importOriginal => ({
-  ...await importOriginal<typeof import("@cloudflare/kumo")>(),
+vi.mock("@cloudflare/kumo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@cloudflare/kumo")>()),
   useKumoToastManager: () => ({ add: () => {} }),
 }));
 
 const snapshot = (_update = 1, readThroughSequence = -1): UserUnreadState => ({
   workspaces: [],
-  unreadChatCount: readThroughSequence < 2 ? 1 : 0, unreadMessageCount: readThroughSequence < 2 ? 1 : 0,
+  unreadChatCount: readThroughSequence < 2 ? 1 : 0,
+  unreadMessageCount: readThroughSequence < 2 ? 1 : 0,
   chats: [
     {
       workspaceId: "workspace",
@@ -55,16 +56,26 @@ describe("timeline read/unread experience", () => {
   const loadEarlier = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const navigate = vi.fn<() => void>();
 
-  const View = ({ oldest = 0, loadingEarlier = false, latestSequence = 2, sequences = [0, 1, 2] }: {
-    oldest?: number; loadingEarlier?: boolean; latestSequence?: number; sequences?: number[];
+  const View = ({
+    oldest = 0,
+    loadingEarlier = false,
+    latestSequence = 2,
+    sequences = [0, 1, 2],
+  }: {
+    oldest?: number;
+    loadingEarlier?: boolean;
+    latestSequence?: number;
+    sequences?: number[];
   }) => {
     const viewport = useRef<HTMLDivElement>(null);
     return (
       <div ref={viewport} data-viewport>
-        <ReadTimeline overseer={api}
+        <ReadTimeline
+          overseer={api}
           workspaceId="workspace"
           chatId={1}
-          container={viewport} latestSequence={latestSequence}
+          container={viewport}
+          latestSequence={latestSequence}
           oldestSequence={oldest}
           loadingEarlier={loadingEarlier}
           loadEarlier={loadEarlier}
@@ -85,16 +96,25 @@ describe("timeline read/unread experience", () => {
   const render = (child = <View />) =>
     act(async () =>
       root.render(
-        <UnreadStateBridge scope={{workspaceId: "workspace"}} authenticatedApi={api as unknown as RpcStub<AuthenticatedApi>}>
+        <UnreadStateBridge
+          scope={{ workspaceId: "workspace" }}
+          authenticatedApi={api as unknown as RpcStub<AuthenticatedApi>}
+        >
           {child}
         </UnreadStateBridge>,
       ),
     );
   const update = (state: UserUnreadState) => act(async () => subscriber.updated(state));
-  const receiveChat = (state: UserUnreadState) => subscriber.chatUpdated("workspace", 1, state.chats[0], {
-    unreadChatCount: state.unreadChatCount, unreadMessageCount: state.unreadMessageCount,
-    workspace: {workspaceId: "workspace", unreadChatCount: state.unreadChatCount, unreadMessageCount: state.unreadMessageCount},
-  });
+  const receiveChat = (state: UserUnreadState) =>
+    subscriber.chatUpdated("workspace", 1, state.chats[0], {
+      unreadChatCount: state.unreadChatCount,
+      unreadMessageCount: state.unreadMessageCount,
+      workspace: {
+        workspaceId: "workspace",
+        unreadChatCount: state.unreadChatCount,
+        unreadMessageCount: state.unreadMessageCount,
+      },
+    });
   const updateChat = (state: UserUnreadState) => act(async () => receiveChat(state));
   const settle = async () => {
     await act(async () => {
@@ -105,7 +125,9 @@ describe("timeline read/unread experience", () => {
     });
   };
   const markUnreadFrom = async (sequence: number) => {
-    await act(async () => container.querySelector<HTMLButtonElement>(`[data-read-start="${sequence}"] button`)!.click());
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>(`[data-read-start="${sequence}"] button`)!.click(),
+    );
     await act(async () => document.querySelector<HTMLElement>('[role="menuitem"]')!.click());
   };
 
@@ -121,10 +143,14 @@ describe("timeline read/unread experience", () => {
       setTimeout(() => fn(0), 0),
     );
     vi.stubGlobal("cancelAnimationFrame", clearTimeout);
-    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function(this: HTMLElement) {
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
       return this.hasAttribute("data-viewport") ? visibleBottom : 0;
     });
-    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function(this: HTMLElement) {
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
       const tail = [...this.querySelectorAll<HTMLElement>("[data-read-through]")].at(-1);
       return tail ? Number(tail.dataset.readThrough) * 100 + 101 : 0;
     });
@@ -169,11 +195,17 @@ describe("timeline read/unread experience", () => {
 
   it("does not flash unread UI for a live reply in a caught-up, focused pane", async () => {
     visibleBottom = 450;
-    await render(); await update(snapshot(1, 2)); await settle();
+    await render();
+    await update(snapshot(1, 2));
+    await settle();
     await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
     const arrival = snapshot(2, 2);
-    await updateChat({...arrival, unreadChatCount: 1, unreadMessageCount: 1,
-      chats: [{...arrival.chats[0], unreadMessageCount: 1}]});
+    await updateChat({
+      ...arrival,
+      unreadChatCount: 1,
+      unreadMessageCount: 1,
+      chats: [{ ...arrival.chats[0], unreadMessageCount: 1 }],
+    });
     expect(container.querySelector("[data-unread-divider]")).toBeNull();
     expect(container.textContent).not.toContain("Unread activity");
     await settle();
@@ -181,11 +213,17 @@ describe("timeline read/unread experience", () => {
   });
 
   it("shows unread activity for a live reply while scrolled away from the tail", async () => {
-    await render(); await update(snapshot(1, 2)); await settle();
+    await render();
+    await update(snapshot(1, 2));
+    await settle();
     await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
     const arrival = snapshot(2, 2);
-    await updateChat({...arrival, unreadChatCount: 1, unreadMessageCount: 1,
-      chats: [{...arrival.chats[0], unreadMessageCount: 1}]});
+    await updateChat({
+      ...arrival,
+      unreadChatCount: 1,
+      unreadMessageCount: 1,
+      chats: [{ ...arrival.chats[0], unreadMessageCount: 1 }],
+    });
     expect(container.querySelector("[data-unread-divider]")).not.toBeNull();
     expect(container.textContent).toContain("Unread activity");
     await settle();
@@ -194,27 +232,36 @@ describe("timeline read/unread experience", () => {
 
   it("keeps a New divider for messages received while the tab was hidden", async () => {
     visibleBottom = 450;
-    await render(); await update(snapshot(1, 2)); await settle();
+    await render();
+    await update(snapshot(1, 2));
+    await settle();
     await act(async () => {
-      Object.defineProperty(document, "visibilityState", {configurable: true, value: "hidden"});
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
       document.dispatchEvent(new Event("visibilitychange"));
     });
     await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
     await act(async () => {
-      Object.defineProperty(document, "visibilityState", {configurable: true, value: "visible"});
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
       document.dispatchEvent(new Event("visibilitychange"));
     });
     const arrival = snapshot(2, 2);
-    await update({...arrival, unreadChatCount: 1, unreadMessageCount: 1,
-      chats: [{...arrival.chats[0], unreadMessageCount: 1}]});
-    expect(container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")?.dataset.readStart).toBe("3");
+    await update({
+      ...arrival,
+      unreadChatCount: 1,
+      unreadMessageCount: 1,
+      chats: [{ ...arrival.chats[0], unreadMessageCount: 1 }],
+    });
+    expect(
+      container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")
+        ?.dataset.readStart,
+    ).toBe("3");
     await settle();
     expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 3);
   });
 
   it("can mark an untouched legacy thread unread without initializing it on open", async () => {
     await render();
-    await update({chats: [], workspaces: [], unreadChatCount: 0, unreadMessageCount: 0});
+    await update({ chats: [], workspaces: [], unreadChatCount: 0, unreadMessageCount: 0 });
     await settle();
     expect(markChatRead).not.toHaveBeenCalled();
     const viewport = container.querySelector<HTMLDivElement>("[data-viewport]")!;
@@ -233,32 +280,39 @@ describe("timeline read/unread experience", () => {
     expect(navigate).not.toHaveBeenCalledWith(true);
   });
 
-  it.each([false, true])("does not treat the first unread event on an already-open legacy thread as a rewind (history first: %s)", async historyFirst => {
-    await render();
-    if (historyFirst) await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
-    await update({chats: [], workspaces: [], unreadChatCount: 0, unreadMessageCount: 0});
-    await settle();
-    const viewport = container.querySelector<HTMLDivElement>("[data-viewport]")!;
-    viewport.scrollTop = 40;
-    navigate.mockClear();
-    await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
-    const arrival = snapshot(1, 2);
-    await updateChat({...arrival, unreadChatCount: 1, unreadMessageCount: 1,
-      chats: [{...arrival.chats[0], unreadMessageCount: 1}]});
-    await settle();
-    expect(viewport.scrollTop).toBe(40);
-    expect(navigate).not.toHaveBeenCalledWith(true);
-    expect(container.textContent).not.toContain("automatic reading paused");
-    visibleBottom = 450;
-    await act(async () => viewport.dispatchEvent(new Event("scroll")));
-    await settle();
-    expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 3);
-  });
+  it.each([false, true])(
+    "does not treat the first unread event on an already-open legacy thread as a rewind (history first: %s)",
+    async (historyFirst) => {
+      await render();
+      if (historyFirst) await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
+      await update({ chats: [], workspaces: [], unreadChatCount: 0, unreadMessageCount: 0 });
+      await settle();
+      const viewport = container.querySelector<HTMLDivElement>("[data-viewport]")!;
+      viewport.scrollTop = 40;
+      navigate.mockClear();
+      await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
+      const arrival = snapshot(1, 2);
+      await updateChat({
+        ...arrival,
+        unreadChatCount: 1,
+        unreadMessageCount: 1,
+        chats: [{ ...arrival.chats[0], unreadMessageCount: 1 }],
+      });
+      await settle();
+      expect(viewport.scrollTop).toBe(40);
+      expect(navigate).not.toHaveBeenCalledWith(true);
+      expect(container.textContent).not.toContain("automatic reading paused");
+      visibleBottom = 450;
+      await act(async () => viewport.dispatchEvent(new Event("scroll")));
+      await settle();
+      expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 3);
+    },
+  );
 
   it("lets visible receipts consume the first cursor of an already-open legacy thread", async () => {
     visibleBottom = 350;
     await render();
-    await update({chats: [], workspaces: [], unreadChatCount: 0, unreadMessageCount: 0});
+    await update({ chats: [], workspaces: [], unreadChatCount: 0, unreadMessageCount: 0 });
     await settle();
     await updateChat(snapshot(1, 0));
     await settle();
@@ -268,159 +322,218 @@ describe("timeline read/unread experience", () => {
   });
 
   it.each([
-    {existingCursor: false, confirmationCount: 1},
-    {existingCursor: false, confirmationCount: 0},
-    {existingCursor: true, confirmationCount: 1},
-  ])("preserves a confirmed unread selection when its response fails (existing cursor: $existingCursor, initial unread: $confirmationCount)", async ({existingCursor, confirmationCount}) => {
-    using _ = vi.spyOn(console, "debug").mockImplementation(() => {});
-    visibleBottom = 450;
-    await render();
-    await update(existingCursor ? snapshot(1, 2) :
-      {chats: [], workspaces: [], unreadChatCount: 0, unreadMessageCount: 0});
-    await settle();
-    const failed = Promise.withResolvers<boolean>();
-    markChatUnread.mockReturnValueOnce(failed.promise);
-    await markUnreadFrom(1);
-    await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
-    const confirmed = {...snapshot(2, 0), unreadChatCount: 1, unreadMessageCount: 1,
-      chats: [{...snapshot(2, 0).chats[0], unreadMessageCount: 1}]};
-    await updateChat({...confirmed, unreadChatCount: confirmationCount, unreadMessageCount: confirmationCount,
-      chats: [{...confirmed.chats[0], unreadMessageCount: confirmationCount}]});
-    // A legacy-only boundary can be confirmed before the first tracked message arrives.
-    if (confirmationCount === 0) await updateChat(confirmed);
-    await act(async () => failed.reject(Object.assign(new Error("Object restarted"), {durableObjectReset: true})));
-    await settle();
-    expect(container.textContent).toContain("automatic reading paused");
-    expect(markChatRead).not.toHaveBeenCalled();
-  });
+    { existingCursor: false, confirmationCount: 1 },
+    { existingCursor: false, confirmationCount: 0 },
+    { existingCursor: true, confirmationCount: 1 },
+  ])(
+    "preserves a confirmed unread selection when its response fails (existing cursor: $existingCursor, initial unread: $confirmationCount)",
+    async ({ existingCursor, confirmationCount }) => {
+      using _ = vi.spyOn(console, "debug").mockImplementation(() => {});
+      visibleBottom = 450;
+      await render();
+      await update(
+        existingCursor
+          ? snapshot(1, 2)
+          : { chats: [], workspaces: [], unreadChatCount: 0, unreadMessageCount: 0 },
+      );
+      await settle();
+      const failed = Promise.withResolvers<boolean>();
+      markChatUnread.mockReturnValueOnce(failed.promise);
+      await markUnreadFrom(1);
+      await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
+      const confirmed = {
+        ...snapshot(2, 0),
+        unreadChatCount: 1,
+        unreadMessageCount: 1,
+        chats: [{ ...snapshot(2, 0).chats[0], unreadMessageCount: 1 }],
+      };
+      await updateChat({
+        ...confirmed,
+        unreadChatCount: confirmationCount,
+        unreadMessageCount: confirmationCount,
+        chats: [{ ...confirmed.chats[0], unreadMessageCount: confirmationCount }],
+      });
+      // A legacy-only boundary can be confirmed before the first tracked message arrives.
+      if (confirmationCount === 0) await updateChat(confirmed);
+      await act(async () =>
+        failed.reject(Object.assign(new Error("Object restarted"), { durableObjectReset: true })),
+      );
+      await settle();
+      expect(container.textContent).toContain("automatic reading paused");
+      expect(markChatRead).not.toHaveBeenCalled();
+    },
+  );
 
   it("rolls back a failed legacy selection when the first cursor belongs to ordinary arrival enrollment", async () => {
     using _ = vi.spyOn(console, "debug").mockImplementation(() => {});
     visibleBottom = 450;
     await render();
-    await update({chats: [], workspaces: [], unreadChatCount: 0, unreadMessageCount: 0});
+    await update({ chats: [], workspaces: [], unreadChatCount: 0, unreadMessageCount: 0 });
     await settle();
     const failed = Promise.withResolvers<boolean>();
     markChatUnread.mockReturnValueOnce(failed.promise);
     await markUnreadFrom(1);
     await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
     const arrival = snapshot(2, 2);
-    await updateChat({...arrival, unreadChatCount: 1, unreadMessageCount: 1,
-      chats: [{...arrival.chats[0], unreadMessageCount: 1}]});
-    await act(async () => failed.reject(Object.assign(new Error("Object restarted"), {durableObjectReset: true})));
+    await updateChat({
+      ...arrival,
+      unreadChatCount: 1,
+      unreadMessageCount: 1,
+      chats: [{ ...arrival.chats[0], unreadMessageCount: 1 }],
+    });
+    await act(async () =>
+      failed.reject(Object.assign(new Error("Object restarted"), { durableObjectReset: true })),
+    );
     await settle();
     expect(container.textContent).not.toContain("automatic reading paused");
     expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 3);
   });
 
-  it.each([false, true])("keeps a failed unread command's navigation in its owning visit (reentered: %s)", async reenter => {
-    using _ = vi.spyOn(console, "error").mockImplementation(() => {});
-    const failed = Promise.withResolvers<never>();
-    markChatUnread.mockReturnValueOnce(failed.promise);
-    await render(<View oldest={2} />);
-    await update(snapshot(1, 0));
-    await settle();
-    await markUnreadFrom(2);
-    await render(<p>Another thread</p>);
-    if (reenter) { await render(); await settle(); }
-    navigate.mockClear();
-    await act(async () => failed.reject(new Error("Unread command failed")));
-    await settle();
-    expect(navigate).not.toHaveBeenCalledWith(true);
-  });
+  it.each([false, true])(
+    "keeps a failed unread command's navigation in its owning visit (reentered: %s)",
+    async (reenter) => {
+      using _ = vi.spyOn(console, "error").mockImplementation(() => {});
+      const failed = Promise.withResolvers<never>();
+      markChatUnread.mockReturnValueOnce(failed.promise);
+      await render(<View oldest={2} />);
+      await update(snapshot(1, 0));
+      await settle();
+      await markUnreadFrom(2);
+      await render(<p>Another thread</p>);
+      if (reenter) {
+        await render();
+        await settle();
+      }
+      navigate.mockClear();
+      await act(async () => failed.reject(new Error("Unread command failed")));
+      await settle();
+      expect(navigate).not.toHaveBeenCalledWith(true);
+    },
+  );
 
   it.each([
-    {ackFirst: false, interveningUpdate: "none"},
-    {ackFirst: true, interveningUpdate: "none"},
-    {ackFirst: false, interveningUpdate: "metadata"},
-    {ackFirst: true, interveningUpdate: "metadata"},
-    {ackFirst: false, interveningUpdate: "bulk"},
-    {ackFirst: true, interveningUpdate: "bulk"},
-  ])("preserves local unread navigation across an intervening arrival (ACK first: $ackFirst, update: $interveningUpdate)", async ({ackFirst, interveningUpdate}) => {
-    visibleBottom = 450;
+    { ackFirst: false, interveningUpdate: "none" },
+    { ackFirst: true, interveningUpdate: "none" },
+    { ackFirst: false, interveningUpdate: "metadata" },
+    { ackFirst: true, interveningUpdate: "metadata" },
+    { ackFirst: false, interveningUpdate: "bulk" },
+    { ackFirst: true, interveningUpdate: "bulk" },
+  ])(
+    "preserves local unread navigation across an intervening arrival (ACK first: $ackFirst, update: $interveningUpdate)",
+    async ({ ackFirst, interveningUpdate }) => {
+      visibleBottom = 450;
+      await render();
+      await update(snapshot(1, 2));
+      await settle();
+      navigate.mockClear();
+      const viewport = container.querySelector<HTMLDivElement>("[data-viewport]")!;
+      viewport.scrollTop = 40;
+      const ack = Promise.withResolvers<boolean>();
+      markChatUnread.mockReturnValueOnce(ack.promise);
+      await markUnreadFrom(1);
+      if (ackFirst) await act(async () => ack.resolve(true));
+      // A rename or bulk read elsewhere can publish this thread's unchanged horizon/count.
+      if (interveningUpdate === "metadata") await updateChat(snapshot(1, 2));
+      if (interveningUpdate === "bulk") await update(snapshot(1, 2));
+      await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
+      const arrival = snapshot(2, 2);
+      await updateChat({
+        ...arrival,
+        unreadChatCount: 1,
+        unreadMessageCount: 1,
+        chats: [{ ...arrival.chats[0], unreadMessageCount: 1 }],
+      });
+      if (!ackFirst) await act(async () => ack.resolve(true));
+      await settle();
+      expect(markChatRead).not.toHaveBeenCalled(); // A changed command still awaits its rewind echo.
+      const rewind = snapshot(3, 0);
+      await updateChat({
+        ...rewind,
+        unreadMessageCount: 3,
+        chats: [{ ...rewind.chats[0], unreadMessageCount: 3 }],
+      });
+      await settle();
+      expect(viewport.scrollTop).toBe(40);
+      expect(navigate).not.toHaveBeenCalledWith(true);
+      expect(container.textContent).toContain("automatic reading paused");
+      expect(markChatRead).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([false, true])(
+    "keeps a local rewind in place when its starting horizon was stale (ACK first: %s)",
+    async (ackFirst) => {
+      await render();
+      await update(snapshot(1, 0));
+      await settle();
+      const viewport = container.querySelector<HTMLDivElement>("[data-viewport]")!;
+      viewport.scrollTop = 40;
+      navigate.mockClear();
+      const ack = Promise.withResolvers<boolean>();
+      markChatUnread.mockReturnValueOnce(ack.promise);
+      await markUnreadFrom(1);
+      if (ackFirst) await act(async () => ack.resolve(true));
+      // Another device advanced the server before this command ran. Its delta and our
+      // real rewind echo arrive after the ACK, despite the unchanged cached boundary.
+      await updateChat(snapshot(2, 2));
+      if (!ackFirst) await act(async () => ack.resolve(true));
+      await updateChat(snapshot(3, 0));
+      await settle();
+      expect(viewport.scrollTop).toBe(40);
+      expect(navigate).not.toHaveBeenCalledWith(true);
+      expect(container.textContent).toContain("automatic reading paused");
+      expect(markChatRead).not.toHaveBeenCalled();
+    },
+  );
+
+  it("lets the latest server horizon settle overlapping local unread selections", async () => {
     await render();
     await update(snapshot(1, 2));
     await settle();
-    navigate.mockClear();
-    const viewport = container.querySelector<HTMLDivElement>("[data-viewport]")!;
-    viewport.scrollTop = 40;
-    const ack = Promise.withResolvers<boolean>();
-    markChatUnread.mockReturnValueOnce(ack.promise);
+    await markUnreadFrom(2);
     await markUnreadFrom(1);
-    if (ackFirst) await act(async () => ack.resolve(true));
-    // A rename or bulk read elsewhere can publish this thread's unchanged horizon/count.
-    if (interveningUpdate === "metadata") await updateChat(snapshot(1, 2));
-    if (interveningUpdate === "bulk") await update(snapshot(1, 2));
-    await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
-    const arrival = snapshot(2, 2);
-    await updateChat({...arrival, unreadChatCount: 1, unreadMessageCount: 1,
-      chats: [{...arrival.chats[0], unreadMessageCount: 1}]});
-    if (!ackFirst) await act(async () => ack.resolve(true));
-    await settle();
-    expect(markChatRead).not.toHaveBeenCalled(); // A changed command still awaits its rewind echo.
-    const rewind = snapshot(3, 0);
-    await updateChat({...rewind, unreadMessageCount: 3,
-      chats: [{...rewind.chats[0], unreadMessageCount: 3}]});
-    await settle();
-    expect(viewport.scrollTop).toBe(40);
-    expect(navigate).not.toHaveBeenCalledWith(true);
+    await updateChat(snapshot(2, 1));
+    await updateChat(snapshot(3, 0));
+    expect(
+      container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")
+        ?.dataset.readStart,
+    ).toBe("1");
     expect(container.textContent).toContain("automatic reading paused");
-    expect(markChatRead).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalledWith(true);
   });
 
-  it.each([false, true])("keeps a local rewind in place when its starting horizon was stale (ACK first: %s)", async ackFirst => {
+  it.each(["before read", "before arrival", "after arrival"])(
+    "resumes after a remote read clears a no-op unread selection (ACK: %s)",
+    async (ackAt) => {
+      await render();
+      await update(snapshot(1, 0));
+      await settle();
+      const ack = Promise.withResolvers<boolean>();
+      markChatUnread.mockReturnValueOnce(ack.promise);
+      await markUnreadFrom(1); // The source horizon is already zero; there will be no local echo.
+      if (ackAt === "before read") await act(async () => ack.resolve(false));
+      await updateChat(snapshot(2, 2));
+      if (ackAt === "before arrival") await act(async () => ack.resolve(false));
+      visibleBottom = 450;
+      await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
+      const arrival = snapshot(3, 2);
+      await updateChat({
+        ...arrival,
+        unreadChatCount: 1,
+        unreadMessageCount: 1,
+        chats: [{ ...arrival.chats[0], unreadMessageCount: 1 }],
+      });
+      if (ackAt === "after arrival") await act(async () => ack.resolve(false));
+      await settle();
+      expect(container.textContent).not.toContain("automatic reading paused");
+      expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 3);
+    },
+  );
+
+  it("respects a remote rewind after an all-read update while a local command is pending", async () => {
     await render();
     await update(snapshot(1, 0));
     await settle();
-    const viewport = container.querySelector<HTMLDivElement>("[data-viewport]")!;
-    viewport.scrollTop = 40;
-    navigate.mockClear();
-    const ack = Promise.withResolvers<boolean>();
-    markChatUnread.mockReturnValueOnce(ack.promise);
-    await markUnreadFrom(1);
-    if (ackFirst) await act(async () => ack.resolve(true));
-    // Another device advanced the server before this command ran. Its delta and our
-    // real rewind echo arrive after the ACK, despite the unchanged cached boundary.
-    await updateChat(snapshot(2, 2));
-    if (!ackFirst) await act(async () => ack.resolve(true));
-    await updateChat(snapshot(3, 0));
-    await settle();
-    expect(viewport.scrollTop).toBe(40);
-    expect(navigate).not.toHaveBeenCalledWith(true);
-    expect(container.textContent).toContain("automatic reading paused");
-    expect(markChatRead).not.toHaveBeenCalled();
-  });
-
-  it("lets the latest server horizon settle overlapping local unread selections", async () => {
-    await render(); await update(snapshot(1, 2)); await settle();
-    await markUnreadFrom(2); await markUnreadFrom(1);
-    await updateChat(snapshot(2, 1)); await updateChat(snapshot(3, 0));
-    expect(container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")?.dataset.readStart).toBe("1");
-    expect(container.textContent).toContain("automatic reading paused");
-    expect(navigate).not.toHaveBeenCalledWith(true);
-  });
-
-  it.each(["before read", "before arrival", "after arrival"])("resumes after a remote read clears a no-op unread selection (ACK: %s)", async ackAt => {
-    await render(); await update(snapshot(1, 0)); await settle();
-    const ack = Promise.withResolvers<boolean>();
-    markChatUnread.mockReturnValueOnce(ack.promise);
-    await markUnreadFrom(1); // The source horizon is already zero; there will be no local echo.
-    if (ackAt === "before read") await act(async () => ack.resolve(false));
-    await updateChat(snapshot(2, 2));
-    if (ackAt === "before arrival") await act(async () => ack.resolve(false));
-    visibleBottom = 450;
-    await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
-    const arrival = snapshot(3, 2);
-    await updateChat({...arrival, unreadChatCount: 1, unreadMessageCount: 1,
-      chats: [{...arrival.chats[0], unreadMessageCount: 1}]});
-    if (ackAt === "after arrival") await act(async () => ack.resolve(false));
-    await settle();
-    expect(container.textContent).not.toContain("automatic reading paused");
-    expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 3);
-  });
-
-  it("respects a remote rewind after an all-read update while a local command is pending", async () => {
-    await render(); await update(snapshot(1, 0)); await settle();
     const ack = Promise.withResolvers<boolean>();
     markChatUnread.mockReturnValueOnce(ack.promise);
     await markUnreadFrom(1);
@@ -428,10 +541,15 @@ describe("timeline read/unread experience", () => {
     await updateChat(snapshot(3, 1));
     await act(async () => ack.resolve(false));
     visibleBottom = 350;
-    await act(async () => container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")));
+    await act(async () =>
+      container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")),
+    );
     await settle();
     expect(container.textContent).toContain("automatic reading paused");
-    expect(container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")?.dataset.readStart).toBe("2");
+    expect(
+      container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")
+        ?.dataset.readStart,
+    ).toBe("2");
     expect(markChatRead).not.toHaveBeenCalled();
   });
 
@@ -441,7 +559,9 @@ describe("timeline read/unread experience", () => {
     await settle();
     const ack = Promise.withResolvers<void>();
     markChatRead.mockReturnValueOnce(ack.promise);
-    const markRead = [...container.querySelectorAll("button")].find(button => button.textContent === "Mark thread read")!;
+    const markRead = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Mark thread read",
+    )!;
     await act(async () => markRead.click());
     await update(snapshot(2, 2)); // The read ran first, but its ACK is still in flight.
     await markUnreadFrom(1);
@@ -460,37 +580,57 @@ describe("timeline read/unread experience", () => {
     await settle();
     const failed = Promise.withResolvers<void>();
     markChatRead.mockReturnValueOnce(failed.promise);
-    await act(async () => [...container.querySelectorAll("button")].find(button => button.textContent === "Mark thread read")!.click());
+    await act(async () =>
+      [...container.querySelectorAll("button")]
+        .find((button) => button.textContent === "Mark thread read")!
+        .click(),
+    );
     await update(snapshot(2, 0));
     await settle();
     await act(async () => failed.reject(new Error("Read command failed")));
     visibleBottom = 350;
-    await act(async () => container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")));
+    await act(async () =>
+      container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")),
+    );
     await settle();
     expect(container.textContent).toContain("automatic reading paused");
-    expect(container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")?.dataset.readStart).toBe("1");
+    expect(
+      container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")
+        ?.dataset.readStart,
+    ).toBe("1");
     expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 2);
   });
 
-  it.each([0, 1])("pauses for a later remote rewind after a no-op unread and completed read (remote horizon: %s)", async horizon => {
-    await render();
-    await update(snapshot(1, 0));
-    await settle();
-    markChatUnread.mockResolvedValueOnce(false);
-    await markUnreadFrom(1); // The server is already at 0 and publishes no local echo.
-    await act(async () => [...container.querySelectorAll("button")].find(button => button.textContent === "Mark thread read")!.click());
-    await updateChat(snapshot(2, 2));
-    await updateChat(snapshot(3, horizon)); // A genuinely later command from another device.
-    visibleBottom = 350;
-    await act(async () => container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")));
-    await settle();
-    expect(container.textContent).toContain("automatic reading paused");
-    expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 2);
-  });
+  it.each([0, 1])(
+    "pauses for a later remote rewind after a no-op unread and completed read (remote horizon: %s)",
+    async (horizon) => {
+      await render();
+      await update(snapshot(1, 0));
+      await settle();
+      markChatUnread.mockResolvedValueOnce(false);
+      await markUnreadFrom(1); // The server is already at 0 and publishes no local echo.
+      await act(async () =>
+        [...container.querySelectorAll("button")]
+          .find((button) => button.textContent === "Mark thread read")!
+          .click(),
+      );
+      await updateChat(snapshot(2, 2));
+      await updateChat(snapshot(3, horizon)); // A genuinely later command from another device.
+      visibleBottom = 350;
+      await act(async () =>
+        container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")),
+      );
+      await settle();
+      expect(container.textContent).toContain("automatic reading paused");
+      expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 2);
+    },
+  );
 
   it("honors a server rewind received after a failed local selection", async () => {
     using _ = vi.spyOn(console, "error").mockImplementation(() => {});
-    await render(); await update(snapshot(1, 2)); await settle();
+    await render();
+    await update(snapshot(1, 2));
+    await settle();
     markChatUnread.mockRejectedValueOnce(new Error("Unread command failed"));
     await markUnreadFrom(1);
     await updateChat(snapshot(2, 0));
@@ -500,13 +640,19 @@ describe("timeline read/unread experience", () => {
 
   it("ignores an older failed selection after a newer selection succeeds", async () => {
     using _ = vi.spyOn(console, "error").mockImplementation(() => {});
-    await render(); await update(snapshot(1, 2)); await settle();
+    await render();
+    await update(snapshot(1, 2));
+    await settle();
     const first = Promise.withResolvers<boolean>();
     markChatUnread.mockReturnValueOnce(first.promise);
-    await markUnreadFrom(2); await markUnreadFrom(1);
+    await markUnreadFrom(2);
+    await markUnreadFrom(1);
     await updateChat(snapshot(2, 0));
     await act(async () => first.reject(new Error("Earlier command failed")));
-    expect(container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")?.dataset.readStart).toBe("1");
+    expect(
+      container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")
+        ?.dataset.readStart,
+    ).toBe("1");
     expect(container.textContent).toContain("automatic reading paused");
   });
 
@@ -526,80 +672,113 @@ describe("timeline read/unread experience", () => {
     await settle();
     expect(viewport.scrollTop).toBe(40);
     expect(navigate).not.toHaveBeenCalledWith(true);
-    expect(container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")?.dataset.readStart).toBe("2");
+    expect(
+      container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")
+        ?.dataset.readStart,
+    ).toBe("2");
     expect(container.textContent).toContain("automatic reading paused");
     expect(markChatRead).not.toHaveBeenCalled();
   });
 
-  it.each([false, true])("rolls back a failed unread selection at the already-unread boundary (fresh snapshot: %s)", async freshSnapshot => {
-    using _ = vi.spyOn(console, "error").mockImplementation(() => {});
-    await render();
-    await update(snapshot(1, 0));
-    await settle();
-    const failed = Promise.withResolvers<never>();
-    markChatUnread.mockReturnValueOnce(failed.promise);
-    await markUnreadFrom(1);
-    if (freshSnapshot) await update(snapshot(2, 0));
-    await act(async () => failed.reject(new Error("Unread command failed")));
-    await settle();
-    expect(container.textContent).not.toContain("automatic reading paused");
-    expect(container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")?.dataset.readStart).toBe("1");
-    visibleBottom = 350;
-    await act(async () => container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")));
-    await settle();
-    expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 2);
-  });
+  it.each([false, true])(
+    "rolls back a failed unread selection at the already-unread boundary (fresh snapshot: %s)",
+    async (freshSnapshot) => {
+      using _ = vi.spyOn(console, "error").mockImplementation(() => {});
+      await render();
+      await update(snapshot(1, 0));
+      await settle();
+      const failed = Promise.withResolvers<never>();
+      markChatUnread.mockReturnValueOnce(failed.promise);
+      await markUnreadFrom(1);
+      if (freshSnapshot) await update(snapshot(2, 0));
+      await act(async () => failed.reject(new Error("Unread command failed")));
+      await settle();
+      expect(container.textContent).not.toContain("automatic reading paused");
+      expect(
+        container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")
+          ?.dataset.readStart,
+      ).toBe("1");
+      visibleBottom = 350;
+      await act(async () =>
+        container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")),
+      );
+      await settle();
+      expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 2);
+    },
+  );
 
-  it.each(["foreground", "reset"])("waits for fresh unread state after %s before sending receipts", async reason => {
-    await render();
-    await update(snapshot(1, 2));
-    await settle();
-    await act(async () => {
-      if (reason === "foreground") {
-        Object.defineProperty(document, "visibilityState", {configurable: true, value: "hidden"});
+  it.each(["foreground", "reset"])(
+    "waits for fresh unread state after %s before sending receipts",
+    async (reason) => {
+      await render();
+      await update(snapshot(1, 2));
+      await settle();
+      await act(async () => {
+        if (reason === "foreground") {
+          Object.defineProperty(document, "visibilityState", {
+            configurable: true,
+            value: "hidden",
+          });
+          document.dispatchEvent(new Event("visibilitychange"));
+        } else subscriber[Symbol.dispose]();
+      });
+      visibleBottom = 450;
+      await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
+      if (reason === "foreground")
+        await act(async () => {
+          Object.defineProperty(document, "visibilityState", {
+            configurable: true,
+            value: "visible",
+          });
+          document.dispatchEvent(new Event("visibilitychange"));
+        });
+      await settle(); // History has advanced, but the replacement unread snapshot has not arrived.
+      expect(markChatRead).not.toHaveBeenCalled();
+      await update(snapshot(2, 0)); // Another device rewound while this subscription was absent.
+      await settle();
+      expect(container.textContent).toContain("automatic reading paused");
+      expect(markChatRead).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([false, true])(
+    "uses the replacement snapshot after another device clears unread while hidden (rewind received: %s)",
+    async (receivedRewind) => {
+      await render();
+      await update(snapshot(1, 2));
+      await settle();
+      await markUnreadFrom(1);
+      if (receivedRewind) await updateChat(snapshot(1, 0));
+      await act(async () => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
         document.dispatchEvent(new Event("visibilitychange"));
-      } else subscriber[Symbol.dispose]();
-    });
-    visibleBottom = 450;
-    await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
-    if (reason === "foreground") await act(async () => {
-      Object.defineProperty(document, "visibilityState", {configurable: true, value: "visible"});
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-    await settle(); // History has advanced, but the replacement unread snapshot has not arrived.
-    expect(markChatRead).not.toHaveBeenCalled();
-    await update(snapshot(2, 0)); // Another device rewound while this subscription was absent.
-    await settle();
-    expect(container.textContent).toContain("automatic reading paused");
-    expect(markChatRead).not.toHaveBeenCalled();
-  });
-
-  it.each([false, true])("uses the replacement snapshot after another device clears unread while hidden (rewind received: %s)", async receivedRewind => {
-    await render(); await update(snapshot(1, 2)); await settle();
-    await markUnreadFrom(1);
-    if (receivedRewind) await updateChat(snapshot(1, 0));
-    await act(async () => {
-      Object.defineProperty(document, "visibilityState", {configurable: true, value: "hidden"});
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-    await act(async () => {
-      Object.defineProperty(document, "visibilityState", {configurable: true, value: "visible"});
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-    await update(snapshot(2, 2));
-    await settle();
-    expect(subscribeToUnreadState).toHaveBeenCalledTimes(2);
-    expect(container.textContent).not.toContain("automatic reading paused");
-    visibleBottom = 450;
-    await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
-    const arrival = snapshot(3, 2);
-    await updateChat({...arrival, unreadChatCount: 1, unreadMessageCount: 1,
-      chats: [{...arrival.chats[0], unreadMessageCount: 1}]});
-    await settle();
-    expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 3);
-    await updateChat(snapshot(3, 1));
-    expect(container.textContent).toContain("automatic reading paused");
-  });
+      });
+      await act(async () => {
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          value: "visible",
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await update(snapshot(2, 2));
+      await settle();
+      expect(subscribeToUnreadState).toHaveBeenCalledTimes(2);
+      expect(container.textContent).not.toContain("automatic reading paused");
+      visibleBottom = 450;
+      await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
+      const arrival = snapshot(3, 2);
+      await updateChat({
+        ...arrival,
+        unreadChatCount: 1,
+        unreadMessageCount: 1,
+        chats: [{ ...arrival.chats[0], unreadMessageCount: 1 }],
+      });
+      await settle();
+      expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 3);
+      await updateChat(snapshot(3, 1));
+      expect(container.textContent).toContain("automatic reading paused");
+    },
+  );
 
   it("does not acknowledge hidden documents, unfocused windows or a zero-size pane", async () => {
     await render();
@@ -629,10 +808,12 @@ describe("timeline read/unread experience", () => {
 
   it("waits to acknowledge a mounted pane until the editor reports it visible", async () => {
     withdraw();
-    await render(); await update(snapshot()); await settle();
+    await render();
+    await update(snapshot());
+    await settle();
     expect(markChatRead).not.toHaveBeenCalled();
     await act(async () => {
-      withdraw = reportVisibleChat(() => ({workspaceId: "workspace", chatId: 1}));
+      withdraw = reportVisibleChat(() => ({ workspaceId: "workspace", chatId: 1 }));
     });
     await settle();
     expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 0);
@@ -654,11 +835,16 @@ describe("timeline read/unread experience", () => {
   it("acknowledges visible messages during continuous streaming renders and resizes", async () => {
     vi.useFakeTimers();
     let resized = () => {};
-    vi.stubGlobal("ResizeObserver", class {
-      constructor(callback: () => void) { resized = callback; }
-      observe() {}
-      disconnect() {}
-    });
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          resized = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
     try {
       await render();
       await update(snapshot());
@@ -677,25 +863,37 @@ describe("timeline read/unread experience", () => {
     }
   });
 
-  it.each([false, true])("pauses for a remote read then rewind, including a following arrival (batched: %s)", async batched => {
-    await render();
-    await update(snapshot(1, 0));
-    await settle();
-    await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
-    const arrival = snapshot(4, 0);
-    const updates = [snapshot(2, 2), snapshot(3, 0), {...arrival,
-      chats: [{...arrival.chats[0], unreadMessageCount: 3}]}];
-    if (batched) await act(async () => {
-      for (const next of updates) await receiveChat(next);
-    });
-    else for (const next of updates) await updateChat(next);
-    visibleBottom = 450;
-    await act(async () => container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")));
-    await settle();
-    expect(container.textContent).toContain("automatic reading paused");
-    expect(container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")?.dataset.readStart).toBe("1");
-    expect(markChatRead).not.toHaveBeenCalled();
-  });
+  it.each([false, true])(
+    "pauses for a remote read then rewind, including a following arrival (batched: %s)",
+    async (batched) => {
+      await render();
+      await update(snapshot(1, 0));
+      await settle();
+      await render(<View latestSequence={3} sequences={[0, 1, 2, 3]} />);
+      const arrival = snapshot(4, 0);
+      const updates = [
+        snapshot(2, 2),
+        snapshot(3, 0),
+        { ...arrival, chats: [{ ...arrival.chats[0], unreadMessageCount: 3 }] },
+      ];
+      if (batched)
+        await act(async () => {
+          for (const next of updates) await receiveChat(next);
+        });
+      else for (const next of updates) await updateChat(next);
+      visibleBottom = 450;
+      await act(async () =>
+        container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")),
+      );
+      await settle();
+      expect(container.textContent).toContain("automatic reading paused");
+      expect(
+        container.querySelector("[data-unread-divider]")?.closest<HTMLElement>("[data-read-start]")
+          ?.dataset.readStart,
+      ).toBe("1");
+      expect(markChatRead).not.toHaveBeenCalled();
+    },
+  );
 
   it("pauses automatic reading when another device marks unread, and resumes after an explicit read", async () => {
     await render();
@@ -716,33 +914,45 @@ describe("timeline read/unread experience", () => {
     expect(container.textContent).toContain("automatic reading paused");
   });
 
-  it.each([0, 2])("resumes explicit reading when a message beats the mark-read ACK (history starts at %s)", async oldest => {
-    const earlier = (readThroughSequence: number): UserUnreadState => ({
-      ...snapshot(1, readThroughSequence),
-      chats: [{...snapshot(1, readThroughSequence).chats[0], unreadMessageCount: readThroughSequence < 1 ? 1 : 0}],
-    });
-    await render(<View oldest={oldest} latestSequence={1} />);
-    await update(earlier(1));
-    await settle();
-    await update(earlier(0));
-    await settle();
-    expect(container.textContent).toContain("automatic reading paused");
-    const ack = Promise.withResolvers<void>();
-    markChatRead.mockReturnValueOnce(ack.promise);
-    const button = [...container.querySelectorAll("button")].find(button => button.textContent === "Mark thread read")!;
-    await act(async () => button.click());
-    expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 1);
-    await render(<View oldest={oldest} latestSequence={2} />);
-    await update(snapshot(2, 1)); // Message 2 arrives while the receipt for message 1 is pending.
-    await act(async () => ack.resolve());
-    await settle();
-    expect(container.textContent).not.toContain("automatic reading paused");
-    expect(markChatRead).toHaveBeenCalledOnce();
-    visibleBottom = 350;
-    await act(async () => container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")));
-    await settle();
-    expect(markChatRead).toHaveBeenLastCalledWith(1, 2);
-  });
+  it.each([0, 2])(
+    "resumes explicit reading when a message beats the mark-read ACK (history starts at %s)",
+    async (oldest) => {
+      const earlier = (readThroughSequence: number): UserUnreadState => ({
+        ...snapshot(1, readThroughSequence),
+        chats: [
+          {
+            ...snapshot(1, readThroughSequence).chats[0],
+            unreadMessageCount: readThroughSequence < 1 ? 1 : 0,
+          },
+        ],
+      });
+      await render(<View oldest={oldest} latestSequence={1} />);
+      await update(earlier(1));
+      await settle();
+      await update(earlier(0));
+      await settle();
+      expect(container.textContent).toContain("automatic reading paused");
+      const ack = Promise.withResolvers<void>();
+      markChatRead.mockReturnValueOnce(ack.promise);
+      const button = [...container.querySelectorAll("button")].find(
+        (button) => button.textContent === "Mark thread read",
+      )!;
+      await act(async () => button.click());
+      expect(markChatRead).toHaveBeenCalledExactlyOnceWith(1, 1);
+      await render(<View oldest={oldest} latestSequence={2} />);
+      await update(snapshot(2, 1)); // Message 2 arrives while the receipt for message 1 is pending.
+      await act(async () => ack.resolve());
+      await settle();
+      expect(container.textContent).not.toContain("automatic reading paused");
+      expect(markChatRead).toHaveBeenCalledOnce();
+      visibleBottom = 350;
+      await act(async () =>
+        container.querySelector("[data-viewport]")!.dispatchEvent(new Event("scroll")),
+      );
+      await settle();
+      expect(markChatRead).toHaveBeenLastCalledWith(1, 2);
+    },
+  );
 
   it("loads older history before acknowledging a newer page, without endlessly retrying a failed page", async () => {
     visibleBottom = 350; // The newer page would otherwise acknowledge items past unseen history.

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createLogger as createBaseLogger } from "../src/logger.js";
 import { createObservabilityContext } from "../src/observability-context.js";
 
@@ -57,7 +57,8 @@ describe("worker logger", () => {
   it("chains child context with nearest values taking precedence", () => {
     const spy = vi.spyOn(console, "info").mockImplementation(() => {});
     const logger = createLogger({
-      component: "gatekeeper.context", vendorId: "context",
+      component: "gatekeeper.context",
+      vendorId: "context",
     });
     const collectionLogger = logger.with({
       operation: "collection.sync",
@@ -84,8 +85,9 @@ describe("worker logger", () => {
 
   it("keeps explicit child context ahead of ambient context", () => {
     const spy = vi.spyOn(console, "info").mockImplementation(() => {});
-    const logger = createLogger({ component: "workshop.overseer" })
-      .with({ operation: "agent.run" });
+    const logger = createLogger({ component: "workshop.overseer" }).with({
+      operation: "agent.run",
+    });
 
     obsContext.with({ operation: "ambient.operation" }, () => {
       logger.info("child wins", { event: "precedence.child" });
@@ -100,7 +102,8 @@ describe("worker logger", () => {
     const spy = vi.spyOn(console, "info").mockImplementation(() => {});
     const logger = createLogger({ component: "workshop.overseer" });
     const runWithUnsafeContext = obsContext.with as unknown as (
-      fields: Record<string, string>, callback: () => void,
+      fields: Record<string, string>,
+      callback: () => void,
     ) => void;
 
     runWithUnsafeContext({ component: "spoofed.component" }, () => {
@@ -145,7 +148,9 @@ describe("worker logger", () => {
     let logger = createLogger({ component: "workshop.overseer" });
     let ready = 0;
     let release!: () => void;
-    const gate = new Promise<void>(resolve => { release = resolve; });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
 
     const runs = Promise.all([
       obsContext.with({ chatId: 1 }, async () => {
@@ -167,7 +172,7 @@ describe("worker logger", () => {
     let logs = spy.mock.calls.map(([entry]) => entry);
     expect(logs).toContainEqual(expect.objectContaining({ event: "first", chatId: 1 }));
     expect(logs).toContainEqual(expect.objectContaining({ event: "second", chatId: 2 }));
-    expect(logs.find(entry => entry.event === "outside")).not.toHaveProperty("chatId");
+    expect(logs.find((entry) => entry.event === "outside")).not.toHaveProperty("chatId");
   });
 
   it("shares async context across independently created loggers", async () => {
@@ -257,7 +262,8 @@ describe("worker logger", () => {
     const logger = createLogger({ component: "workshop.agent" });
 
     logger.warn("object error", {
-      event: "object.error", error: { message: "safe summary", tokenValue: "do not log" },
+      event: "object.error",
+      error: { message: "safe summary", tokenValue: "do not log" },
     });
 
     expect(spy.mock.calls[0]?.[0]).toMatchObject({ error: "safe summary" });

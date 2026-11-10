@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  allUrl, isAllUrl, isSitePagesUrl, isSiteRootPath, normalizeForShares, parseSharePointHost, parseSharePointUrl, shareIdFor,
+  allUrl,
+  isAllUrl,
+  isSitePagesUrl,
+  isSiteRootPath,
+  normalizeForShares,
+  parseSharePointHost,
+  parseSharePointUrl,
+  shareIdFor,
   sitePathNamed,
 } from "../src/sharepoint-urls";
 
@@ -19,7 +26,10 @@ describe("parseSharePointHost", () => {
   });
 
   it("keeps a hyphenated host that isn't the OneDrive host as its own tenant", () => {
-    expect(parseSharePointHost("contoso-admin.sharepoint.com")).toEqual({ tenant: "contoso-admin", personal: false });
+    expect(parseSharePointHost("contoso-admin.sharepoint.com")).toEqual({
+      tenant: "contoso-admin",
+      personal: false,
+    });
   });
 
   it.each([
@@ -32,14 +42,16 @@ describe("parseSharePointHost", () => {
     "contoso-.sharepoint.com",
     "-my.sharepoint.com",
     "graph.microsoft.com",
-  ])("refuses %s", host => {
+  ])("refuses %s", (host) => {
     expect(parseSharePointHost(host)).toBeNull();
   });
 });
 
 describe("parseSharePointUrl", () => {
   it("accepts a SharePoint link, trimming it and dropping the fragment", () => {
-    const parsed = parseSharePointUrl("  https://contoso.sharepoint.com/sites/Eng/Shared%20Documents?web=1#top  ");
+    const parsed = parseSharePointUrl(
+      "  https://contoso.sharepoint.com/sites/Eng/Shared%20Documents?web=1#top  ",
+    );
     expect(parsed?.href).toBe("https://contoso.sharepoint.com/sites/Eng/Shared%20Documents?web=1");
   });
 
@@ -56,7 +68,7 @@ describe("parseSharePointUrl", () => {
     "javascript:alert(1)",
     "not a url",
     "",
-  ])("refuses %s", raw => {
+  ])("refuses %s", (raw) => {
     expect(parseSharePointUrl(raw)).toBeNull();
   });
 });
@@ -65,12 +77,18 @@ describe("the URL of everything", () => {
   it("is the start page, recognized on either host and in any case", () => {
     expect(allUrl("contoso")).toBe("https://contoso.sharepoint.com/_layouts/15/sharepoint.aspx");
     expect(isAllUrl(url(allUrl("contoso")))).toBe(true);
-    expect(isAllUrl(url("https://contoso-my.sharepoint.com/_layouts/15/SharePoint.aspx?v=following"))).toBe(true);
+    expect(
+      isAllUrl(url("https://contoso-my.sharepoint.com/_layouts/15/SharePoint.aspx?v=following")),
+    ).toBe(true);
   });
 
   it("is not a site's own start page or a look-alike", () => {
-    expect(isAllUrl(url("https://contoso.sharepoint.com/sites/Eng/_layouts/15/sharepoint.aspx"))).toBe(false);
-    expect(isAllUrl(url("https://contoso.sharepoint.com/_layouts/15/sharepoint.aspxx"))).toBe(false);
+    expect(
+      isAllUrl(url("https://contoso.sharepoint.com/sites/Eng/_layouts/15/sharepoint.aspx")),
+    ).toBe(false);
+    expect(isAllUrl(url("https://contoso.sharepoint.com/_layouts/15/sharepoint.aspxx"))).toBe(
+      false,
+    );
   });
 });
 
@@ -82,7 +100,7 @@ describe("isSiteRootPath", () => {
     "https://contoso.sharepoint.com/sites/Eng/",
     "https://contoso.sharepoint.com/teams/Ops",
     "https://contoso-my.sharepoint.com/personal/sarah_contoso_com",
-  ])("%s can only be a site", raw => {
+  ])("%s can only be a site", (raw) => {
     expect(isSiteRootPath(url(raw))).toBe(true);
   });
 
@@ -91,7 +109,7 @@ describe("isSiteRootPath", () => {
     "https://contoso.sharepoint.com/sites",
     "https://contoso.sharepoint.com/sites/Eng?id=%2Fsites%2FEng%2FShared%20Documents",
     "https://contoso.sharepoint.com/Shared%20Documents",
-  ])("%s may be something else", raw => {
+  ])("%s may be something else", (raw) => {
     expect(isSiteRootPath(url(raw))).toBe(false);
   });
 });
@@ -111,46 +129,82 @@ describe("normalizeForShares", () => {
   });
 
   it("keeps the parameters that name a document and drops the ones that only steer the view", () => {
-    const normalized = normalizeForShares(url(
-      "https://contoso.sharepoint.com/:w:/r/sites/Eng/_layouts/15/Doc.aspx?sourcedoc=%7BABC%7D&file=Brief.docx&action=default&mobileredirect=true&d=w123"));
-    expect(normalized).toBe("https://contoso.sharepoint.com/:w:/r/sites/Eng/_layouts/15/Doc.aspx?sourcedoc=%7BABC%7D&file=Brief.docx&d=w123");
+    const normalized = normalizeForShares(
+      url(
+        "https://contoso.sharepoint.com/:w:/r/sites/Eng/_layouts/15/Doc.aspx?sourcedoc=%7BABC%7D&file=Brief.docx&action=default&mobileredirect=true&d=w123",
+      ),
+    );
+    expect(normalized).toBe(
+      "https://contoso.sharepoint.com/:w:/r/sites/Eng/_layouts/15/Doc.aspx?sourcedoc=%7BABC%7D&file=Brief.docx&d=w123",
+    );
   });
 
   it("drops a query that holds nothing but view parameters", () => {
-    expect(normalizeForShares(url("https://contoso.sharepoint.com/sites/Eng/Shared%20Documents/a.docx?web=1&csf=1")))
-      .toBe("https://contoso.sharepoint.com/sites/Eng/Shared%20Documents/a.docx");
+    expect(
+      normalizeForShares(
+        url("https://contoso.sharepoint.com/sites/Eng/Shared%20Documents/a.docx?web=1&csf=1"),
+      ),
+    ).toBe("https://contoso.sharepoint.com/sites/Eng/Shared%20Documents/a.docx");
   });
 });
 
 describe("shareIdFor", () => {
   it("is u! plus the unpadded base64url of the URL", () => {
     // Microsoft's documented example.
-    expect(shareIdFor("https://onedrive.live.com/redir?resid=1231244193912!12&authKey=1201919!12921!1"))
-      .toBe("u!aHR0cHM6Ly9vbmVkcml2ZS5saXZlLmNvbS9yZWRpcj9yZXNpZD0xMjMxMjQ0MTkzOTEyITEyJmF1dGhLZXk9MTIwMTkxOSExMjkyMSEx");
+    expect(
+      shareIdFor("https://onedrive.live.com/redir?resid=1231244193912!12&authKey=1201919!12921!1"),
+    ).toBe(
+      "u!aHR0cHM6Ly9vbmVkcml2ZS5saXZlLmNvbS9yZWRpcj9yZXNpZD0xMjMxMjQ0MTkzOTEyITEyJmF1dGhLZXk9MTIwMTkxOSExMjkyMSEx",
+    );
   });
 
   it("encodes UTF-8 and never emits + / or =", () => {
-    const id = shareIdFor("https://contoso.sharepoint.com/sites/Eng/Shared Documents/Café ?>?.docx");
+    const id = shareIdFor(
+      "https://contoso.sharepoint.com/sites/Eng/Shared Documents/Café ?>?.docx",
+    );
     expect(id).toMatch(/^u![A-Za-z0-9_-]+$/);
     const base64 = id.slice(2).replace(/-/g, "+").replace(/_/g, "/");
-    const bytes = Uint8Array.from(atob(base64 + "=".repeat((4 - base64.length % 4) % 4)), char => char.charCodeAt(0));
-    expect(new TextDecoder().decode(bytes)).toBe("https://contoso.sharepoint.com/sites/Eng/Shared Documents/Café ?>?.docx");
+    const bytes = Uint8Array.from(
+      atob(base64 + "=".repeat((4 - (base64.length % 4)) % 4)),
+      (char) => char.charCodeAt(0),
+    );
+    expect(new TextDecoder().decode(bytes)).toBe(
+      "https://contoso.sharepoint.com/sites/Eng/Shared Documents/Café ?>?.docx",
+    );
   });
 });
 
 describe("sitePathNamed", () => {
   it("names a site, a subsite, or the host root by its whole path", () => {
     expect(sitePathNamed(url("https://contoso.sharepoint.com/sites/Eng"))).toBe("/sites/Eng");
-    expect(sitePathNamed(url("https://contoso.sharepoint.com/sites/Eng/Sub/Deeper/"))).toBe("/sites/Eng/Sub/Deeper");
+    expect(sitePathNamed(url("https://contoso.sharepoint.com/sites/Eng/Sub/Deeper/"))).toBe(
+      "/sites/Eng/Sub/Deeper",
+    );
     expect(sitePathNamed(url("https://contoso.sharepoint.com/Team"))).toBe("/Team");
     expect(sitePathNamed(url("https://contoso.sharepoint.com/"))).toBe("/");
-    expect(sitePathNamed(url("https://contoso-my.sharepoint.com/personal/sarah_contoso_com"))).toBe("/personal/sarah_contoso_com");
-    expect(sitePathNamed(url("https://contoso-my.sharepoint.com/personal/sarah_contoso_com/_layouts/15/onedrive.aspx"))).toBe("/personal/sarah_contoso_com");
+    expect(sitePathNamed(url("https://contoso-my.sharepoint.com/personal/sarah_contoso_com"))).toBe(
+      "/personal/sarah_contoso_com",
+    );
+    expect(
+      sitePathNamed(
+        url(
+          "https://contoso-my.sharepoint.com/personal/sarah_contoso_com/_layouts/15/onedrive.aspx",
+        ),
+      ),
+    ).toBe("/personal/sarah_contoso_com");
   });
 
   it("takes a plain _layouts page, such as site contents, as its site, but not one that opens a document", () => {
-    expect(sitePathNamed(url("https://contoso.sharepoint.com/sites/Eng/_layouts/15/viewlsts.aspx"))).toBe("/sites/Eng");
-    expect(sitePathNamed(url("https://contoso.sharepoint.com/sites/Eng/_layouts/15/Doc.aspx?sourcedoc=%7B1%7D&file=x.docx"))).toBeNull();
+    expect(
+      sitePathNamed(url("https://contoso.sharepoint.com/sites/Eng/_layouts/15/viewlsts.aspx")),
+    ).toBe("/sites/Eng");
+    expect(
+      sitePathNamed(
+        url(
+          "https://contoso.sharepoint.com/sites/Eng/_layouts/15/Doc.aspx?sourcedoc=%7B1%7D&file=x.docx",
+        ),
+      ),
+    ).toBeNull();
   });
 
   it("names no site for a link into a site's contents, which must resolve as what it is", () => {
@@ -161,21 +215,32 @@ describe("sitePathNamed", () => {
       "https://contoso.sharepoint.com/sites/Eng/SitePages/Home.aspx",
       "https://contoso.sharepoint.com/Shared%20Documents/a.docx",
       "https://contoso-my.sharepoint.com/personal/sarah_contoso_com/Documents/a.txt",
-    ]) expect(sitePathNamed(url(link)), link).toBeNull();
+    ])
+      expect(sitePathNamed(url(link)), link).toBeNull();
   });
 });
 
 describe("isSitePagesUrl", () => {
   it("recognizes a page, encoded or not", () => {
-    expect(isSitePagesUrl(url("https://contoso.sharepoint.com/sites/Eng/SitePages/Launch-Plan.aspx"))).toBe(true);
-    expect(isSitePagesUrl(url("https://contoso.sharepoint.com/sites/Eng/sitepages/Launch%20Plan.aspx"))).toBe(true);
+    expect(
+      isSitePagesUrl(url("https://contoso.sharepoint.com/sites/Eng/SitePages/Launch-Plan.aspx")),
+    ).toBe(true);
+    expect(
+      isSitePagesUrl(url("https://contoso.sharepoint.com/sites/Eng/sitepages/Launch%20Plan.aspx")),
+    ).toBe(true);
   });
 
   it("refuses the library view and other pages", () => {
-    expect(isSitePagesUrl(url("https://contoso.sharepoint.com/sites/Eng/SitePages/Forms/ByAuthor.aspx"))).toBe(false);
-    expect(isSitePagesUrl(url("https://contoso.sharepoint.com/sites/Eng/Shared%20Documents/x.aspx"))).toBe(false);
+    expect(
+      isSitePagesUrl(url("https://contoso.sharepoint.com/sites/Eng/SitePages/Forms/ByAuthor.aspx")),
+    ).toBe(false);
+    expect(
+      isSitePagesUrl(url("https://contoso.sharepoint.com/sites/Eng/Shared%20Documents/x.aspx")),
+    ).toBe(false);
   });
   it("answers for a path with a stray percent sign rather than throwing", () => {
-    expect(isSitePagesUrl(url("https://contoso.sharepoint.com/sites/Eng/SitePages/100%done.aspx"))).toBe(true);
+    expect(
+      isSitePagesUrl(url("https://contoso.sharepoint.com/sites/Eng/SitePages/100%done.aspx")),
+    ).toBe(true);
   });
 });

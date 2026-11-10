@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { MarkdownWriter, escapeMarkdownText, renderTable, safeLinkTarget } from "../../src/content/markdown";
+import { describe, expect, it } from "vite-plus/test";
+import {
+  MarkdownWriter,
+  escapeMarkdownText,
+  renderTable,
+  safeLinkTarget,
+} from "../../src/content/markdown";
 
 describe("escapeMarkdownText", () => {
   it.each([
@@ -24,12 +29,16 @@ describe("safeLinkTarget", () => {
     expect(safeLinkTarget("mailto:someone@example.com")).toBe("mailto:someone@example.com");
   });
 
-  it.each(["javascript:alert(1)", "JAVASCRIPT:alert(1)", "data:text/html,<script>", "file:///etc/passwd", "vbscript:x", "not a url"])(
-    "drops %j",
-    target => {
-      expect(safeLinkTarget(target)).toBeUndefined();
-    },
-  );
+  it.each([
+    "javascript:alert(1)",
+    "JAVASCRIPT:alert(1)",
+    "data:text/html,<script>",
+    "file:///etc/passwd",
+    "vbscript:x",
+    "not a url",
+  ])("drops %j", (target) => {
+    expect(safeLinkTarget(target)).toBeUndefined();
+  });
 });
 
 describe("renderTable", () => {

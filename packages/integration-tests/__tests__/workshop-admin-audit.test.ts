@@ -1,13 +1,22 @@
 import { createHash } from "node:crypto";
 import type { RpcStub } from "capnweb";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import {
-  MAX_ADMIN_AUDIT_VALUE_LENGTH, MAX_SITE_NAME_LENGTH,
-  type AdminApi, type AdminAuditKind, type AdminAuditRecord,
-  type AdminAuditStats, type AdminSettingRecord, type AuthenticatedApi,
+  MAX_ADMIN_AUDIT_VALUE_LENGTH,
+  MAX_SITE_NAME_LENGTH,
+  type AdminApi,
+  type AdminAuditKind,
+  type AdminAuditRecord,
+  type AdminAuditStats,
+  type AdminSettingRecord,
+  type AuthenticatedApi,
 } from "@gadgets/workshop-shared/api";
 import {
-  ADMIN_USERNAME, startHarness, TEST_GATEKEEPER_BINDING, TEST_GATEKEEPER_DIR, TEST_VENDOR_ID,
+  ADMIN_USERNAME,
+  startHarness,
+  TEST_GATEKEEPER_BINDING,
+  TEST_GATEKEEPER_DIR,
+  TEST_VENDOR_ID,
   type Harness,
 } from "../src/harness.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
@@ -25,8 +34,9 @@ let adminApi: RpcStub<AuthenticatedApi>;
 let admin: RpcStub<AdminApi>;
 let auditor: RpcStub<AdminApi>;
 
-async function signUpAdmin(username: string)
-    : Promise<{ api: RpcStub<AuthenticatedApi>; admin: RpcStub<AdminApi> }> {
+async function signUpAdmin(
+  username: string,
+): Promise<{ api: RpcStub<AuthenticatedApi>; admin: RpcStub<AdminApi> }> {
   const api = fileScope.use(await signUp(fileScope.use(connect(harness.url)), username));
   const stub = await api.getAdminApi();
   if (stub === null) throw new Error(`The admin API was unavailable to ${username}`);
@@ -37,7 +47,7 @@ beforeAll(async () => {
   network.install();
   harness = await startHarness({
     gatekeepers: [{ binding: TEST_GATEKEEPER_BINDING, dir: TEST_GATEKEEPER_DIR }],
-    patchWorkshop: config => {
+    patchWorkshop: (config) => {
       config.vars = { ...config.vars, ADMINS: [ADMIN_USERNAME, AUDITOR_USERNAME] };
     },
   });
@@ -75,7 +85,10 @@ function tinyPng(): Uint8Array {
   png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   const view = new DataView(png.buffer);
   view.setUint32(8, 13);
-  png.set([..."IHDR"].map(char => char.charCodeAt(0)), 12);
+  png.set(
+    [..."IHDR"].map((char) => char.charCodeAt(0)),
+    12,
+  );
   view.setUint32(16, 1);
   view.setUint32(20, 1);
   png.set([8, 6, 0, 0, 0], 24);
@@ -84,12 +97,18 @@ function tinyPng(): Uint8Array {
 
 it("records every setting change, before it takes effect", async () => {
   const settings = await admin.getSettings();
-  const expectRecord = async (previous: AdminSettingRecord | undefined,
-                              method: AdminSettingRecord["method"],
-                              changes: AdminSettingRecord["changes"]) => {
+  const expectRecord = async (
+    previous: AdminSettingRecord | undefined,
+    method: AdminSettingRecord["method"],
+    changes: AdminSettingRecord["changes"],
+  ) => {
     const record = await newSetting(previous);
     expect(record).toMatchObject({
-      kind: "setting", method, admin: ADMIN_USERNAME, via: "api", at: expect.any(Date),
+      kind: "setting",
+      method,
+      admin: ADMIN_USERNAME,
+      via: "api",
+      at: expect.any(Date),
     });
     expect(record.changes).toEqual(changes);
     return record;
@@ -97,12 +116,14 @@ it("records every setting change, before it takes effect", async () => {
 
   let last = await newestSetting();
   await admin.setSiteName("Audited Deployment");
-  last = await expectRecord(last, "setSiteName",
-      [{ setting: "siteName", before: "", after: "Audited Deployment" }]);
+  last = await expectRecord(last, "setSiteName", [
+    { setting: "siteName", before: "", after: "Audited Deployment" },
+  ]);
   const { sessionId } = last;
   await admin.setSiteName("");
-  last = await expectRecord(last, "setSiteName",
-      [{ setting: "siteName", before: "Audited Deployment", after: "" }]);
+  last = await expectRecord(last, "setSiteName", [
+    { setting: "siteName", before: "Audited Deployment", after: "" },
+  ]);
   expect(last.sessionId).toBe(sessionId);
 
   await admin.setBanner("Maintenance tonight", "warning");
@@ -115,30 +136,37 @@ it("records every setting change, before it takes effect", async () => {
 
   try {
     await admin.setGatekeeperMode(TEST_VENDOR_ID, "disabled");
-    last = await expectRecord(last, "setGatekeeperMode",
-        [{ setting: "ambientGatekeeperModes", key: TEST_VENDOR_ID, after: "disabled" }]);
+    last = await expectRecord(last, "setGatekeeperMode", [
+      { setting: "ambientGatekeeperModes", key: TEST_VENDOR_ID, after: "disabled" },
+    ]);
   } finally {
     await admin.setGatekeeperMode(TEST_VENDOR_ID, "optional");
   }
-  last = await expectRecord(last, "setGatekeeperMode",
-      [{ setting: "ambientGatekeeperModes", key: TEST_VENDOR_ID, before: "disabled" }]);
+  last = await expectRecord(last, "setGatekeeperMode", [
+    { setting: "ambientGatekeeperModes", key: TEST_VENDOR_ID, before: "disabled" },
+  ]);
 
   const png = tinyPng();
-  const logo = JSON.stringify({ bytes: 33, sha256: createHash("sha256").update(png).digest("hex") });
+  const logo = JSON.stringify({
+    bytes: 33,
+    sha256: createHash("sha256").update(png).digest("hex"),
+  });
   try {
     await admin.setSiteLogo(png);
-    last = await expectRecord(last, "setSiteLogo",
-        [{ setting: "siteLogo", before: "default", after: logo }]);
+    last = await expectRecord(last, "setSiteLogo", [
+      { setting: "siteLogo", before: "default", after: logo },
+    ]);
     // The same logo again changes nothing.
     await admin.setSiteLogo(png);
     expect(await newestSetting()).toEqual(last);
   } finally {
     await admin.setSiteLogo(null);
   }
-  last = await expectRecord(last, "setSiteLogo",
-      [{ setting: "siteLogo", before: logo, after: "default" }]);
+  last = await expectRecord(last, "setSiteLogo", [
+    { setting: "siteLogo", before: logo, after: "default" },
+  ]);
 
-  const document = settings.formats.find(format => format.output?.id === "document");
+  const document = settings.formats.find((format) => format.output?.id === "document");
   if (document === undefined) throw new Error("The bundled document format is not offered");
   const hint = `Prefer it for audit ${crypto.randomUUID()}.`;
   try {
@@ -154,13 +182,14 @@ it("records every setting change, before it takes effect", async () => {
   }
   last = await newSetting(last);
 
-  const order = settings.formats.map(format => format.blueprintId);
+  const order = settings.formats.map((format) => format.blueprintId);
   expect(order.length).toBeGreaterThan(1);
   const reversed = order.toReversed();
   try {
     await admin.setFormatOrder(reversed);
-    last = await expectRecord(last, "setFormatOrder",
-        [{ setting: "formats", before: JSON.stringify(order), after: JSON.stringify(reversed) }]);
+    last = await expectRecord(last, "setFormatOrder", [
+      { setting: "formats", before: JSON.stringify(order), after: JSON.stringify(reversed) },
+    ]);
   } finally {
     await admin.setFormatOrder(order);
   }
@@ -173,8 +202,9 @@ it("records every setting change, before it takes effect", async () => {
     await admin.setInstanceInstructions(instructions);
     last = await newSetting(last);
     await admin.setInstanceInstructions(edited);
-    last = await expectRecord(last, "setInstanceInstructions",
-        [{ setting: "instanceInstructions", before: instructions, after: edited }]);
+    last = await expectRecord(last, "setInstanceInstructions", [
+      { setting: "instanceInstructions", before: instructions, after: edited },
+    ]);
   } finally {
     await admin.setInstanceInstructions(settings.instanceInstructions);
   }
@@ -191,7 +221,9 @@ it("records every setting change, before it takes effect", async () => {
     expect(last.changes).toHaveLength(1);
     const [change] = last.changes;
     expect(change).toMatchObject({
-      setting: "disabledResources", key: TEST_VENDOR_ID, excerpt: { offset: 0, afterLength: 12_004 },
+      setting: "disabledResources",
+      key: TEST_VENDOR_ID,
+      excerpt: { offset: 0, afterLength: 12_004 },
     });
     expect(change).not.toHaveProperty("before");
     expect(change!.after!.length).toBeLessThanOrEqual(MAX_ADMIN_AUDIT_VALUE_LENGTH);
@@ -201,15 +233,20 @@ it("records every setting change, before it takes effect", async () => {
   }
   last = await newSetting(last);
   expect(last.method).toBe("setResourceEnabled");
-  expect(last.changes).toEqual([expect.objectContaining({
-    setting: "disabledResources", key: TEST_VENDOR_ID, excerpt: { offset: 0, beforeLength: 12_004 },
-  })]);
+  expect(last.changes).toEqual([
+    expect.objectContaining({
+      setting: "disabledResources",
+      key: TEST_VENDOR_ID,
+      excerpt: { offset: 0, beforeLength: 12_004 },
+    }),
+  ]);
   expect(last.changes[0]).not.toHaveProperty("after");
 
   try {
     await admin.setUpdateCheckIntervalMinutes(120);
-    last = await expectRecord(last, "setUpdateCheckIntervalMinutes",
-        [{ setting: "updateCheckIntervalMinutes", before: "60", after: "120" }]);
+    last = await expectRecord(last, "setUpdateCheckIntervalMinutes", [
+      { setting: "updateCheckIntervalMinutes", before: "60", after: "120" },
+    ]);
   } finally {
     await admin.setUpdateCheckIntervalMinutes(60);
   }
@@ -217,8 +254,9 @@ it("records every setting change, before it takes effect", async () => {
 
   try {
     await admin.setUserSearchEnabled(true);
-    last = await expectRecord(last, "setUserSearchEnabled",
-        [{ setting: "userSearchEnabled", before: "false", after: "true" }]);
+    last = await expectRecord(last, "setUserSearchEnabled", [
+      { setting: "userSearchEnabled", before: "false", after: "true" },
+    ]);
     // A call that changes nothing records nothing.
     await admin.setUserSearchEnabled(true);
     expect(await newestSetting()).toEqual(last);
@@ -229,13 +267,15 @@ it("records every setting change, before it takes effect", async () => {
 
   try {
     await admin.setAdminAuditRetentionDays(120);
-    last = await expectRecord(last, "setAdminAuditRetentionDays",
-        [{ setting: "adminAuditRetentionDays", before: "90", after: "120" }]);
+    last = await expectRecord(last, "setAdminAuditRetentionDays", [
+      { setting: "adminAuditRetentionDays", before: "90", after: "120" },
+    ]);
   } finally {
     await admin.setAdminAuditRetentionDays(90);
   }
-  last = await expectRecord(last, "setAdminAuditRetentionDays",
-      [{ setting: "adminAuditRetentionDays", before: "120", after: "90" }]);
+  last = await expectRecord(last, "setAdminAuditRetentionDays", [
+    { setting: "adminAuditRetentionDays", before: "120", after: "90" },
+  ]);
 
   // A refused change records nothing.
   await expect(admin.setSiteName("x".repeat(MAX_SITE_NAME_LENGTH + 1))).rejects.toThrow();
@@ -259,13 +299,14 @@ it("gives a new capability's records a session of their own", async () => {
 
 /** The kinds of the newest records `listAdminAudit({ kind })` lists. */
 async function kinds(kind: AdminAuditKind): Promise<AdminAuditKind[]> {
-  return (await admin.listAdminAudit({ kind, limit: 200 })).records.map(record => record.kind);
+  return (await admin.listAdminAudit({ kind, limit: 200 })).records.map((record) => record.kind);
 }
 
 it("filters the log by kind", async () => {
   // A workspace access record, as the table can hold, which a setting filter leaves out.
-  const storage = await harness.server.getWorker("workshop-backend")
-      .getDurableObjectStorage("AdminAuditDurableObject", { name: "" });
+  const storage = await harness.server
+    .getWorker("workshop-backend")
+    .getDurableObjectStorage("AdminAuditDurableObject", { name: "" });
   const settingsBefore = await admin.getAdminAuditStats({ kind: "setting" });
   await storage.exec(`INSERT INTO admin_audit
       (at, kind, admin, workspace_id, workspace_title, exposed, record)
@@ -276,9 +317,10 @@ it("filters the log by kind", async () => {
     expect(setting.length).toBeGreaterThan(0);
     expect(new Set(setting)).toEqual(new Set(["setting"]));
     const settingsAfter = await admin.getAdminAuditStats({ kind: "setting" });
-    expect(settingsAfter.totalEvents)
-        .toBe(settingsBefore.totalEvents - droppedDays(settingsBefore, settingsAfter));
-    expect(settingsAfter.topAdmins.map(entry => entry.admin)).not.toContain("filter-check");
+    expect(settingsAfter.totalEvents).toBe(
+      settingsBefore.totalEvents - droppedDays(settingsBefore, settingsAfter),
+    );
+    expect(settingsAfter.topAdmins.map((entry) => entry.admin)).not.toContain("filter-check");
   } finally {
     await storage.exec("DELETE FROM admin_audit WHERE admin = 'filter-check'");
   }
@@ -290,31 +332,39 @@ it("filters the log by method, and refuses a method that is not audited", async 
     await admin.setSignupsEnabled(false);
     await admin.setSignupsEnabled(true);
     const methods = async (method: AdminAuditRecord["method"]) =>
-      (await admin.listAdminAudit({ method, limit: 200 })).records.map(record => record.method);
+      (await admin.listAdminAudit({ method, limit: 200 })).records.map((record) => record.method);
     const siteNames = await methods("setSiteName");
     expect(siteNames.length).toBeGreaterThan(0);
     expect(new Set(siteNames)).toEqual(new Set(["setSiteName"]));
     expect((await methods("setSignupsEnabled")).length).toBeGreaterThanOrEqual(2);
-    await expect(admin.listAdminAudit(
-      { method: "listAdminAudit" } as unknown as Parameters<AdminApi["listAdminAudit"]>[0]))
-        .rejects.toThrow();
+    await expect(
+      admin.listAdminAudit({ method: "listAdminAudit" } as unknown as Parameters<
+        AdminApi["listAdminAudit"]
+      >[0]),
+    ).rejects.toThrow();
   } finally {
     await admin.setSiteName("");
   }
 });
 
 /** How much each named entry of `after` grew since `before`. */
-function growth<T>(before: T[], after: T[], key: (entry: T) => string, count: (entry: T) => number)
-    : Map<string, number> {
-  const earlier = new Map(before.map(entry => [key(entry), count(entry)]));
-  return new Map(after.map(entry => [key(entry), count(entry) - (earlier.get(key(entry)) ?? 0)]));
+function growth<T>(
+  before: T[],
+  after: T[],
+  key: (entry: T) => string,
+  count: (entry: T) => number,
+): Map<string, number> {
+  const earlier = new Map(before.map((entry) => [key(entry), count(entry)]));
+  return new Map(after.map((entry) => [key(entry), count(entry) - (earlier.get(key(entry)) ?? 0)]));
 }
 
 /** The records `before` counted on days that have since left the window: none unless the UTC day
  * turned between the two reads. */
 function droppedDays(before: AdminAuditStats, after: AdminAuditStats): number {
   const kept = new Set(after.byDay.map(({ day }) => day));
-  return before.byDay.filter(({ day }) => !kept.has(day)).reduce((sum, { count }) => sum + count, 0);
+  return before.byDay
+    .filter(({ day }) => !kept.has(day))
+    .reduce((sum, { count }) => sum + count, 0);
 }
 
 it("counts the log across two admins", async () => {
@@ -329,21 +379,31 @@ it("counts the log across two admins", async () => {
     const after = await admin.getAdminAuditStats();
     expect(after.days).toBe(7);
     expect(after.totalEvents).toBe(before.totalEvents + 3 - droppedDays(before, after));
-    const byDay = growth(before.byDay, after.byDay, entry => entry.day, entry => entry.count);
+    const byDay = growth(
+      before.byDay,
+      after.byDay,
+      (entry) => entry.day,
+      (entry) => entry.count,
+    );
     expect([...byDay.values()].reduce((sum, count) => sum + count, 0)).toBe(3);
 
     expect(after.byDay).toHaveLength(7);
     const days = after.byDay.map(({ day }) => Date.parse(`${day}T00:00:00Z`));
     for (let i = 1; i < days.length; i++) expect(days[i]! - days[i - 1]!).toBe(24 * 60 * 60_000);
 
-    const admins = growth(before.topAdmins, after.topAdmins, entry => entry.admin,
-        entry => entry.count);
+    const admins = growth(
+      before.topAdmins,
+      after.topAdmins,
+      (entry) => entry.admin,
+      (entry) => entry.count,
+    );
     expect(admins.get(ADMIN_USERNAME)).toBe(1);
     expect(admins.get(AUDITOR_USERNAME)).toBe(2);
 
     const settingsAfter = await admin.getAdminAuditStats({ kind: "setting" });
-    expect(settingsAfter.totalEvents)
-        .toBe(settingsBefore.totalEvents + 3 - droppedDays(settingsBefore, settingsAfter));
+    expect(settingsAfter.totalEvents).toBe(
+      settingsBefore.totalEvents + 3 - droppedDays(settingsBefore, settingsAfter),
+    );
   } finally {
     await admin.setUserSearchEnabled(false);
   }
@@ -356,8 +416,9 @@ it("counts the log across two admins", async () => {
 
 it("refuses a setting change whose audit record cannot be written", async () => {
   // Addresses the deployment-wide log, which is always getByName("").
-  const storage = await harness.server.getWorker("workshop-backend")
-      .getDurableObjectStorage("AdminAuditDurableObject", { name: "" });
+  const storage = await harness.server
+    .getWorker("workshop-backend")
+    .getDurableObjectStorage("AdminAuditDurableObject", { name: "" });
   const before = await newestSetting();
   const { siteName } = await admin.getSettings();
   try {

@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { AUTO_APPROVABLE_KINDS, RUN_SQL_ACTION, executeActionDescription } from "../src/supabase-actions";
+import { describe, expect, it } from "vite-plus/test";
+import {
+  AUTO_APPROVABLE_KINDS,
+  RUN_SQL_ACTION,
+  executeActionDescription,
+} from "../src/supabase-actions";
 
 describe("executeActionDescription", () => {
   it.each([
@@ -17,10 +21,13 @@ describe("executeActionDescription", () => {
   });
 
   it("shows the statement and parameters verbatim", () => {
-    const { fields, implementsRevert, awaitDecision } =
-      executeActionDescription("abcdefghijklmnop", "DELETE FROM notes WHERE id = $1", [7]);
+    const { fields, implementsRevert, awaitDecision } = executeActionDescription(
+      "abcdefghijklmnop",
+      "DELETE FROM notes WHERE id = $1",
+      [7],
+    );
 
-    expect(fields?.map(field => field.label)).toEqual(["SQL", "Parameters"]);
+    expect(fields?.map((field) => field.label)).toEqual(["SQL", "Parameters"]);
     expect(fields?.[0]).toMatchObject({ value: "DELETE FROM notes WHERE id = $1" });
     expect(implementsRevert).toBe(false);
     expect(awaitDecision).toBe(true);

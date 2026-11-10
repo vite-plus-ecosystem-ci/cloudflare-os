@@ -1,4 +1,4 @@
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 
 import { McpFacetBase } from "../src/facet.js";
 import { McpSessionBase } from "../src/session.js";
@@ -10,18 +10,28 @@ import type { ConnectionAccount } from "../src/connection.js";
 import type { ResourceDescription } from "@gadgets/workshop-shared/gatekeeper";
 
 const log = {
-  debug() {}, info() {}, error() {},
+  debug() {},
+  info() {},
+  error() {},
   warnings: [] as string[],
-  warn(message: string) { this.warnings.push(message); },
-  with() { return this; },
+  warn(message: string) {
+    this.warnings.push(message);
+  },
+  with() {
+    return this;
+  },
 };
 
 class TestSession extends McpSessionBase {}
 
-class TestFacet extends McpFacetBase<object, {
-  endpoint: string;
-  scope: ToolScope;
-}, TestSession> {
+class TestFacet extends McpFacetBase<
+  object,
+  {
+    endpoint: string;
+    scope: ToolScope;
+  },
+  TestSession
+> {
   catalogResult: Promise<ScopedCatalog> = Promise.resolve({
     isPortal: false,
     truncated: false,
@@ -34,35 +44,51 @@ class TestFacet extends McpFacetBase<object, {
   remoteCalls = 0;
   beforeCatalogRead: (() => Promise<void>) | undefined;
 
-  protected get log() { return log; }
-  protected get trust(): ServerTrust { return "byo"; }
-  protected get sessionClass() { return TestSession; }
-  protected get actionScopeTag() { return "test"; }
-  protected get observerName() { return "the test server"; }
-  protected account(): ConnectionAccount { throw new Error("not used"); }
-  get observationSubresources() { return undefined; }
-  describe(): Promise<ResourceDescription> { throw new Error("not used"); }
-  getTypeScriptTypes(): Promise<string> { throw new Error("not used"); }
-  get serverName() { return "Test"; }
+  protected get log() {
+    return log;
+  }
+  protected get trust(): ServerTrust {
+    return "byo";
+  }
+  protected get sessionClass() {
+    return TestSession;
+  }
+  protected get actionScopeTag() {
+    return "test";
+  }
+  protected get observerName() {
+    return "the test server";
+  }
+  protected account(): ConnectionAccount {
+    throw new Error("not used");
+  }
+  get observationSubresources() {
+    return undefined;
+  }
+  describe(): Promise<ResourceDescription> {
+    throw new Error("not used");
+  }
+  getTypeScriptTypes(): Promise<string> {
+    throw new Error("not used");
+  }
+  get serverName() {
+    return "Test";
+  }
   protected override async catalog() {
     this.catalogReads++;
     await this.beforeCatalogRead?.();
     return this.catalogResult;
   }
-  override async call<T>(
-    fn: (client: McpClient) => Promise<T>,
-  ): Promise<T> {
+  override async call<T>(fn: (client: McpClient) => Promise<T>): Promise<T> {
     this.remoteCalls++;
     const client = {
-      findTool: async (name: string) => this.remoteTools.find(tool => tool.name === name),
-      listTools: async (
-        _maxTools: number,
-        include: (tool: McpTool) => boolean,
-      ) => ({ tools: this.remoteTools.filter(include), truncated: false }),
-      listMatchingToolSummaries: async (
-        maxTools: number,
-        include: (tool: McpTool) => boolean,
-      ) => this.remoteTools.filter(include).slice(0, maxTools),
+      findTool: async (name: string) => this.remoteTools.find((tool) => tool.name === name),
+      listTools: async (_maxTools: number, include: (tool: McpTool) => boolean) => ({
+        tools: this.remoteTools.filter(include),
+        truncated: false,
+      }),
+      listMatchingToolSummaries: async (maxTools: number, include: (tool: McpTool) => boolean) =>
+        this.remoteTools.filter(include).slice(0, maxTools),
     } as unknown as McpClient;
     return fn(client);
   }
@@ -80,7 +106,9 @@ function facet(scope: ToolScope = {}) {
 }
 
 const queue = {
-  dup() { return this; },
+  dup() {
+    return this;
+  },
   authorizeObservation() {},
 };
 
@@ -96,8 +124,9 @@ it("builds tool methods and falls back to the plain session when catalog loading
 });
 
 it("keeps facets owner-only using the connector's resource label", async () => {
-  await expect(facet().addObserver("observer", {} as never))
-    .rejects.toThrow(/test server.*only be opened by its owner/s);
+  await expect(facet().addObserver("observer", {} as never)).rejects.toThrow(
+    /test server.*only be opened by its owner/s,
+  );
 });
 
 it("discovers and resolves tools beyond the initially described catalog", async () => {
@@ -108,11 +137,15 @@ it("discovers and resolves tools beyond the initially described catalog", async 
     { name: "create_issue", description: "Create an issue" },
   ];
 
-  await expect(subject.searchTools("search")).resolves.toMatchObject([{
-    tool: { name: "search_issues" }, mode: "read",
-  }]);
+  await expect(subject.searchTools("search")).resolves.toMatchObject([
+    {
+      tool: { name: "search_issues" },
+      mode: "read",
+    },
+  ]);
   await expect(subject.findTool("create_issue")).resolves.toMatchObject({
-    tool: { name: "create_issue" }, mode: "action",
+    tool: { name: "create_issue" },
+    mode: "action",
   });
 });
 
@@ -120,9 +153,12 @@ it("answers searches from a complete catalog without rescanning the endpoint", a
   const subject = facet();
   subject.remoteTools = [{ name: "search_issues", description: "Remote copy" }];
 
-  await expect(subject.searchTools("issues")).resolves.toMatchObject([{
-    tool: { name: "list_issues" }, mode: "read",
-  }]);
+  await expect(subject.searchTools("issues")).resolves.toMatchObject([
+    {
+      tool: { name: "list_issues" },
+      mode: "read",
+    },
+  ]);
   expect(subject.remoteCalls).toBe(0);
 });
 
@@ -157,13 +193,17 @@ it("bounds concurrent discovery work across distinct requests", async () => {
   let active = 0;
   let maxActive = 0;
   let release!: () => void;
-  const gate = new Promise<void>(resolve => { release = resolve; });
-  const calls = Array.from({ length: 12 }, () => subject.runDiscoveryTest(async () => {
-    active++;
-    maxActive = Math.max(maxActive, active);
-    await gate;
-    active--;
-  }));
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const calls = Array.from({ length: 12 }, () =>
+    subject.runDiscoveryTest(async () => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      await gate;
+      active--;
+    }),
+  );
 
   await vi.waitFor(() => expect(active).toBe(4));
   expect(maxActive).toBe(4);
@@ -176,7 +216,9 @@ it("bounds concurrent catalog reads", async () => {
   const subject = facet();
   let active = 0;
   let release!: () => void;
-  const gate = new Promise<void>(resolve => { release = resolve; });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   subject.beforeCatalogRead = async () => {
     active++;
     await gate;

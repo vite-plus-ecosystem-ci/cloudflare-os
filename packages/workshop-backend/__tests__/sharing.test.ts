@@ -1,12 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import * as fc from "fast-check";
 import { PROPERTY_RUN_OPTIONS } from "@gadgets/scripts/property-runs";
 import { createTypedStorage, collection } from "@gadgets/typed-storage";
 import { SharingManager, SharingStorage, accessIncludesGadget } from "../src/sharing.js";
 import type { CollaboratorRecord, ShareKeyRecord } from "../src/storage-schema/overseer-storage.js";
 import {
-  AffectedCollaborator, AiChatAuthorInfo, PermissionEdge, CollaboratorRole, CollaboratorAccess,
-  CollaboratorGrant, WorkpieceId, getOpenWorkspaceErrorCode, OPEN_WORKSPACE_ERROR_CODES,
+  AffectedCollaborator,
+  AiChatAuthorInfo,
+  PermissionEdge,
+  CollaboratorRole,
+  CollaboratorAccess,
+  CollaboratorGrant,
+  WorkpieceId,
+  getOpenWorkspaceErrorCode,
+  OPEN_WORKSPACE_ERROR_CODES,
 } from "@gadgets/workshop-shared/api";
 import { makeMockStorage } from "./mock-storage.js";
 
@@ -19,8 +26,10 @@ function makeStorage(): SharingStorage {
       shareKeys: collection<ShareKeyRecord>()({
         primaryKey: "id",
         nonUniqueIndexes: {
-          byAlias(record: ShareKeyRecord) { return record.alias ?? null; }
-        }
+          byAlias(record: ShareKeyRecord) {
+            return record.alias ?? null;
+          },
+        },
       }),
     },
   });
@@ -30,14 +39,17 @@ const OWNER = "owner@example.com";
 
 // `gadgets` is the set of shareable gadget ids; tests may add or delete ids to model a gadget
 // being published or deleted.
-function makeManager(opts: {
-  ownerInvitesOnly?: () => boolean;
-  gadgets?: Iterable<WorkpieceId>;
-} = {}) {
+function makeManager(
+  opts: {
+    ownerInvitesOnly?: () => boolean;
+    gadgets?: Iterable<WorkpieceId>;
+  } = {},
+) {
   let storage = makeStorage();
   let gadgets = new Set<WorkpieceId>(opts.gadgets ?? [1, 2, 3]);
-  let mgr = new SharingManager(
-      storage, OWNER, opts.ownerInvitesOnly ?? (() => false), id => gadgets.has(id));
+  let mgr = new SharingManager(storage, OWNER, opts.ownerInvitesOnly ?? (() => false), (id) =>
+    gadgets.has(id),
+  );
   return { storage, gadgets, mgr };
 }
 
@@ -59,18 +71,36 @@ function profile(id: string): AiChatAuthorInfo {
 }
 
 // A user edge. `role: "use"` without `gadgetId` is a legacy grant of every gadget.
-function userEdge(sharer: string, role: CollaboratorRole = "build", gadgetId?: WorkpieceId)
-    : PermissionEdge {
-  return { type: "user", sharer, created: new Date(), role, ...(gadgetId !== undefined ? { gadgetId } : {}) };
+function userEdge(
+  sharer: string,
+  role: CollaboratorRole = "build",
+  gadgetId?: WorkpieceId,
+): PermissionEdge {
+  return {
+    type: "user",
+    sharer,
+    created: new Date(),
+    role,
+    ...(gadgetId !== undefined ? { gadgetId } : {}),
+  };
 }
 
 function gadgetEdge(sharer: string, gadgetId: WorkpieceId): PermissionEdge {
   return userEdge(sharer, "use", gadgetId);
 }
 
-function keyEdge(keyId: string, role: CollaboratorRole = "build", gadgetId?: WorkpieceId)
-    : PermissionEdge {
-  return { type: "shareKey", keyId, created: new Date(), role, ...(gadgetId !== undefined ? { gadgetId } : {}) };
+function keyEdge(
+  keyId: string,
+  role: CollaboratorRole = "build",
+  gadgetId?: WorkpieceId,
+): PermissionEdge {
+  return {
+    type: "shareKey",
+    keyId,
+    created: new Date(),
+    role,
+    ...(gadgetId !== undefined ? { gadgetId } : {}),
+  };
 }
 
 function seedCollaborator(storage: SharingStorage, id: string, addedBy: PermissionEdge[]) {
@@ -80,10 +110,17 @@ function seedCollaborator(storage: SharingStorage, id: string, addedBy: Permissi
 // Seed a share link. A link is stored as its first key, so `linkId` is that key's hash -- which is
 // what `shareKey` edges reference.
 function seedLink(
-    storage: SharingStorage, linkId: string, createdBy: string,
-    role: CollaboratorRole = "build", gadgetId?: WorkpieceId) {
+  storage: SharingStorage,
+  linkId: string,
+  createdBy: string,
+  role: CollaboratorRole = "build",
+  gadgetId?: WorkpieceId,
+) {
   storage.shareKeys.put({
-    id: linkId, created: new Date(), createdBy, role,
+    id: linkId,
+    created: new Date(),
+    createdBy,
+    role,
     ...(gadgetId !== undefined ? { gadgetId } : {}),
   });
 }
@@ -97,15 +134,17 @@ function link(storage: SharingStorage, linkId: string) {
 
 // A redeemable link sharing every gadget, as created before gadgets were shared individually.
 // Such links can no longer be made, so mint a link and rewrite it into the legacy shape.
-async function legacyAllUseLink(storage: SharingStorage, mgr: SharingManager)
-    : Promise<{ key: string; linkId: string }> {
+async function legacyAllUseLink(
+  storage: SharingStorage,
+  mgr: SharingManager,
+): Promise<{ key: string; linkId: string }> {
   let result = await mgr.createShareLink({ caller: owner, grant: "workspace" });
   storage.shareKeys.put({ ...link(storage, result.linkId), role: "use" });
   return result;
 }
 
 function ids(list: { profile: AiChatAuthorInfo }[]): string[] {
-  return list.map(x => x.profile.id).toSorted();
+  return list.map((x) => x.profile.id).toSorted();
 }
 
 function edgesOf(storage: SharingStorage, id: string): PermissionEdge[] {
@@ -170,12 +209,16 @@ describe("redeemShareKey", () => {
     await mgr.redeemShareKey({
       rawKey: key,
       profileId: "newbie",
-      fetchProfile: async () => { fetched++; return profile("newbie"); },
+      fetchProfile: async () => {
+        fetched++;
+        return profile("newbie");
+      },
     });
 
     expect(fetched).toBe(1);
-    expect(edgesOf(storage, "newbie"))
-        .toEqual([expect.objectContaining({ type: "shareKey", role: "build" })]);
+    expect(edgesOf(storage, "newbie")).toEqual([
+      expect.objectContaining({ type: "shareKey", role: "build" }),
+    ]);
     expect(mgr.getEffectiveAccess("newbie")).toEqual(BUILD);
   });
 
@@ -184,7 +227,8 @@ describe("redeemShareKey", () => {
     let { key, linkId } = await mgr.createShareLink({ caller: owner, grant: { gadgetId: 2 } });
 
     await mgr.redeemShareKey({
-      rawKey: key, profileId: "a",
+      rawKey: key,
+      profileId: "a",
       fetchProfile: async () => profile("a"),
     });
 
@@ -204,8 +248,12 @@ describe("redeemShareKey", () => {
 
     let fetched = 0;
     await mgr.redeemShareKey({
-      rawKey: key, profileId: "a",
-      fetchProfile: async () => { fetched++; return profile("a"); },
+      rawKey: key,
+      profileId: "a",
+      fetchProfile: async () => {
+        fetched++;
+        return profile("a");
+      },
     });
 
     expect(fetched).toBe(0);
@@ -219,11 +267,13 @@ describe("redeemShareKey", () => {
     let { key } = await mgr.createShareLink({ caller: owner, grant: "workspace" });
 
     await mgr.redeemShareKey({
-      rawKey: key, profileId: "a",
+      rawKey: key,
+      profileId: "a",
       fetchProfile: async () => profile("a"),
     });
     await mgr.redeemShareKey({
-      rawKey: key, profileId: "a",
+      rawKey: key,
+      profileId: "a",
       fetchProfile: async () => profile("a"),
     });
 
@@ -234,7 +284,8 @@ describe("redeemShareKey", () => {
     let { storage, mgr } = makeManager();
     // A syntactically-valid raw key (hex) that was never created.
     await mgr.redeemShareKey({
-      rawKey: "00112233445566778899aabbccddeeff", profileId: "a",
+      rawKey: "00112233445566778899aabbccddeeff",
+      profileId: "a",
       fetchProfile: async () => profile("a"),
     });
     expect(storage.collaborators.get("a")).toBeUndefined();
@@ -245,7 +296,8 @@ describe("redeemShareKey", () => {
     let { key, linkId } = await legacyAllUseLink(storage, mgr);
 
     await mgr.redeemShareKey({
-      rawKey: key, profileId: "newbie",
+      rawKey: key,
+      profileId: "newbie",
       fetchProfile: async () => profile("newbie"),
     });
 
@@ -263,7 +315,11 @@ describe("redeemShareKey", () => {
     let { key } = await legacyAllUseLink(storage, mgr);
     seedCollaborator(storage, "a", [gadgetEdge(OWNER, 1)]);
 
-    await mgr.redeemShareKey({ rawKey: key, profileId: "a", fetchProfile: async () => profile("a") });
+    await mgr.redeemShareKey({
+      rawKey: key,
+      profileId: "a",
+      fetchProfile: async () => profile("a"),
+    });
 
     expect(edgesOf(storage, "a")).toHaveLength(2);
     expect(mgr.getEffectiveAccess("a")).toEqual(ALL);
@@ -275,7 +331,11 @@ describe("redeemShareKey", () => {
     seedCollaborator(storage, "a", [keyEdge(linkId, "use", 2)]);
     gadgets.delete(2);
 
-    await mgr.redeemShareKey({ rawKey: key, profileId: "b", fetchProfile: async () => profile("b") });
+    await mgr.redeemShareKey({
+      rawKey: key,
+      profileId: "b",
+      fetchProfile: async () => profile("b"),
+    });
 
     expect(storage.collaborators.get("b")).toBeUndefined();
     // The existing recipient's grant confers nothing either, and its edge is not rewritten.
@@ -287,7 +347,12 @@ describe("redeemShareKey", () => {
 describe("addCollaborator", () => {
   it("adds a new collaborator with a user edge from the caller", () => {
     let { storage, mgr } = makeManager();
-    let info = mgr.addCollaborator({ caller: owner, profile: profile("a"), grant: "workspace", note: "hi" });
+    let info = mgr.addCollaborator({
+      caller: owner,
+      profile: profile("a"),
+      grant: "workspace",
+      note: "hi",
+    });
     expect(info.addedBy).toEqual([
       expect.objectContaining({ type: "user", sharer: OWNER, role: "build", note: "hi" }),
     ]);
@@ -297,7 +362,11 @@ describe("addCollaborator", () => {
 
   it("records a gadget grant as an edge to that one gadget", () => {
     let { mgr } = makeManager();
-    let info = mgr.addCollaborator({ caller: owner, profile: profile("a"), grant: { gadgetId: 1 } });
+    let info = mgr.addCollaborator({
+      caller: owner,
+      profile: profile("a"),
+      grant: { gadgetId: 1 },
+    });
     expect(info.addedBy).toEqual([
       expect.objectContaining({ type: "user", sharer: OWNER, role: "use", gadgetId: 1 }),
     ]);
@@ -306,14 +375,16 @@ describe("addCollaborator", () => {
 
   it("refuses to add the owner", () => {
     let { mgr } = makeManager();
-    expect(() => mgr.addCollaborator({ caller: owner, profile: profile(OWNER), grant: "workspace" }))
-        .toThrow(/owner/);
+    expect(() =>
+      mgr.addCollaborator({ caller: owner, profile: profile(OWNER), grant: "workspace" }),
+    ).toThrow(/owner/);
   });
 
   it("refuses a grant of a gadget that cannot be shared", () => {
     let { storage, mgr } = makeManager();
-    expect(() => mgr.addCollaborator({ caller: owner, profile: profile("a"), grant: { gadgetId: 9 } }))
-        .toThrow("No such gadget: 9");
+    expect(() =>
+      mgr.addCollaborator({ caller: owner, profile: profile("a"), grant: { gadgetId: 9 } }),
+    ).toThrow("No such gadget: 9");
     expect(storage.collaborators.get("a")).toBeUndefined();
   });
 
@@ -321,8 +392,9 @@ describe("addCollaborator", () => {
     let { storage, mgr } = makeManager();
     seedCollaborator(storage, "a", [gadgetEdge(OWNER, 1)]);
     for (let grant of ["workspace", { gadgetId: 1 }, { gadgetId: 2 }] as const) {
-      expect(() => mgr.addCollaborator({ caller: collab("a"), profile: profile("b"), grant }))
-          .toThrow("You do not have permission to share this workspace.");
+      expect(() =>
+        mgr.addCollaborator({ caller: collab("a"), profile: profile("b"), grant }),
+      ).toThrow("You do not have permission to share this workspace.");
     }
     expect(storage.collaborators.get("b")).toBeUndefined();
   });
@@ -332,17 +404,27 @@ describe("addCollaborator", () => {
     mgr.addCollaborator({ caller: owner, profile: profile("b"), grant: "workspace" });
     mgr.addCollaborator({ caller: owner, profile: profile("a"), grant: "workspace" });
     mgr.addCollaborator({ caller: collab("b"), profile: profile("a"), grant: "workspace" });
-    mgr.addCollaborator({ caller: owner, profile: profile("a"), grant: "workspace", note: "again" });
+    mgr.addCollaborator({
+      caller: owner,
+      profile: profile("a"),
+      grant: "workspace",
+      note: "again",
+    });
     expect(edgesOf(storage, "a")).toHaveLength(2);
     // Re-granting only updates the note.
     expect(edgesOf(storage, "a")).toContainEqual(
-        expect.objectContaining({ sharer: OWNER, role: "build", note: "again" }));
+      expect.objectContaining({ sharer: OWNER, role: "build", note: "again" }),
+    );
   });
 
   it("keeps independent grants of different gadgets from one sharer, and unions them", () => {
     let { storage, mgr } = makeManager();
     mgr.addCollaborator({ caller: owner, profile: profile("a"), grant: { gadgetId: 1 } });
-    let info = mgr.addCollaborator({ caller: owner, profile: profile("a"), grant: { gadgetId: 2 } });
+    let info = mgr.addCollaborator({
+      caller: owner,
+      profile: profile("a"),
+      grant: { gadgetId: 2 },
+    });
     expect(info.access).toEqual(only(1, 2));
     expect(edgesOf(storage, "a")).toEqual([
       expect.objectContaining({ sharer: OWNER, role: "use", gadgetId: 1 }),
@@ -354,7 +436,12 @@ describe("addCollaborator", () => {
     expect(mgr.getEffectiveAccess("a")).toEqual(BUILD);
 
     // Re-granting a gadget that build covers narrows nothing.
-    mgr.addCollaborator({ caller: owner, profile: profile("a"), grant: { gadgetId: 1 }, note: "n" });
+    mgr.addCollaborator({
+      caller: owner,
+      profile: profile("a"),
+      grant: { gadgetId: 1 },
+      note: "n",
+    });
     expect(mgr.getEffectiveAccess("a")).toEqual(BUILD);
   });
 
@@ -416,8 +503,7 @@ describe("computeEffectiveAccess", () => {
     expect(mgr.getEffectiveAccess("a")).toBeUndefined();
   });
 
-  it("keeps legacy all-gadget grants covering every gadget, including later ones, never build",
-      () => {
+  it("keeps legacy all-gadget grants covering every gadget, including later ones, never build", () => {
     let { storage, gadgets, mgr } = makeManager({ gadgets: [1] });
     seedLink(storage, "k1", OWNER, "use");
     seedCollaborator(storage, "direct", [userEdge(OWNER, "use")]);
@@ -441,8 +527,10 @@ describe("computeEffectiveAccess", () => {
     expect(mgr.listCollaborators()).toEqual([]);
 
     // Gadget access cannot activate a cycle of otherwise unsupported grants.
-    storage.collaborators.put({ profile: profile("a"), addedBy: [
-      ...edgesOf(storage, "a"), gadgetEdge(OWNER, 2)] });
+    storage.collaborators.put({
+      profile: profile("a"),
+      addedBy: [...edgesOf(storage, "a"), gadgetEdge(OWNER, 2)],
+    });
     expect(mgr.getEffectiveAccess("a")).toEqual(only(2));
     expect(mgr.getEffectiveAccess("b")).toBeUndefined();
 
@@ -455,7 +543,7 @@ describe("computeEffectiveAccess", () => {
     let { storage, mgr } = makeManager();
     seedCollaborator(storage, "a", [userEdge(OWNER)]);
     seedCollaborator(storage, "b", [userEdge("a")]);
-    let access = mgr.computeEffectiveAccess({ severed: target => target === "a" });
+    let access = mgr.computeEffectiveAccess({ severed: (target) => target === "a" });
     expect(access.has("a")).toBe(false);
     expect(access.has("b")).toBe(false);
   });
@@ -487,7 +575,7 @@ describe("previewRemoveCollaborator", () => {
     seedCollaborator(storage, "b", [userEdge("a")]);
     let affected = mgr.previewRemoveCollaborator(owner, "a");
     expect(ids(affected)).toEqual(["a", "b"]);
-    expect(affected.find(x => x.profile.id === "b")!.newAccess).toBe(null);
+    expect(affected.find((x) => x.profile.id === "b")!.newAccess).toBe(null);
   });
 
   it("reports a narrowing rather than a removal", () => {
@@ -495,7 +583,7 @@ describe("previewRemoveCollaborator", () => {
     // b has build via a, but also gadget 1 directly from the owner.
     seedCollaborator(storage, "a", [userEdge(OWNER, "build")]);
     seedCollaborator(storage, "b", [gadgetEdge(OWNER, 1), userEdge("a", "build")]);
-    let b = mgr.previewRemoveCollaborator(owner, "a").find(x => x.profile.id === "b")!;
+    let b = mgr.previewRemoveCollaborator(owner, "a").find((x) => x.profile.id === "b")!;
     expect(b.oldAccess).toEqual(BUILD);
     expect(b.newAccess).toEqual(only(1));
   });
@@ -544,7 +632,11 @@ describe("removeCollaborator", () => {
     mgr.addCollaborator({ caller: collab("bob"), profile: profile("carol"), grant: "workspace" });
     mgr.addCollaborator({ caller: owner, profile: profile("carol"), grant: { gadgetId: 2 } });
     let { key } = await mgr.createShareLink({ caller: collab("bob"), grant: { gadgetId: 1 } });
-    await mgr.redeemShareKey({ rawKey: key, profileId: "dave", fetchProfile: async () => profile("dave") });
+    await mgr.redeemShareKey({
+      rawKey: key,
+      profileId: "dave",
+      fetchProfile: async () => profile("dave"),
+    });
     expect(mgr.getEffectiveAccess("carol")).toEqual(BUILD);
     expect(mgr.getEffectiveAccess("dave")).toEqual(only(1));
 
@@ -571,11 +663,12 @@ describe("removeCollaborator", () => {
     seedCollaborator(storage, "b", [userEdge("a")]);
 
     let affected = mgr.removeCollaborator(owner, "a", ["b"]);
-    expect(ids(affected)).toEqual(["a"]);  // b is kept, so not reported
+    expect(ids(affected)).toEqual(["a"]); // b is kept, so not reported
     expect(mgr.getEffectiveAccess("b")).toEqual(BUILD);
     // b gained a fresh edge from the caller.
-    expect(edgesOf(storage, "b"))
-        .toContainEqual(expect.objectContaining({ type: "user", sharer: OWNER, role: "build" }));
+    expect(edgesOf(storage, "b")).toContainEqual(
+      expect.objectContaining({ type: "user", sharer: OWNER, role: "build" }),
+    );
   });
 
   it("keeps a narrowed user at their prior access when kept", () => {
@@ -596,10 +689,15 @@ describe("removeCollaborator", () => {
     mgr.removeCollaborator(owner, "a", ["b"]);
 
     expect(mgr.getEffectiveAccess("b")).toEqual(only(1, 2, 3));
-    let ownerEdges = edgesOf(storage, "b").filter(e => e.type === "user" && e.sharer === OWNER);
+    let ownerEdges = edgesOf(storage, "b").filter((e) => e.type === "user" && e.sharer === OWNER);
     expect(ownerEdges).toHaveLength(3);
-    expect(ownerEdges.map(e => [e.role, e.gadgetId])).toEqual(
-        expect.arrayContaining([["use", 3], ["use", 1], ["use", 2]]));
+    expect(ownerEdges.map((e) => [e.role, e.gadgetId])).toEqual(
+      expect.arrayContaining([
+        ["use", 3],
+        ["use", 1],
+        ["use", 2],
+      ]),
+    );
   });
 
   it("keeps a legacy all-gadget user's access without upgrading it", () => {
@@ -610,7 +708,7 @@ describe("removeCollaborator", () => {
     mgr.removeCollaborator(owner, "a", ["b"]);
 
     expect(mgr.getEffectiveAccess("b")).toEqual(ALL);
-    let restored = edgesOf(storage, "b").find(e => e.type === "user" && e.sharer === OWNER)!;
+    let restored = edgesOf(storage, "b").find((e) => e.type === "user" && e.sharer === OWNER)!;
     expect(restored.role).toBe("use");
     expect(restored.gadgetId).toBeUndefined();
   });
@@ -622,7 +720,7 @@ describe("removeCollaborator", () => {
 
     let affected = mgr.removeCollaborator(owner, "a", []);
     expect(ids(affected)).toEqual(["a", "b"]);
-    expect(affected.find(x => x.profile.id === "b")!.newAccess).toEqual(only(1));
+    expect(affected.find((x) => x.profile.id === "b")!.newAccess).toEqual(only(1));
     // b retains gadget 1; its (now-inert) edge from a is left untouched (lazy).
     expect(mgr.getEffectiveAccess("b")).toEqual(only(1));
     expect(edgesOf(storage, "b")).toHaveLength(2);
@@ -647,8 +745,9 @@ describe("removeCollaborator", () => {
 
     let affected = mgr.removeCollaborator(collab("a"), "t", []);
     expect(affected).toEqual([]);
-    expect(edgesOf(storage, "t"))
-        .toEqual([expect.objectContaining({ type: "user", sharer: OWNER })]);
+    expect(edgesOf(storage, "t")).toEqual([
+      expect.objectContaining({ type: "user", sharer: OWNER }),
+    ]);
   });
 
   it("forbids a non-owner from removing a user they didn't add", () => {
@@ -665,7 +764,11 @@ describe("removeCollaborator", () => {
   it("lets the owner remove one gadget, keeping the others and reporting the change", () => {
     let { storage, mgr } = makeManager();
     seedCollaborator(storage, "a", [userEdge(OWNER, "build")]);
-    seedCollaborator(storage, "b", [gadgetEdge(OWNER, 1), gadgetEdge(OWNER, 2), gadgetEdge("a", 1)]);
+    seedCollaborator(storage, "b", [
+      gadgetEdge(OWNER, 1),
+      gadgetEdge(OWNER, 2),
+      gadgetEdge("a", 1),
+    ]);
 
     let affected = mgr.removeCollaborator(owner, "b", [], 1);
 
@@ -673,7 +776,9 @@ describe("removeCollaborator", () => {
       expect.objectContaining({ profile: profile("b"), oldAccess: only(1, 2), newAccess: only(2) }),
     ]);
     // Every edge granting gadget 1 is severed, whoever gave it; the gadget 2 grant survives.
-    expect(edgesOf(storage, "b")).toEqual([expect.objectContaining({ sharer: OWNER, gadgetId: 2 })]);
+    expect(edgesOf(storage, "b")).toEqual([
+      expect.objectContaining({ sharer: OWNER, gadgetId: 2 }),
+    ]);
     expect(mgr.getEffectiveAccess("b")).toEqual(only(2));
     expect(mgr.getEffectiveAccess("a")).toEqual(BUILD);
   });
@@ -725,7 +830,7 @@ describe("revokeShareLink", () => {
     let { storage, mgr } = makeManager();
     seedLink(storage, "k1", OWNER);
     seedCollaborator(storage, "a", [keyEdge("k1")]);
-    seedLink(storage, "k2", "a");  // link created by a
+    seedLink(storage, "k2", "a"); // link created by a
     seedCollaborator(storage, "b", [keyEdge("k2")]);
 
     mgr.revokeShareLink(owner, "k1", []);
@@ -764,7 +869,8 @@ describe("revokeShareLink", () => {
     expect(mgr.revokeShareLink(owner, "k1", ["a"])).toEqual([]);
     expect(mgr.getEffectiveAccess("a")).toEqual(only(1));
     expect(edgesOf(storage, "a")).toContainEqual(
-        expect.objectContaining({ type: "user", sharer: OWNER, role: "use", gadgetId: 1 }));
+      expect.objectContaining({ type: "user", sharer: OWNER, role: "use", gadgetId: 1 }),
+    );
   });
 
   it("revokes a legacy all-gadget link, keeping recipients only on request", () => {
@@ -789,7 +895,8 @@ describe("revokeShareLink", () => {
     mgr.revokeShareLink(owner, linkId, []);
 
     await mgr.redeemShareKey({
-      rawKey: key, profileId: "a",
+      rawKey: key,
+      profileId: "a",
       fetchProfile: async () => profile("a"),
     });
     expect(storage.collaborators.get("a")).toBeUndefined();
@@ -824,8 +931,9 @@ describe("createShareLink", () => {
 
   it("refuses a link to a gadget that cannot be shared", async () => {
     let { mgr } = makeManager();
-    await expect(mgr.createShareLink({ caller: owner, grant: { gadgetId: 9 } }))
-        .rejects.toThrow("No such gadget: 9");
+    await expect(mgr.createShareLink({ caller: owner, grant: { gadgetId: 9 } })).rejects.toThrow(
+      "No such gadget: 9",
+    );
     expect(mgr.listShareLinkRecords()).toEqual([]);
   });
 
@@ -833,8 +941,9 @@ describe("createShareLink", () => {
     let { storage, mgr } = makeManager();
     seedCollaborator(storage, "a", [gadgetEdge(OWNER, 1)]);
     for (let grant of ["workspace", { gadgetId: 1 }, { gadgetId: 2 }] as const) {
-      await expect(mgr.createShareLink({ caller: collab("a"), grant }))
-          .rejects.toThrow("You do not have permission to share this workspace.");
+      await expect(mgr.createShareLink({ caller: collab("a"), grant })).rejects.toThrow(
+        "You do not have permission to share this workspace.",
+      );
     }
     expect(mgr.listShareLinkRecords()).toEqual([]);
   });
@@ -843,8 +952,11 @@ describe("createShareLink", () => {
 describe("newShareLinkKey", () => {
   it("mints a new key for the same link that redeems to one grant", async () => {
     let { storage, mgr } = makeManager();
-    let { key: key1, linkId } =
-        await mgr.createShareLink({ caller: owner, grant: { gadgetId: 1 }, note: "team" });
+    let { key: key1, linkId } = await mgr.createShareLink({
+      caller: owner,
+      grant: { gadgetId: 1 },
+      note: "team",
+    });
 
     let { key: key2 } = await mgr.newShareLinkKey({ caller: owner, linkId });
     expect(key2).not.toBe(key1);
@@ -857,8 +969,16 @@ describe("newShareLinkKey", () => {
     expect(listed[0]).toMatchObject({ role: "use", gadgetId: 1, note: "team" });
 
     // Both secrets redeem, and a user redeeming both gets a single (deduplicated) edge.
-    await mgr.redeemShareKey({ rawKey: key1, profileId: "a", fetchProfile: async () => profile("a") });
-    await mgr.redeemShareKey({ rawKey: key2, profileId: "a", fetchProfile: async () => profile("a") });
+    await mgr.redeemShareKey({
+      rawKey: key1,
+      profileId: "a",
+      fetchProfile: async () => profile("a"),
+    });
+    await mgr.redeemShareKey({
+      rawKey: key2,
+      profileId: "a",
+      fetchProfile: async () => profile("a"),
+    });
     expect(edgesOf(storage, "a")).toHaveLength(1);
     expect(mgr.getEffectiveAccess("a")).toEqual(only(1));
   });
@@ -871,7 +991,7 @@ describe("newShareLinkKey", () => {
     mgr.revokeShareLink(owner, linkId, []);
     expect(link(storage, linkId).revoked).toBe(true);
     // The copies are reclaimed; the link row stays, since edges point at it.
-    expect([...storage.shareKeys.list()].map(r => r.id)).toEqual([linkId]);
+    expect([...storage.shareKeys.list()].map((r) => r.id)).toEqual([linkId]);
 
     // Neither the original nor the copied secret can be redeemed anymore.
     for (let rawKey of [key1, key2]) {
@@ -885,9 +1005,15 @@ describe("newShareLinkKey", () => {
     let { linkId } = await legacyAllUseLink(storage, mgr);
     let { key } = await mgr.newShareLinkKey({ caller: owner, linkId });
 
-    await mgr.redeemShareKey({ rawKey: key, profileId: "a", fetchProfile: async () => profile("a") });
+    await mgr.redeemShareKey({
+      rawKey: key,
+      profileId: "a",
+      fetchProfile: async () => profile("a"),
+    });
 
-    expect(edgesOf(storage, "a")).toEqual([expect.objectContaining({ type: "shareKey", keyId: linkId })]);
+    expect(edgesOf(storage, "a")).toEqual([
+      expect.objectContaining({ type: "shareKey", keyId: linkId }),
+    ]);
     expect(mgr.getEffectiveAccess("a")).toEqual(ALL);
   });
 
@@ -896,15 +1022,16 @@ describe("newShareLinkKey", () => {
     let { linkId } = await mgr.createShareLink({ caller: owner, grant: { gadgetId: 2 } });
     gadgets.delete(2);
     await expect(mgr.newShareLinkKey({ caller: owner, linkId })).rejects.toThrow(/not found/);
-    expect([...storage.shareKeys.list()].map(r => r.id)).toEqual([linkId]);
+    expect([...storage.shareKeys.list()].map((r) => r.id)).toEqual([linkId]);
   });
 
   it("forbids a non-owner from copying a link they didn't create", async () => {
     let { storage, mgr } = makeManager();
     seedLink(storage, "k1", OWNER);
     seedCollaborator(storage, "a", [userEdge(OWNER, "build")]);
-    await expect(mgr.newShareLinkKey({ caller: collab("a"), linkId: "k1" }))
-        .rejects.toThrow(/only copy/);
+    await expect(mgr.newShareLinkKey({ caller: collab("a"), linkId: "k1" })).rejects.toThrow(
+      /only copy/,
+    );
   });
 
   it("forbids copying a link once its creator no longer holds build", async () => {
@@ -914,8 +1041,9 @@ describe("newShareLinkKey", () => {
     seedLink(storage, "k2", "a", "use", 1);
     seedCollaborator(storage, "a", [gadgetEdge(OWNER, 1)]);
     for (let linkId of ["k1", "k2"]) {
-      await expect(mgr.newShareLinkKey({ caller: collab("a"), linkId }))
-          .rejects.toThrow("You do not have permission to share this workspace.");
+      await expect(mgr.newShareLinkKey({ caller: collab("a"), linkId })).rejects.toThrow(
+        "You do not have permission to share this workspace.",
+      );
     }
   });
 
@@ -926,9 +1054,11 @@ describe("newShareLinkKey", () => {
 
     // A copy has its own hash in the same table. Mistaking one for a link would make revocation a
     // silent no-op: redemption resolves the copy through to the link, which would go untouched.
-    let aliasId = [...storage.shareKeys.list()].find(r => r.alias !== undefined)!.id;
-    expect(mgr.listShareLinkRecords().map(r => r.id)).toEqual([linkId]);
-    await expect(mgr.newShareLinkKey({ caller: owner, linkId: aliasId })).rejects.toThrow(/not found/);
+    let aliasId = [...storage.shareKeys.list()].find((r) => r.alias !== undefined)!.id;
+    expect(mgr.listShareLinkRecords().map((r) => r.id)).toEqual([linkId]);
+    await expect(mgr.newShareLinkKey({ caller: owner, linkId: aliasId })).rejects.toThrow(
+      /not found/,
+    );
     expect(() => mgr.updateShareLink(owner, aliasId, "x")).toThrow(/not found/);
     expect(() => mgr.revokeShareLink(owner, aliasId, [])).toThrow(/not found/);
   });
@@ -940,17 +1070,25 @@ describe("pre-copy share keys", () => {
     // A key written before copies existed already has the shape of a link, and its edges already
     // point at the hash, so it reads back as a link with no migration. No role means build.
     storage.shareKeys.put({
-      id: "hash1", note: "team", created: new Date("2025-01-01"), createdBy: OWNER,
+      id: "hash1",
+      note: "team",
+      created: new Date("2025-01-01"),
+      createdBy: OWNER,
     });
     seedCollaborator(storage, "a", [{ type: "shareKey", keyId: "hash1", created: new Date() }]);
 
-    expect(mgr.listShareLinkRecords()).toMatchObject([{ id: "hash1", note: "team", createdBy: OWNER }]);
+    expect(mgr.listShareLinkRecords()).toMatchObject([
+      { id: "hash1", note: "team", createdBy: OWNER },
+    ]);
     expect(mgr.getEffectiveAccess("a")).toEqual(BUILD);
 
     // Such a link can also be copied, and the copy grants the same access.
     let { key } = await mgr.newShareLinkKey({ caller: owner, linkId: "hash1" });
-    await mgr.redeemShareKey(
-        { rawKey: key, profileId: "b", fetchProfile: async () => profile("b") });
+    await mgr.redeemShareKey({
+      rawKey: key,
+      profileId: "b",
+      fetchProfile: async () => profile("b"),
+    });
     expect(mgr.getEffectiveAccess("b")).toEqual(BUILD);
   });
 });
@@ -962,16 +1100,16 @@ describe("listCollaborators", () => {
     seedCollaborator(storage, "b", [userEdge(OWNER, "use")]);
     seedCollaborator(storage, "c", [gadgetEdge(OWNER, 3), gadgetEdge(OWNER, 1)]);
     let list = mgr.listCollaborators();
-    expect(list.find(x => x.profile.id === "a")!.access).toEqual(BUILD);
-    expect(list.find(x => x.profile.id === "b")!.access).toEqual(ALL);
-    expect(list.find(x => x.profile.id === "c")!.access).toEqual(only(1, 3));
+    expect(list.find((x) => x.profile.id === "a")!.access).toEqual(BUILD);
+    expect(list.find((x) => x.profile.id === "b")!.access).toEqual(ALL);
+    expect(list.find((x) => x.profile.id === "c")!.access).toEqual(only(1, 3));
   });
 
   it("omits collaborators who linger in storage but are unreachable", () => {
     let { storage, mgr } = makeManager();
     seedCollaborator(storage, "a", [userEdge(OWNER)]);
-    seedCollaborator(storage, "dead", []);  // record with no incoming edges
-    seedCollaborator(storage, "deleted", [gadgetEdge(OWNER, 9)]);  // grant of a missing gadget
+    seedCollaborator(storage, "dead", []); // record with no incoming edges
+    seedCollaborator(storage, "deleted", [gadgetEdge(OWNER, 9)]); // grant of a missing gadget
     let list = mgr.listCollaborators();
     expect(ids(list)).toEqual(["a"]);
   });
@@ -982,7 +1120,7 @@ describe("listShareLinkRecords", () => {
     let { storage, mgr } = makeManager();
     seedLink(storage, "k1", OWNER);
     storage.shareKeys.put({ id: "k2", created: new Date(), createdBy: OWNER, revoked: true });
-    expect(mgr.listShareLinkRecords().map(r => r.id)).toEqual(["k1"]);
+    expect(mgr.listShareLinkRecords().map((r) => r.id)).toEqual(["k1"]);
   });
 });
 
@@ -1007,14 +1145,18 @@ describe("ownerInvitesOnly", () => {
     seedLink(storage, "k1", OWNER);
     flags.ownerInvitesOnly = true;
 
-    await expect(mgr.createShareLink({ caller: owner, grant: { gadgetId: 1 } }))
-        .rejects.toThrow(/Share links are disabled/);
-    await expect(mgr.newShareLinkKey({ caller: owner, linkId: "k1" }))
-        .rejects.toThrow(/Share links are disabled/);
-    expect([...storage.shareKeys.list()].map(r => r.id)).toEqual(["k1"]);
+    await expect(mgr.createShareLink({ caller: owner, grant: { gadgetId: 1 } })).rejects.toThrow(
+      /Share links are disabled/,
+    );
+    await expect(mgr.newShareLinkKey({ caller: owner, linkId: "k1" })).rejects.toThrow(
+      /Share links are disabled/,
+    );
+    expect([...storage.shareKeys.list()].map((r) => r.id)).toEqual(["k1"]);
 
     // Link management isn't an open() failure, so it carries no open-workspace code.
-    let error = await mgr.createShareLink({ caller: owner, grant: { gadgetId: 1 } }).catch(e => e);
+    let error = await mgr
+      .createShareLink({ caller: owner, grant: { gadgetId: 1 } })
+      .catch((e) => e);
     expect(getOpenWorkspaceErrorCode(error)).toBeUndefined();
   });
 
@@ -1029,7 +1171,7 @@ describe("ownerInvitesOnly", () => {
 
     await expect(created).rejects.toThrow(/Share links are disabled/);
     await expect(copied).rejects.toThrow(/Share links are disabled/);
-    expect([...storage.shareKeys.list()].map(r => r.id)).toEqual(["k1"]);
+    expect([...storage.shareKeys.list()].map((r) => r.id)).toEqual(["k1"]);
   });
 
   it("refuses a new user redeeming a link created before ownerInvitesOnly", async () => {
@@ -1038,10 +1180,16 @@ describe("ownerInvitesOnly", () => {
     flags.ownerInvitesOnly = true;
 
     let fetched = 0;
-    await expect(mgr.redeemShareKey({
-      rawKey: key, profileId: "newbie",
-      fetchProfile: async () => { fetched++; return profile("newbie"); },
-    })).rejects.toMatchObject({
+    await expect(
+      mgr.redeemShareKey({
+        rawKey: key,
+        profileId: "newbie",
+        fetchProfile: async () => {
+          fetched++;
+          return profile("newbie");
+        },
+      }),
+    ).rejects.toMatchObject({
       code: OPEN_WORKSPACE_ERROR_CODES.shareLinksDisabled,
       message: expect.stringMatching(/Share links are disabled/),
     });
@@ -1055,10 +1203,16 @@ describe("ownerInvitesOnly", () => {
     let { storage, flags, mgr } = makeManagerWithFlag();
     let { key } = await mgr.createShareLink({ caller: owner, grant: { gadgetId: 1 } });
 
-    await expect(mgr.redeemShareKey({
-      rawKey: key, profileId: "newbie",
-      fetchProfile: async () => { flags.ownerInvitesOnly = true; return profile("newbie"); },
-    })).rejects.toMatchObject({ code: OPEN_WORKSPACE_ERROR_CODES.shareLinksDisabled });
+    await expect(
+      mgr.redeemShareKey({
+        rawKey: key,
+        profileId: "newbie",
+        fetchProfile: async () => {
+          flags.ownerInvitesOnly = true;
+          return profile("newbie");
+        },
+      }),
+    ).rejects.toMatchObject({ code: OPEN_WORKSPACE_ERROR_CODES.shareLinksDisabled });
     expect(storage.collaborators.get("newbie")).toBeUndefined();
   });
 
@@ -1069,7 +1223,8 @@ describe("ownerInvitesOnly", () => {
     flags.ownerInvitesOnly = true;
 
     await mgr.redeemShareKey({
-      rawKey: key, profileId: "a",
+      rawKey: key,
+      profileId: "a",
       fetchProfile: async () => profile("a"),
     });
 
@@ -1086,10 +1241,13 @@ describe("ownerInvitesOnly", () => {
     seedCollaborator(storage, "a", [keyEdge(linkId)]);
     flags.ownerInvitesOnly = true;
 
-    await expect(mgr.redeemShareKey({
-      rawKey: key, profileId: "a",
-      fetchProfile: async () => profile("a"),
-    })).rejects.toMatchObject({ code: OPEN_WORKSPACE_ERROR_CODES.shareLinksDisabled });
+    await expect(
+      mgr.redeemShareKey({
+        rawKey: key,
+        profileId: "a",
+        fetchProfile: async () => profile("a"),
+      }),
+    ).rejects.toMatchObject({ code: OPEN_WORKSPACE_ERROR_CODES.shareLinksDisabled });
     expect(edgesOf(storage, "a")).toEqual([
       expect.objectContaining({ type: "shareKey", keyId: linkId }),
     ]);
@@ -1099,7 +1257,8 @@ describe("ownerInvitesOnly", () => {
     let { storage, flags, mgr } = makeManagerWithFlag();
     flags.ownerInvitesOnly = true;
     await mgr.redeemShareKey({
-      rawKey: "00112233445566778899aabbccddeeff", profileId: "a",
+      rawKey: "00112233445566778899aabbccddeeff",
+      profileId: "a",
       fetchProfile: async () => profile("a"),
     });
     expect(storage.collaborators.get("a")).toBeUndefined();
@@ -1110,8 +1269,9 @@ describe("ownerInvitesOnly", () => {
     seedCollaborator(storage, "a", [userEdge(OWNER, "build")]);
     flags.ownerInvitesOnly = true;
 
-    expect(() => mgr.addCollaborator({ caller: collab("a"), profile: profile("b"), grant: { gadgetId: 1 } }))
-        .toThrow(/Only the workspace owner/);
+    expect(() =>
+      mgr.addCollaborator({ caller: collab("a"), profile: profile("b"), grant: { gadgetId: 1 } }),
+    ).toThrow(/Only the workspace owner/);
     expect(storage.collaborators.get("b")).toBeUndefined();
 
     mgr.addCollaborator({ caller: owner, profile: profile("b"), grant: { gadgetId: 1 } });
@@ -1124,7 +1284,7 @@ describe("ownerInvitesOnly", () => {
     seedCollaborator(storage, "a", [keyEdge("k1"), gadgetEdge(OWNER, 1)]);
     flags.ownerInvitesOnly = true;
 
-    expect(mgr.listShareLinkRecords().map(r => r.id)).toEqual(["k1"]);
+    expect(mgr.listShareLinkRecords().map((r) => r.id)).toEqual(["k1"]);
     mgr.updateShareLink(owner, "k1", "renamed");
     // The link already grants nothing, so revoking it changes nobody's access.
     expect(mgr.revokeShareLink(owner, "k1", [])).toEqual([]);
@@ -1149,7 +1309,11 @@ describe("ownerInvitesOnly", () => {
     expect(ids(mgr.listCollaborators())).toEqual(["direct"]);
     expect(mgr.computeAffectedByOwnerInvitesOnly(baseline)).toEqual([
       expect.objectContaining({ profile: profile("linked"), oldAccess: BUILD, newAccess: null }),
-      expect.objectContaining({ profile: profile("transitive"), oldAccess: BUILD, newAccess: null }),
+      expect.objectContaining({
+        profile: profile("transitive"),
+        oldAccess: BUILD,
+        newAccess: null,
+      }),
     ]);
   });
 
@@ -1158,7 +1322,11 @@ describe("ownerInvitesOnly", () => {
     seedLink(storage, "k3", OWNER, "use", 3);
     seedCollaborator(storage, "a", [userEdge(OWNER, "build")]);
     // b holds gadget 1 from the owner, gadget 2 through a, and gadget 3 through a link.
-    seedCollaborator(storage, "b", [gadgetEdge(OWNER, 1), gadgetEdge("a", 2), keyEdge("k3", "use", 3)]);
+    seedCollaborator(storage, "b", [
+      gadgetEdge(OWNER, 1),
+      gadgetEdge("a", 2),
+      keyEdge("k3", "use", 3),
+    ]);
     let baseline = mgr.computeEffectiveAccess();
     expect(baseline.get("b")).toEqual(only(1, 2, 3));
 
@@ -1166,7 +1334,11 @@ describe("ownerInvitesOnly", () => {
 
     expect(mgr.getEffectiveAccess("b")).toEqual(only(1));
     expect(mgr.computeAffectedByOwnerInvitesOnly(baseline)).toEqual([
-      expect.objectContaining({ profile: profile("b"), oldAccess: only(1, 2, 3), newAccess: only(1) }),
+      expect.objectContaining({
+        profile: profile("b"),
+        oldAccess: only(1, 2, 3),
+        newAccess: only(1),
+      }),
     ]);
   });
 
@@ -1274,16 +1446,26 @@ function describeGrant(grant: CollaboratorGrant): string {
 function narrows(before: CollaboratorAccess, after: CollaboratorAccess | undefined): boolean {
   if (!after) return true;
   if (before.role === "build") return after.role !== "build";
-  return SHARED_GADGETS.some(id => accessIncludesGadget(before, id) && !accessIncludesGadget(after, id));
+  return SHARED_GADGETS.some(
+    (id) => accessIncludesGadget(before, id) && !accessIncludesGadget(after, id),
+  );
 }
 
 // The grants restoring what someone with `prior` access lost on dropping to `now`.
 function lostGrants(prior: CollaboratorAccess, now: CollaboratorAccess | undefined): ModelGrant[] {
   if (prior.role === "build") return ["build"];
-  return SHARED_GADGETS.filter(id => accessIncludesGadget(prior, id) && !(now && accessIncludesGadget(now, id)));
+  return SHARED_GADGETS.filter(
+    (id) => accessIncludesGadget(prior, id) && !(now && accessIncludesGadget(now, id)),
+  );
 }
 
-type ModelLink = { id: string; creator: string; grant: ModelGrant; revoked: boolean; keys: string[] };
+type ModelLink = {
+  id: string;
+  creator: string;
+  grant: ModelGrant;
+  revoked: boolean;
+  keys: string[];
+};
 
 class SharingModel {
   /** target -> inviter -> everything that inviter granted them. */
@@ -1336,7 +1518,8 @@ class SharingModel {
     builders.delete(OWNER);
     let result = new Map<string, CollaboratorAccess>();
     for (let id of builders) result.set(id, BUILD);
-    for (let [id, gadgetIds] of users) result.set(id, only(...[...gadgetIds].toSorted((a, b) => a - b)));
+    for (let [id, gadgetIds] of users)
+      result.set(id, only(...[...gadgetIds].toSorted((a, b) => a - b)));
     return result;
   }
 
@@ -1349,7 +1532,10 @@ type Change = { id: string; oldAccess: CollaboratorAccess; newAccess: Collaborat
 
 // The people whose access narrowed going from `before` to `after`. (None of these steps widens
 // anyone's.)
-function changes(before: Map<string, CollaboratorAccess>, after: Map<string, CollaboratorAccess>): Change[] {
+function changes(
+  before: Map<string, CollaboratorAccess>,
+  after: Map<string, CollaboratorAccess>,
+): Change[] {
   let result: Change[] = [];
   for (let [id, oldAccess] of before) {
     let newAccess = after.get(id);
@@ -1359,8 +1545,9 @@ function changes(before: Map<string, CollaboratorAccess>, after: Map<string, Col
 }
 
 function reported(list: AffectedCollaborator[]): Change[] {
-  return list.map(x => ({ id: x.profile.id, oldAccess: x.oldAccess, newAccess: x.newAccess }))
-      .toSorted((a, b) => a.id.localeCompare(b.id));
+  return list
+    .map((x) => ({ id: x.profile.id, oldAccess: x.oldAccess, newAccess: x.newAccess }))
+    .toSorted((a, b) => a.id.localeCompare(b.id));
 }
 
 function caller(id: string) {
@@ -1374,19 +1561,28 @@ function pick<T>(list: T[], index: number): T | undefined {
 async function replaySharing(steps: Step[]) {
   let { mgr } = makeManager();
   let model = new SharingModel();
-  let sharers = () => PEOPLE.filter(id => model.access(id)?.role === "build");
+  let sharers = () => PEOPLE.filter((id) => model.access(id)?.role === "build");
   // The live links each sharer may revoke or copy: any, for the owner; their own, for anyone else.
-  let linkActions = () => sharers().flatMap(actor => model.links
-      .filter(shareLink => !shareLink.revoked && (actor === OWNER || shareLink.creator === actor))
-      .map(shareLink => ({ actor, shareLink })));
+  let linkActions = () =>
+    sharers().flatMap((actor) =>
+      model.links
+        .filter(
+          (shareLink) => !shareLink.revoked && (actor === OWNER || shareLink.creator === actor),
+        )
+        .map((shareLink) => ({ actor, shareLink })),
+    );
   // The people each sharer may remove: anyone with access, for the owner; people they invited who
   // still have access, for anyone else.
   let removals = () => {
     let accesses = model.accesses();
-    return sharers().flatMap(actor => PEOPLE
-        .filter(target => accesses.has(target) && target !== actor
-            && (actor === OWNER || model.invites.get(target)?.has(actor)))
-        .map(target => ({ actor, target })));
+    return sharers().flatMap((actor) =>
+      PEOPLE.filter(
+        (target) =>
+          accesses.has(target) &&
+          target !== actor &&
+          (actor === OWNER || model.invites.get(target)?.has(actor)),
+      ).map((target) => ({ actor, target })),
+    );
   };
 
   // Confirm a previewed removal or revocation, keeping the previewed people `keep` selects (never
@@ -1394,40 +1590,64 @@ async function replaySharing(steps: Step[]) {
   // the model says loses access or some of it; the confirmation, the same minus whoever the kept
   // people's fresh grants restore.
   let confirm = (opts: {
-    label: string; actor: string; keep: number; before: Map<string, CollaboratorAccess>;
-    preview: Change[]; target?: string; commit: (keepUsers: string[]) => Change[];
+    label: string;
+    actor: string;
+    keep: number;
+    before: Map<string, CollaboratorAccess>;
+    preview: Change[];
+    target?: string;
+    commit: (keepUsers: string[]) => Change[];
   }) => {
     let afterSever = model.accesses();
     expect(opts.preview, `${opts.label}: preview`).toEqual(changes(opts.before, afterSever));
-    let keepUsers = opts.preview.map(x => x.id)
-        .filter(id => id !== opts.target && (opts.keep & (1 << PEOPLE.indexOf(id))) !== 0);
+    let keepUsers = opts.preview
+      .map((x) => x.id)
+      .filter((id) => id !== opts.target && (opts.keep & (1 << PEOPLE.indexOf(id))) !== 0);
     let actual = opts.commit(keepUsers);
     for (let id of keepUsers) {
       for (let grant of lostGrants(opts.before.get(id)!, afterSever.get(id))) {
         model.invite(id, opts.actor, grant);
       }
     }
-    expect(actual, `${opts.label} keeping [${keepUsers.join(", ")}]: people reported as losing access`)
-        .toEqual(changes(opts.before, model.accesses()));
+    expect(
+      actual,
+      `${opts.label} keeping [${keepUsers.join(", ")}]: people reported as losing access`,
+    ).toEqual(changes(opts.before, model.accesses()));
   };
 
   for (let [index, step] of steps.entries()) {
     let label = `step ${index}`;
     switch (step.kind) {
       case "invite": {
-        let actor = pick(sharers(), step.actor)!, target = PEOPLE[step.target];
+        let actor = pick(sharers(), step.actor)!,
+          target = PEOPLE[step.target];
         if (actor === target) break;
         label += `: ${actor} invites ${target} to ${describeGrant(step.grant)}`;
-        let info = mgr.addCollaborator({ caller: caller(actor), profile: profile(target), grant: step.grant });
+        let info = mgr.addCollaborator({
+          caller: caller(actor),
+          profile: profile(target),
+          grant: step.grant,
+        });
         model.invite(target, actor, modelGrant(step.grant));
-        expect(info.access, `${label}: access reported for ${target}`).toEqual(model.access(target));
+        expect(info.access, `${label}: access reported for ${target}`).toEqual(
+          model.access(target),
+        );
         break;
       }
       case "createLink": {
         let actor = pick(sharers(), step.actor)!;
         label += `: ${actor} creates link ${model.links.length} to ${describeGrant(step.grant)}`;
-        let { key, linkId } = await mgr.createShareLink({ caller: caller(actor), grant: step.grant });
-        model.links.push({ id: linkId, creator: actor, grant: modelGrant(step.grant), revoked: false, keys: [key] });
+        let { key, linkId } = await mgr.createShareLink({
+          caller: caller(actor),
+          grant: step.grant,
+        });
+        model.links.push({
+          id: linkId,
+          creator: actor,
+          grant: modelGrant(step.grant),
+          revoked: false,
+          keys: [key],
+        });
         break;
       }
       case "copyLink": {
@@ -1440,7 +1660,8 @@ async function replaySharing(steps: Step[]) {
         break;
       }
       case "open": {
-        let person = PEOPLE[step.person], shareLink = pick(model.links, step.link);
+        let person = PEOPLE[step.person],
+          shareLink = pick(model.links, step.link);
         if (!shareLink) break;
         let keyIndex = step.key % shareLink.keys.length;
         label += `: ${person} opens link ${model.links.indexOf(shareLink)} with key ${keyIndex}`;
@@ -1461,8 +1682,13 @@ async function replaySharing(steps: Step[]) {
         let preview = reported(mgr.previewRevokeShareLink(caller(actor), shareLink.id));
         shareLink.revoked = true;
         confirm({
-          label, actor, keep: step.keep, before, preview,
-          commit: keepUsers => reported(mgr.revokeShareLink(caller(actor), shareLink.id, keepUsers)),
+          label,
+          actor,
+          keep: step.keep,
+          before,
+          preview,
+          commit: (keepUsers) =>
+            reported(mgr.revokeShareLink(caller(actor), shareLink.id, keepUsers)),
         });
         break;
       }
@@ -1481,8 +1707,13 @@ async function replaySharing(steps: Step[]) {
           model.invites.get(target)!.delete(actor);
         }
         confirm({
-          label, actor, keep: step.keep, before, preview, target,
-          commit: keepUsers => reported(mgr.removeCollaborator(caller(actor), target, keepUsers)),
+          label,
+          actor,
+          keep: step.keep,
+          before,
+          preview,
+          target,
+          commit: (keepUsers) => reported(mgr.removeCollaborator(caller(actor), target, keepUsers)),
         });
         break;
       }
@@ -1492,26 +1723,58 @@ async function replaySharing(steps: Step[]) {
     for (let id of PEOPLE.slice(1)) {
       expect(mgr.getEffectiveAccess(id), `${label}: ${id}'s access`).toEqual(expected.get(id));
     }
-    expect(Object.fromEntries(mgr.listCollaborators().map(c => [c.profile.id, c.access])),
-        `${label}: people with access`).toEqual(Object.fromEntries(expected));
-    expect(mgr.listShareLinkRecords().map(l => l.id).toSorted(), `${label}: live links`)
-        .toEqual(model.links.filter(l => !l.revoked).map(l => l.id).toSorted());
+    expect(
+      Object.fromEntries(mgr.listCollaborators().map((c) => [c.profile.id, c.access])),
+      `${label}: people with access`,
+    ).toEqual(Object.fromEntries(expected));
+    expect(
+      mgr
+        .listShareLinkRecords()
+        .map((l) => l.id)
+        .toSorted(),
+      `${label}: live links`,
+    ).toEqual(
+      model.links
+        .filter((l) => !l.revoked)
+        .map((l) => l.id)
+        .toSorted(),
+    );
   }
 }
 
 describe("sharing graph property", () => {
   const grant = fc.oneof(
-      fc.constant<CollaboratorGrant>("workspace"),
-      fc.constantFrom(...SHARED_GADGETS).map((gadgetId): CollaboratorGrant => ({ gadgetId })));
+    fc.constant<CollaboratorGrant>("workspace"),
+    fc.constantFrom(...SHARED_GADGETS).map((gadgetId): CollaboratorGrant => ({ gadgetId })),
+  );
   const person = fc.integer({ min: 1, max: 4 });
   const choice = fc.nat({ max: 15 });
   const keep = fc.nat({ max: (1 << PEOPLE.length) - 1 });
   // Grants outweigh removals, so people often hold several paths when one is cut.
   const step: fc.Arbitrary<Step> = fc.oneof(
-    { arbitrary: fc.record({ kind: fc.constant("invite" as const), actor: choice, target: person, grant }), weight: 4 },
-    { arbitrary: fc.record({ kind: fc.constant("createLink" as const), actor: choice, grant }), weight: 2 },
+    {
+      arbitrary: fc.record({
+        kind: fc.constant("invite" as const),
+        actor: choice,
+        target: person,
+        grant,
+      }),
+      weight: 4,
+    },
+    {
+      arbitrary: fc.record({ kind: fc.constant("createLink" as const), actor: choice, grant }),
+      weight: 2,
+    },
     { arbitrary: fc.record({ kind: fc.constant("copyLink" as const), choice }), weight: 1 },
-    { arbitrary: fc.record({ kind: fc.constant("open" as const), person, link: choice, key: choice }), weight: 4 },
+    {
+      arbitrary: fc.record({
+        kind: fc.constant("open" as const),
+        person,
+        link: choice,
+        key: choice,
+      }),
+      weight: 4,
+    },
     { arbitrary: fc.record({ kind: fc.constant("revoke" as const), choice, keep }), weight: 1 },
     { arbitrary: fc.record({ kind: fc.constant("remove" as const), choice, keep }), weight: 1 },
   );
@@ -1522,58 +1785,72 @@ describe("sharing graph property", () => {
     // Removing a link's creator cuts off whoever joined through it. Re-adding them with one gadget
     // leaves those people cut off, since only "build" supports grants; re-adding them to the
     // workspace restores them.
-    [[
-      { kind: "invite", actor: 0, target: ANA, grant: "workspace" },  // owner
-      { kind: "createLink", actor: 1, grant: "workspace" },  // ana
-      { kind: "open", person: BEN, link: 0, key: 0 },
-      { kind: "remove", choice: 0, keep: 0 },  // owner removes ana
-      { kind: "invite", actor: 0, target: ANA, grant: { gadgetId: 1 } },
-      { kind: "invite", actor: 0, target: ANA, grant: "workspace" },
-    ]],
+    [
+      [
+        { kind: "invite", actor: 0, target: ANA, grant: "workspace" }, // owner
+        { kind: "createLink", actor: 1, grant: "workspace" }, // ana
+        { kind: "open", person: BEN, link: 0, key: 0 },
+        { kind: "remove", choice: 0, keep: 0 }, // owner removes ana
+        { kind: "invite", actor: 0, target: ANA, grant: { gadgetId: 1 } },
+        { kind: "invite", actor: 0, target: ANA, grant: "workspace" },
+      ],
+    ],
     // A collaborator withdraws their own invite: ana keeps the owner's grant of gadget 1, and cy,
     // who joined through ana's link, loses access, since ana no longer holds "build".
-    [[
-      { kind: "invite", actor: 0, target: ANA, grant: { gadgetId: 1 } },
-      { kind: "invite", actor: 0, target: BEN, grant: "workspace" },
-      { kind: "invite", actor: 1, target: ANA, grant: "workspace" },  // ben
-      { kind: "createLink", actor: 1, grant: "workspace" },  // ana
-      { kind: "open", person: CY, link: 0, key: 0 },
-      { kind: "remove", choice: 3, keep: 0 },  // ben removes ana
-    ]],
+    [
+      [
+        { kind: "invite", actor: 0, target: ANA, grant: { gadgetId: 1 } },
+        { kind: "invite", actor: 0, target: BEN, grant: "workspace" },
+        { kind: "invite", actor: 1, target: ANA, grant: "workspace" }, // ben
+        { kind: "createLink", actor: 1, grant: "workspace" }, // ana
+        { kind: "open", person: CY, link: 0, key: 0 },
+        { kind: "remove", choice: 3, keep: 0 }, // ben removes ana
+      ],
+    ],
     // Revoking a link while keeping ben, who joined through it, also keeps cy, whom ben invited.
-    [[
-      { kind: "invite", actor: 0, target: ANA, grant: "workspace" },
-      { kind: "createLink", actor: 1, grant: "workspace" },  // ana
-      { kind: "open", person: BEN, link: 0, key: 0 },
-      { kind: "invite", actor: 2, target: CY, grant: { gadgetId: 1 } },  // ben
-      { kind: "revoke", choice: 0, keep: 1 << BEN },  // owner revokes link 0
-    ]],
+    [
+      [
+        { kind: "invite", actor: 0, target: ANA, grant: "workspace" },
+        { kind: "createLink", actor: 1, grant: "workspace" }, // ana
+        { kind: "open", person: BEN, link: 0, key: 0 },
+        { kind: "invite", actor: 2, target: CY, grant: { gadgetId: 1 } }, // ben
+        { kind: "revoke", choice: 0, keep: 1 << BEN }, // owner revokes link 0
+      ],
+    ],
     // Neither a copied key nor the original lets anyone in once the link is revoked.
-    [[
-      { kind: "createLink", actor: 0, grant: { gadgetId: 1 } },
-      { kind: "copyLink", choice: 0 },
-      { kind: "open", person: ANA, link: 0, key: 1 },
-      { kind: "revoke", choice: 0, keep: 0 },
-      { kind: "open", person: BEN, link: 0, key: 1 },
-      { kind: "open", person: ANA, link: 0, key: 0 },
-    ]],
+    [
+      [
+        { kind: "createLink", actor: 0, grant: { gadgetId: 1 } },
+        { kind: "copyLink", choice: 0 },
+        { kind: "open", person: ANA, link: 0, key: 1 },
+        { kind: "revoke", choice: 0, keep: 0 },
+        { kind: "open", person: BEN, link: 0, key: 1 },
+        { kind: "open", person: ANA, link: 0, key: 0 },
+      ],
+    ],
     // Keeping someone who lost one of two gadgets restores only that one, from the actor: when
     // the other gadget's path is cut later, they keep the restored one, and re-adding its sharer
     // brings the other back.
-    [[
-      { kind: "invite", actor: 0, target: ANA, grant: "workspace" },
-      { kind: "invite", actor: 0, target: CY, grant: "workspace" },
-      { kind: "invite", actor: 1, target: BEN, grant: { gadgetId: 2 } },  // ana
-      { kind: "invite", actor: 2, target: BEN, grant: { gadgetId: 1 } },  // cy
-      { kind: "remove", choice: 0, keep: 1 << BEN },  // owner removes ana, keeping ben
-      { kind: "remove", choice: 1, keep: 0 },  // owner removes cy
-      { kind: "invite", actor: 0, target: CY, grant: "workspace" },
-    ]],
+    [
+      [
+        { kind: "invite", actor: 0, target: ANA, grant: "workspace" },
+        { kind: "invite", actor: 0, target: CY, grant: "workspace" },
+        { kind: "invite", actor: 1, target: BEN, grant: { gadgetId: 2 } }, // ana
+        { kind: "invite", actor: 2, target: BEN, grant: { gadgetId: 1 } }, // cy
+        { kind: "remove", choice: 0, keep: 1 << BEN }, // owner removes ana, keeping ben
+        { kind: "remove", choice: 1, keep: 0 }, // owner removes cy
+        { kind: "invite", actor: 0, target: CY, grant: "workspace" },
+      ],
+    ],
   ];
 
   it("gives each person the access the grants still reachable from the owner allow", async () => {
     await fc.assert(
-        fc.asyncProperty(fc.array(step, { minLength: 1, maxLength: 30, size: "medium" }), replaySharing),
-        { ...PROPERTY_RUN_OPTIONS, numRuns: 200, examples });
+      fc.asyncProperty(
+        fc.array(step, { minLength: 1, maxLength: 30, size: "medium" }),
+        replaySharing,
+      ),
+      { ...PROPERTY_RUN_OPTIONS, numRuns: 200, examples },
+    );
   });
 });

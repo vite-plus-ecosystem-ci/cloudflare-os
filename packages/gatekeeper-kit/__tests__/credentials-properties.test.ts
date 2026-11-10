@@ -18,11 +18,15 @@
 // the workflows a seed might miss are pinned as `examples`, each under a few fixed schedules.
 
 import * as fc from "fast-check";
-import { expect, it, vi } from "vitest";
+import { expect, it, vi } from "vite-plus/test";
 import { PROPERTY_RUN_OPTIONS } from "@gadgets/scripts/property-runs";
 import {
-  ConnectionSupersededError, CredentialCoordinator, CredentialsExpiredError, CredentialSource,
-  isCredentialsChanged, isCredentialsExpired,
+  ConnectionSupersededError,
+  CredentialCoordinator,
+  CredentialsExpiredError,
+  CredentialSource,
+  isCredentialsChanged,
+  isCredentialsExpired,
 } from "../src/credentials";
 import { fakeKv } from "./fake-kv";
 
@@ -46,27 +50,32 @@ function rotatingProvider() {
     minted.push({ ...creds, grant });
     return creds;
   };
-  const newest = (grant: number) => minted.findLast(pair => pair.grant === grant);
+  const newest = (grant: number) => minted.findLast((pair) => pair.grant === grant);
   const live = (grant: number) => grant >= revokedBelow;
   return {
     /** Every token pair issued, in order. */
     minted,
     now: () => now,
-    grantOf: (access: string) => minted.find(pair => pair.access === access)?.grant,
+    grantOf: (access: string) => minted.find((pair) => pair.access === access)?.grant,
     live,
     authorize: () => mint(grants++),
     refresh(current: Creds): Creds {
-      const used = minted.find(pair => pair.refresh === current.refresh);
+      const used = minted.find((pair) => pair.refresh === current.refresh);
       if (used === undefined || !live(used.grant) || used !== newest(used.grant)) {
         throw new CredentialsExpiredError("invalid_grant");
       }
       return mint(used.grant);
     },
     accepts(access: string): boolean {
-      const serial = minted.findIndex(pair => pair.access === access);
+      const serial = minted.findIndex((pair) => pair.access === access);
       const used = minted[serial];
-      return used !== undefined && live(used.grant) && used === newest(used.grant)
-        && serial >= staleBelow && used.expiresAt > now;
+      return (
+        used !== undefined &&
+        live(used.grant) &&
+        used === newest(used.grant) &&
+        serial >= staleBelow &&
+        used.expiresAt > now
+      );
     },
     expire: () => void now++,
     /** Drops every access token early; their refresh tokens still work. */
@@ -86,21 +95,24 @@ async function replay(steps: Step[], s: fc.Scheduler): Promise<void> {
   // What became of each mint, by access token.
   const [written, discarded, refused] = [0, 1, 2].map(() => new Set<unknown>());
   const kv = fakeKv();
-  const coordinator = new CredentialCoordinator<Creds>({
-    ...kv,
-    put: (key, value) => {
-      if (typeof value === "object" && value !== null && "access" in value) {
-        written.add(value.access);
-      }
-      kv.put(key, value);
+  const coordinator = new CredentialCoordinator<Creds>(
+    {
+      ...kv,
+      put: (key, value) => {
+        if (typeof value === "object" && value !== null && "access" in value) {
+          written.add(value.access);
+        }
+        kv.put(key, value);
+      },
     },
-  }, {
-    expiresAt: creds => creds.expiresAt > provider.now() ? Number.MAX_SAFE_INTEGER : 0,
-    discardMint: async mint => {
-      discarded.add(mint.access);
-      await hop("discardMint");
+    {
+      expiresAt: (creds) => (creds.expiresAt > provider.now() ? Number.MAX_SAFE_INTEGER : 0),
+      discardMint: async (mint) => {
+        discarded.add(mint.access);
+        await hop("discardMint");
+      },
     },
-  });
+  );
 
   let refreshing = 0;
   const refresh = async (current: Creds): Promise<Creds> => {
@@ -126,28 +138,42 @@ async function replay(steps: Step[], s: fc.Scheduler): Promise<void> {
   };
   const account = {
     getCredentials: () => reply("getCredentials", coordinator.snapshot(refresh, { notify })),
-    reportCredentialsRejected: (identity: string) => reply("reportCredentialsRejected",
-      coordinator.adjudicateRejection(identity, { refresh, notify })),
+    reportCredentialsRejected: (identity: string) =>
+      reply(
+        "reportCredentialsRejected",
+        coordinator.adjudicateRejection(identity, { refresh, notify }),
+      ),
   };
-  const chats = [0, 1].map(() => new CredentialSource<Creds>({
-    account: () => account,
-    isAuthError: error => error instanceof Error && error.message === "401",
-    expiredMessage: "Reconnect.",
-  }));
+  const chats = [0, 1].map(
+    () =>
+      new CredentialSource<Creds>({
+        account: () => account,
+        isAuthError: (error) => error instanceof Error && error.message === "401",
+        expiredMessage: "Reconnect.",
+      }),
+  );
 
   const runs: { replayable: boolean; attempts: string[] }[] = [];
   /** @returns Whether the operation succeeded, the chat otherwise told to re-enter or reconnect. */
   const run = (chat: number, replayable: boolean): Promise<boolean> => {
     const attempts: string[] = [];
     runs.push({ replayable, attempts });
-    return chats[chat].run(async creds => {
-      attempts.push(creds.access);
-      await hop(`chat ${chat} calls with ${creds.access}`);
-      if (!provider.accepts(creds.access)) throw new Error("401");
-    }, { replayable }).then(() => true, error => {
-      if (!isCredentialsChanged(error) && !isCredentialsExpired(error)) throw error;
-      return false;
-    });
+    return chats[chat]
+      .run(
+        async (creds) => {
+          attempts.push(creds.access);
+          await hop(`chat ${chat} calls with ${creds.access}`);
+          if (!provider.accepts(creds.access)) throw new Error("401");
+        },
+        { replayable },
+      )
+      .then(
+        () => true,
+        (error) => {
+          if (!isCredentialsChanged(error) && !isCredentialsExpired(error)) throw error;
+          return false;
+        },
+      );
   };
 
   // The test's own record of the connection: the grant connected, and a count of connects and
@@ -180,7 +206,8 @@ async function replay(steps: Step[], s: fc.Scheduler): Promise<void> {
       else if (step.kind === "expire") provider.expire();
       else if (step.kind === "staleBearer") provider.dropAccessTokens();
       else if (step.kind === "revoke") provider.revoke();
-      else {  // disconnect
+      else {
+        // disconnect
         coordinator.clear();
         connected = undefined;
         epoch++;
@@ -199,13 +226,15 @@ async function replay(steps: Step[], s: fc.Scheduler): Promise<void> {
 
   for (const { replayable, attempts } of runs) {
     expect(attempts.length, "times one operation ran").toBeLessThanOrEqual(replayable ? 2 : 1);
-    expect(new Set(attempts.map(provider.grantOf)).size, "grants one operation ran under")
-      .toBeLessThanOrEqual(1);
+    expect(
+      new Set(attempts.map(provider.grantOf)).size,
+      "grants one operation ran under",
+    ).toBeLessThanOrEqual(1);
   }
   const stored = coordinator.stored();
   expect(stored && provider.grantOf(stored.access), "the stored grant").toBe(connected);
   for (const { access } of provider.minted) {
-    const fates = [written, discarded, refused].filter(tokens => tokens.has(access));
+    const fates = [written, discarded, refused].filter((tokens) => tokens.has(access));
     expect(fates, `fates of ${access}`).toHaveLength(1);
   }
 
@@ -218,7 +247,7 @@ const operation = (chat: 0 | 1, replayable: boolean): Step => ({ kind: "run", ch
 // Operations outweigh the rest: the races need some in flight when the connection changes.
 const chat = fc.constantFrom<0 | 1>(0, 1);
 const step: fc.Arbitrary<Step> = fc.oneof(
-  { weight: 6, arbitrary: fc.tuple(chat, fc.boolean()).map(args => operation(...args)) },
+  { weight: 6, arbitrary: fc.tuple(chat, fc.boolean()).map((args) => operation(...args)) },
   { weight: 3, arbitrary: fc.constant(on("expire")) },
   { weight: 2, arbitrary: fc.constant(on("staleBearer")) },
   { weight: 2, arbitrary: fc.constant(on("reconnect")) },
@@ -241,14 +270,18 @@ const workflows: Step[][] = [
 ];
 
 it("never replays an operation across connections or loses a token rotation", async () => {
-  const examples = workflows.flatMap(steps => fc.sample(fc.scheduler(), { seed: 0, numRuns: 10 })
-    .map((schedule): [Step[], fc.Scheduler] => [steps, schedule]));
+  const examples = workflows.flatMap((steps) =>
+    fc
+      .sample(fc.scheduler(), { seed: 0, numRuns: 10 })
+      .map((schedule): [Step[], fc.Scheduler] => [steps, schedule]),
+  );
   // The kit logs each heal a reconnect or disconnect overtook, hundreds of lines over the runs.
   const logged = vi.spyOn(console, "warn").mockImplementation(() => {});
   try {
     await fc.assert(
       fc.asyncProperty(fc.array(step, { minLength: 1, maxLength: 12 }), fc.scheduler(), replay),
-      { ...PROPERTY_RUN_OPTIONS, numRuns: 1000, examples });
+      { ...PROPERTY_RUN_OPTIONS, numRuns: 1000, examples },
+    );
   } finally {
     logged.mockRestore();
   }

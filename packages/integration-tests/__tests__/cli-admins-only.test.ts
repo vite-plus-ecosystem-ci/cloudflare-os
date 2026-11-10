@@ -5,7 +5,7 @@
 import { execFile } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { ADMIN_USERNAME, startTestGatekeeperHarness, type Harness } from "../src/harness.js";
 import { connect, nextUsernames, signUp } from "../src/rpc-client.js";
 
@@ -26,14 +26,22 @@ afterAll(async () => {
 });
 
 /** `cf-os api --url <harness> <args>`, with `env` and nothing inherited but PATH. */
-function cfOsApi(args: string[], env: Record<string, string> = {})
-    : Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise(settle => {
-    execFile(process.execPath, [CLI, "api", "--url", harness.url.origin, ...args],
-        { env: { PATH: process.env.PATH ?? "", ...env } },
-        (error, stdout, stderr) => settle({
-          code: error === null ? 0 : typeof error.code === "number" ? error.code : -1, stdout, stderr,
-        }));
+function cfOsApi(
+  args: string[],
+  env: Record<string, string> = {},
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise((settle) => {
+    execFile(
+      process.execPath,
+      [CLI, "api", "--url", harness.url.origin, ...args],
+      { env: { PATH: process.env.PATH ?? "", ...env } },
+      (error, stdout, stderr) =>
+        settle({
+          code: error === null ? 0 : typeof error.code === "number" ? error.code : -1,
+          stdout,
+          stderr,
+        }),
+    );
   });
 }
 
@@ -47,7 +55,9 @@ describe("on a local instance", () => {
     const config = await cfOsApi(["public", "get-server-config"]);
     expect(config, config.stderr).toMatchObject({ code: 0 });
 
-    const asBob = await cfOsApi(["--username", bob!, "am-i-admin"], { CFOS_API_PASSWORD: PASSWORD });
+    const asBob = await cfOsApi(["--username", bob!, "am-i-admin"], {
+      CFOS_API_PASSWORD: PASSWORD,
+    });
     expect(asBob, asBob.stderr).toMatchObject({ code: 0 });
     expect(JSON.parse(asBob.stdout)).toBe(false);
   });
@@ -55,20 +65,23 @@ describe("on a local instance", () => {
 
 describe("on a deployment", () => {
   beforeAll(async () => {
-    await harness.redeployWorkshop(config => {
+    await harness.redeployWorkshop((config) => {
       delete config.vars!.WORKSHOP_ENVIRONMENT;
     });
   });
 
   it("lets the CLI sign in as a deployment admin", async () => {
-    const asAdmin = await cfOsApi(["--username", ADMIN_USERNAME, "am-i-admin"],
-        { CFOS_API_PASSWORD: PASSWORD });
+    const asAdmin = await cfOsApi(["--username", ADMIN_USERNAME, "am-i-admin"], {
+      CFOS_API_PASSWORD: PASSWORD,
+    });
     expect(asAdmin, asAdmin.stderr).toMatchObject({ code: 0 });
     expect(JSON.parse(asAdmin.stdout)).toBe(true);
   });
 
   it("refuses the CLI anyone else, by password or token, and every call that signs no one in", async () => {
-    const asBob = await cfOsApi(["--username", bob!, "am-i-admin"], { CFOS_API_PASSWORD: PASSWORD });
+    const asBob = await cfOsApi(["--username", bob!, "am-i-admin"], {
+      CFOS_API_PASSWORD: PASSWORD,
+    });
     expect(asBob).toMatchObject({ code: 1, stdout: "" });
     expect(asBob.stderr).toContain(REFUSED);
 
@@ -81,7 +94,10 @@ describe("on a deployment", () => {
     expect(asCarol.stderr).toContain(REFUSED);
 
     const [dave] = nextUsernames("dave");
-    for (const args of [["create-account", dave!], ["public", "get-server-config"]]) {
+    for (const args of [
+      ["create-account", dave!],
+      ["public", "get-server-config"],
+    ]) {
       const refused = await cfOsApi(args, { CFOS_API_PASSWORD: PASSWORD });
       expect(refused).toMatchObject({ code: 1, stdout: "" });
       expect(refused.stderr).toContain(REFUSED);

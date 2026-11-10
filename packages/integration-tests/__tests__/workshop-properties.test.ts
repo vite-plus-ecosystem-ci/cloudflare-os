@@ -11,23 +11,45 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import type { RpcStub } from "capnweb";
 import * as fc from "fast-check";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vite-plus/test";
 import type {
-  AiChatAuthorInfo, AiChatMessage, AiChatMetadata, AiChatStreamEvent, AiChatSubscriber,
-  ActionLogEntry, CodeChangeSubmission, Overseer, WorkpieceId,
+  AiChatAuthorInfo,
+  AiChatMessage,
+  AiChatMetadata,
+  AiChatStreamEvent,
+  AiChatSubscriber,
+  ActionLogEntry,
+  CodeChangeSubmission,
+  Overseer,
+  WorkpieceId,
 } from "@gadgets/workshop-shared/api";
 import {
-  applyCodeChange, diffFiles, replaceSpanChange, type CodeChange, type CodeContent,
+  applyCodeChange,
+  diffFiles,
+  replaceSpanChange,
+  type CodeChange,
+  type CodeContent,
 } from "@gadgets/workshop-shared/code-change";
 import { PROPERTY_RUN_OPTIONS } from "@gadgets/scripts/property-runs";
 import type { TestSession } from "../fixtures/gatekeeper-test/src/test-gatekeeper.js";
 import { loadAllChatHistory } from "../src/agent-session.js";
 import {
-  startTestGatekeeperHarness, TEST_VENDOR_ID, testActionState, testControl, type Harness,
+  startTestGatekeeperHarness,
+  TEST_VENDOR_ID,
+  testActionState,
+  testControl,
+  type Harness,
 } from "../src/harness.js";
 import { NetworkInterceptor } from "../src/network-interceptor.js";
 import {
-  accountLabel, connect, listConnectedAccounts, nextUsernames, RpcTarget, signUp, stubFor, waitFor,
+  accountLabel,
+  connect,
+  listConnectedAccounts,
+  nextUsernames,
+  RpcTarget,
+  signUp,
+  stubFor,
+  waitFor,
   WorkpieceRecorder,
 } from "../src/rpc-client.js";
 
@@ -92,7 +114,10 @@ class ApprovalModel {
   /** The provider fails the next apply attempt. */
   failNext = false;
 
-  constructor(readonly values: number[], readonly eligible: boolean[]) {
+  constructor(
+    readonly values: number[],
+    readonly eligible: boolean[],
+  ) {
     this.states = values.map(() => "pending");
     this.auto = values.map(() => false);
   }
@@ -128,12 +153,15 @@ class ApprovalModel {
 }
 
 const approvalScenario: fc.Arbitrary<ApprovalScenario> = fc.record({
-  writes: fc.uniqueArray(fc.record({
-    value: fc.integer({ min: -1_000_000, max: 1_000_000 }),
-    autoApprovable: fc.boolean(),
-    decision: fc.constantFrom<Decision>("approve", "reject", "leave"),
-    rank: fc.nat(),
-  }), { minLength: 1, maxLength: 6, selector: write => write.value }),
+  writes: fc.uniqueArray(
+    fc.record({
+      value: fc.integer({ min: -1_000_000, max: 1_000_000 }),
+      autoApprovable: fc.boolean(),
+      decision: fc.constantFrom<Decision>("approve", "reject", "leave"),
+      rank: fc.nat(),
+    }),
+    { minLength: 1, maxLength: 6, selector: (write) => write.value },
+  ),
   ruleEnabled: fc.boolean(),
   concurrent: fc.boolean(),
   failBefore: fc.option(fc.nat({ max: 4 }), { freq: 2 }),
@@ -144,7 +172,10 @@ const approvalScenario: fc.Arbitrary<ApprovalScenario> = fc.record({
  * Deciding a manual write must restart the drain for the auto-approvable writes queued behind it
  * (the turn-resumption fix, 1200259, lives on this path). Random cases reach it only sometimes.
  */
-const cascade = (decision: "approve" | "reject", failBefore: number | null = null): ApprovalScenario => ({
+const cascade = (
+  decision: "approve" | "reject",
+  failBefore: number | null = null,
+): ApprovalScenario => ({
   writes: [
     { value: 1, autoApprovable: false, decision, rank: 0 },
     { value: 2, autoApprovable: true, decision: "leave", rank: 0 },
@@ -165,7 +196,7 @@ const failureExamples: ApprovalScenario[] = [
   cascade("reject", 1),
   // The drain fails the only write and nothing retries it: it stays pending for the user to
   // decide, not dropped or recorded as applied, and approving it is then a manual approval.
-  ...(["leave", "approve"] as const).map(decision => ({
+  ...(["leave", "approve"] as const).map((decision) => ({
     writes: [{ value: 1, autoApprovable: true, decision, rank: 0 }],
     ruleEnabled: true,
     concurrent: false,
@@ -187,133 +218,157 @@ async function writesOf(ws: RpcStub<Overseer>, gatekeeperId: number) {
   return writes;
 }
 
-const valueOf = (entry: ActionLogEntry) => Number(/^Set the test value to (-?\d+)$/
-    .exec(entry.description.title)?.[1]);
+const valueOf = (entry: ActionLogEntry) =>
+  Number(/^Set the test value to (-?\d+)$/.exec(entry.description.title)?.[1]);
 
 const PROVIDER_FAILURE = "The provider is temporarily unavailable.";
 
 it.concurrent("decided writes apply exactly once, to the write the user decided", async () => {
-  await fc.assert(fc.asyncProperty(approvalScenario, async scenario => {
-    const { writes, ruleEnabled, concurrent, failBefore, afterFailure } = scenario;
-    using stack = new DisposableStack();
-    const { api, ws } = await freshWorkspace(stack, "approvals");
-    await api.provisionAmbientAccount(TEST_VENDOR_ID);
-    const account = await waitFor("the test account", async () =>
-      (await listConnectedAccounts(api)).find(a => a.vendorId === TEST_VENDOR_ID) ?? null);
-    const label = accountLabel(account);
-    const gatekeeper = await ws.newGatekeeper(account.id, "https://gadgets-test.example/things/approvals");
-    if (!gatekeeper) throw new Error("Failed to create the test connection");
-    const gatekeeperId = await stack.use(gatekeeper).getId();
-    const session = stack.use(await gatekeeper.openSession() as RpcStub<TestSession>);
-    if (ruleEnabled) {
-      await ws.setAutoApprovedActionKind(gatekeeperId, { tag: "set-value", label: "Set value" });
-    }
-    const failNextApply = async () => {
-      await testControl(harness, "fail-next-apply", { label, reason: PROVIDER_FAILURE });
-      model.failNext = true;
-    };
-
-    const values = writes.map(write => write.value);
-    const eligible = writes.map(write => ruleEnabled && write.autoApprovable);
-    const model = new ApprovalModel(values, eligible);
-    if (failBefore === 0) await failNextApply();
-    const submit = ({ value, autoApprovable }: Write) => session.writeValue(value, { autoApprovable });
-    // A gadget may fire its writes concurrently, but the drain then races submission, so the
-    // model's "nothing applies past a pending gate" order holds only for sequential submission.
-    if (concurrent && !ruleEnabled) {
-      await Promise.all(writes.map(submit));
-    } else {
-      for (const [i, write] of writes.entries()) {
-        await submit(write);
-        if (eligible[i]) model.drain();
+  await fc.assert(
+    fc.asyncProperty(approvalScenario, async (scenario) => {
+      const { writes, ruleEnabled, concurrent, failBefore, afterFailure } = scenario;
+      using stack = new DisposableStack();
+      const { api, ws } = await freshWorkspace(stack, "approvals");
+      await api.provisionAmbientAccount(TEST_VENDOR_ID);
+      const account = await waitFor(
+        "the test account",
+        async () =>
+          (await listConnectedAccounts(api)).find((a) => a.vendorId === TEST_VENDOR_ID) ?? null,
+      );
+      const label = accountLabel(account);
+      const gatekeeper = await ws.newGatekeeper(
+        account.id,
+        "https://gadgets-test.example/things/approvals",
+      );
+      if (!gatekeeper) throw new Error("Failed to create the test connection");
+      const gatekeeperId = await stack.use(gatekeeper).getId();
+      const session = stack.use((await gatekeeper.openSession()) as RpcStub<TestSession>);
+      if (ruleEnabled) {
+        await ws.setAutoApprovedActionKind(gatekeeperId, { tag: "set-value", label: "Set value" });
       }
-    }
+      const failNextApply = async () => {
+        await testControl(harness, "fail-next-apply", { label, reason: PROVIDER_FAILURE });
+        model.failNext = true;
+      };
 
-    const idOf = new Map((await writesOf(ws, gatekeeperId)).map(entry => [valueOf(entry), entry.id]));
-    expect([...idOf.keys()].toSorted()).toEqual(values.toSorted());
-
-    // Apply attempts settle too, and must have finished, not just started: a pending write whose
-    // attempt is still in flight looks the same in the ledger as one the drain already failed, and
-    // deciding it then would race that attempt for the one-shot failure. Every attempt reaching the
-    // provider exactly once is itself part of the contract.
-    const matchesModel = async () => {
-      const { attempts, settled } = await testControl<{ attempts: number; settled: number }>(
-        harness, "apply-attempts", { label });
-      if (attempts !== model.attempts || settled !== attempts) return null;
-      const entries = await writesOf(ws, gatekeeperId);
-      const states = new Map(entries.map(entry => [valueOf(entry), entry.state]));
-      return values.every((value, i) => states.get(value) === model.states[i]) ? entries : null;
-    };
-    const expectFixtureMatches = async () => {
-      const pending = values.filter((_, i) => model.states[i] === "pending");
-      const state = await testActionState(harness, label);
-      expect(state.pending.map(action => action.value).toSorted()).toEqual(pending.toSorted());
-      expect(state.applyCount).toBe(model.applied.length);
-      expect(state.value).toBe(model.applied.at(-1));
-    };
-
-    await waitFor("the initial drain", matchesModel, SETTLE_MS);
-    // The user works through the pending list, including auto-approvable writes still held behind
-    // a gate or failed by the drain.
-    let decisions = 0;
-    for (const i of [...writes.keys()].toSorted((a, b) => writes[a]!.rank - writes[b]!.rank)) {
-      const { value, decision } = writes[i]!;
-      if (decision === "leave" || model.states[i] !== "pending") continue;
-      if (++decisions === failBefore) await failNextApply();
-      const id = idOf.get(value)!;
-      let step: string = decision;
-      if (decision === "reject") {
-        await ws.rejectAction(id);
-        model.reject(i);
-      } else if (model.apply(i, false)) {
-        await ws.approveAction(id);
-        model.drain();
+      const values = writes.map((write) => write.value);
+      const eligible = writes.map((write) => ruleEnabled && write.autoApprovable);
+      const model = new ApprovalModel(values, eligible);
+      if (failBefore === 0) await failNextApply();
+      const submit = ({ value, autoApprovable }: Write) =>
+        session.writeValue(value, { autoApprovable });
+      // A gadget may fire its writes concurrently, but the drain then races submission, so the
+      // model's "nothing applies past a pending gate" order holds only for sequential submission.
+      if (concurrent && !ruleEnabled) {
+        await Promise.all(writes.map(submit));
       } else {
-        const failure = await ws.approveAction(id).then(() => "approved", (error: unknown) => `${error}`);
-        expect(failure, `the provider's failure to apply ${value}`).toContain(PROVIDER_FAILURE);
-        await waitFor(`the ledger after the failed approval of ${value}`, matchesModel, SETTLE_MS);
-        await expectFixtureMatches();
-        step = `${afterFailure} after a failed approval`;
-        if (afterFailure === "retry") {
-          await ws.approveAction(id);
-          model.apply(i, false);
-          model.drain();
-        } else {
-          await ws.rejectAction(id);
-          model.reject(i);
+        for (const [i, write] of writes.entries()) {
+          await submit(write);
+          if (eligible[i]) model.drain();
         }
       }
-      await waitFor(`the ledger after ${step} of ${value}`, matchesModel, SETTLE_MS);
-      await expectFixtureMatches();
-    }
 
-    // A drain that wrongly skips past a pending gate runs out of process (ctx.waitUntil), so only
-    // a real delay can show it, and only while an eligible write is still held behind a gate.
-    if (eligible.some((isEligible, i) => isEligible && model.states[i] === "pending")) await sleep(300);
-    const entries = await matchesModel();
-    expect(entries, "ledger states and apply attempts after settling").not.toBeNull();
-    for (const entry of entries!) {
-      const i = values.indexOf(valueOf(entry));
-      if (model.states[i] === "approved") {
-        expect(!!entry.autoApproved, `autoApproved of write ${values[i]}`).toBe(model.auto[i]);
+      const idOf = new Map(
+        (await writesOf(ws, gatekeeperId)).map((entry) => [valueOf(entry), entry.id]),
+      );
+      expect([...idOf.keys()].toSorted()).toEqual(values.toSorted());
+
+      // Apply attempts settle too, and must have finished, not just started: a pending write whose
+      // attempt is still in flight looks the same in the ledger as one the drain already failed, and
+      // deciding it then would race that attempt for the one-shot failure. Every attempt reaching the
+      // provider exactly once is itself part of the contract.
+      const matchesModel = async () => {
+        const { attempts, settled } = await testControl<{ attempts: number; settled: number }>(
+          harness,
+          "apply-attempts",
+          { label },
+        );
+        if (attempts !== model.attempts || settled !== attempts) return null;
+        const entries = await writesOf(ws, gatekeeperId);
+        const states = new Map(entries.map((entry) => [valueOf(entry), entry.state]));
+        return values.every((value, i) => states.get(value) === model.states[i]) ? entries : null;
+      };
+      const expectFixtureMatches = async () => {
+        const pending = values.filter((_, i) => model.states[i] === "pending");
+        const state = await testActionState(harness, label);
+        expect(state.pending.map((action) => action.value).toSorted()).toEqual(pending.toSorted());
+        expect(state.applyCount).toBe(model.applied.length);
+        expect(state.value).toBe(model.applied.at(-1));
+      };
+
+      await waitFor("the initial drain", matchesModel, SETTLE_MS);
+      // The user works through the pending list, including auto-approvable writes still held behind
+      // a gate or failed by the drain.
+      let decisions = 0;
+      for (const i of [...writes.keys()].toSorted((a, b) => writes[a]!.rank - writes[b]!.rank)) {
+        const { value, decision } = writes[i]!;
+        if (decision === "leave" || model.states[i] !== "pending") continue;
+        if (++decisions === failBefore) await failNextApply();
+        const id = idOf.get(value)!;
+        let step: string = decision;
+        if (decision === "reject") {
+          await ws.rejectAction(id);
+          model.reject(i);
+        } else if (model.apply(i, false)) {
+          await ws.approveAction(id);
+          model.drain();
+        } else {
+          const failure = await ws.approveAction(id).then(
+            () => "approved",
+            (error: unknown) => `${error}`,
+          );
+          expect(failure, `the provider's failure to apply ${value}`).toContain(PROVIDER_FAILURE);
+          await waitFor(
+            `the ledger after the failed approval of ${value}`,
+            matchesModel,
+            SETTLE_MS,
+          );
+          await expectFixtureMatches();
+          step = `${afterFailure} after a failed approval`;
+          if (afterFailure === "retry") {
+            await ws.approveAction(id);
+            model.apply(i, false);
+            model.drain();
+          } else {
+            await ws.rejectAction(id);
+            model.reject(i);
+          }
+        }
+        await waitFor(`the ledger after ${step} of ${value}`, matchesModel, SETTLE_MS);
+        await expectFixtureMatches();
       }
-    }
-    await expectFixtureMatches();
 
-    // A second tab deciding an already decided write must not apply it again.
-    const decided = values.findIndex((_, i) => model.states[i] !== "pending");
-    if (decided !== -1) {
-      const id = idOf.get(values[decided]!)!;
-      await expect(ws.approveAction(id)).rejects.toThrow(`Action is not pending: ${id}`);
-      await expect(ws.rejectAction(id)).rejects.toThrow(`Action is not pending: ${id}`);
+      // A drain that wrongly skips past a pending gate runs out of process (ctx.waitUntil), so only
+      // a real delay can show it, and only while an eligible write is still held behind a gate.
+      if (eligible.some((isEligible, i) => isEligible && model.states[i] === "pending"))
+        await sleep(300);
+      const entries = await matchesModel();
+      expect(entries, "ledger states and apply attempts after settling").not.toBeNull();
+      for (const entry of entries!) {
+        const i = values.indexOf(valueOf(entry));
+        if (model.states[i] === "approved") {
+          expect(!!entry.autoApproved, `autoApproved of write ${values[i]}`).toBe(model.auto[i]);
+        }
+      }
       await expectFixtureMatches();
-    }
-  }), {
-    ...PROPERTY_RUN_OPTIONS,
-    numRuns: 15,
-    examples: [cascade("reject"), cascade("approve"), ...failureExamples]
-      .map(example => [example] as [ApprovalScenario]),
-  });
+
+      // A second tab deciding an already decided write must not apply it again.
+      const decided = values.findIndex((_, i) => model.states[i] !== "pending");
+      if (decided !== -1) {
+        const id = idOf.get(values[decided]!)!;
+        await expect(ws.approveAction(id)).rejects.toThrow(`Action is not pending: ${id}`);
+        await expect(ws.rejectAction(id)).rejects.toThrow(`Action is not pending: ${id}`);
+        await expectFixtureMatches();
+      }
+    }),
+    {
+      ...PROPERTY_RUN_OPTIONS,
+      numRuns: 15,
+      examples: [cascade("reject"), cascade("approve"), ...failureExamples].map(
+        (example) => [example] as [ApprovalScenario],
+      ),
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -323,10 +378,12 @@ it.concurrent("decided writes apply exactly once, to the write the user decided"
 
 type File = { bytes: Uint8Array; mimeType: string; name: string };
 
-const PNG_SIGNATURE = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const file: fc.Arbitrary<File> = fc.oneof(
   fc.record({
-    bytes: fc.string({ unit: "grapheme", maxLength: 200 }).map(text => new TextEncoder().encode(text)),
+    bytes: fc
+      .string({ unit: "grapheme", maxLength: 200 })
+      .map((text) => new TextEncoder().encode(text)),
     mimeType: fc.constant("text/plain"),
     name: fc.constantFrom("notes.txt", "todo.txt"),
   }),
@@ -336,7 +393,9 @@ const file: fc.Arbitrary<File> = fc.oneof(
     name: fc.constantFrom("export.bin", "data.bin"),
   }),
   fc.record({
-    bytes: fc.uint8Array({ maxLength: 1024 }).map(tail => new Uint8Array([...PNG_SIGNATURE, ...tail])),
+    bytes: fc
+      .uint8Array({ maxLength: 1024 })
+      .map((tail) => new Uint8Array([...PNG_SIGNATURE, ...tail])),
     mimeType: fc.constant("image/png"),
     name: fc.constantFrom("screenshot.png", "photo.png"),
   }),
@@ -353,97 +412,133 @@ const chatOp = fc.oneof(
 // A session opens with a chat carrying a file; the generated ops may then reply, delete, or start
 // more. Without it, a run whose first chat carries nothing checks no attachment at all.
 const opening = fc.record({
-  op: fc.constant("new" as const), text: message, attach: fc.uniqueArray(fc.nat(), { minLength: 1, maxLength: 3 }),
+  op: fc.constant("new" as const),
+  text: message,
+  attach: fc.uniqueArray(fc.nat(), { minLength: 1, maxLength: 3 }),
 });
 
 type ModelMessage = { text: string; attachments: { id: string; file: number }[] };
 
 it.concurrent("attachment ids resolve to their bytes in exactly the chat that holds them", async () => {
-  await fc.assert(fc.asyncProperty(
+  await fc.assert(
+    fc.asyncProperty(
       fc.array(file, { minLength: 1, maxLength: 4 }),
-      fc.tuple(opening, fc.array(chatOp, { maxLength: 7 })).map(([first, rest]) => [first, ...rest]),
+      fc
+        .tuple(opening, fc.array(chatOp, { maxLength: 7 }))
+        .map(([first, rest]) => [first, ...rest]),
       async (files, ops) => {
-    using stack = new DisposableStack();
-    const { ws } = await freshWorkspace(stack, "attachments");
-    const oids: string[] = [];
-    for (const { bytes } of files) {
-      const oid = await ws.uploadBlob(bytes);
-      expect(await ws.uploadBlob(bytes.slice())).toBe(oid);
-      oids.push(oid);
-    }
-
-    const live = new Map<number, ModelMessage[]>();
-    const deleted = new Map<number, string[]>();
-    // Send `text` with the files `picks` selects, as a new chat or into `chatId`, and record the
-    // attachment ids the chat's history assigned them.
-    const send = async (chatId: number | undefined, text: string, picks: number[]) => {
-      const picked = [...new Set(picks.map(p => p % files.length))];
-      const sent = picked.map(f => ({ oid: oids[f]!, mimeType: files[f]!.mimeType, name: files[f]!.name }));
-      if (chatId === undefined) {
-        chatId = await ws.newChat(text, null, undefined, sent);
-        expect(live.has(chatId)).toBe(false);
-        live.set(chatId, []);
-      } else {
-        await ws.sendChatMessage(chatId, text, null, undefined, sent);
-      }
-      const last = (await ws.getChatHistory(chatId)).messages.findLast(m => m.type === "message");
-      if (last?.type !== "message") throw new Error(`Chat ${chatId} has no message`);
-      expect(last.message).toBe(text);
-      const attachments = last.attachments ?? [];
-      expect(attachments.map(({ oid, mimeType, name, size }) => ({ oid, mimeType, name, size })))
-          .toEqual(sent.map((handle, i) => ({ ...handle, size: files[picked[i]!]!.bytes.byteLength })));
-      live.get(chatId)!.push({ text, attachments: attachments.map((a, i) => ({ id: a.id, file: picked[i]! })) });
-    };
-
-    for (const op of ops) {
-      const chats = [...live.keys()];
-      if (op.op === "new") {
-        await send(undefined, op.text, op.attach);
-      } else if (chats.length > 0) {
-        const chatId = chats[op.chat % chats.length]!;
-        if (op.op === "send") {
-          await send(chatId, op.text, op.attach);
-        } else {
-          await ws.deleteChat(chatId);
-          deleted.set(chatId, live.get(chatId)!.flatMap(m => m.attachments.map(a => a.id)));
-          live.delete(chatId);
+        using stack = new DisposableStack();
+        const { ws } = await freshWorkspace(stack, "attachments");
+        const oids: string[] = [];
+        for (const { bytes } of files) {
+          const oid = await ws.uploadBlob(bytes);
+          expect(await ws.uploadBlob(bytes.slice())).toBe(oid);
+          oids.push(oid);
         }
-      }
-    }
 
-    expect((await ws.listChats()).map(chat => chat.id).toSorted()).toEqual([...live.keys()].toSorted());
-    const owner = new Map<string, number>();
-    for (const [chatId, messages] of live) {
-      const history = await loadAllChatHistory(before => ws.getChatHistory(chatId, before));
-      expect(history.flatMap(m => m.type === "message" ? [m.message] : []))
-          .toEqual(messages.map(m => m.text));
-      for (const { id, file: f } of messages.flatMap(m => m.attachments)) {
-        owner.set(id, chatId);
-        // capnweb hands Node a Buffer; compare the bytes, not the class.
-        expect(new Uint8Array(await ws.getChatAttachmentContent(chatId, id))).toEqual(files[f]!.bytes);
-      }
-    }
-    // A chat the user starts now holds none of them: every id, live or deleted, must miss there.
-    // Each live id is also tried in one other live chat, and each deleted chat's ids in that chat
-    // and every live one.
-    const chatIds = [...live.keys()];
-    const fresh = await ws.newChat("Starting over", null);
-    for (const [id, chatId] of owner) {
-      await expect(ws.getChatAttachmentContent(fresh, id)).rejects.toThrow("Chat attachment not found.");
-      const other = chatIds.find(c => c !== chatId);
-      if (other !== undefined) {
-        await expect(ws.getChatAttachmentContent(other, id)).rejects.toThrow("Chat attachment not found.");
-      }
-    }
-    for (const [chatId, ids] of deleted) {
-      expect((await ws.getChatHistory(chatId)).messages).toEqual([]);
-      for (const id of ids) {
-        for (const c of [chatId, fresh, ...chatIds]) {
-          await expect(ws.getChatAttachmentContent(c, id)).rejects.toThrow("Chat attachment not found.");
+        const live = new Map<number, ModelMessage[]>();
+        const deleted = new Map<number, string[]>();
+        // Send `text` with the files `picks` selects, as a new chat or into `chatId`, and record the
+        // attachment ids the chat's history assigned them.
+        const send = async (chatId: number | undefined, text: string, picks: number[]) => {
+          const picked = [...new Set(picks.map((p) => p % files.length))];
+          const sent = picked.map((f) => ({
+            oid: oids[f]!,
+            mimeType: files[f]!.mimeType,
+            name: files[f]!.name,
+          }));
+          if (chatId === undefined) {
+            chatId = await ws.newChat(text, null, undefined, sent);
+            expect(live.has(chatId)).toBe(false);
+            live.set(chatId, []);
+          } else {
+            await ws.sendChatMessage(chatId, text, null, undefined, sent);
+          }
+          const last = (await ws.getChatHistory(chatId)).messages.findLast(
+            (m) => m.type === "message",
+          );
+          if (last?.type !== "message") throw new Error(`Chat ${chatId} has no message`);
+          expect(last.message).toBe(text);
+          const attachments = last.attachments ?? [];
+          expect(
+            attachments.map(({ oid, mimeType, name, size }) => ({ oid, mimeType, name, size })),
+          ).toEqual(
+            sent.map((handle, i) => ({ ...handle, size: files[picked[i]!]!.bytes.byteLength })),
+          );
+          live
+            .get(chatId)!
+            .push({
+              text,
+              attachments: attachments.map((a, i) => ({ id: a.id, file: picked[i]! })),
+            });
+        };
+
+        for (const op of ops) {
+          const chats = [...live.keys()];
+          if (op.op === "new") {
+            await send(undefined, op.text, op.attach);
+          } else if (chats.length > 0) {
+            const chatId = chats[op.chat % chats.length]!;
+            if (op.op === "send") {
+              await send(chatId, op.text, op.attach);
+            } else {
+              await ws.deleteChat(chatId);
+              deleted.set(
+                chatId,
+                live.get(chatId)!.flatMap((m) => m.attachments.map((a) => a.id)),
+              );
+              live.delete(chatId);
+            }
+          }
         }
-      }
-    }
-  }), { ...PROPERTY_RUN_OPTIONS, numRuns: 15 });
+
+        expect((await ws.listChats()).map((chat) => chat.id).toSorted()).toEqual(
+          [...live.keys()].toSorted(),
+        );
+        const owner = new Map<string, number>();
+        for (const [chatId, messages] of live) {
+          const history = await loadAllChatHistory((before) => ws.getChatHistory(chatId, before));
+          expect(history.flatMap((m) => (m.type === "message" ? [m.message] : []))).toEqual(
+            messages.map((m) => m.text),
+          );
+          for (const { id, file: f } of messages.flatMap((m) => m.attachments)) {
+            owner.set(id, chatId);
+            // capnweb hands Node a Buffer; compare the bytes, not the class.
+            expect(new Uint8Array(await ws.getChatAttachmentContent(chatId, id))).toEqual(
+              files[f]!.bytes,
+            );
+          }
+        }
+        // A chat the user starts now holds none of them: every id, live or deleted, must miss there.
+        // Each live id is also tried in one other live chat, and each deleted chat's ids in that chat
+        // and every live one.
+        const chatIds = [...live.keys()];
+        const fresh = await ws.newChat("Starting over", null);
+        for (const [id, chatId] of owner) {
+          await expect(ws.getChatAttachmentContent(fresh, id)).rejects.toThrow(
+            "Chat attachment not found.",
+          );
+          const other = chatIds.find((c) => c !== chatId);
+          if (other !== undefined) {
+            await expect(ws.getChatAttachmentContent(other, id)).rejects.toThrow(
+              "Chat attachment not found.",
+            );
+          }
+        }
+        for (const [chatId, ids] of deleted) {
+          expect((await ws.getChatHistory(chatId)).messages).toEqual([]);
+          for (const id of ids) {
+            for (const c of [chatId, fresh, ...chatIds]) {
+              await expect(ws.getChatAttachmentContent(c, id)).rejects.toThrow(
+                "Chat attachment not found.",
+              );
+            }
+          }
+        }
+      },
+    ),
+    { ...PROPERTY_RUN_OPTIONS, numRuns: 15 },
+  );
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -460,8 +555,13 @@ class ChangeRecorder extends RpcTarget implements AiChatSubscriber {
   metadata(_chat: AiChatMetadata): void {}
   deleted(_chatId: number): void {}
   message(_message: AiChatMessage): void {}
-  changeApplied(chatId: number, _generation: number, revision: number, _author: AiChatAuthorInfo,
-                change: CodeChange): void {
+  changeApplied(
+    chatId: number,
+    _generation: number,
+    revision: number,
+    _author: AiChatAuthorInfo,
+    change: CodeChange,
+  ): void {
     this.applied.push({ chatId, revision, change });
   }
   stream(_chatId: number, _event: AiChatStreamEvent): void {}
@@ -470,127 +570,172 @@ class ChangeRecorder extends RpcTarget implements AiChatSubscriber {
 const PATH = "app.txt";
 const SEED_LINES = ["alpha", "beta", "gamma", "delta"];
 const linesOf = (text: string) => text.split("\n").slice(0, -1);
-const textOf = (lines: string[]) => lines.map(line => `${line}\n`).join("");
+const textOf = (lines: string[]) => lines.map((line) => `${line}\n`).join("");
 const files = (gadgetId: number, text?: string): CodeContent =>
   new Map([[gadgetId, new Map(text === undefined ? [] : [[PATH, text]])]]);
 
 const headOf = (workpieces: WorkpieceRecorder, gadgetId: WorkpieceId, after?: string) =>
-  waitFor(`a new head for gadget ${gadgetId}`, async () => {
-    const summary = workpieces.summaries.get(gadgetId);
-    return summary?.type === "gadget" && summary.commitId !== undefined &&
-        summary.commitId !== after ? summary.commitId : null;
-  }, SETTLE_MS);
+  waitFor(
+    `a new head for gadget ${gadgetId}`,
+    async () => {
+      const summary = workpieces.summaries.get(gadgetId);
+      return summary?.type === "gadget" &&
+        summary.commitId !== undefined &&
+        summary.commitId !== after
+        ? summary.commitId
+        : null;
+    },
+    SETTLE_MS,
+  );
 
 type Client = "left" | "right";
 type EditorOp = { kind: "insert" | "delete" | "resend"; client: Client; lag: number; at: number };
 
 const editorOp = (kind: fc.Arbitrary<EditorOp["kind"]>): fc.Arbitrary<EditorOp> =>
-  fc.record({ kind, client: fc.constantFrom("left", "right"), lag: fc.nat({ max: 3 }), at: fc.nat() });
+  fc.record({
+    kind,
+    client: fc.constantFrom("left", "right"),
+    lag: fc.nat({ max: 3 }),
+    at: fc.nat(),
+  });
 
 // A session opens with an edit, so every run has a draft to accept.
-const editorSession = fc.tuple(
-  editorOp(fc.constant("insert")),
-  fc.array(editorOp(fc.constantFrom("insert", "delete", "resend")), { maxLength: 7 }),
-).map(([first, rest]) => [first, ...rest]);
+const editorSession = fc
+  .tuple(
+    editorOp(fc.constant("insert")),
+    fc.array(editorOp(fc.constantFrom("insert", "delete", "resend")), { maxLength: 7 }),
+  )
+  .map(([first, rest]) => [first, ...rest]);
 
 /** A resend arriving after the other editor's change landed: random cases reach it only sometimes. */
-const resendAfterOther: [number, EditorOp[]] = [2, [
-  { kind: "insert", client: "left", lag: 0, at: 0 },
-  { kind: "insert", client: "right", lag: 0, at: 0 },
-  { kind: "resend", client: "left", lag: 0, at: 0 },
-]];
+const resendAfterOther: [number, EditorOp[]] = [
+  2,
+  [
+    { kind: "insert", client: "left", lag: 0, at: 0 },
+    { kind: "insert", client: "right", lag: 0, at: 0 },
+    { kind: "resend", client: "left", lag: 0, at: 0 },
+  ],
+];
 
 it.concurrent("stale and resent edits converge, and accepting commits the converged text", async () => {
-  await fc.assert(fc.asyncProperty(
+  await fc.assert(
+    fc.asyncProperty(
       fc.integer({ min: 1, max: SEED_LINES.length }),
       editorSession,
       async (seedCount, ops) => {
-    using stack = new DisposableStack();
-    const { ws } = await freshWorkspace(stack, "editors");
-    const workpieces = new WorkpieceRecorder();
-    const recorder = new ChangeRecorder();
-    stack.use(await ws.subscribeToWorkpieces(stack.use(stubFor(workpieces))));
-    stack.use(await ws.subscribeToChat(stack.use(stubFor(recorder))));
-    await workpieces.loaded;
+        using stack = new DisposableStack();
+        const { ws } = await freshWorkspace(stack, "editors");
+        const workpieces = new WorkpieceRecorder();
+        const recorder = new ChangeRecorder();
+        stack.use(await ws.subscribeToWorkpieces(stack.use(stubFor(workpieces))));
+        stack.use(await ws.subscribeToChat(stack.use(stubFor(recorder))));
+        await workpieces.loaded;
 
-    const seedLines = SEED_LINES.slice(0, seedCount);
-    const seed = textOf(seedLines);
-    const gadget = stack.use(ws.createGadget("App", undefined, "APP"));
-    const gadgetId = await gadget.getId();
-    const empty = await headOf(workpieces, gadgetId);
-    const seedChat = await ws.newChat("Seed", null);
-    await ws.submitCodeChange(seedChat, {
-      generation: 0, revision: 0, clientId: "seed", seq: 1,
-      pins: [{ gadgetId, baseCommit: empty }], change: diffFiles(files(gadgetId), files(gadgetId, seed)),
-    });
-    expect(await ws.mergeChanges(seedChat)).toEqual({ outcome: "merged" });
-    const head = await headOf(workpieces, gadgetId, empty);
+        const seedLines = SEED_LINES.slice(0, seedCount);
+        const seed = textOf(seedLines);
+        const gadget = stack.use(ws.createGadget("App", undefined, "APP"));
+        const gadgetId = await gadget.getId();
+        const empty = await headOf(workpieces, gadgetId);
+        const seedChat = await ws.newChat("Seed", null);
+        await ws.submitCodeChange(seedChat, {
+          generation: 0,
+          revision: 0,
+          clientId: "seed",
+          seq: 1,
+          pins: [{ gadgetId, baseCommit: empty }],
+          change: diffFiles(files(gadgetId), files(gadgetId, seed)),
+        });
+        expect(await ws.mergeChanges(seedChat)).toEqual({ outcome: "merged" });
+        const head = await headOf(workpieces, gadgetId, empty);
 
-    const chatId = await ws.newChat("Edit together", null);
-    const pins = [{ gadgetId, baseCommit: head }];
-    // The changes broadcast to this chat, in arrival order, which must number them 1..n.
-    const stream = async (count: number) => {
-      const changes = await waitFor(`${count} changes to chat ${chatId}`, async () => {
-        const all = recorder.applied.filter(c => c.chatId === chatId);
-        return all.length >= count ? all : null;
-      }, SETTLE_MS);
-      expect(changes.map(c => c.revision)).toEqual(changes.map((_, i) => i + 1));
-      return changes;
-    };
-    const textAt = (changes: { change: CodeChange }[]) => {
-      const text = changes.reduce((content, { change }) => applyCodeChange(content, change),
-          files(gadgetId, seed)).get(gadgetId)?.get(PATH);
-      if (typeof text !== "string") throw new Error(`${PATH} is not text`);
-      return text;
-    };
+        const chatId = await ws.newChat("Edit together", null);
+        const pins = [{ gadgetId, baseCommit: head }];
+        // The changes broadcast to this chat, in arrival order, which must number them 1..n.
+        const stream = async (count: number) => {
+          const changes = await waitFor(
+            `${count} changes to chat ${chatId}`,
+            async () => {
+              const all = recorder.applied.filter((c) => c.chatId === chatId);
+              return all.length >= count ? all : null;
+            },
+            SETTLE_MS,
+          );
+          expect(changes.map((c) => c.revision)).toEqual(changes.map((_, i) => i + 1));
+          return changes;
+        };
+        const textAt = (changes: { change: CodeChange }[]) => {
+          const text = changes
+            .reduce(
+              (content, { change }) => applyCodeChange(content, change),
+              files(gadgetId, seed),
+            )
+            .get(gadgetId)
+            ?.get(PATH);
+          if (typeof text !== "string") throw new Error(`${PATH} is not text`);
+          return text;
+        };
 
-    const last = new Map<Client, { submission: CodeChangeSubmission; ack: object }>();
-    const inserted: string[] = [];
-    const deleted = new Set<string>();
-    let revision = 0;
-    for (const [i, { kind, client, lag, at }] of ops.entries()) {
-      if (kind === "resend") {
-        const prior = last.get(client);
-        if (prior) expect(await ws.submitCodeChange(chatId, prior.submission)).toEqual(prior.ack);
-        continue;
-      }
-      const base = Math.max(0, revision - lag);
-      const before = textAt((await stream(revision)).slice(0, base));
-      const lines = linesOf(before);
-      // The editor submits its transaction's exact range (CodeEditor.tsx), so edits here are
-      // spans too: a minimal diff could straddle lines and attribute a deletion to its neighbours.
-      let span: { line: number; replaced: string; insert: string };
-      if (kind === "insert") {
-        inserted.push(`${client} ${i}`);
-        span = { line: at % (lines.length + 1), replaced: "", insert: `${inserted.at(-1)}\n` };
-      } else if (lines.length > 0) {
-        const line = at % lines.length;
-        deleted.add(lines[line]!);
-        span = { line, replaced: `${lines[line]}\n`, insert: "" };
-      } else {
-        continue;
-      }
-      const edit = replaceSpanChange(
-          before.length, textOf(lines.slice(0, span.line)).length, span.replaced, span.insert);
-      const submission: CodeChangeSubmission = {
-        generation: 0, revision: base, clientId: client, seq: (last.get(client)?.submission.seq ?? 0) + 1,
-        pins, change: { [gadgetId]: [[PATH, { edit }]] },
-      };
-      const ack = await ws.submitCodeChange(chatId, submission);
-      expect(ack).toEqual({ generation: 0, revision: ++revision });
-      last.set(client, { submission, ack });
-    }
+        const last = new Map<Client, { submission: CodeChangeSubmission; ack: object }>();
+        const inserted: string[] = [];
+        const deleted = new Set<string>();
+        let revision = 0;
+        for (const [i, { kind, client, lag, at }] of ops.entries()) {
+          if (kind === "resend") {
+            const prior = last.get(client);
+            if (prior)
+              expect(await ws.submitCodeChange(chatId, prior.submission)).toEqual(prior.ack);
+            continue;
+          }
+          const base = Math.max(0, revision - lag);
+          const before = textAt((await stream(revision)).slice(0, base));
+          const lines = linesOf(before);
+          // The editor submits its transaction's exact range (CodeEditor.tsx), so edits here are
+          // spans too: a minimal diff could straddle lines and attribute a deletion to its neighbours.
+          let span: { line: number; replaced: string; insert: string };
+          if (kind === "insert") {
+            inserted.push(`${client} ${i}`);
+            span = { line: at % (lines.length + 1), replaced: "", insert: `${inserted.at(-1)}\n` };
+          } else if (lines.length > 0) {
+            const line = at % lines.length;
+            deleted.add(lines[line]!);
+            span = { line, replaced: `${lines[line]}\n`, insert: "" };
+          } else {
+            continue;
+          }
+          const edit = replaceSpanChange(
+            before.length,
+            textOf(lines.slice(0, span.line)).length,
+            span.replaced,
+            span.insert,
+          );
+          const submission: CodeChangeSubmission = {
+            generation: 0,
+            revision: base,
+            clientId: client,
+            seq: (last.get(client)?.submission.seq ?? 0) + 1,
+            pins,
+            change: { [gadgetId]: [[PATH, { edit }]] },
+          };
+          const ack = await ws.submitCodeChange(chatId, submission);
+          expect(ack).toEqual({ generation: 0, revision: ++revision });
+          last.set(client, { submission, ack });
+        }
 
-    const converged = textAt(await stream(revision));
-    const lines = linesOf(converged);
-    const survivors = (all: string[]) => all.filter(line => !deleted.has(line));
-    expect(lines.toSorted()).toEqual(survivors([...seedLines, ...inserted]).toSorted());
-    expect(lines.filter(line => seedLines.includes(line))).toEqual(survivors(seedLines));
+        const converged = textAt(await stream(revision));
+        const lines = linesOf(converged);
+        const survivors = (all: string[]) => all.filter((line) => !deleted.has(line));
+        expect(lines.toSorted()).toEqual(survivors([...seedLines, ...inserted]).toSorted());
+        expect(lines.filter((line) => seedLines.includes(line))).toEqual(survivors(seedLines));
 
-    expect(await ws.mergeChanges(chatId)).toEqual({ outcome: "merged" });
-    // A draft that nets to no change (a line inserted, then deleted) leaves the head where it was.
-    const merged = converged === seed ? head : await headOf(workpieces, gadgetId, head);
-    expect(await ws.readFilesAtCommit(merged, [PATH])).toEqual([[PATH, { kind: "text", text: converged }]]);
-    expect(recorder.applied.filter(c => c.chatId === chatId)).toHaveLength(revision);
-  }), { ...PROPERTY_RUN_OPTIONS, numRuns: 15, examples: [resendAfterOther] });
+        expect(await ws.mergeChanges(chatId)).toEqual({ outcome: "merged" });
+        // A draft that nets to no change (a line inserted, then deleted) leaves the head where it was.
+        const merged = converged === seed ? head : await headOf(workpieces, gadgetId, head);
+        expect(await ws.readFilesAtCommit(merged, [PATH])).toEqual([
+          [PATH, { kind: "text", text: converged }],
+        ]);
+        expect(recorder.applied.filter((c) => c.chatId === chatId)).toHaveLength(revision);
+      },
+    ),
+    { ...PROPERTY_RUN_OPTIONS, numRuns: 15, examples: [resendAfterOther] },
+  );
 });

@@ -1,13 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import {
-  BASE_SCOPES, DEFAULT_DAILY_READ_LIMIT, RESOURCES, RESOURCE_SCOPES, dailyReadLimit, getRedirectUri,
-  grantedResourcePatterns, kindOfPattern, scopesFor, type Env,
+  BASE_SCOPES,
+  DEFAULT_DAILY_READ_LIMIT,
+  RESOURCES,
+  RESOURCE_SCOPES,
+  dailyReadLimit,
+  getRedirectUri,
+  grantedResourcePatterns,
+  kindOfPattern,
+  scopesFor,
+  type Env,
 } from "../src/x-env";
 
 describe("getRedirectUri", () => {
   it("joins the base URL however many trailing slashes it was configured with", () => {
-    expect(getRedirectUri({ BASE_URL: "https://gadgets.example/gatekeeper/x//" } as Env))
-      .toBe("https://gadgets.example/gatekeeper/x/oauth");
+    expect(getRedirectUri({ BASE_URL: "https://gadgets.example/gatekeeper/x//" } as Env)).toBe(
+      "https://gadgets.example/gatekeeper/x/oauth",
+    );
     expect(getRedirectUri({} as Env)).toBe("http://localhost:8787/gatekeeper/x/oauth");
   });
 });
@@ -15,7 +24,8 @@ describe("getRedirectUri", () => {
 describe("scopesFor", () => {
   it("asks for every resource's scopes when no resource types are named", () => {
     const all = new Set(scopesFor());
-    for (const scope of [...BASE_SCOPES, ...Object.values(RESOURCE_SCOPES).flat()]) expect(all.has(scope)).toBe(true);
+    for (const scope of [...BASE_SCOPES, ...Object.values(RESOURCE_SCOPES).flat()])
+      expect(all.has(scope)).toBe(true);
   });
 
   it("asks for nothing beyond identity and refresh for an empty list", () => {
@@ -23,9 +33,12 @@ describe("scopesFor", () => {
   });
 
   it("asks for only what the named resource types need", () => {
-    expect(scopesFor([RESOURCES.profile.urlPattern]).toSorted()).toEqual([...BASE_SCOPES].toSorted());
-    expect(scopesFor([RESOURCES.list.urlPattern]).toSorted())
-      .toEqual([...BASE_SCOPES, "list.read", "list.write"].toSorted());
+    expect(scopesFor([RESOURCES.profile.urlPattern]).toSorted()).toEqual(
+      [...BASE_SCOPES].toSorted(),
+    );
+    expect(scopesFor([RESOURCES.list.urlPattern]).toSorted()).toEqual(
+      [...BASE_SCOPES, "list.read", "list.write"].toSorted(),
+    );
     expect(scopesFor([RESOURCES.post.urlPattern])).not.toContain("follows.write");
   });
 
@@ -37,10 +50,15 @@ describe("scopesFor", () => {
 describe("grantedResourcePatterns", () => {
   it("covers each resource type whose scopes were all granted", () => {
     expect(grantedResourcePatterns([...BASE_SCOPES])).toEqual([RESOURCES.profile.urlPattern]);
-    expect(grantedResourcePatterns(scopesFor([RESOURCES.list.urlPattern])))
-      .toEqual([RESOURCES.list.urlPattern, RESOURCES.profile.urlPattern]);
-    expect(grantedResourcePatterns(scopesFor()).toSorted())
-      .toEqual(Object.values(RESOURCES).map(resource => resource.urlPattern).toSorted());
+    expect(grantedResourcePatterns(scopesFor([RESOURCES.list.urlPattern]))).toEqual([
+      RESOURCES.list.urlPattern,
+      RESOURCES.profile.urlPattern,
+    ]);
+    expect(grantedResourcePatterns(scopesFor()).toSorted()).toEqual(
+      Object.values(RESOURCES)
+        .map((resource) => resource.urlPattern)
+        .toSorted(),
+    );
   });
 
   it("covers nothing without the base scopes", () => {
@@ -49,7 +67,9 @@ describe("grantedResourcePatterns", () => {
 
   it("round-trips through scopesFor for every resource type", () => {
     for (const resource of Object.values(RESOURCES)) {
-      expect(grantedResourcePatterns(scopesFor([resource.urlPattern]))).toContain(resource.urlPattern);
+      expect(grantedResourcePatterns(scopesFor([resource.urlPattern]))).toContain(
+        resource.urlPattern,
+      );
     }
   });
 });

@@ -12,9 +12,12 @@
 // delivery log records each request whatever the answer.
 
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import {
-  GitHubApi, type GitHubIssueResponse, type GitHubRepoResponse, type GitHubSimpleUser,
+  GitHubApi,
+  type GitHubIssueResponse,
+  type GitHubRepoResponse,
+  type GitHubSimpleUser,
 } from "../../src/github-api";
 import { parseWebhookEvent, type WebhookPayload } from "../../src/github-webhook-events";
 
@@ -24,19 +27,28 @@ const outsiderToken = process.env.CONTRACT_GITHUB_OUTSIDER_TOKEN;
 const receiver = process.env.CONTRACT_GITHUB_WEBHOOK_URL || "https://example.com/webhook";
 
 /** One attempt in a webhook's delivery log, as GitHub lists it. */
-type DeliverySummary = { id: number; guid: string; event: string; action: string | null; redelivery: boolean };
+type DeliverySummary = {
+  id: number;
+  guid: string;
+  event: string;
+  action: string | null;
+  redelivery: boolean;
+};
 /** One attempt in full: where it went, and the request GitHub made. */
 type Delivery = DeliverySummary & {
   url: string;
   request: { headers: Record<string, string>; payload: Record<string, unknown> & WebhookPayload };
 };
 
-const sign = (secret: string, body: string) => `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
+const sign = (secret: string, body: string) =>
+  `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
 const newSecret = () => randomBytes(32).toString("hex");
 /** A URL for one webhook alone, as GitHub refuses a second at one URL with overlapping events. */
 const newUrl = () => `${receiver}?contract=${randomUUID()}`;
-const header = (delivery: Delivery, name: string) => Object.entries(delivery.request.headers)
-  .find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1];
+const header = (delivery: Delivery, name: string) =>
+  Object.entries(delivery.request.headers).find(
+    ([key]) => key.toLowerCase() === name.toLowerCase(),
+  )?.[1];
 
 /** Poll `attempt` until it returns something, as GitHub delivers in its own time. */
 async function eventually<T>(what: string, attempt: () => Promise<T | undefined>): Promise<T> {
@@ -45,7 +57,7 @@ async function eventually<T>(what: string, attempt: () => Promise<T | undefined>
     const result = await attempt();
     if (result !== undefined) return result;
     if (Date.now() > deadline) throw new Error(`Timed out waiting for ${what}`);
-    await new Promise(resolve => setTimeout(resolve, 3_000));
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
   }
 }
 
@@ -54,13 +66,16 @@ async function github<T>(method: string, path: string, body?: unknown): Promise<
   const response = await fetch(`https://api.github.com${path}`, {
     method,
     headers: {
-      Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "Cloudflare-Gadgets-contract",
-      ...body === undefined ? {} : { "Content-Type": "application/json" },
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "Cloudflare-Gadgets-contract",
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
     },
-    ...body === undefined ? {} : { body: JSON.stringify(body) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  if (!response.ok) throw new Error(`${method} ${path} answered ${response.status}: ${await response.text()}`);
+  if (!response.ok)
+    throw new Error(`${method} ${path} answered ${response.status}: ${await response.text()}`);
   return (response.status === 204 ? undefined : await response.json()) as T;
 }
 
@@ -85,17 +100,33 @@ describe.skipIf(!token || !repoName)("GitHub, as the GitHub gatekeeper's hooks r
 
   /** An issue the account opens, closed after the checks. */
   async function openIssue(): Promise<GitHubIssueResponse> {
-    const issue = await api.createIssue(owner, name, { title: "Contract check", body: "Opened by the GitHub contract checks." });
+    const issue = await api.createIssue(owner, name, {
+      title: "Contract check",
+      body: "Opened by the GitHub contract checks.",
+    });
     cleanups.push(() => api.updateIssue(owner, name, issue.number, { state: "closed" }));
     return issue;
   }
 
   /** The first attempt, or redelivery, logged for webhook `hookId` that `matches`. */
-  function delivery(hookId: number, event: string, matches: (delivery: Delivery) => boolean, redelivery = false) {
+  function delivery(
+    hookId: number,
+    event: string,
+    matches: (delivery: Delivery) => boolean,
+    redelivery = false,
+  ) {
     return eventually(`${redelivery ? "a redelivery" : "a delivery"} of ${event}`, async () => {
-      const log = await github<DeliverySummary[]>("GET", `${repoPath}/hooks/${hookId}/deliveries?per_page=100`);
-      for (const summary of log.filter(entry => entry.event === event && entry.redelivery === redelivery)) {
-        const found = await github<Delivery>("GET", `${repoPath}/hooks/${hookId}/deliveries/${summary.id}`);
+      const log = await github<DeliverySummary[]>(
+        "GET",
+        `${repoPath}/hooks/${hookId}/deliveries?per_page=100`,
+      );
+      for (const summary of log.filter(
+        (entry) => entry.event === event && entry.redelivery === redelivery,
+      )) {
+        const found = await github<Delivery>(
+          "GET",
+          `${repoPath}/hooks/${hookId}/deliveries/${summary.id}`,
+        );
         if (matches(found)) return found;
       }
       return undefined;
@@ -105,7 +136,9 @@ describe.skipIf(!token || !repoName)("GitHub, as the GitHub gatekeeper's hooks r
   beforeAll(async () => {
     repository = await api.getRepo(owner, name);
     if (repository.private !== true) {
-      throw new Error(`${repoName} must be private, or anyone could read it and the access check would prove nothing.`);
+      throw new Error(
+        `${repoName} must be private, or anyone could read it and the access check would prove nothing.`,
+      );
     }
     viewer = (await api.getViewer()).user;
   });
@@ -119,27 +152,43 @@ describe.skipIf(!token || !repoName)("GitHub, as the GitHub gatekeeper's hooks r
         failures.push(error);
       }
     }
-    if (failures.length > 0) throw new AggregateError(failures, "Failed to clean up after the contract checks");
+    if (failures.length > 0)
+      throw new AggregateError(failures, "Failed to clean up after the contract checks");
   });
 
-  it.skipIf(!outsiderToken)("answers 404, not 304, to a token that can't read the repository, whatever ETag it sends", async () => {
-    const fresh = await api.getRepoByIdConditional(repository.id);
-    const etag = fresh.headers.get("ETag");
-    expect(fresh.status).toBe(200);
-    expect(etag).toBeTruthy();
-    // The ETag is current: the account itself is told nothing changed.
-    expect((await api.getRepoByIdConditional(repository.id, { ifNoneMatch: etag! })).status).toBe(304);
-    const outsider = new GitHubApi(async () => outsiderToken!);
-    await expect(outsider.getRepoByIdConditional(repository.id, { ifNoneMatch: etag! }))
-      .rejects.toMatchObject({ status: 404 });
-  });
+  it.skipIf(!outsiderToken)(
+    "answers 404, not 304, to a token that can't read the repository, whatever ETag it sends",
+    async () => {
+      const fresh = await api.getRepoByIdConditional(repository.id);
+      const etag = fresh.headers.get("ETag");
+      expect(fresh.status).toBe(200);
+      expect(etag).toBeTruthy();
+      // The ETag is current: the account itself is told nothing changed.
+      expect((await api.getRepoByIdConditional(repository.id, { ifNoneMatch: etag! })).status).toBe(
+        304,
+      );
+      const outsider = new GitHubApi(async () => outsiderToken!);
+      await expect(
+        outsider.getRepoByIdConditional(repository.id, { ifNoneMatch: etag! }),
+      ).rejects.toMatchObject({ status: 404 });
+    },
+  );
 
   it("signs each delivery, names the account as the sender of what it did, and sends what the gatekeeper reads", async () => {
     const hook = await webhook(["issues", "issue_comment"]);
     const issue = await openIssue();
-    const comment = await api.createIssueComment(owner, name, issue.number, "Commented by the GitHub contract checks.");
+    const comment = await api.createIssueComment(
+      owner,
+      name,
+      issue.number,
+      "Commented by the GitHub contract checks.",
+    );
     const opened = await delivery(hook.id, "issues", ofIssue(issue, "opened"));
-    const commented = await delivery(hook.id, "issue_comment", found => found.request.payload.comment?.id === comment.id);
+    const commented = await delivery(
+      hook.id,
+      "issue_comment",
+      (found) => found.request.payload.comment?.id === comment.id,
+    );
     for (const found of [opened, commented]) {
       expect(header(found, "Content-Type")).toBe("application/json");
       expect(header(found, "X-GitHub-Delivery")).toBe(found.guid);
@@ -147,20 +196,28 @@ describe.skipIf(!token || !repoName)("GitHub, as the GitHub gatekeeper's hooks r
     }
     // The comment is the account's own, which no hook of the account's is handed.
     expect(parseWebhookEvent("issues", opened.guid, opened.request.payload)).toMatchObject({
-      event: { kind: "issue", action: "opened", number: issue.number, repoId: repository.id }, senderId: viewer.id,
+      event: { kind: "issue", action: "opened", number: issue.number, repoId: repository.id },
+      senderId: viewer.id,
     });
-    expect(parseWebhookEvent("issue_comment", commented.guid, commented.request.payload)).toMatchObject({
-      event: { kind: "comment", number: issue.number, comment: { id: comment.id } }, senderId: viewer.id,
+    expect(
+      parseWebhookEvent("issue_comment", commented.guid, commented.request.payload),
+    ).toMatchObject({
+      event: { kind: "comment", number: issue.number, comment: { id: comment.id } },
+      senderId: viewer.id,
     });
   });
 
-  it("redelivers with the webhook's URL, encoding and secret as they are now, not as they were", async ({ skip }) => {
+  it("redelivers with the webhook's URL, encoding and secret as they are now, not as they were", async ({
+    skip,
+  }) => {
     const secrets = { was: newSecret(), now: newSecret() };
     const urls = { json: { was: newUrl(), now: newUrl() }, form: { was: newUrl(), now: newUrl() } };
     // One webhook sending JSON, and one sending forms, as someone may have switched it to.
     const json = await webhook(["issues"], secrets.was, urls.json.was);
     const form = await github<{ id: number }>("POST", `${repoPath}/hooks`, {
-      name: "web", active: true, events: ["issues"],
+      name: "web",
+      active: true,
+      events: ["issues"],
       config: { url: urls.form.was, secret: secrets.was, content_type: "form", insecure_ssl: "0" },
     });
     cleanups.push(() => api.deleteRepoWebhook(repository.id, form.id));
@@ -170,12 +227,30 @@ describe.skipIf(!token || !repoName)("GitHub, as the GitHub gatekeeper's hooks r
     expect(header(formFirst, "Content-Type")).toBe("application/x-www-form-urlencoded");
 
     // Repaired as the gatekeeper's hourly check repairs a webhook, then redelivered.
-    await api.updateRepoWebhook(repository.id, json.id, { url: urls.json.now, secret: secrets.now, events: ["issues"] });
-    await api.updateRepoWebhook(repository.id, form.id, { url: urls.form.now, secret: secrets.now, events: ["issues"] });
+    await api.updateRepoWebhook(repository.id, json.id, {
+      url: urls.json.now,
+      secret: secrets.now,
+      events: ["issues"],
+    });
+    await api.updateRepoWebhook(repository.id, form.id, {
+      url: urls.form.now,
+      secret: secrets.now,
+      events: ["issues"],
+    });
     await api.redeliverRepoWebhookDelivery(repository.id, json.id, jsonFirst.id);
     await api.redeliverRepoWebhookDelivery(repository.id, form.id, formFirst.id);
-    const jsonAgain = await delivery(json.id, "issues", found => found.guid === jsonFirst.guid, true);
-    const formAgain = await delivery(form.id, "issues", found => found.guid === formFirst.guid, true);
+    const jsonAgain = await delivery(
+      json.id,
+      "issues",
+      (found) => found.guid === jsonFirst.guid,
+      true,
+    );
+    const formAgain = await delivery(
+      form.id,
+      "issues",
+      (found) => found.guid === formFirst.guid,
+      true,
+    );
     expect([jsonAgain.url, formAgain.url]).toEqual([urls.json.now, urls.form.now]);
     expect(header(formAgain, "Content-Type")).toBe("application/json");
     // The same payload under the same secret would carry the same signature.
@@ -184,11 +259,14 @@ describe.skipIf(!token || !repoName)("GitHub, as the GitHub gatekeeper's hooks r
     // Which secret signed it shows only where the log's payload re-serializes to the bytes GitHub
     // signed, as the first delivery's signature tells; where it doesn't, the check says so, rather
     // than passing on the rest.
-    skip(signature !== sign(secrets.was, JSON.stringify(jsonFirst.request.payload)),
-      "GitHub's delivery log doesn't give back the bytes it signed, so which secret signed the redelivery went unchecked.");
-    expect(header(jsonAgain, "X-Hub-Signature-256")).toBe(sign(secrets.now, JSON.stringify(jsonAgain.request.payload)));
+    skip(
+      signature !== sign(secrets.was, JSON.stringify(jsonFirst.request.payload)),
+      "GitHub's delivery log doesn't give back the bytes it signed, so which secret signed the redelivery went unchecked.",
+    );
+    expect(header(jsonAgain, "X-Hub-Signature-256")).toBe(
+      sign(secrets.now, JSON.stringify(jsonAgain.request.payload)),
+    );
   });
-
 
   it("lists a webhook's deliveries newest first, the gatekeeper paging through them as it does", async () => {
     const hook = await webhook(["issues"]);
@@ -198,12 +276,12 @@ describe.skipIf(!token || !repoName)("GitHub, as the GitHub gatekeeper's hooks r
     const opened = await delivery(hook.id, "issues", ofIssue(issue, "opened"));
     await delivery(hook.id, "issues", ofIssue(issue, "reopened"));
     await api.redeliverRepoWebhookDelivery(repository.id, hook.id, opened.id);
-    const again = await delivery(hook.id, "issues", found => found.guid === opened.guid, true);
+    const again = await delivery(hook.id, "issues", (found) => found.guid === opened.guid, true);
 
     const listed = await api.listRepoWebhookDeliveries(repository.id, hook.id, 0);
-    const times = listed.map(entry => Date.parse(entry.delivered_at));
+    const times = listed.map((entry) => Date.parse(entry.delivered_at));
     expect(times).toEqual(times.toSorted((a, b) => b - a));
-    expect(listed.map(entry => entry.id)).toEqual(expect.arrayContaining([opened.id, again.id]));
+    expect(listed.map((entry) => entry.id)).toEqual(expect.arrayContaining([opened.id, again.id]));
     expect(listed[0]?.id).toBe(again.id);
   });
 
@@ -211,36 +289,77 @@ describe.skipIf(!token || !repoName)("GitHub, as the GitHub gatekeeper's hooks r
     const hook = await webhook(["push", "pull_request", "pull_request_review"]);
     const branch = `contract-${randomUUID()}`;
     const base = await github<{ object: { sha: string } }>(
-      "GET", `${repoPath}/git/ref/heads/${encodeURIComponent(repository.default_branch)}`);
-    await github("POST", `${repoPath}/git/refs`, { ref: `refs/heads/${branch}`, sha: base.object.sha });
-    cleanups.push(() => github("DELETE", `${repoPath}/git/refs/heads/${branch}`));
-    const file = await github<{ commit: { sha: string } }>("PUT", `${repoPath}/contents/contract/${branch}.md`, {
-      message: "Contract check", branch, content: Buffer.from("Committed by the GitHub contract checks.\n").toString("base64"),
+      "GET",
+      `${repoPath}/git/ref/heads/${encodeURIComponent(repository.default_branch)}`,
+    );
+    await github("POST", `${repoPath}/git/refs`, {
+      ref: `refs/heads/${branch}`,
+      sha: base.object.sha,
     });
+    cleanups.push(() => github("DELETE", `${repoPath}/git/refs/heads/${branch}`));
+    const file = await github<{ commit: { sha: string } }>(
+      "PUT",
+      `${repoPath}/contents/contract/${branch}.md`,
+      {
+        message: "Contract check",
+        branch,
+        content: Buffer.from("Committed by the GitHub contract checks.\n").toString("base64"),
+      },
+    );
     const pull = await api.createPullRequest(owner, name, {
-      title: "Contract check", head: branch, base: repository.default_branch, body: "Opened by the GitHub contract checks.",
+      title: "Contract check",
+      head: branch,
+      base: repository.default_branch,
+      body: "Opened by the GitHub contract checks.",
     });
     cleanups.push(() => github("PATCH", `${repoPath}/pulls/${pull.number}`, { state: "closed" }));
-    const review = await github<{ id: number }>("POST", `${repoPath}/pulls/${pull.number}/reviews`, {
-      event: "COMMENT", body: "Reviewed by the GitHub contract checks.",
-    });
+    const review = await github<{ id: number }>(
+      "POST",
+      `${repoPath}/pulls/${pull.number}/reviews`,
+      {
+        event: "COMMENT",
+        body: "Reviewed by the GitHub contract checks.",
+      },
+    );
 
-    const pushed = await delivery(hook.id, "push", found => found.request.payload.after === file.commit.sha);
-    const opened = await delivery(hook.id, "pull_request",
-      found => found.action === "opened" && found.request.payload.pull_request?.number === pull.number);
-    const reviewed = await delivery(hook.id, "pull_request_review", found => found.request.payload.review?.id === review.id);
+    const pushed = await delivery(
+      hook.id,
+      "push",
+      (found) => found.request.payload.after === file.commit.sha,
+    );
+    const opened = await delivery(
+      hook.id,
+      "pull_request",
+      (found) =>
+        found.action === "opened" && found.request.payload.pull_request?.number === pull.number,
+    );
+    const reviewed = await delivery(
+      hook.id,
+      "pull_request_review",
+      (found) => found.request.payload.review?.id === review.id,
+    );
     const push = parseWebhookEvent("push", pushed.guid, pushed.request.payload);
     expect(push).toMatchObject({
-      event: { kind: "push", branch, before: base.object.sha, after: file.commit.sha, forced: false },
+      event: {
+        kind: "push",
+        branch,
+        before: base.object.sha,
+        after: file.commit.sha,
+        forced: false,
+      },
       senderId: viewer.id,
     });
     // When it happened: the push's own payload spells it in seconds.
     expect(Math.abs(push!.at - Date.now())).toBeLessThan(3_600_000);
     expect(parseWebhookEvent("pull_request", opened.guid, opened.request.payload)).toMatchObject({
-      event: { kind: "pullRequest", action: "opened", number: pull.number }, senderId: viewer.id,
+      event: { kind: "pullRequest", action: "opened", number: pull.number },
+      senderId: viewer.id,
     });
-    expect(parseWebhookEvent("pull_request_review", reviewed.guid, reviewed.request.payload)).toMatchObject({
-      event: { kind: "review", number: pull.number, review: { id: review.id } }, senderId: viewer.id,
+    expect(
+      parseWebhookEvent("pull_request_review", reviewed.guid, reviewed.request.payload),
+    ).toMatchObject({
+      event: { kind: "review", number: pull.number, review: { id: review.id } },
+      senderId: viewer.id,
     });
   });
 });

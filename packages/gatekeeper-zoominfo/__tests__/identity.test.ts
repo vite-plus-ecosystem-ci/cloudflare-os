@@ -5,11 +5,20 @@
 // attributed to whoever the connection acts for now. ZoomInfo is faked at `fetch`.
 
 import { env, runInDurableObject } from "cloudflare:test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { generateNonce } from "@gadgets/gatekeeper-kit/connect-nonce";
 import {
-  ALICE, BOB, CLIENT_ID, FakeZoomInfo, accountStub, failure, hooks, reconnectAs, seedAccount,
-  storedGrant, unwrap,
+  ALICE,
+  BOB,
+  CLIENT_ID,
+  FakeZoomInfo,
+  accountStub,
+  failure,
+  hooks,
+  reconnectAs,
+  seedAccount,
+  storedGrant,
+  unwrap,
 } from "./fake-zoominfo";
 import type { GatekeeperProps, Step } from "./worker";
 
@@ -38,7 +47,9 @@ function binding(userObjectId: string) {
       let seen = 0;
       return async () => {
         const { observations } = await hooks().queueLog(name);
-        return observations.slice(seen, seen = observations.length).map(observation => observation.subresources);
+        return observations
+          .slice(seen, (seen = observations.length))
+          .map((observation) => observation.subresources);
       };
     })(),
   };
@@ -50,11 +61,13 @@ async function connect(fake: FakeZoomInfo, claims: Record<string, unknown> | nul
   const id = env.USER_ACCOUNT.newUniqueId().toString();
   const initiation = generateNonce();
   await hooks().installCallback(id, initiation);
-  const accepted = await runInDurableObject(accountStub(id), async instance => {
+  const accepted = await runInDurableObject(accountStub(id), async (instance) => {
     const flow = await instance.beginOAuthFlow(initiation);
     if (!flow) throw new Error("the connect did not start");
     return await instance.acceptAuthCode(fake.code(ALICE), flow.oauthNonce).then(
-      handoff => ({ ok: handoff }), (error: Error) => ({ error: error.message }));
+      (handoff) => ({ ok: handoff }),
+      (error: Error) => ({ error: error.message }),
+    );
   });
   return { id, accepted };
 }
@@ -117,7 +130,10 @@ describe("a connection made before its user's ID was kept", () => {
     const id = await seedAccount(fake, ALICE, { legacy: true });
     fake.tokenLatencyMs = 20;
     const [first, second] = [binding(id), binding(id)];
-    const results = await Promise.all([first.run(["searchCompanies", {}]), second.run(["getCreditUsage"])]);
+    const results = await Promise.all([
+      first.run(["searchCompanies", {}]),
+      second.run(["getCreditUsage"]),
+    ]);
     results.forEach(unwrap);
     expect(fake.count(/^POST \/gtm\/oauth\/v1\/token$/)).toBe(1);
     expect(await first.reported()).toEqual([[ALICE_ID]]);
@@ -130,7 +146,9 @@ describe("a connection made before its user's ID was kept", () => {
     const id = await seedAccount(fake, ALICE, { legacy: true });
     fake.idToken = () => null;
     const zoominfo = binding(id);
-    expect(failure(await zoominfo.run(["searchCompanies", {}]))).toMatch(/Please reconnect the account/);
+    expect(failure(await zoominfo.run(["searchCompanies", {}]))).toMatch(
+      /Please reconnect the account/,
+    );
     // Later reads are refused without redeeming another refresh token or announcing it again.
     expect(failure(await zoominfo.run(["searchCompanies", {}]))).toMatch(/expired/);
     expect(fake.count(/^POST \/gtm\/oauth\/v1\/token$/)).toBe(1);
@@ -138,7 +156,7 @@ describe("a connection made before its user's ID was kept", () => {
     expect(await zoominfo.reported()).toEqual([]);
     expect(await hooks().expiredNotices(id)).toBe(1);
 
-    fake.idToken = user => ({ sub: user.sub, aud: CLIENT_ID });
+    fake.idToken = (user) => ({ sub: user.sub, aud: CLIENT_ID });
     await reconnectAs(fake, id, ALICE);
     unwrap(await zoominfo.run(["searchCompanies", {}]));
     expect(await zoominfo.reported()).toEqual([[ALICE_ID]]);
@@ -153,11 +171,15 @@ describe("a connection made before its user's ID was kept", () => {
     expect(failure(await zoominfo.apply(ticket))).toMatch(/Please reconnect the account/);
     expect(fake.count(/enrich$/)).toBe(0);
 
-    fake.idToken = user => ({ sub: user.sub, aud: CLIENT_ID });
+    fake.idToken = (user) => ({ sub: user.sub, aud: CLIENT_ID });
     await reconnectAs(fake, id, ALICE);
-    expect(unwrap(await zoominfo.run(["getEnrichmentResult", ticket]))).toEqual({ status: "pending" });
+    expect(unwrap(await zoominfo.run(["getEnrichmentResult", ticket]))).toEqual({
+      status: "pending",
+    });
     unwrap(await zoominfo.apply(ticket));
-    expect(unwrap(await zoominfo.run(["getEnrichmentResult", ticket]))).toMatchObject({ status: "ready" });
+    expect(unwrap(await zoominfo.run(["getEnrichmentResult", ticket]))).toMatchObject({
+      status: "ready",
+    });
     expect(await zoominfo.reported()).toEqual([[ALICE_ID], [ALICE_ID]]);
   });
 
@@ -168,10 +190,16 @@ describe("a connection made before its user's ID was kept", () => {
     // As an earlier version left them: an outcome and a cache entry naming no user.
     await zoominfo.seed({
       [`enrich:result:${ticket.id}`]: { status: "ready", result: [] },
-      "cache:lookup:industries:{}": { value: [{ id: "1", type: "Value", name: "old value" }], fetchedAt: Date.now() },
+      "cache:lookup:industries:{}": {
+        value: [{ id: "1", type: "Value", name: "old value" }],
+        fetchedAt: Date.now(),
+      },
     });
-    expect(unwrap(await zoominfo.run(["getEnrichmentResult", ticket])))
-      .toEqual({ status: "ready", kind: "companies", result: [] });
+    expect(unwrap(await zoominfo.run(["getEnrichmentResult", ticket]))).toEqual({
+      status: "ready",
+      kind: "companies",
+      result: [],
+    });
     expect(unwrap(await zoominfo.run(["lookup", "industries"]))).toEqual([
       { id: "1", type: "Value", name: "Alice's value", attributes: {} },
     ]);
@@ -185,13 +213,16 @@ describe("a refresh", () => {
     const fake = new FakeZoomInfo().install();
     fake.refreshScopeDefaults = ["api:data:company", "api:data:contact", "api:agent:read"];
     const id = await seedAccount(fake, ALICE, {
-      expiresInMs: 0, scopes: ["api:data:company", "api:data:contact"],
+      expiresInMs: 0,
+      scopes: ["api:data:company", "api:data:contact"],
     });
     const zoominfo = binding(id);
     expect(unwrap(await zoominfo.run(["getCreditUsage"]))).toEqual({
       usage: [{ limitType: "record", currentUsage: 3 }],
     });
-    expect(await storedGrant(id)).toMatchObject({ scopes: ["api:data:company", "api:data:contact"] });
+    expect(await storedGrant(id)).toMatchObject({
+      scopes: ["api:data:company", "api:data:contact"],
+    });
     expect(await zoominfo.reported()).toEqual([[ALICE_ID]]);
     expect(await hooks().expiredNotices(id)).toBe(0);
   });
@@ -203,7 +234,9 @@ describe("a refresh", () => {
     expect(unwrap(await zoominfo.run(["getCreditUsage"]))).toEqual({
       usage: [{ limitType: "record", currentUsage: 3 }],
     });
-    expect(await storedGrant(id)).toMatchObject({ scopes: ["api:data:company", "api:data:contact"] });
+    expect(await storedGrant(id)).toMatchObject({
+      scopes: ["api:data:company", "api:data:contact"],
+    });
     expect(await zoominfo.reported()).toEqual([[ALICE_ID]]);
   });
 
@@ -236,7 +269,9 @@ describe("a refresh", () => {
     const id = await seedAccount(fake, ALICE, { expiresInMs: 0 });
     fake.refuseRefreshes = { status: 400, error: "invalid_grant" };
     const zoominfo = binding(id);
-    expect(failure(await zoominfo.run(["searchCompanies", {}]))).toMatch(/Please reconnect the account/);
+    expect(failure(await zoominfo.run(["searchCompanies", {}]))).toMatch(
+      /Please reconnect the account/,
+    );
     fake.refuseRefreshes = undefined;
     expect(failure(await zoominfo.run(["searchCompanies", {}]))).toMatch(/expired/);
     expect(fake.count(/^POST \/gtm\/oauth\/v1\/token$/)).toBe(1);
@@ -278,9 +313,14 @@ describe("enrichment outcomes", () => {
     unwrap(await zoominfo.apply(failed));
     unwrap(await zoominfo.reject(rejected));
     const outcomes = [];
-    for (const ticket of tickets) outcomes.push(unwrap(await zoominfo.run(["getEnrichmentResult", ticket])));
+    for (const ticket of tickets)
+      outcomes.push(unwrap(await zoominfo.run(["getEnrichmentResult", ticket])));
     expect(outcomes).toEqual([
-      { status: "ready", kind: "companies", result: [expect.objectContaining({ status: "matched" })] },
+      {
+        status: "ready",
+        kind: "companies",
+        result: [expect.objectContaining({ status: "matched" })],
+      },
       { status: "failed", message: expect.stringMatching(/503/) },
       { status: "rejected" },
       { status: "pending" },
@@ -318,7 +358,9 @@ describe("reconnecting", () => {
     await vi.waitUntil(() => fake.count(/^GET \/gtm\/data\/v1\/lookup\//) === 1);
     await reconnectAs(fake, id, ALICE);
     load.resolve();
-    expect(unwrap(await reading)).toEqual([{ id: "1", type: "Value", name: "Bob's value", attributes: {} }]);
+    expect(unwrap(await reading)).toEqual([
+      { id: "1", type: "Value", name: "Bob's value", attributes: {} },
+    ]);
 
     expect(unwrap(await zoominfo.run(["lookup", "industries"]))).toEqual([
       { id: "1", type: "Value", name: "Alice's value", attributes: {} },
@@ -337,17 +379,21 @@ describe("reconnecting", () => {
 
     // Alice's result stays hers; Bob's connection doesn't make it his.
     expect(unwrap(await zoominfo.run(["getEnrichmentResult", done]))).toMatchObject({
-      status: "ready", result: [{ record: { fields: { enrichedFor: "Alice" } } }],
+      status: "ready",
+      result: [{ record: { fields: { enrichedFor: "Alice" } } }],
     });
     // Alice's cached lookup isn't served to Bob: his entitlements are fetched with his token.
     expect(unwrap(await zoominfo.run(["lookup", "industries"]))).toEqual([
       { id: "1", type: "Value", name: "Bob's value", attributes: {} },
     ]);
     // The pending request holds nothing yet; once approved it spends Bob's credits on Bob's data.
-    expect(unwrap(await zoominfo.run(["getEnrichmentResult", pending]))).toEqual({ status: "pending" });
+    expect(unwrap(await zoominfo.run(["getEnrichmentResult", pending]))).toEqual({
+      status: "pending",
+    });
     unwrap(await zoominfo.apply(pending));
     expect(unwrap(await zoominfo.run(["getEnrichmentResult", pending]))).toMatchObject({
-      status: "ready", result: [{ record: { fields: { enrichedFor: "Bob" } } }],
+      status: "ready",
+      result: [{ record: { fields: { enrichedFor: "Bob" } } }],
     });
     expect(await zoominfo.reported()).toEqual([[ALICE_ID], [BOB_ID], [BOB_ID], [BOB_ID]]);
   });

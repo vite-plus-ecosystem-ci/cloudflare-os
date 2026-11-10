@@ -3,13 +3,20 @@
 // take. This keeps the copies in step: a node of each kind is choosable exactly when its own
 // resource's pattern is accepted, and a refusal names the kinds that are.
 
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vite-plus/test";
 import configurator from "../src/configurator/pagerduty-configurator-ui";
-import type { PagerDutyNode, PagerDutyNodeKind } from "../src/configurator/pagerduty-configurator-types";
+import type {
+  PagerDutyNode,
+  PagerDutyNodeKind,
+} from "../src/configurator/pagerduty-configurator-types";
 import { RESOURCES, type ResourceKind } from "../src/pagerduty-env";
 
 vi.mock("@gadgets/configurator-ui", () => ({
-  h: (component: unknown, props: unknown, ...children: unknown[]) => ({ component, props: props ?? {}, children }),
+  h: (component: unknown, props: unknown, ...children: unknown[]) => ({
+    component,
+    props: props ?? {},
+    children,
+  }),
   Field: "Field",
   HierarchyPicker: "HierarchyPicker",
   Notice: "Notice",
@@ -18,7 +25,10 @@ vi.mock("@gadgets/configurator-ui", () => ({
 
 type Tree = { component: unknown; props: Record<string, unknown>; children: unknown[] };
 type Spec = {
-  isReady(context: { values: Record<string, unknown>; acceptedResourceUrlPatterns?: string[] }): boolean;
+  isReady(context: {
+    values: Record<string, unknown>;
+    acceptedResourceUrlPatterns?: string[];
+  }): boolean;
   render(context: unknown): Tree;
 };
 
@@ -39,14 +49,26 @@ function find(node: unknown, component: string): Tree | undefined {
   return undefined;
 }
 
-const ready = Promise.resolve({ state: "ready", account: { ref: "account", host: "acme.pagerduty.com" } });
+const ready = Promise.resolve({
+  state: "ready",
+  account: { ref: "account", host: "acme.pagerduty.com" },
+});
 
 /** The picker as the frame renders it once the connection is ready, under `accepted`. */
 function picker(accepted: string[] | undefined, rows: PagerDutyNode[] = []) {
   const ui = { getStatus: () => ready, loadItems: async () => ({ items: rows }) };
-  const tree = spec.render({ values: {}, setValues: () => {}, ui, acceptedResourceUrlPatterns: accepted });
+  const tree = spec.render({
+    values: {},
+    setValues: () => {},
+    ui,
+    acceptedResourceUrlPatterns: accepted,
+  });
   return find(tree, "HierarchyPicker")?.props as {
-    loadItems(request: { parentId: string; query: string; cursor: string | null }): Promise<{ items: { selectable: boolean; unselectableReason?: string }[] }>;
+    loadItems(request: {
+      parentId: string;
+      query: string;
+      cursor: string | null;
+    }): Promise<{ items: { selectable: boolean; unselectableReason?: string }[] }>;
   };
 }
 
@@ -57,22 +79,44 @@ beforeAll(async () => {
 });
 
 describe("the configurator's copy of the resource URL patterns", () => {
-  it.each(KINDS)("lets a %s be chosen exactly when its resource's pattern is accepted", kind => {
+  it.each(KINDS)("lets a %s be chosen exactly when its resource's pattern is accepted", (kind) => {
     const values = { ref: kind === "account" ? "account" : `${kind}:PABC123`, kind };
     expect(spec.isReady({ values, acceptedResourceUrlPatterns: [patternOf(kind)] })).toBe(true);
-    expect(spec.isReady({ values, acceptedResourceUrlPatterns: KINDS.filter(k => k !== kind).map(patternOf) })).toBe(false);
+    expect(
+      spec.isReady({
+        values,
+        acceptedResourceUrlPatterns: KINDS.filter((k) => k !== kind).map(patternOf),
+      }),
+    ).toBe(false);
     expect(spec.isReady({ values })).toBe(true);
   });
 
-  it.each(KINDS.filter(kind => kind !== "account") as Exclude<PagerDutyNodeKind, "account">[])(
-    "names what is accepted when a %s isn't", async kind => {
+  it.each(KINDS.filter((kind) => kind !== "account") as Exclude<PagerDutyNodeKind, "account">[])(
+    "names what is accepted when a %s isn't",
+    async (kind) => {
       const row: PagerDutyNode = { ref: `${kind}:PABC123`, kind, title: "Row" };
-      const others = KINDS.filter(k => k !== kind && k !== "account");
-      const { items: [refused] } = await picker([patternOf(others[0])], [row]).loadItems({ parentId: "teams", query: "", cursor: null });
-      expect(refused).toMatchObject({ selectable: false, unselectableReason: `This connection needs a ${others[0]}.` });
-      const { items: [chosen] } = await picker([patternOf(kind)], [row]).loadItems({ parentId: "teams", query: "", cursor: null });
+      const others = KINDS.filter((k) => k !== kind && k !== "account");
+      const {
+        items: [refused],
+      } = await picker([patternOf(others[0])], [row]).loadItems({
+        parentId: "teams",
+        query: "",
+        cursor: null,
+      });
+      expect(refused).toMatchObject({
+        selectable: false,
+        unselectableReason: `This connection needs a ${others[0]}.`,
+      });
+      const {
+        items: [chosen],
+      } = await picker([patternOf(kind)], [row]).loadItems({
+        parentId: "teams",
+        query: "",
+        cursor: null,
+      });
       expect(chosen).toMatchObject({ selectable: true });
-    });
+    },
+  );
 });
 
 describe("choosing", () => {
@@ -80,11 +124,15 @@ describe("choosing", () => {
     const setValues = vi.fn();
     const ui = { getStatus: () => ready, loadItems: async () => ({ items: [] }) };
     const tree = spec.render({ values: {}, setValues, ui, acceptedResourceUrlPatterns: undefined });
-    const { onChange } = find(tree, "HierarchyPicker")!.props as { onChange(next: string | null): void };
+    const { onChange } = find(tree, "HierarchyPicker")!.props as {
+      onChange(next: string | null): void;
+    };
     // Never listed: a search result's path names it, and the picker hands back only its ref.
     onChange("service:PCRUMB1");
     const values = setValues.mock.lastCall![0];
     expect(values).toEqual({ ref: "service:PCRUMB1", kind: "service" });
-    expect(spec.isReady({ values, acceptedResourceUrlPatterns: [patternOf("service")] })).toBe(true);
+    expect(spec.isReady({ values, acceptedResourceUrlPatterns: [patternOf("service")] })).toBe(
+      true,
+    );
   });
 });

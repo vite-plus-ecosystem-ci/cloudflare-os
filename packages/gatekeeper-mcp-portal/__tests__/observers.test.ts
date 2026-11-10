@@ -5,7 +5,7 @@
 // facet's cache. Approved-call results take the session's same reporting path, covered against the
 // session alone in mcp-shared, since the action store needs SQLite.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type * as Connection from "@gadgets/mcp-shared/connection";
 import type { ToolScope } from "@gadgets/mcp-shared/scope";
 
@@ -16,8 +16,8 @@ vi.mock("capnweb-validate", () => ({
   skipRpcValidation: () => (value: unknown) => value,
 }));
 
-vi.mock("@gadgets/mcp-shared/connection", async importOriginal => ({
-  ...await importOriginal<typeof Connection>(),
+vi.mock("@gadgets/mcp-shared/connection", async (importOriginal) => ({
+  ...(await importOriginal<typeof Connection>()),
   withClient: mocks.withClient,
 }));
 
@@ -41,11 +41,20 @@ const CATALOG = [
 function portalFacet(scope: ToolScope & { serverId: string }) {
   const ctx = {
     props: {
-      accountObjectId: "account-id", endpoint: ENDPOINT, serverId: "portal", serverName: "CF Portal", scope,
+      accountObjectId: "account-id",
+      endpoint: ENDPOINT,
+      serverId: "portal",
+      serverName: "CF Portal",
+      scope,
     },
     storage: {
       kv: {
-        get: () => ({ tools: CATALOG, revision: "cached", fetchedAt: Date.now(), truncated: false }),
+        get: () => ({
+          tools: CATALOG,
+          revision: "cached",
+          fetchedAt: Date.now(),
+          truncated: false,
+        }),
         put() {},
       },
     },
@@ -60,15 +69,22 @@ function recordingQueue() {
   const observations: Observation[] = [];
   return {
     observations,
-    dup() { return this; },
-    authorizeObservation(description: Observation) { observations.push(description); },
+    dup() {
+      return this;
+    },
+    authorizeObservation(description: Observation) {
+      observations.push(description);
+    },
   };
 }
 
 /** An observer whose verifier, as `getVerifier()` mints it, stands for portal account `account`. */
 const observer = (id: string, account: string) => ({
   id,
-  verifier: new McpPortalVerifier({ props: { accountObjectId: account } } as never, {} as never) as never,
+  verifier: new McpPortalVerifier(
+    { props: { accountObjectId: account } } as never,
+    {} as never,
+  ) as never,
 });
 
 beforeEach(() => {
@@ -92,7 +108,10 @@ describe("portal observations", () => {
     expect(await session.listTools({ name: "jira_search" })).toHaveLength(1);
     expect(await session.listTools({ name: "jira_missing" })).toEqual([]);
     expect(await session.listTools({ search: "issue" })).toHaveLength(2);
-    expect(await session.callTool("jira_search", {})).toMatchObject({ status: "ok", text: "PROJ-1" });
+    expect(await session.callTool("jira_search", {})).toMatchObject({
+      status: "ok",
+      text: "PROJ-1",
+    });
 
     expect(queue.observations).toHaveLength(5);
     for (const observation of queue.observations) {
@@ -105,11 +124,13 @@ describe("portal observations", () => {
     const queue = recordingQueue();
     const session = await facet.startSession(queue as never);
 
-    expect((await session.listTools()).map(tool => tool.name)).toEqual(["jira_search"]);
+    expect((await session.listTools()).map((tool) => tool.name)).toEqual(["jira_search"]);
     for (const name of ["jira_create_issue", "gitlab_list", "portal_list_servers"]) {
       await expect(session.callTool(name, {}), name).rejects.toThrow(/does not grant/);
     }
-    expect(queue.observations.map(observation => observation.subresources)).toEqual([["server/jira"]]);
+    expect(queue.observations.map((observation) => observation.subresources)).toEqual([
+      ["server/jira"],
+    ]);
   });
 });
 
@@ -117,12 +138,17 @@ describe("portal observer admission", () => {
   it("allows only observers through the account the binding reads with", async () => {
     const facet = portalFacet({ serverId: "jira" });
 
-    await expect(facet.verifyObserverAccess([
-      observer("connector", "account-id"),
-      // The same person or portal user, through another connected account.
-      observer("connector-elsewhere", "account-id-2"),
-      observer("colleague", "colleague-account"),
-    ], ["server/jira", "server/jira"])).resolves.toEqual({ allowedObserverIds: ["connector"] });
+    await expect(
+      facet.verifyObserverAccess(
+        [
+          observer("connector", "account-id"),
+          // The same person or portal user, through another connected account.
+          observer("connector-elsewhere", "account-id-2"),
+          observer("colleague", "colleague-account"),
+        ],
+        ["server/jira", "server/jira"],
+      ),
+    ).resolves.toEqual({ allowedObserverIds: ["connector"] });
   });
 
   it("admits the binding's account at every open, and refuses everyone else", async () => {
@@ -131,8 +157,9 @@ describe("portal observer admission", () => {
 
     await expect(facet.addObserver("connector", verifier)).resolves.toBeUndefined();
     // The refusal says who can open it, since the collaborator who added the connection can.
-    await expect(facet.addObserver("colleague", observer("colleague", "colleague-account").verifier))
-      .rejects.toThrow(/only be opened by its owner and by whoever added this connection/);
+    await expect(
+      facet.addObserver("colleague", observer("colleague", "colleague-account").verifier),
+    ).rejects.toThrow(/only be opened by its owner and by whoever added this connection/);
   });
 
   it("refuses the whole call for any ID the binding did not report", async () => {
@@ -150,8 +177,10 @@ describe("portal observer admission", () => {
       "server",
       "",
     ]) {
-      await expect(facet.verifyObserverAccess([connector], ["server/jira", id]), id)
-        .rejects.toThrow(/subresource ID/);
+      await expect(
+        facet.verifyObserverAccess([connector], ["server/jira", id]),
+        id,
+      ).rejects.toThrow(/subresource ID/);
     }
     await expect(facet.verifyObserverAccess([connector], [])).rejects.toThrow(/no subresources/);
   });
@@ -160,11 +189,18 @@ describe("portal observer admission", () => {
     const facet = portalFacet({ serverId: "jira" });
     const unreachable = {
       id: "unreachable",
-      verifier: { getAccountObjectId: async () => { throw new Error("verifier unavailable"); } } as never,
+      verifier: {
+        getAccountObjectId: async () => {
+          throw new Error("verifier unavailable");
+        },
+      } as never,
     };
 
-    await expect(facet.verifyObserverAccess(
-      [observer("connector", "account-id"), unreachable], ["server/jira"],
-    )).rejects.toThrow("verifier unavailable");
+    await expect(
+      facet.verifyObserverAccess(
+        [observer("connector", "account-id"), unreachable],
+        ["server/jira"],
+      ),
+    ).rejects.toThrow("verifier unavailable");
   });
 });

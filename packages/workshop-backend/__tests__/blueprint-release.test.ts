@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import * as fc from "fast-check";
 import { deflateSync } from "node:zlib";
 import { PROPERTY_RUN_OPTIONS } from "@gadgets/scripts/property-runs";
@@ -52,7 +52,7 @@ class Repo {
   #clock = 1700000000;
 
   /** The lookup a publisher gives `buildReleasePack()`, minus whatever `hidden` names. */
-  lookup = (oid: string) => this.hidden.has(oid) ? undefined : this.objects.get(oid);
+  lookup = (oid: string) => (this.hidden.has(oid) ? undefined : this.objects.get(oid));
 
   async add(type: PackableObject["type"], payload: Uint8Array): Promise<string> {
     let oid = gitObjectOid(type, payload);
@@ -71,18 +71,32 @@ class Repo {
 
   /** Adds a release commit, each one a second later than the last. */
   async release(tree: string, parents: string[] = []): Promise<string> {
-    return await this.add("commit", encodeReleaseCommit({
-      tree, parents, author: ALICE, title: "Test Gadget", version: parents.length + 1,
-      timestamp: new Date(this.#clock++ * 1000),
-    }));
+    return await this.add(
+      "commit",
+      encodeReleaseCommit({
+        tree,
+        parents,
+        author: ALICE,
+        title: "Test Gadget",
+        version: parents.length + 1,
+        timestamp: new Date(this.#clock++ * 1000),
+      }),
+    );
   }
 
   /** Adds the empty-tree root a derived blueprint's lineage starts from. */
   async root(): Promise<string> {
     let signature = { ...ALICE, timestamp: new Date(this.#clock++ * 1000), utcOffsetMinutes: 0 };
-    return await this.add("commit", encodeGitCommit({
-      tree: EMPTY_TREE, parents: [], author: signature, committer: signature, message: "Root",
-    }));
+    return await this.add(
+      "commit",
+      encodeGitCommit({
+        tree: EMPTY_TREE,
+        parents: [],
+        author: signature,
+        committer: signature,
+        message: "Root",
+      }),
+    );
   }
 
   treeOf(commit: string | PackableObject): string {
@@ -92,8 +106,10 @@ class Repo {
 }
 
 /** One version of a gadget's files. Every version shares `lib/`, as real ones share most files. */
-const version = (name: string): [string, string][] =>
-    [["client.js", `// ${name}\n`], ["lib/util.js", "export const answer = 42;\n"]];
+const version = (name: string): [string, string][] => [
+  ["client.js", `// ${name}\n`],
+  ["lib/util.js", "export const answer = 42;\n"],
+];
 
 async function packOf(objects: Iterable<PackableObject>): Promise<Uint8Array> {
   return concatBytes(await buildPackBytes([...objects]));
@@ -111,7 +127,10 @@ async function validRelease() {
   let release = await repo.release(await repo.tree(version("release")), [previous]);
   let objects = await readReleasePack(await buildReleasePack(repo.lookup, release), release);
   return {
-    repo, objects, release, previous,
+    repo,
+    objects,
+    release,
+    previous,
     tree: repo.treeOf(release),
     previousTree: repo.treeOf(previous),
     clientBlob: blobOid("// release\n"),
@@ -139,14 +158,17 @@ async function readTree(payload: Uint8Array, ...referents: PackableObject[]) {
 /** Reads a pack of a release whose one file, `f`, is a blob with this payload. */
 async function readFile(payload: Uint8Array) {
   let oid = gitObjectOid("blob", payload);
-  return await readTree(
-      encodeGitTree([{ mode: "100644", name: "f", oid }]), { type: "blob", payload });
+  return await readTree(encodeGitTree([{ mode: "100644", name: "f", oid }]), {
+    type: "blob",
+    payload,
+  });
 }
 
 /** A tree payload written exactly as given: unsorted and unchecked. */
 function rawTree(entries: GitTreeEntry[]): Uint8Array {
-  return concatBytes(entries.flatMap(({ mode, name, oid }) =>
-      [bytes(`${mode} ${name}\0`), Uint8Array.fromHex(oid)]));
+  return concatBytes(
+    entries.flatMap(({ mode, name, oid }) => [bytes(`${mode} ${name}\0`), Uint8Array.fromHex(oid)]),
+  );
 }
 
 describe("release commits", () => {
@@ -178,10 +200,13 @@ describe("release commits", () => {
     expect(commitId).toBe("d0ad880962e5d52af57e21ca611da200c5ef34de");
 
     // So a release by any publisher passes the check on what a pack may hold.
-    validateReleaseObjects(new Map([
-      [commitId, { type: "commit", payload }],
-      [EMPTY_TREE, { type: "tree", payload: new Uint8Array() }],
-    ]), commitId);
+    validateReleaseObjects(
+      new Map([
+        [commitId, { type: "commit", payload }],
+        [EMPTY_TREE, { type: "tree", payload: new Uint8Array() }],
+      ]),
+      commitId,
+    );
   });
 });
 
@@ -189,8 +214,12 @@ describe("release commits", () => {
 function mergeCommit(parents: string[], marks: string[], message = "Merge"): Uint8Array {
   let signature = { ...ALICE, timestamp: new Date(1700000000_000), utcOffsetMinutes: 0 };
   return encodeGitCommit({
-    tree: EMPTY_TREE, parents, author: signature, committer: signature,
-    headers: marks.map(releaseMergeHeader), message,
+    tree: EMPTY_TREE,
+    parents,
+    author: signature,
+    committer: signature,
+    headers: marks.map(releaseMergeHeader),
+    message,
   });
 }
 
@@ -200,8 +229,9 @@ describe("merging releases", () => {
   const S = "3".repeat(40);
 
   it("finds a release that a commit marks as one of its other parents", () => {
-    expect(new TextDecoder().decode(mergeCommit([H, R], [R])))
-        .toMatch(new RegExp(`\ncommitter [^\n]*\nblueprint-release ${R}\n\nMerge\n$`));
+    expect(new TextDecoder().decode(mergeCommit([H, R], [R]))).toMatch(
+      new RegExp(`\ncommitter [^\n]*\nblueprint-release ${R}\n\nMerge\n$`),
+    );
     expect(releasesMergedBy(mergeCommit([H, R], [R]))).toStrictEqual([R]);
     // In the order of the parents, not of the marks.
     expect(releasesMergedBy(mergeCommit([H, S, R], [R, S]))).toStrictEqual([S, R]);
@@ -227,8 +257,10 @@ describe("snapshot releases", () => {
   it("derives a fixed, known commit id from the files alone", async () => {
     let { commitId, objects } = buildSnapshotRelease(FILES);
     expect(commitId).toBe(FILES_SNAPSHOT);
-    expect(parseGitCommitRefs(objects.get(commitId)!.payload))
-        .toStrictEqual({ tree: FILES_TREE, parents: [] });
+    expect(parseGitCommitRefs(objects.get(commitId)!.payload)).toStrictEqual({
+      tree: FILES_TREE,
+      parents: [],
+    });
 
     // Neither the order the files are given in nor when or where this runs is part of it.
     let reordered = buildSnapshotRelease(new Map([...FILES].toReversed()));
@@ -247,12 +279,17 @@ describe("snapshot releases", () => {
       ["empty.txt", ""],
     ]);
     let store = makeLocalGitCache();
-    let viaStore = await store.writeFilesAsCommit(
-        files, { parents: [], author: ALICE, message: "files", timestamp: new Date(0) });
+    let viaStore = await store.writeFilesAsCommit(files, {
+      parents: [],
+      author: ALICE,
+      message: "files",
+      timestamp: new Date(0),
+    });
 
     let { commitId, objects } = buildSnapshotRelease(files);
-    expect(parseGitCommitRefs(objects.get(commitId)!.payload).tree)
-        .toBe(store.commitTree(viaStore));
+    expect(parseGitCommitRefs(objects.get(commitId)!.payload).tree).toBe(
+      store.commitTree(viaStore),
+    );
     validateReleaseObjects(objects, commitId);
     expect(listReleaseFiles(objects, commitId)).toStrictEqual(files);
   });
@@ -261,8 +298,14 @@ describe("snapshot releases", () => {
     for (let path of ["", "/a", "a/", "a//b", "./a", "a/../b"]) {
       expect(() => buildSnapshotRelease(new Map([[path, ""]]))).toThrow(/invalid entry name/);
     }
-    expect(() => buildSnapshotRelease(new Map([["a", ""], ["a/b", ""]])))
-        .toThrow(/duplicate entry name "a"/);
+    expect(() =>
+      buildSnapshotRelease(
+        new Map([
+          ["a", ""],
+          ["a/b", ""],
+        ]),
+      ),
+    ).toThrow(/duplicate entry name "a"/);
   });
 });
 
@@ -279,7 +322,7 @@ describe("release packs", () => {
     // Three commits, and a3's two trees and two files.
     expect(objects.size).toBe(7);
     for (let [oid, object] of objects) expect(object).toStrictEqual(repo.objects.get(oid));
-    expect([...objects.values()].filter(o => o.type === "commit")).toHaveLength(3);
+    expect([...objects.values()].filter((o) => o.type === "commit")).toHaveLength(3);
     expect(listReleaseFiles(objects, a3)).toStrictEqual(new Map(version("a3")));
     // A tree is absent when its root is, even though `lib/` is here as part of a3's.
     expect(objects.has(repo.treeOf(a2))).toBe(false);
@@ -307,8 +350,9 @@ describe("release packs", () => {
     // The releases whose trees the pack for `release` carries, of those above.
     let treesCarried = async (release: string) => {
       let objects = await readReleasePack(await buildReleasePack(repo.lookup, release), release);
-      let carried = Object.entries({ a1, a2, a3, b0, b1, c1, d1 })
-          .filter(([, commit]) => objects.has(repo.treeOf(commit)));
+      let carried = Object.entries({ a1, a2, a3, b0, b1, c1, d1 }).filter(([, commit]) =>
+        objects.has(repo.treeOf(commit)),
+      );
       for (let [name, commit] of carried) {
         expect(listReleaseFiles(objects, commit)).toStrictEqual(new Map(version(name)));
       }
@@ -366,8 +410,9 @@ describe("release packs", () => {
     let blob = await repo.add("blob", bytes("#!/bin/sh\n"));
     let script = encodeGitTree([{ mode: "100755", name: "run.sh", oid: blob }]);
     let release = await repo.release(await repo.add("tree", script), [a2]);
-    await expect(buildReleasePack(repo.lookup, release))
-        .rejects.toThrow(/invalid blueprint release: .*unsupported mode 100755/);
+    await expect(buildReleasePack(repo.lookup, release)).rejects.toThrow(
+      /invalid blueprint release: .*unsupported mode 100755/,
+    );
   });
 
   it("admits a large file: a release holds what storage held", async () => {
@@ -394,94 +439,151 @@ describe("release round trip, for generated gadget trees", () => {
 
   // Directory names and file stems overlap, as `utils/` and `utils.ts` do in real projects.
   const directory = fc.constantFrom(
-      "src", "lib", "public", "components", "utils", "api", "assets", "styles", "server",
-      "docs", "na\u00efve");
+    "src",
+    "lib",
+    "public",
+    "components",
+    "utils",
+    "api",
+    "assets",
+    "styles",
+    "server",
+    "docs",
+    "na\u00efve",
+  );
   const fileName = fc.oneof(
-      fc.tuple(
-          fc.constantFrom(
-              "index", "app", "main", "utils", "api", "api-client", "server", "lib", "components",
-              "styles", "README", "caf\u00e9"),
-          fc.constantFrom(".ts", ".tsx", ".js", ".html", ".css", ".json", ".md", ""))
-          .map(([stem, extension]) => stem + extension),
-      fc.constantFrom(".gitignore", ".env.example", "LICENSE"));
-  const path = fc.tuple(fc.array(directory, { maxLength: 3 }), fileName)
-      .map(([directories, name]) => [...directories, name].join("/"));
+    fc
+      .tuple(
+        fc.constantFrom(
+          "index",
+          "app",
+          "main",
+          "utils",
+          "api",
+          "api-client",
+          "server",
+          "lib",
+          "components",
+          "styles",
+          "README",
+          "caf\u00e9",
+        ),
+        fc.constantFrom(".ts", ".tsx", ".js", ".html", ".css", ".json", ".md", ""),
+      )
+      .map(([stem, extension]) => stem + extension),
+    fc.constantFrom(".gitignore", ".env.example", "LICENSE"),
+  );
+  const path = fc
+    .tuple(fc.array(directory, { maxLength: 3 }), fileName)
+    .map(([directories, name]) => [...directories, name].join("/"));
   // Lines of printable text in either line ending, or one of a few texts that real gadgets
   // repeat across files, so that one blob can sit under several paths.
   const text = fc.oneof(
-      fc.tuple(
-          fc.array(fc.string({ unit: "grapheme", maxLength: 40 }), { maxLength: 8 }),
-          fc.constantFrom("\n", "\r\n"), fc.boolean())
-          .map(([lines, ending, final]) => lines.join(ending) + (final ? ending : "")),
-      fc.constantFrom("", "export {};\n", "MIT License\n"));
+    fc
+      .tuple(
+        fc.array(fc.string({ unit: "grapheme", maxLength: 40 }), { maxLength: 8 }),
+        fc.constantFrom("\n", "\r\n"),
+        fc.boolean(),
+      )
+      .map(([lines, ending, final]) => lines.join(ending) + (final ? ending : "")),
+    fc.constantFrom("", "export {};\n", "MIT License\n"),
+  );
   // A path cannot be both a file and a directory; a gadget holds whichever came deeper.
-  const files = fc.uniqueArray(fc.tuple(path, text), {
-    minLength: 1, maxLength: 15, selector: ([filePath]) => filePath,
-  }).map(entries => entries.filter(([filePath]) =>
-      !entries.some(([other]) => other.startsWith(`${filePath}/`))));
-  const scenario = files.chain(entries => fc.record({
-    entries: fc.constant(entries),
-    reordered: fc.shuffledSubarray(entries, {
-      minLength: entries.length, maxLength: entries.length,
+  const files = fc
+    .uniqueArray(fc.tuple(path, text), {
+      minLength: 1,
+      maxLength: 15,
+      selector: ([filePath]) => filePath,
+    })
+    .map((entries) =>
+      entries.filter(([filePath]) => !entries.some(([other]) => other.startsWith(`${filePath}/`))),
+    );
+  const scenario = files.chain((entries) =>
+    fc.record({
+      entries: fc.constant(entries),
+      reordered: fc.shuffledSubarray(entries, {
+        minLength: entries.length,
+        maxLength: entries.length,
+      }),
+      edit: fc
+        .record({ index: fc.nat({ max: entries.length - 1 }), text })
+        .filter((edit) => edit.text !== entries[edit.index][1]),
     }),
-    edit: fc.record({ index: fc.nat({ max: entries.length - 1 }), text })
-        .filter(edit => edit.text !== entries[edit.index][1]),
-  }));
-  type Scenario = { entries: Entry[], reordered: Entry[], edit: { index: number, text: string } };
+  );
+  type Scenario = { entries: Entry[]; reordered: Entry[]; edit: { index: number; text: string } };
 
   // Each sort trap at once, beneath a nested directory, with shared and empty files: what a
   // random seed reaches only now and then.
   const sortTraps: Entry[] = [
-    ["src/utils.ts", "export * from \"./utils/format\";\n"],
+    ["src/utils.ts", 'export * from "./utils/format";\n'],
     ["src/utils/format.ts", "export const format = (s: string) => s.trim();\n"],
     ["src/utils-v2.ts", "export {};\n"],
     ["src/utils0.ts", "export {};\n"],
-    ["src/components/na\u00efve/caf\u00e9.tsx", "\ufeffexport default \"\u2615\";\r\n"],
+    ["src/components/na\u00efve/caf\u00e9.tsx", '\ufeffexport default "\u2615";\r\n'],
     ["public/index.html", "<!doctype html>\n<title>\u{1F600}</title>\n"],
     [".gitignore", ""],
   ];
-  const examples: [Scenario][] = [[{
-    entries: sortTraps,
-    reordered: sortTraps.toReversed(),
-    edit: { index: 1, text: "export const format = (s: string) => s;\n" },
-  }]];
+  const examples: [Scenario][] = [
+    [
+      {
+        entries: sortTraps,
+        reordered: sortTraps.toReversed(),
+        edit: { index: 1, text: "export const format = (s: string) => s;\n" },
+      },
+    ],
+  ];
 
   it("installs exactly the published files, under an id they alone determine", async () => {
-    await fc.assert(fc.asyncProperty(scenario, async ({ entries, reordered, edit }) => {
-      let published = new Map(entries);
-      let { commitId, objects } = await buildSnapshotRelease(published);
+    await fc.assert(
+      fc.asyncProperty(scenario, async ({ entries, reordered, edit }) => {
+        let published = new Map(entries);
+        let { commitId, objects } = await buildSnapshotRelease(published);
 
-      let store = makeLocalGitCache();
-      let viaStore = await store.writeFilesAsCommit(
-          published, { parents: [], author: ALICE, message: "files", timestamp: new Date(0) });
-      expect(parseGitCommitRefs(objects.get(commitId)!.payload).tree,
-          "the release's tree is the one the git cache writes").toBe(store.commitTree(viaStore));
+        let store = makeLocalGitCache();
+        let viaStore = await store.writeFilesAsCommit(published, {
+          parents: [],
+          author: ALICE,
+          message: "files",
+          timestamp: new Date(0),
+        });
+        expect(
+          parseGitCommitRefs(objects.get(commitId)!.payload).tree,
+          "the release's tree is the one the git cache writes",
+        ).toBe(store.commitTree(viaStore));
 
-      let pack = await buildReleasePack(oid => objects.get(oid), commitId);
-      let installed = listReleaseFiles(await readReleasePack(pack, commitId), commitId);
-      expect(installed, "the installed files are the published ones").toStrictEqual(published);
+        let pack = await buildReleasePack((oid) => objects.get(oid), commitId);
+        let installed = listReleaseFiles(await readReleasePack(pack, commitId), commitId);
+        expect(installed, "the installed files are the published ones").toStrictEqual(published);
 
-      expect((await buildSnapshotRelease(new Map(reordered))).commitId,
-          "the same files in another order make the same release").toBe(commitId);
+        expect(
+          (await buildSnapshotRelease(new Map(reordered))).commitId,
+          "the same files in another order make the same release",
+        ).toBe(commitId);
 
-      let edited = new Map(published).set(entries[edit.index][0], edit.text);
-      expect((await buildSnapshotRelease(edited)).commitId,
-          `editing ${entries[edit.index][0]} makes another release`).not.toBe(commitId);
-    }), { ...PROPERTY_RUN_OPTIONS, numRuns: 100, examples });
+        let edited = new Map(published).set(entries[edit.index][0], edit.text);
+        expect(
+          (await buildSnapshotRelease(edited)).commitId,
+          `editing ${entries[edit.index][0]} makes another release`,
+        ).not.toBe(commitId);
+      }),
+      { ...PROPERTY_RUN_OPTIONS, numRuns: 100, examples },
+    );
   });
 });
 
 describe("release pack validation", () => {
   it("refuses a pack over the size cap", async () => {
-    await expect(readReleasePack(new Uint8Array(MAX_RELEASE_PACK_BYTES + 1), ABSENT))
-        .rejects.toThrow(/pack is larger than/);
+    await expect(
+      readReleasePack(new Uint8Array(MAX_RELEASE_PACK_BYTES + 1), ABSENT),
+    ).rejects.toThrow(/pack is larger than/);
   });
 
   it("refuses an object over the size cap", async () => {
     let { objects, release } = await validRelease();
     let payload = new Uint8Array(MAX_RELEASE_PACK_BYTES + 1);
-    await expect(read([...objects.values(), { type: "blob", payload }], release))
-        .rejects.toThrow(/exceeds the .*limit/);
+    await expect(read([...objects.values(), { type: "blob", payload }], release)).rejects.toThrow(
+      /exceeds the .*limit/,
+    );
   });
 
   it("refuses a delta against an object outside the pack", async () => {
@@ -493,8 +595,10 @@ describe("release pack validation", () => {
     new DataView(header.buffer).setUint32(4, 2);
     new DataView(header.buffer).setUint32(8, 1);
     let body = concatBytes([
-      header, new Uint8Array([(7 << 4) | delta.length]),
-      Uint8Array.fromHex(gitObjectOid("blob", base)), deflateSync(delta),
+      header,
+      new Uint8Array([(7 << 4) | delta.length]),
+      Uint8Array.fromHex(gitObjectOid("blob", base)),
+      deflateSync(delta),
     ]);
     let pack = concatBytes([body, new Uint8Array(await crypto.subtle.digest("SHA-1", body))]);
     await expect(readReleasePack(pack, ABSENT)).rejects.toThrow(/delta base .* is unavailable/);
@@ -524,21 +628,36 @@ describe("release pack validation", () => {
     let chain: string[] = [];
     for (let i = 0; i <= MAX_RELEASE_COMMITS; i++) {
       if (i === MAX_RELEASE_COMMITS) validateReleaseObjects(objects, chain.at(-1)!);
-      chain.push(await add("commit", encodeGitCommit({
-        tree, parents: chain.slice(-1), author: signature, committer: signature, message: "",
-      })));
+      chain.push(
+        await add(
+          "commit",
+          encodeGitCommit({
+            tree,
+            parents: chain.slice(-1),
+            author: signature,
+            committer: signature,
+            message: "",
+          }),
+        ),
+      );
     }
-    expect(() => validateReleaseObjects(objects, chain.at(-1)!))
-        .toThrow(/holds more than 10000 commits/);
+    expect(() => validateReleaseObjects(objects, chain.at(-1)!)).toThrow(
+      /holds more than 10000 commits/,
+    );
   });
 
   it("refuses a release whose tree is absent or incomplete", async () => {
     let { objects, release, tree, clientBlob, libTree } = await validRelease();
-    for (let [missing, type] of [[tree, "tree"], [libTree, "tree"], [clientBlob, "blob"]]) {
+    for (let [missing, type] of [
+      [tree, "tree"],
+      [libTree, "tree"],
+      [clientBlob, "blob"],
+    ]) {
       let partial = new Map(objects);
       partial.delete(missing);
-      await expect(read(partial.values(), release))
-          .rejects.toThrow(`${type} ${missing} is missing`);
+      await expect(read(partial.values(), release)).rejects.toThrow(
+        `${type} ${missing} is missing`,
+      );
     }
   });
 
@@ -555,44 +674,68 @@ describe("release pack validation", () => {
     let blob: PackableObject = { type: "blob", payload: bytes("x\n") };
     let oid = gitObjectOid("blob", blob.payload);
     for (let mode of ["100755", "120000", "160000"] as const) {
-      await expect(readTree(encodeGitTree([{ mode, name: "f", oid }]), blob))
-          .rejects.toThrow(`unsupported mode ${mode}`);
+      await expect(readTree(encodeGitTree([{ mode, name: "f", oid }]), blob)).rejects.toThrow(
+        `unsupported mode ${mode}`,
+      );
     }
 
     // Nor may an entry's mode misstate what it names, even an object the tree rightly holds.
     let directory: PackableObject = {
-      type: "tree", payload: encodeGitTree([{ mode: "100644", name: "f", oid }]),
+      type: "tree",
+      payload: encodeGitTree([{ mode: "100644", name: "f", oid }]),
     };
     let directoryOid = gitObjectOid("tree", directory.payload);
-    await expect(readTree(encodeGitTree([
-      { mode: "40000", name: "d", oid: directoryOid },
-      { mode: "100644", name: "e", oid: directoryOid },
-    ]), directory, blob)).rejects.toThrow(`object ${directoryOid} is a tree, not a blob`);
-    await expect(readTree(encodeGitTree([
-      { mode: "100644", name: "e", oid },
-      { mode: "40000", name: "g", oid },
-    ]), blob)).rejects.toThrow(`object ${oid} is a blob, not a tree`);
+    await expect(
+      readTree(
+        encodeGitTree([
+          { mode: "40000", name: "d", oid: directoryOid },
+          { mode: "100644", name: "e", oid: directoryOid },
+        ]),
+        directory,
+        blob,
+      ),
+    ).rejects.toThrow(`object ${directoryOid} is a tree, not a blob`);
+    await expect(
+      readTree(
+        encodeGitTree([
+          { mode: "100644", name: "e", oid },
+          { mode: "40000", name: "g", oid },
+        ]),
+        blob,
+      ),
+    ).rejects.toThrow(`object ${oid} is a blob, not a tree`);
   });
 
   it("refuses a file that is not UTF-8", async () => {
-    await expect(readFile(new Uint8Array([0x66, 0xff, 0xfe])))
-        .rejects.toThrow(/blob .* is not valid UTF-8/);
+    await expect(readFile(new Uint8Array([0x66, 0xff, 0xfe]))).rejects.toThrow(
+      /blob .* is not valid UTF-8/,
+    );
   });
 
   it("refuses a path that is too long, wherever its tree appears", async () => {
     let repo = new Repo();
     let directory = "d".repeat(MAX_FILE_PATH_LENGTH - 2);
-    let fits = await repo.release(await repo.tree([["a/f", ""], [`${directory}/f`, ""]]));
+    let fits = await repo.release(
+      await repo.tree([
+        ["a/f", ""],
+        [`${directory}/f`, ""],
+      ]),
+    );
     await readReleasePack(await buildReleasePack(repo.lookup, fits), fits);
 
     // `a` and the long directory are one tree: checked under `a`, then met again too deep.
-    let tooLong = await repo.release(await repo.tree([["a/ff", ""], [`${directory}/ff`, ""]]));
-    await expect(buildReleasePack(repo.lookup, tooLong))
-        .rejects.toThrow(/file path is longer than/);
+    let tooLong = await repo.release(
+      await repo.tree([
+        ["a/ff", ""],
+        [`${directory}/ff`, ""],
+      ]),
+    );
+    await expect(buildReleasePack(repo.lookup, tooLong)).rejects.toThrow(
+      /file path is longer than/,
+    );
     // And a name that is too long by itself, which no directory need be read to see.
     let name = await repo.release(await repo.tree([["f".repeat(MAX_FILE_PATH_LENGTH + 1), ""]]));
-    await expect(buildReleasePack(repo.lookup, name))
-        .rejects.toThrow(/file path is longer than/);
+    await expect(buildReleasePack(repo.lookup, name)).rejects.toThrow(/file path is longer than/);
   });
 
   it("refuses anything the release does not need", async () => {
@@ -603,8 +746,9 @@ describe("release pack validation", () => {
       repo.objects.get(await repo.root())!,
     ];
     for (let extra of extras) {
-      await expect(read([...objects.values(), extra], release))
-          .rejects.toThrow(new RegExp(`${extra.type} .* is not part of the release`));
+      await expect(read([...objects.values(), extra], release)).rejects.toThrow(
+        new RegExp(`${extra.type} .* is not part of the release`),
+      );
     }
   });
 
@@ -613,27 +757,53 @@ describe("release pack validation", () => {
     let oid = gitObjectOid("blob", blob.payload);
     let file = (name: string): GitTreeEntry => ({ mode: "100644", name, oid });
     for (let entries of [
-      [file("b"), file("a")],   // unsorted
-      [file("a"), file("a")],   // the same name twice
-      [file("a/b")],            // a path, not a name
+      [file("b"), file("a")], // unsorted
+      [file("a"), file("a")], // the same name twice
+      [file("a/b")], // a path, not a name
       [file("..")],
     ]) {
-      await expect(readTree(rawTree(entries), blob))
-          .rejects.toThrow(/tree .* is not in canonical form/);
+      await expect(readTree(rawTree(entries), blob)).rejects.toThrow(
+        /tree .* is not in canonical form/,
+      );
     }
   });
 
   it("refuses exactly the names the git store refuses to write", async () => {
     let names = [
-      ".git", ".GIT", ".git. ", ".git:stream", ".git\u200d", "git~1", ".git~1", "GIT~2", "a\\b",
-      ".\u200c", "..\ufeff",
-      ".gitignore", "x.git", "git", "git~0", "~git", "a:b", "a b", "\ufeffx", "...",
+      ".git",
+      ".GIT",
+      ".git. ",
+      ".git:stream",
+      ".git\u200d",
+      "git~1",
+      ".git~1",
+      "GIT~2",
+      "a\\b",
+      ".\u200c",
+      "..\ufeff",
+      ".gitignore",
+      "x.git",
+      "git",
+      "git~0",
+      "~git",
+      "a:b",
+      "a b",
+      "\ufeffx",
+      "...",
     ];
     for (let name of names) {
       let files = new Map([[`dir/${name}`, "x\n"]]);
-      let writable = await makeLocalGitCache().writeFilesAsCommit(
-          files, { parents: [], author: ALICE, message: "m", timestamp: new Date(0) })
-          .then(() => true, () => false);
+      let writable = await makeLocalGitCache()
+        .writeFilesAsCommit(files, {
+          parents: [],
+          author: ALICE,
+          message: "m",
+          timestamp: new Date(0),
+        })
+        .then(
+          () => true,
+          () => false,
+        );
 
       let snapshot = buildSnapshotRelease(files);
       let validate = () => validateReleaseObjects(snapshot.objects, snapshot.commitId);
@@ -657,13 +827,18 @@ describe("release pack validation", () => {
 
     let signature = { ...ALICE, timestamp: new Date(1700000100_000), utcOffsetMinutes: 0 };
     let payload = encodeGitCommit({
-      tree, parents: [previous, upstream], author: signature, committer: signature,
-      headers: [releaseMergeHeader(upstream)], message: "Release 2: Test Gadget",
+      tree,
+      parents: [previous, upstream],
+      author: signature,
+      committer: signature,
+      headers: [releaseMergeHeader(upstream)],
+      message: "Release 2: Test Gadget",
     });
     let marked = gitObjectOid("commit", payload);
     objects.delete(release);
-    await expect(read([...objects.values(), { type: "commit", payload }], marked))
-        .rejects.toThrow(new RegExp(`commit ${marked} is not in canonical form`));
+    await expect(read([...objects.values(), { type: "commit", payload }], marked)).rejects.toThrow(
+      new RegExp(`commit ${marked} is not in canonical form`),
+    );
   });
 
   it("refuses a commit that is not in canonical form", async () => {
@@ -671,8 +846,10 @@ describe("release pack validation", () => {
     let canonical = new TextDecoder().decode(objects.get(release)!.payload);
     objects.delete(release);
     let readWith = async (payload: Uint8Array) =>
-        await read([...objects.values(), { type: "commit", payload }],
-            gitObjectOid("commit", payload));
+      await read(
+        [...objects.values(), { type: "commit", payload }],
+        gitObjectOid("commit", payload),
+      );
     for (let [from, to] of [
       [/^committer .*\n/m, ""],
       [/\n\n/, "\nencoding ISO-8859-1\n\n"],
@@ -685,8 +862,9 @@ describe("release pack validation", () => {
       expect(changed).not.toBe(canonical);
       await expect(readWith(bytes(changed))).rejects.toThrow(/commit .* is not in canonical form/);
     }
-    await expect(readWith(concatBytes([bytes(canonical), new Uint8Array([0xff])])))
-        .rejects.toThrow(/commit .* is not valid UTF-8/);
+    await expect(readWith(concatBytes([bytes(canonical), new Uint8Array([0xff])]))).rejects.toThrow(
+      /commit .* is not valid UTF-8/,
+    );
     await readWith(bytes(canonical));
   });
 });
