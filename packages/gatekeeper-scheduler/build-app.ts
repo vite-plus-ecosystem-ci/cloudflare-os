@@ -13,7 +13,7 @@ const dev = process.argv.includes("--dev");
 // Reached directly: Vite+ runs tasks with a filtered environment that drops `npm_execpath`, so on
 // Windows there is no shell-free way back to pnpm. Falls back to `pnpm exec` if vite is missing.
 const viteArgs = ["build", "-c", "vite.app.config.ts", ...(watch ? ["--watch"] : [])];
-const viteEntry = resolveBinEntry(packageDirectory, "vite");
+const viteEntry = resolveBinEntry(packageDirectory, "vp");
 const [command, argv] = viteEntry
   ? [process.execPath, [viteEntry, ...viteArgs]]
   : pnpmCommand(["exec", "vp", ...viteArgs]);
