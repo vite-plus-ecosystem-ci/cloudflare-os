@@ -16,7 +16,7 @@ const viteArgs = ["build", "-c", "vite.app.config.ts", ...(watch ? ["--watch"] :
 const viteEntry = resolveBinEntry(packageDirectory, "vite");
 const [command, argv] = viteEntry
   ? [process.execPath, [viteEntry, ...viteArgs]]
-  : pnpmCommand(["exec", "vite", ...viteArgs]);
+  : pnpmCommand(["exec", "vp", ...viteArgs]);
 execFileSync(
   command,
   argv,
